@@ -17,6 +17,10 @@ bun run test src/path/file.test.ts # Run single test file
 bun run check                      # lint + typecheck + test
 ```
 
+## Deployment
+
+Vercel auto-deploys from git. Just commit and push — no manual deploy needed.
+
 ## Documentation
 
 - **docs/architecture.md** — Tech stack, project structure, design patterns, config files, API design
