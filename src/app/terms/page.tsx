@@ -114,9 +114,9 @@ export default function TermsOfService() {
             <p className="mb-4 leading-relaxed text-neutral-300">
               ScrollTunes respects the intellectual property rights of others. If you are a
               copyright owner or authorized agent and believe that content accessible through
-              ScrollTunes infringes your copyright, please contact us on Twitter at{" "}
+              ScrollTunes infringes your copyright, please contact us on X at{" "}
               <a
-                href="https://twitter.com/ScrollTunes"
+                href="https://x.com/ScrollTunes"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 underline hover:text-blue-300"
@@ -220,9 +220,9 @@ export default function TermsOfService() {
           <section>
             <h2 className="mb-4 text-2xl font-semibold">Contact</h2>
             <p className="leading-relaxed text-neutral-300">
-              For questions about these Terms of Service, reach out to us on Twitter at{" "}
+              For questions about these Terms of Service, reach out to us on X at{" "}
               <a
-                href="https://twitter.com/ScrollTunes"
+                href="https://x.com/ScrollTunes"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 underline hover:text-blue-300"

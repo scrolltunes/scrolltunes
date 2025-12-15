@@ -184,14 +184,14 @@ export default function PrivacyPage() {
               that may be collected by our hosting provider or third-party services, please refer to
               their respective privacy policies. For privacy-related requests, contact us at{" "}
               <a
-                href="https://twitter.com/ScrollTunes"
+                href="https://x.com/ScrollTunes"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-indigo-400 hover:text-indigo-300 underline"
               >
                 @ScrollTunes
               </a>{" "}
-              on Twitter.
+              on X.
             </p>
           </section>
 
@@ -204,14 +204,14 @@ export default function PrivacyPage() {
               third-party services where possible. If you believe a child has used our service,
               please contact us at{" "}
               <a
-                href="https://twitter.com/ScrollTunes"
+                href="https://x.com/ScrollTunes"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-indigo-400 hover:text-indigo-300 underline"
               >
                 @ScrollTunes
               </a>{" "}
-              on Twitter.
+              on X.
             </p>
           </section>
 
@@ -228,14 +228,14 @@ export default function PrivacyPage() {
             <p className="text-neutral-300 leading-relaxed">
               If you have questions about this privacy policy, you can reach us at{" "}
               <a
-                href="https://twitter.com/ScrollTunes"
+                href="https://x.com/ScrollTunes"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-indigo-400 hover:text-indigo-300 underline"
               >
                 @ScrollTunes
               </a>{" "}
-              on Twitter.
+              on X.
             </p>
           </section>
         </motion.div>
