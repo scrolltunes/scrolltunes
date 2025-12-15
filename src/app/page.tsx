@@ -38,24 +38,39 @@ export default function Home() {
 
         {/* Static footer - required for GetSongBPM API key verification */}
         <footer className="fixed bottom-2 left-0 right-0 text-center text-xs text-neutral-600">
-          Powered by{" "}
-          <a
-            href="https://lrclib.net"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
-          >
-            LRCLIB
-          </a>
-          {" & "}
-          <a
-            href="https://getsongbpm.com"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
-          >
-            GetSongBPM
-          </a>
+          <div className="mb-1">
+            Powered by{" "}
+            <a
+              href="https://lrclib.net"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
+            >
+              LRCLIB
+            </a>
+            {" & "}
+            <a
+              href="https://getsongbpm.com"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
+            >
+              GetSongBPM
+            </a>
+          </div>
+          <div className="flex justify-center gap-3">
+            <Link href="/about" className="text-neutral-500 hover:text-neutral-400">
+              About
+            </Link>
+            <span className="text-neutral-700">·</span>
+            <Link href="/terms" className="text-neutral-500 hover:text-neutral-400">
+              Terms
+            </Link>
+            <span className="text-neutral-700">·</span>
+            <Link href="/privacy" className="text-neutral-500 hover:text-neutral-400">
+              Privacy
+            </Link>
+          </div>
         </footer>
       </main>
     </div>
