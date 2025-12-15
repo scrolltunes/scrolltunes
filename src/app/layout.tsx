@@ -1,4 +1,4 @@
-import { DevTitle, ThemeProvider } from "@/components/layout"
+import { DevTitle, Footer, FooterProvider, ThemeProvider } from "@/components/layout"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
@@ -42,8 +42,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
-          <DevTitle />
-          {children}
+          <FooterProvider>
+            <DevTitle />
+            {children}
+            <Footer />
+          </FooterProvider>
         </ThemeProvider>
       </body>
     </html>

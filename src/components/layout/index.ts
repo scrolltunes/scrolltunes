@@ -1,2 +1,5 @@
 export { DevTitle } from "./DevTitle"
+export { Footer } from "./Footer"
+export { FooterProvider, useFooterSlot } from "./FooterContext"
+export { FooterSlot } from "./FooterSlot"
 export { ThemeProvider } from "./ThemeProvider"

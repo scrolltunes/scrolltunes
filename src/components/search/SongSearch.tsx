@@ -186,7 +186,7 @@ export const SongSearch = memo(function SongSearch({
           type="text"
           value={query}
           onChange={handleInputChange}
-          placeholder="Search for a song"
+          placeholder="Search by song title or artist name"
           className="w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 pr-10 border border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
           aria-label="Search for a song"
         />
@@ -242,13 +242,6 @@ export const SongSearch = memo(function SongSearch({
                 Try a different spelling or search for the artist name
               </p>
             </div>
-          </div>
-        )}
-
-        {!error && !hasSearched && !isPending && !query && (
-          <div className="mt-3 p-6 flex items-center justify-center gap-2 text-neutral-600">
-            <MagnifyingGlass size={16} weight="bold" />
-            <span className="text-sm">Search by song title or artist name</span>
           </div>
         )}
       </AnimatePresence>

@@ -30,7 +30,7 @@ export const Attribution = memo(function Attribution({
       className={`text-xs text-neutral-500 text-center ${className}`}
       aria-label="Data attribution"
     >
-      <span>Data from </span>
+      <span>Powered by </span>
       {sources.map((source, index) => (
         <span key={source.name}>
           {index > 0 && " & "}

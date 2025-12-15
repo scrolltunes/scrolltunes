@@ -1,12 +1,13 @@
 "use client"
 
 import { RecentSongs, SongSearch } from "@/components/search"
+import { Attribution } from "@/components/ui"
 import { GearSix, MusicNote } from "@phosphor-icons/react"
 import Link from "next/link"
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen bg-neutral-950 text-white pb-7">
       <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -26,62 +27,17 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="pt-16 h-screen flex flex-col">
+      <main className="pt-16 flex flex-col">
         <div className="flex-1 flex flex-col items-center p-6 pt-24">
-          <div className="w-full max-w-md text-center mb-8">
-            <h2 className="text-2xl font-medium mb-2">Find a song</h2>
-            <p className="text-neutral-500">Search for any song to get synced lyrics</p>
-          </div>
+          <h2 className="text-2xl font-medium mb-8">Find a song</h2>
           <SongSearch className="w-full max-w-md" />
+          <Attribution
+            lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}
+            bpm={{ name: "GetSongBPM", url: "https://getsongbpm.com" }}
+            className="mt-3"
+          />
           <RecentSongs className="w-full max-w-md mt-8" />
         </div>
-
-        {/* Static footer - required for GetSongBPM API key verification */}
-        <footer className="fixed bottom-2 left-0 right-0 text-center text-xs text-neutral-600">
-          <div className="mb-1">
-            Powered by{" "}
-            <a
-              href="https://lrclib.net"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
-            >
-              LRCLIB
-            </a>
-            {" & "}
-            <a
-              href="https://getsongbpm.com"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
-            >
-              GetSongBPM
-            </a>
-          </div>
-          <div className="flex justify-center gap-3 mb-1">
-            <Link href="/about" className="text-neutral-500 hover:text-neutral-400">
-              About
-            </Link>
-            <span className="text-neutral-700">·</span>
-            <Link href="/terms" className="text-neutral-500 hover:text-neutral-400">
-              Terms
-            </Link>
-            <span className="text-neutral-700">·</span>
-            <Link href="/privacy" className="text-neutral-500 hover:text-neutral-400">
-              Privacy
-            </Link>
-          </div>
-          <div className="text-neutral-700">
-            By using ScrollTunes you agree to our{" "}
-            <Link href="/terms" className="underline underline-offset-2 hover:text-neutral-500">
-              Terms
-            </Link>
-            {" and "}
-            <Link href="/privacy" className="underline underline-offset-2 hover:text-neutral-500">
-              Privacy Policy
-            </Link>
-          </div>
-        </footer>
       </main>
     </div>
   )

@@ -1,14 +1,8 @@
 "use client"
 
 import { springs } from "@/animations"
-import {
-  FloatingMetronome,
-  FontSizeControl,
-  ProgressIndicator,
-  VoiceIndicator,
-} from "@/components/audio"
+import { FloatingMetronome, FontSizeControl, VoiceIndicator } from "@/components/audio"
 import { LyricsDisplay } from "@/components/display"
-import { Attribution } from "@/components/ui"
 import {
   type Lyrics,
   recentSongsStore,
@@ -392,7 +386,7 @@ export default function SongPage() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={springs.default}
-              className="fixed bottom-10 left-0 right-0 z-20 bg-neutral-900/95 backdrop-blur-lg border-t border-neutral-800"
+              className="fixed bottom-7 left-0 right-0 z-20 bg-neutral-900/95 backdrop-blur-lg border-t border-neutral-800"
             >
               <div className="max-w-4xl mx-auto p-4">
                 <FontSizeControl />
@@ -400,17 +394,6 @@ export default function SongPage() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        <footer className="fixed bottom-0 left-0 right-0 z-10 bg-neutral-950/80 backdrop-blur-lg border-t border-neutral-800 px-4 py-2">
-          <div className="max-w-4xl mx-auto flex items-center gap-4">
-            <ProgressIndicator className="flex-1" />
-
-            <Attribution
-              lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}
-              bpm={{ name: "GetSongBPM", url: "https://getsongbpm.com" }}
-            />
-          </div>
-        </footer>
       </main>
     </div>
   )
