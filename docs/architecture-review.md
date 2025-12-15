@@ -12,8 +12,9 @@
 | `src/core/` layer | ✅ Complete | LyricsPlayer, VoiceActivityStore with Effect.ts patterns |
 | `src/lib/` pure functions | ✅ Complete | lyrics-parser, voice-detection, spotify-client, lyrics-client |
 | Single AudioContext | ✅ Complete | SoundSystem owns context, VAD receives AnalyserNode |
-| API routes | ⚠️ Needs fixes | Response normalization, Effect usage consistency |
-| State publishing | ⚠️ Needs optimization | Per-frame updates should be throttled |
+| API routes | ✅ Complete | Response normalization, Effect usage consistency |
+| State publishing | ✅ Fixed | LyricsPlayer only notifies on line changes |
+| Permalink routes | ✅ Complete | /song/[artistSlug]/[trackSlugWithId], /s/[id] |
 | Tests | ⚠️ Partial | lyrics-parser, voice-detection, LyricsPlayer tested |
 
 ---
@@ -42,6 +43,7 @@ src/
     voice-detection.ts       # Pure signal processing math ✅
     spotify-client.ts        # Spotify API with Effect.ts ✅
     lyrics-client.ts         # LRCLIB API with Effect.ts ✅
+    slug.ts                  # URL slug generation ✅
     __tests__/
       lyrics-parser.test.ts  # ✅ Implemented
       voice-detection.test.ts # ✅ Implemented
@@ -49,12 +51,22 @@ src/
 
 ### API Route Paths
 
-Current implementation uses simplified paths:
+Current implementation:
 
 ```
 app/api/
   search/route.ts              # GET /api/search?q=...&limit=...
   lyrics/route.ts              # GET /api/lyrics?track=...&artist=...
+  lyrics/[id]/route.ts         # GET /api/lyrics/[id] - by LRCLIB ID
+
+app/song/
+  [artistSlug]/
+    [trackSlugWithId]/
+      page.tsx                 # Canonical lyrics page
+
+app/s/
+  [id]/
+    page.tsx                   # Short URL redirect
 ```
 
 **Deviation from docs**: Original spec called for `/api/spotify/search` and `/api/lyrics/[songId]`. Current approach is acceptable for MVP but differs from documented REST-style paths.
@@ -79,23 +91,11 @@ VAD receives an `AnalyserNode` from SoundSystem via `getMicrophoneAnalyserEffect
 
 Correctly used for: `LyricsPlayer`, `VoiceActivityStore`
 
-### ⚠️ ISSUE: Per-Frame State Updates
+### ✅ FIXED: Per-Frame State Updates
 
-**Current implementation**: `LyricsPlayer.handleTick()` calls `setState` on every animation frame:
+**Previous issue**: `LyricsPlayer.handleTick()` called `setState` on every animation frame, triggering React re-renders in all subscribers every frame.
 
-```typescript
-private handleTick(deltaTime: number): void {
-  if (this.state._tag === "Playing") {
-    const newTime = this.state.currentTime + deltaTime * this.scrollSpeed
-    // This publishes every frame!
-    this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: newTime })
-  }
-}
-```
-
-**Problem**: Every frame while playing triggers React re-renders in all subscribers.
-
-**Recommended fix**: Only notify listeners when `currentLineIndex` changes:
+**Current implementation**: Only notifies listeners when `currentLineIndex` changes:
 
 ```typescript
 private handleTick(deltaTime: number): void {
@@ -104,7 +104,7 @@ private handleTick(deltaTime: number): void {
   const oldLineIndex = this.getCurrentLineIndex()
   const newTime = this.state.currentTime + deltaTime * this.scrollSpeed
   
-  // Update internal state
+  // Update internal state without notifying
   this.state = { _tag: "Playing", lyrics: this.state.lyrics, currentTime: newTime }
   
   // Only notify on semantic changes
@@ -232,9 +232,9 @@ Only current line gets special treatment:
 ))}
 ```
 
-### ⚠️ Throttle React Updates
+### ✅ Throttled React Updates
 
-As noted above, `LyricsPlayer` publishes every frame. This needs to be fixed per the state management section.
+Per-frame publishing is fixed. `LyricsPlayer` now only notifies on line index changes (see State Management section).
 
 ---
 
@@ -260,49 +260,13 @@ Total: 36 tests passing
 
 ## API Integration Issues
 
-### ⚠️ CRITICAL: Lyrics Route Effect Misuse
+### DTO Alignment Opportunities
 
-**Current (BROKEN)**:
-```typescript
-// src/app/api/lyrics/route.ts
-const lyrics = await getLyrics(track, artist) // getLyrics returns Effect, not Promise!
-```
-
-**Fix**: Use the async wrapper:
-```typescript
-import { fetchLyricsWithFallback } from "@/lib/lyrics-client"
-const lyrics = await fetchLyricsWithFallback(track, artist)
-```
-
-### ⚠️ CRITICAL: Search Route Response Shape
-
-**Current**: Returns raw `SpotifySearchResult`:
-```typescript
-const tracks = await searchTracks(query, parsedLimit)
-return NextResponse.json({ tracks }) // tracks is SpotifySearchResult, not array!
-```
-
-**Client expects**: Array of `SearchResultTrack`:
-```typescript
-const data = await response.json()
-setResults(data.tracks ?? []) // Expects SearchResultTrack[]
-```
-
-**Fix**: Normalize in route:
-```typescript
-import { formatArtists, getAlbumImageUrl } from "@/lib/spotify-client"
-
-const result = await searchTracks(query, parsedLimit)
-const tracks = result.tracks.items.map(t => ({
-  id: t.id,
-  name: t.name,
-  artist: formatArtists(t.artists),
-  album: t.album.name,
-  albumArt: getAlbumImageUrl(t.album, "small") ?? undefined,
-  duration: t.duration_ms,
-}))
-return NextResponse.json({ tracks })
-```
+| Issue | Location | Notes |
+|-------|----------|-------|
+| `SearchResultTrack` duplication | `/api/search/route.ts` and `SongSearch.tsx` | Should unify into shared type |
+| `LyricsApiResponse` type exists | `lyrics-client.ts` | Routes don't use it explicitly |
+| Params typing | `/api/lyrics/[id]/route.ts` | Uses `Promise<{id}>` incorrectly |
 
 ---
 
@@ -315,7 +279,8 @@ return NextResponse.json({ tracks })
 | `spotify-client.ts` | Effect + async wrappers | ✅ Correct |
 | `lyrics-client.ts` | Effect + async wrappers | ✅ Correct |
 | `/api/search` | Uses async wrapper | ✅ Correct |
-| `/api/lyrics` | Awaits Effect directly | ❌ Bug |
+| `/api/lyrics` | Uses async wrapper | ✅ Correct |
+| `/api/lyrics/[id]` | Uses async wrapper | ✅ Correct |
 
 ---
 
@@ -360,11 +325,10 @@ export interface UserProfileRepository {
 
 | Issue | Priority | Effort |
 |-------|----------|--------|
-| Lyrics route awaits Effect instead of async wrapper | 🔴 Critical | S |
-| Search route returns raw SpotifySearchResult | 🔴 Critical | S |
-| LyricsPlayer publishes per-frame, not per-line | 🟡 High | M |
 | No guidance text when mic permission denied | 🟡 Medium | S |
-| Debug `console.log` in LyricsDisplay | 🟢 Low | S |
+| SongConfirmation component is dead code | 🟡 Medium | S |
+| SearchResultTrack type duplication | 🟢 Low | S |
+| Unused async wrappers in lyrics-client.ts | 🟢 Low | S |
 | Fixed LINE_HEIGHT may break with different fonts | 🟢 Low | M |
 
 ---

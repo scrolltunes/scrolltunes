@@ -2,7 +2,7 @@
 
 > Analysis of design.md features, identifying gaps, corner cases, and open questions.
 >
-> **Last updated**: Phase 4 implementation complete
+> **Last updated**: Phase 7 implementation mostly complete
 
 ## Implementation Status
 
@@ -10,9 +10,10 @@
 |---------|-------|--------|-------|
 | Core teleprompter | 2 | ✅ Complete | LyricsDisplay with smooth scrolling |
 | Voice detection | 3 | ✅ Complete | VAD with hysteresis, auto-play trigger |
-| Song search | 4 | ✅ Complete | Spotify integration |
-| Lyrics fetch | 4 | ⚠️ Bug | API route has Effect usage issue |
-| Tempo adjustment | 5 | ❌ Not started | Scroll speed exists but no UI |
+| Song search | 4 | ✅ Complete | Spotify integration, direct navigation |
+| Lyrics fetch | 4 | ✅ Complete | Effect-based API with ID endpoint |
+| Permalink support | 7 | ✅ Complete | SEO-friendly URLs with ID suffix |
+| Tempo adjustment | 5 | ⚠️ Partial | UI exists via TempoControl |
 | Karaoke mode | 9 | ❌ Not started | |
 | Jam session | 10 | ❌ Not started | |
 
@@ -27,7 +28,8 @@
 | Mic access requires user gesture | ✅ Lazy init on first use |
 | Clear UX for denied state | ⚠️ VoiceIndicator shows icon, needs text |
 | Graceful degradation (manual scroll) | ⚠️ Works but no guidance shown |
-| Wake lock permission | ❌ Not implemented |
+| Wake lock | ✅ Implemented via useWakeLock hook |
+| Auto-hide controls | ✅ Implemented via useAutoHide hook |
 
 **Current implementation**:
 - `VoiceActivityStore.startListening()` catches permission errors
@@ -54,6 +56,7 @@
 
 - ✅ No permanent lyrics storage (fetched on-demand)
 - ✅ Lyrics attribution displayed ("Lyrics provided by lrclib.net")
+- ✅ BPM attribution shown when fetched
 - ⚠️ Error logs may contain track names (not lyrics content)
 
 ---
@@ -95,18 +98,20 @@
 - No frequency analysis (guitar may trigger VAD)
 - No calibration UI for different environments
 
-### 3. Song Search (Phase 4) ✅ COMPLETE (with bugs)
+### 3. Song Search (Phase 4) ✅ COMPLETE
 
 **Implemented**:
 - Spotify client credentials OAuth
 - Token caching with auto-refresh
 - Debounced search (300ms)
 - Search results with album art
-- Track selection flow
+- Direct navigation to song pages (no confirmation modal)
 
-**⚠️ CRITICAL BUG**: `/api/search` returns raw `SpotifySearchResult` but client expects normalized `SearchResultTrack[]`. This will cause runtime errors.
+**Notes**:
+- Search returns normalized `SearchResultTrack[]`
+- Navigation goes directly to `/song/[artistSlug]/[trackSlugWithId]` routes
 
-### 4. Lyrics Fetch (Phase 4) ⚠️ NEEDS FIX
+### 4. Lyrics Fetch (Phase 4) ✅ COMPLETE
 
 **Implemented**:
 - LRCLIB integration for synced lyrics
@@ -114,17 +119,24 @@
 - Fallback from direct lookup to search
 - 404 handling for missing lyrics
 - Attribution in API response
+- ID-based endpoint: `/api/lyrics/[id]`
 
-**⚠️ CRITICAL BUG**: `/api/lyrics` awaits `getLyrics()` which returns an Effect, not a Promise. Should use `fetchLyricsWithFallback()`.
+**Notes**:
+- Effect-based API with proper Effect.runPromise usage
+- BPM fetched and displayed with attribution
 
-### 5. Song Confirmation (Phase 4) ✅ COMPLETE
+### 5. Permalink Support (Phase 7) ✅ COMPLETE
 
 **Implemented**:
-- Track details display (art, name, artist, album)
-- Lyrics loading state
-- Success state with "Start" button
-- Error state with "Play without synced lyrics" option
-- Back navigation
+- Canonical URLs: `/song/[artistSlug]/[trackSlugWithId]`
+- Short URLs: `/s/[id]` with 308 permanent redirect
+- Slug utilities in `src/lib/slug.ts`
+- ID-based lyrics API: `/api/lyrics/[id]`
+- SEO-friendly URL structure with track ID suffix
+
+**URL examples**:
+- `/song/artist-name/track-title-abc123` (canonical)
+- `/s/abc123` (short URL, redirects to canonical)
 
 ---
 
@@ -134,19 +146,19 @@
 
 | Feature | Status |
 |---------|--------|
-| Manual slider control | ❌ Not implemented |
-| Presets (Slower, Original, Faster) | ❌ Not implemented |
-| Per-song tempo preferences | ❌ Not implemented |
+| Manual slider control | ⚠️ Partial (TempoControl UI exists) |
+| Presets (Slower, Original, Faster) | ⚠️ Partial (preset buttons exist) |
+| Per-song tempo preferences | ⚠️ Partial (stored in localStorage) |
 | Auto-detection from live audio | ❌ Not implemented |
 
-**Current**: `LyricsPlayer` has `scrollSpeed` (default 1.0, range 0.5-2.0) but no UI to adjust it.
+**Current**: `LyricsPlayer` has `scrollSpeed` (default 1.0, range 0.5-2.0) with TempoControl UI component.
 
 ### From design.md Section 7: Metronome Mode
 
 | Feature | Status |
 |---------|--------|
 | Audio click | ⚠️ `SoundSystem.playMetronomeTick()` exists |
-| Visual pulse | ❌ Not implemented |
+| Visual pulse | ⚠️ Partial (FloatingMetronome with BPM display) |
 | Tap tempo | ❌ Not implemented |
 | Count-in | ❌ Not implemented |
 
@@ -164,7 +176,7 @@
 |---------|--------|
 | Mobile-first responsive | ✅ Implemented |
 | Distraction-free mode | ❌ Not implemented |
-| Wake lock | ❌ Not implemented |
+| Wake lock | ✅ Implemented |
 | Double-tap to pause | ❌ Not implemented |
 | Voice commands | ❌ Not implemented |
 
@@ -172,27 +184,31 @@
 
 ## Priority Decisions for Next Phases
 
-### Phase 5: Tempo & Controls
+### Phase 8: Polish & Cleanup
 
-1. Add tempo slider UI component
-2. Add preset buttons (0.75x, 1.0x, 1.25x, 1.5x)
-3. Wire to `LyricsPlayer.setScrollSpeed()`
-4. Consider per-song preference storage (localStorage first)
+1. Remove dead code (SongConfirmation component)
+2. Unify SearchResultTrack type between API and client
+3. Add distraction-free mode toggle
+4. Improve permission denied UX with actionable guidance
 
-### Phase 6: Mobile & Hands-Free
+### Phase 9: Karaoke Mode
 
-1. Implement `useWakeLock` hook
-2. Add distraction-free mode toggle
-3. Implement double-tap gesture detection
-4. Test on iOS Safari and Android Chrome
+1. Implement word-level highlighting
+2. Add pitch detection for scoring
+3. Design karaoke-specific UI overlay
+
+### Phase 10: Jam Session
+
+1. Design multi-device sync architecture
+2. Evaluate WebSocket vs WebRTC
+3. Implement shared tempo/position state
 
 ---
 
-## Critical Fixes Required Before Next Phase
+## Critical Fixes Required
 
-1. **Fix `/api/lyrics` Effect usage** - Change to `fetchLyricsWithFallback()`
-2. **Fix `/api/search` response shape** - Normalize to `SearchResultTrack[]`
-3. **Throttle LyricsPlayer updates** - Only notify on line changes
+1. **Remove dead code: SongConfirmation component** - No longer used after navigation model change
+2. **Unify SearchResultTrack type between API and client** - Ensure consistent typing across boundaries
 
 ---
 
@@ -203,6 +219,8 @@
 - **Lyrics provider?** → LRCLIB (free, provides synced LRC)
 - **Voice detection approach?** → Energy-based VAD with hysteresis
 - **State management?** → useSyncExternalStore with Effect.ts patterns
+- **URL structure?** → SEO-friendly slugs with ID suffix
+- **BPM source?** → Fetched from LRCLIB API
 
 ### Still Open
 

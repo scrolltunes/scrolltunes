@@ -30,18 +30,19 @@ ScrollTunes is a web application for live musicians that displays synchronized s
 scrolltunes/
 ├── app/                          # Next.js App Router
 │   ├── layout.tsx                # Root layout with metadata
-│   ├── page.tsx                  # Home page
+│   ├── page.tsx                  # Home page (search only)
 │   ├── globals.css               # Global styles + Tailwind
-│   ├── ClientAppContent.tsx      # Client-side app wrapper
-│   ├── song/[id]/
-│   │   └── page.tsx              # Song player page
-│   ├── session/[id]/
-│   │   └── page.tsx              # Jam session page
-│   ├── profile/
-│   │   └── page.tsx              # User profile
+│   ├── s/[id]/
+│   │   └── page.tsx              # Short URL redirect
+│   ├── song/[artistSlug]/[trackSlugWithId]/
+│   │   └── page.tsx              # Canonical lyrics player page
+│   ├── settings/
+│   │   └── page.tsx              # Settings page
 │   └── api/                      # API routes
 │       ├── search/route.ts       # LRCLIB song search
-│       ├── lyrics/route.ts
+│       ├── lyrics/
+│       │   ├── route.ts          # Lyrics by track/artist (legacy)
+│       │   └── [id]/route.ts     # Lyrics by LRCLIB ID
 │       └── session/route.ts
 │
 ├── src/
@@ -90,10 +91,13 @@ scrolltunes/
 │   │
 │   ├── lib/                      # Core library code
 │   │   ├── lyrics-parser.ts      # LRC/timestamp parsing
-│   │   ├── lrclib-client.ts      # LRCLIB API wrapper
-│   │   ├── voice-detection.ts    # VAD algorithms
-│   │   ├── tempo-tracker.ts      # Beat detection
-│   │   └── songs-manifest.ts     # Song registry (like examples-manifest)
+│   │   ├── lyrics-client.ts      # LRCLIB API wrapper (Effect.ts)
+│   │   ├── slug.ts               # URL slug utilities
+│   │   ├── bpm/                  # BPM provider abstraction
+│   │   │   ├── index.ts
+│   │   │   ├── bpm-types.ts
+│   │   │   └── getsongbpm-client.ts
+│   │   └── ...
 │   │
 │   ├── sounds/                   # Audio system (Tone.js)
 │   │   ├── SoundSystem.ts        # Centralized sound manager
@@ -573,11 +577,24 @@ Key principles:
 
 ```
 /api/search              # Search songs via LRCLIB
-/api/lyrics/[songId]     # Fetch lyrics (proxy to avoid CORS)
+/api/lyrics              # Fetch lyrics by track/artist (legacy)
+/api/lyrics/[id]         # Fetch lyrics by LRCLIB ID
 /api/session/create      # Create jam session
 /api/session/[id]/join   # Join session
 /api/session/[id]/queue  # Manage song queue
 ```
+
+### Permalink URL Structure
+
+Canonical URLs embed the LRCLIB ID for stability while maintaining SEO-friendly slugs:
+
+| Pattern | Example | Purpose |
+|---------|---------|---------|
+| `/song/[artistSlug]/[trackSlug]-[id]` | `/song/queen/bohemian-rhapsody-12345` | Canonical lyrics page |
+| `/s/[id]` | `/s/12345` | Short URL (308 redirects to canonical) |
+
+Slug generation uses `normalizeTrackKey` for semantic normalization (removes "feat.", parentheticals) 
+and `toSlug` for URL-safe encoding (lowercase, accents removed, hyphens).
 
 ### External Services
 

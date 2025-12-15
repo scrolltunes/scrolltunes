@@ -142,7 +142,7 @@
 - [ ] Create settings UI screen for gesture toggles
 - [ ] Manual mobile testing (iOS Safari, Android Chrome)
 
-## Phase 7: Single-User Polish
+## Phase 7: Single-User Polish ✅
 
 ### Settings UI
 - [x] Create `/settings` page
@@ -157,8 +157,14 @@
 - [x] Improve error states (API failures, no lyrics found)
 - [x] Add loading skeletons for search results
 - [x] Add "no results" empty state with suggestions
-- [ ] Display lyrics attribution in UI (API already returns it)
+- [x] Display lyrics attribution in UI (API returns it, shown in Attribution component)
 - [ ] Skip lyrics fetch when `hasLyrics === false` (show error immediately)
+
+### Permalinks & URLs
+- [x] Implement permalink support (SEO-friendly canonical URLs)
+- [x] Implement short URL redirects (/s/[id])
+- [x] Add /api/lyrics/[id] endpoint for ID-based lookup
+- [x] Create slug utilities (toSlug, makeCanonicalPath)
 
 ### Visual Polish
 - [ ] Refine typography and spacing
@@ -173,6 +179,14 @@
 - [ ] Verify VAD doesn't trigger on guitar/instruments
 - [ ] Test with background noise
 - [ ] Performance audit (bundle size, FCP, LCP)
+
+## Code Cleanup (Technical Debt)
+
+- [ ] Remove dead SongConfirmation component
+- [ ] Remove unused async wrappers from lyrics-client.ts
+- [ ] Unify SearchResultTrack type (API and client)
+- [ ] Fix /api/lyrics/[id] params typing (Promise<{id}> → {id})
+- [ ] Add LyricsApiResponse type to route responses
 
 ## Phase 8: Song Management (Local)
 
@@ -260,15 +274,13 @@
 
 > Update this section with what you're currently working on
 
-**Completed:** Phase 0, 1, 2, 3, 4, 5, 6
+**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core)
 
-**Active:** Phase 7 - Single-User Polish
-- UX improvements
-- Mobile testing
+**Active:** Code Cleanup, Phase 8 planning
 
 **Blocked:** Nothing
 
-**Next:** Phase 8 (Song Management - Local), then V2 features
+**Next:** Phase 8 (Song Management - Local)
 
 ---
 
@@ -287,6 +299,19 @@ User clicks mic → VoiceActivityStore.startListening()
   → useCurrentLineIndex() updates → LyricsDisplay scrolls
 ```
 
+### Permalink Flow
+```
+Search → SongSearch.handleTrackClick()
+  → extractLrclibId(track.id) → makeCanonicalPath()
+  → router.push('/song/[artistSlug]/[trackSlug]-[id]')
+  → SongPage parses ID → fetches /api/lyrics/[id]
+  → Loads into LyricsPlayer → renders LyricsDisplay
+
+Short URL: /s/[id]
+  → Server fetches /api/lyrics/[id]
+  → Builds canonical path → 308 redirect
+```
+
 ### Libraries
 | Purpose | Library | Notes |
 |---------|---------|-------|
@@ -297,6 +322,7 @@ User clicks mic → VoiceActivityStore.startListening()
 | Lyrics Source | LRCLIB | Free, synced LRC format |
 | Song Search | LRCLIB | Direct search by artist/title |
 | BPM Data | GetSongBPM | Free tier, API key required, backlink mandatory |
+| Slug Utilities | Custom | toSlug, makeCanonicalPath for SEO URLs |
 
 ### BPM Integration
 ```
