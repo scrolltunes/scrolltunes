@@ -98,17 +98,19 @@ export const SongSearch = memo(function SongSearch({
       }
 
       const data: SearchApiResponse = await response.json()
+      // Batch these updates together to avoid skeleton flicker
       setResults(data.tracks ?? [])
       setHasSearched(true)
+      setIsPending(false)
+      setIsLoading(false)
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         return
       }
       setError("Unable to search. Please try again")
       setResults([])
-    } finally {
-      setIsLoading(false)
       setIsPending(false)
+      setIsLoading(false)
     }
   }, [])
 
@@ -124,8 +126,11 @@ export const SongSearch = memo(function SongSearch({
       // Show skeleton immediately on typing
       if (value.trim()) {
         setIsPending(true)
+        setHasSearched(false)
         setError(null)
       } else {
+        // Cancel any in-flight request when text is cleared
+        abortControllerRef.current?.abort()
         setIsPending(false)
         setResults([])
         setHasSearched(false)
