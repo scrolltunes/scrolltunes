@@ -34,6 +34,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           }
           return Effect.succeed(null)
         }),
+        Effect.catchAllDefect(defect => {
+          console.error("BPM defect:", defect)
+          return Effect.succeed(null)
+        }),
       )
 
       return Effect.map(bpmEffect, bpm => ({ lyrics, bpm }))
