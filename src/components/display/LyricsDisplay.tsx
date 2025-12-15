@@ -43,42 +43,37 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     return Math.max(0, lineIndex) * LINE_HEIGHT
   }, [])
 
-  // Store the initial position of line 0 as the target for all lines
-  const initialTargetY = useRef<number | null>(null)
-
   // Update scroll position when current line changes (if not manually scrolling)
   useEffect(() => {
     if (isManualScrolling || !lyrics) return
 
-    const container = containerRef.current
-    const lineIndex = Math.max(0, currentLineIndex)
-    const activeLine = lineRefs.current[lineIndex]
+    // Wait for layout to stabilize before calculating positions
+    const rafId = requestAnimationFrame(() => {
+      const container = containerRef.current
+      const lineIndex = Math.max(0, currentLineIndex)
+      const activeLine = lineRefs.current[lineIndex]
 
-    // Skip if container not ready
-    if (!container) return
+      // Skip if container not ready
+      if (!container) return
 
-    // If active line ref is null (empty line), don't scroll - keep current position
-    if (!activeLine) return
+      // If active line ref is null (empty line), don't scroll - keep current position
+      if (!activeLine) return
 
-    const containerRect = container.getBoundingClientRect()
-    const lineRect = activeLine.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      const lineRect = activeLine.getBoundingClientRect()
 
-    // Where the line currently is (relative to container top)
-    const lineCurrentY = lineRect.top - containerRect.top
+      // Where the line currently is (relative to container top)
+      const lineCurrentY = lineRect.top - containerRect.top
 
-    // Capture the initial position of line 0 as our target position (reduced by 40%)
-    if (initialTargetY.current === null && lineIndex === 0 && scrollY === 0) {
-      initialTargetY.current = lineCurrentY * 0.6
-      // Don't scroll on first render - line 0 is already in position
-      return
-    }
+      // Target position: 25% from container top for comfortable reading
+      const targetY = containerRect.height * 0.25
 
-    // Use the initial position as target for all lines
-    const targetY = initialTargetY.current ?? containerRect.height * 0.4
+      // Adjust scroll by the difference
+      const delta = lineCurrentY - targetY
+      setScrollY(prev => prev + delta)
+    })
 
-    // Adjust scroll by the difference
-    const delta = lineCurrentY - targetY
-    setScrollY(prev => prev + delta)
+    return () => cancelAnimationFrame(rafId)
   }, [currentLineIndex, isManualScrolling, lyrics, getTargetScrollY])
 
   // Handle manual scroll detection
