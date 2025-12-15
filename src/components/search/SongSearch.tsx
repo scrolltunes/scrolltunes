@@ -1,7 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
-import { MagnifyingGlass, MusicNote, SpinnerGap, X } from "@phosphor-icons/react"
+import { CircleNotch, MagnifyingGlass, MusicNote, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 
@@ -123,12 +123,7 @@ export const SongSearch = memo(function SongSearch({
       <div className="relative">
         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
           {isLoading ? (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-            >
-              <SpinnerGap size={20} weight="bold" />
-            </motion.div>
+            <CircleNotch size={20} weight="bold" className="text-indigo-500 animate-spin" />
           ) : (
             <MagnifyingGlass size={20} weight="bold" />
           )}

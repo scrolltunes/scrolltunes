@@ -3,13 +3,26 @@
 import { VoiceIndicator } from "@/components/audio"
 import { LyricsDisplay } from "@/components/display"
 import { usePlayerControls, usePlayerState } from "@/core"
-import { useVoiceTrigger } from "@/hooks"
+import { useDebounce, useVoiceTrigger } from "@/hooks"
 import { MOCK_SONGS, getMockLyrics } from "@/lib/mock-lyrics"
-import { ArrowCounterClockwise, MusicNote, Pause, Play } from "@phosphor-icons/react"
-import { useState } from "react"
+import {
+  ArrowCounterClockwise,
+  CircleNotch,
+  MagnifyingGlass,
+  MusicNote,
+  Pause,
+  Play,
+} from "@phosphor-icons/react"
+import { useMemo, useState } from "react"
 
-export default function AdminPage() {
+const DEBOUNCE_MS = 300
+
+export default function DemoPage() {
   const [selectedSong, setSelectedSong] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const { debouncedValue: debouncedQuery, isPending: isSearching } = useDebounce(searchQuery, {
+    delayMs: DEBOUNCE_MS,
+  })
 
   const playerState = usePlayerState()
   const { play, pause, unload, load } = usePlayerControls()
@@ -44,6 +57,14 @@ export default function AdminPage() {
 
   const isPlaying = playerState._tag === "Playing"
   const isReady = playerState._tag !== "Idle"
+
+  const filteredSongs = useMemo(() => {
+    if (!debouncedQuery.trim()) return MOCK_SONGS
+    const query = debouncedQuery.toLowerCase()
+    return MOCK_SONGS.filter(
+      song => song.title.toLowerCase().includes(query) || song.artist.toLowerCase().includes(query),
+    )
+  }, [debouncedQuery])
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
@@ -102,18 +123,46 @@ export default function AdminPage() {
         {playerState._tag === "Idle" && (
           <div className="flex-1 flex flex-col items-center justify-center p-8">
             <h2 className="text-2xl font-medium mb-6">Select a song to test</h2>
+
+            {/* Search box */}
+            <div className="relative w-full max-w-sm mb-6">
+              {isSearching ? (
+                <CircleNotch
+                  size={20}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500 animate-spin"
+                />
+              ) : (
+                <MagnifyingGlass
+                  size={20}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500"
+                />
+              )}
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search songs..."
+                className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+            </div>
+
+            {/* Song results */}
             <div className="grid gap-4 w-full max-w-sm">
-              {MOCK_SONGS.map(song => (
-                <button
-                  key={song.id}
-                  type="button"
-                  onClick={() => handleLoadSong(song.id)}
-                  className="p-4 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 rounded-xl text-left transition-colors"
-                >
-                  <div className="font-medium">{song.title}</div>
-                  <div className="text-sm text-neutral-400">{song.artist}</div>
-                </button>
-              ))}
+              {filteredSongs.length > 0 ? (
+                filteredSongs.map(song => (
+                  <button
+                    key={song.id}
+                    type="button"
+                    onClick={() => handleLoadSong(song.id)}
+                    className="p-4 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 rounded-xl text-left transition-colors"
+                  >
+                    <div className="font-medium">{song.title}</div>
+                    <div className="text-sm text-neutral-400">{song.artist}</div>
+                  </button>
+                ))
+              ) : (
+                <p className="text-neutral-500 text-center py-4">No songs found</p>
+              )}
             </div>
 
             <p className="mt-8 text-sm text-neutral-500 text-center max-w-md">

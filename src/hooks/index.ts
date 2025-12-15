@@ -20,3 +20,8 @@ export {
   type UseAutoHideOptions,
   type UseAutoHideResult,
 } from "./useAutoHide"
+export {
+  useDebounce,
+  type UseDebounceOptions,
+  type UseDebounceResult,
+} from "./useDebounce"
