@@ -1,7 +1,25 @@
 /**
  * Lyrics client for fetching synced lyrics from LRCLIB API
  *
- * Server-side only - uses Effect.ts patterns with tagged error classes
+ * Server-side only - uses Effect.ts patterns with tagged error classes.
+ *
+ * ## Effect Patterns Used
+ *
+ * 1. **Tagged Error Classes** - Uses `Data.TaggedClass` for discriminated union errors.
+ *    The `_tag` field enables exhaustive pattern matching in error handlers.
+ *
+ * 2. **Effect.gen** - Generator syntax for sequential, imperative-style Effect composition.
+ *    Uses `yield*` to unwrap Effect values, similar to async/await but type-safe.
+ *
+ * 3. **Effect.tryPromise** - Wraps Promise-returning functions, converting rejections
+ *    to typed Effect failures.
+ *
+ * 4. **Effect.fail** - Constructs a failed Effect with a typed error value.
+ *
+ * 5. **Effect.orElse** - Fallback combinator for error recovery with alternative Effects.
+ *
+ * 6. **Effect.runPromise** - Converts Effect to Promise for async wrapper functions.
+ *    Used at the edge where Effect meets Promise-based consumers.
  */
 
 import type { Lyrics } from "@/core"
@@ -10,11 +28,19 @@ import { parseLRC } from "./lyrics-parser"
 
 // --- Error Classes ---
 
+/**
+ * Lyrics not found for the requested track.
+ * Uses Data.TaggedClass for discriminated union pattern matching.
+ */
 export class LyricsNotFoundError extends Data.TaggedClass("LyricsNotFoundError")<{
   readonly trackName: string
   readonly artistName: string
 }> {}
 
+/**
+ * API-level error (network, HTTP status, parse failure).
+ * Uses Data.TaggedClass for discriminated union pattern matching.
+ */
 export class LyricsAPIError extends Data.TaggedClass("LyricsAPIError")<{
   readonly status: number
   readonly message: string
@@ -41,7 +67,13 @@ const LRCLIB_BASE_URL = "https://lrclib.net/api"
 // --- Effect-based Functions ---
 
 /**
- * Fetch lyrics for a song by track and artist name
+ * Fetch lyrics for a song by track and artist name.
+ *
+ * Returns `Effect.Effect<Lyrics, LyricsError>` - a lazy, composable computation
+ * that will fetch lyrics when executed. The error channel is typed to the
+ * union of possible failures (LyricsNotFoundError | LyricsAPIError).
+ *
+ * Uses Effect.gen for sequential composition with yield* to unwrap each step.
  */
 export const getLyrics = (
   trackName: string,
@@ -83,7 +115,10 @@ export const getLyrics = (
 }
 
 /**
- * Search for lyrics and return the first match
+ * Search for lyrics and return the first match with synced lyrics.
+ *
+ * Similar to getLyrics but uses the search endpoint which may return
+ * multiple results. Filters for the first result with syncedLyrics available.
  */
 export const searchLyrics = (
   trackName: string,
@@ -127,9 +162,12 @@ export const searchLyrics = (
 }
 
 /**
- * Get lyrics by Spotify track ID
- * Note: LRCLIB doesn't directly support Spotify IDs, but this is a placeholder
- * for future integration or alternative APIs that do support it
+ * Get lyrics by Spotify track ID.
+ *
+ * Currently returns Effect.fail since LRCLIB doesn't support Spotify IDs.
+ * Placeholder for future integration with Spotify-aware lyrics APIs.
+ *
+ * Demonstrates Effect.fail for immediate typed failure construction.
  */
 export const getLyricsBySpotifyId = (trackId: string): Effect.Effect<Lyrics, LyricsError> => {
   return Effect.fail(
@@ -141,23 +179,31 @@ export const getLyricsBySpotifyId = (trackId: string): Effect.Effect<Lyrics, Lyr
 }
 
 // --- Async Convenience Wrappers ---
+// These use Effect.runPromise to convert Effects to Promises for consumers
+// that aren't Effect-aware. Errors become Promise rejections.
 
 /**
- * Fetch lyrics for a song (async wrapper)
+ * Fetch lyrics for a song (async wrapper).
+ *
+ * Uses Effect.runPromise to execute the Effect and convert to Promise.
+ * LyricsError failures become Promise rejections.
  */
 export async function fetchLyrics(trackName: string, artistName: string): Promise<Lyrics> {
   return Effect.runPromise(getLyrics(trackName, artistName))
 }
 
 /**
- * Search for lyrics (async wrapper)
+ * Search for lyrics (async wrapper).
  */
 export async function fetchLyricsSearch(trackName: string, artistName: string): Promise<Lyrics> {
   return Effect.runPromise(searchLyrics(trackName, artistName))
 }
 
 /**
- * Fetch lyrics with fallback to search if direct lookup fails
+ * Fetch lyrics with fallback to search if direct lookup fails.
+ *
+ * Demonstrates Effect.orElse for error recovery - if getLyrics fails,
+ * automatically tries searchLyrics as a fallback before failing.
  */
 export async function fetchLyricsWithFallback(
   trackName: string,

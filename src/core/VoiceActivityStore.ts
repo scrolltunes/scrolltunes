@@ -39,6 +39,9 @@ export class UpdateLevel extends Data.TaggedClass("UpdateLevel")<{ readonly leve
 
 export type VADEvent = StartListening | StopListening | VoiceStart | VoiceStop | UpdateLevel
 
+/**
+ * VAD error wrapping audio errors with Effect.ts tagged class pattern
+ */
 export class VADError extends Data.TaggedClass("VADError")<{
   readonly cause: AudioError
 }> {}
@@ -125,6 +128,13 @@ export class VoiceActivityStore {
 
   // --- Event handlers ---
 
+  /**
+   * Dispatch a VAD event using Effect.ts pattern
+   *
+   * All events are handled as Effects for consistent error propagation.
+   * Use Effect.runSync for synchronous events (StopListening, VoiceStop, UpdateLevel)
+   * and Effect.runPromise for async events (StartListening, VoiceStart).
+   */
   readonly dispatch = (event: VADEvent): Effect.Effect<void, VADError> => {
     switch (event._tag) {
       case "StartListening":
@@ -215,7 +225,7 @@ export class VoiceActivityStore {
       }
 
       if (!prevSpeaking && nextRuntime.isSpeaking) {
-        Effect.runPromise(this.dispatch(new VoiceStart({}))).catch(() => {})
+        Effect.runPromise(Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void))
       } else if (prevSpeaking && !nextRuntime.isSpeaking) {
         Effect.runSync(this.dispatch(new VoiceStop({})))
       }
@@ -237,6 +247,12 @@ export class VoiceActivityStore {
 
   // --- Convenience methods ---
 
+  /**
+   * Start listening for voice activity
+   *
+   * Runs the Effect-based startListeningEffect with error handling.
+   * On MicPermissionDenied, sets permissionDenied state for UI feedback.
+   */
   async startListening(): Promise<void> {
     await Effect.runPromise(
       Effect.catchAll(this.startListeningEffect, e => {
@@ -249,6 +265,9 @@ export class VoiceActivityStore {
     )
   }
 
+  /**
+   * Stop listening for voice activity (synchronous cleanup)
+   */
   stopListening(): void {
     Effect.runSync(this.dispatch(new StopListening({})))
   }

@@ -42,7 +42,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   useEffect(() => {
     if (isManualScrolling || !lyrics) return
     const targetY = getTargetScrollY(currentLineIndex)
-    console.log("Scrolling to line", currentLineIndex, "targetY:", targetY)
     setScrollY(targetY)
   }, [currentLineIndex, isManualScrolling, lyrics, getTargetScrollY])
 

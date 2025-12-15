@@ -88,50 +88,51 @@ const getCredentials = (): Effect.Effect<
     return Effect.succeed({ clientId, clientSecret })
   })
 
-async function fetchTokenFromSpotify(
+const fetchTokenFromSpotify = (
   clientId: string,
   clientSecret: string,
-): Promise<{ access_token: string; expires_in: number }> {
-  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
+): Effect.Effect<{ access_token: string; expires_in: number }, SpotifyAPIError> =>
+  Effect.gen(function* () {
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
 
-  const response = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${credentials}`,
-    },
-    body: "grant_type=client_credentials",
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        fetch("https://accounts.spotify.com/api/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Authorization: `Basic ${credentials}`,
+          },
+          body: "grant_type=client_credentials",
+        }),
+      catch: () => new SpotifyAPIError({ status: 0, message: "Network error" }),
+    })
+
+    if (!response.ok) {
+      const text = yield* Effect.tryPromise({
+        try: () => response.text(),
+        catch: () => new SpotifyAPIError({ status: response.status, message: "Auth failed" }),
+      }).pipe(Effect.orElseSucceed(() => "Unknown error"))
+      return yield* Effect.fail(
+        new SpotifyAPIError({ status: response.status, message: `Auth failed: ${text}` }),
+      )
+    }
+
+    return yield* Effect.tryPromise({
+      try: () => response.json() as Promise<{ access_token: string; expires_in: number }>,
+      catch: () => new SpotifyAPIError({ status: 0, message: "Failed to parse response" }),
+    })
   })
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "Unknown error")
-    throw new SpotifyAPIError({
-      status: response.status,
-      message: `Auth failed: ${text}`,
-    })
-  }
-
-  return response.json()
-}
-
 const fetchAccessToken = (): Effect.Effect<string, SpotifyError> =>
-  Effect.gen(function* (_) {
+  Effect.gen(function* () {
     const now = Date.now()
     if (tokenCache && tokenCache.expiresAt > now + 60000) {
       return tokenCache.accessToken
     }
 
-    const { clientId, clientSecret } = yield* _(getCredentials())
-
-    const data = yield* _(
-      Effect.tryPromise({
-        try: () => fetchTokenFromSpotify(clientId, clientSecret),
-        catch: e => {
-          if (e instanceof SpotifyAPIError) return e
-          return new SpotifyAuthError({ cause: e })
-        },
-      }),
-    )
+    const { clientId, clientSecret } = yield* getCredentials()
+    const data = yield* fetchTokenFromSpotify(clientId, clientSecret)
 
     tokenCache = {
       accessToken: data.access_token,
@@ -141,30 +142,41 @@ const fetchAccessToken = (): Effect.Effect<string, SpotifyError> =>
     return data.access_token
   })
 
-async function fetchFromSpotifyAPI<T>(accessToken: string, url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  })
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "Unknown error")
-    throw new SpotifyAPIError({
-      status: response.status,
-      message: text,
+const fetchFromSpotifyAPI = <T>(
+  accessToken: string,
+  url: string,
+): Effect.Effect<T, SpotifyAPIError> =>
+  Effect.gen(function* () {
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        fetch(url, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }),
+      catch: () => new SpotifyAPIError({ status: 0, message: "Network error" }),
     })
-  }
 
-  return response.json()
-}
+    if (!response.ok) {
+      const text = yield* Effect.tryPromise({
+        try: () => response.text(),
+        catch: () => new SpotifyAPIError({ status: response.status, message: "Unknown error" }),
+      }).pipe(Effect.orElseSucceed(() => "Unknown error"))
+      return yield* Effect.fail(new SpotifyAPIError({ status: response.status, message: text }))
+    }
+
+    return yield* Effect.tryPromise({
+      try: () => response.json() as Promise<T>,
+      catch: () => new SpotifyAPIError({ status: 0, message: "Failed to parse response" }),
+    })
+  })
 
 const spotifyFetch = <T>(
   path: string,
   params?: Record<string, string>,
 ): Effect.Effect<T, SpotifyError> =>
-  Effect.gen(function* (_) {
-    const accessToken = yield* _(fetchAccessToken())
+  Effect.gen(function* () {
+    const accessToken = yield* fetchAccessToken()
 
     const url = new URL(`https://api.spotify.com/v1${path}`)
     if (params) {
@@ -173,15 +185,7 @@ const spotifyFetch = <T>(
       }
     }
 
-    return yield* _(
-      Effect.tryPromise({
-        try: () => fetchFromSpotifyAPI<T>(accessToken, url.toString()),
-        catch: e => {
-          if (e instanceof SpotifyAPIError) return e
-          return new SpotifyAPIError({ status: 0, message: String(e) })
-        },
-      }),
-    )
+    return yield* fetchFromSpotifyAPI<T>(accessToken, url.toString())
   })
 
 // --- Public API (Effect-based) ---

@@ -48,7 +48,10 @@ export type PlayerState =
   | { readonly _tag: "Completed"; readonly lyrics: Lyrics }
 
 /**
- * Player events for state transitions
+ * Player events for state transitions.
+ *
+ * Uses Effect.ts Data.TaggedClass for type-safe event discrimination.
+ * Events are processed by dispatch() which returns Effect.Effect<void>.
  */
 export class LoadLyrics extends Data.TaggedClass("LoadLyrics")<{
   readonly lyrics: Lyrics
@@ -156,7 +159,10 @@ export class LyricsPlayer {
   // --- Event handlers ---
 
   /**
-   * Process a player event (Effect-style command pattern)
+   * Process a player event using Effect-style command pattern.
+   *
+   * Returns Effect.Effect<void> for composability, though state updates are
+   * synchronous. Convenience methods use Effect.runSync since there's no I/O.
    */
   readonly dispatch = (event: PlayerEvent): Effect.Effect<void> => {
     return Effect.sync(() => {
@@ -290,6 +296,8 @@ export class LyricsPlayer {
   }
 
   // --- Convenience methods ---
+  // These sync wrappers use Effect.runSync at the React boundary.
+  // Safe because all state updates are synchronous (no I/O).
 
   /**
    * Load lyrics and optionally auto-play
