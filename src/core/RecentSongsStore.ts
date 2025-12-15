@@ -34,7 +34,9 @@ class RecentSongsStore {
       if (stored) {
         const parsed = JSON.parse(stored) as readonly RecentSong[]
         if (Array.isArray(parsed)) {
-          this.state = parsed.slice(0, MAX_RECENT_SONGS)
+          this.state = [...parsed]
+            .sort((a, b) => b.lastPlayedAt - a.lastPlayedAt)
+            .slice(0, MAX_RECENT_SONGS)
         }
       }
     } catch {
@@ -77,7 +79,7 @@ class RecentSongsStore {
   /**
    * Update song metadata without changing position in list.
    * Use this when loading a song page without actually playing it.
-   * If the song doesn't exist yet, adds it to the end (not top).
+   * If the song doesn't exist yet, adds it to the front.
    */
   updateMetadata(song: Omit<RecentSong, "lastPlayedAt">): void {
     this.setState(prev => {
@@ -95,12 +97,12 @@ class RecentSongsStore {
         return [...prev.slice(0, existingIndex), updated, ...prev.slice(existingIndex + 1)]
       }
 
-      // Song not in list - add to end (not top) with current timestamp
+      // Song not in list - add to front with current timestamp
       const newSong: RecentSong = {
         ...song,
         lastPlayedAt: Date.now(),
       }
-      return [...prev, newSong].slice(0, MAX_RECENT_SONGS)
+      return [newSong, ...prev].slice(0, MAX_RECENT_SONGS)
     })
   }
 
