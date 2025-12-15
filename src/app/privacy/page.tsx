@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           transition={{ duration: 0.3 }}
           className="space-y-8"
         >
-          <p className="text-sm text-neutral-500">Last updated: December 2024</p>
+          <p className="text-sm text-neutral-500">Last updated: December 2025</p>
 
           <section className="space-y-4">
             <h2 className="text-xl font-semibold">Overview</h2>

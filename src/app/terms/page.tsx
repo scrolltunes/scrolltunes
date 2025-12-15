@@ -16,7 +16,7 @@ export default function TermsOfService() {
         </Link>
 
         <h1 className="mb-2 text-4xl font-bold">Terms of Service</h1>
-        <p className="mb-12 text-neutral-400">Last updated: December 2024</p>
+        <p className="mb-12 text-neutral-400">Last updated: December 2025</p>
 
         <div className="space-y-10">
           <section>
