@@ -41,10 +41,7 @@ export function loadCachedLyrics(id: number): CachedLyrics | null {
 /**
  * Save lyrics to cache
  */
-export function saveCachedLyrics(
-  id: number,
-  data: Omit<CachedLyrics, "cachedAt">
-): void {
+export function saveCachedLyrics(id: number, data: Omit<CachedLyrics, "cachedAt">): void {
   if (typeof window === "undefined") return
 
   try {

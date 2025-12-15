@@ -49,6 +49,7 @@ export function useVoiceTrigger(options: UseVoiceTriggerOptions = {}) {
     // Auto-play from Ready state
     if (playerState._tag === "Ready" && opts.autoPlay) {
       lyricsPlayer.play()
+      voiceActivityStore.stopListening()
       return
     }
 

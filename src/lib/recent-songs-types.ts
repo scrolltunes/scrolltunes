@@ -8,15 +8,15 @@ import type { Lyrics } from "@/core"
  * A recently played song entry stored in localStorage
  */
 export interface RecentSong {
-  readonly id: number              // LRCLIB numeric ID
+  readonly id: number // LRCLIB numeric ID
   readonly title: string
   readonly artist: string
   readonly album: string
   readonly albumArt?: string | undefined
-  readonly durationSeconds: number        // seconds (matching Lyrics.duration)
-  readonly lastPlayedAt: number    // timestamp (ms since epoch)
-  readonly lastPositionSeconds?: number | undefined  // seconds (resume position)
-  readonly lastPositionUpdatedAt?: number | undefined  // timestamp for position freshness
+  readonly durationSeconds: number // seconds (matching Lyrics.duration)
+  readonly lastPlayedAt: number // timestamp (ms since epoch)
+  readonly lastPositionSeconds?: number | undefined // seconds (resume position)
+  readonly lastPositionUpdatedAt?: number | undefined // timestamp for position freshness
 }
 
 /**
@@ -26,13 +26,13 @@ export interface CachedLyrics {
   readonly lyrics: Lyrics
   readonly bpm: number | null
   readonly key: string | null
-  readonly cachedAt: number        // timestamp (ms since epoch)
+  readonly cachedAt: number // timestamp (ms since epoch)
 }
 
 /**
  * Configuration for lyrics cache
  */
-export const LYRICS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000  // 7 days
+export const LYRICS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 /**
  * Configuration for recent songs

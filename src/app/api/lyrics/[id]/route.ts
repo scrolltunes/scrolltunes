@@ -11,10 +11,7 @@ import { NextResponse } from "next/server"
 
 const bpmProviders = [withInMemoryCache(getSongBpmProvider)]
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: idParam } = await params
   const id = Number.parseInt(idParam, 10)
 

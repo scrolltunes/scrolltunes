@@ -196,7 +196,8 @@ export class LyricsPlayer {
 
   private handlePlay(): void {
     if (this.state._tag === "Ready") {
-      this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: 0 })
+      const firstLineTime = this.state.lyrics.lines[0]?.startTime ?? 0
+      this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: firstLineTime })
       this.startPlaybackLoop()
     } else if (this.state._tag === "Paused") {
       this.setState({
@@ -206,7 +207,8 @@ export class LyricsPlayer {
       })
       this.startPlaybackLoop()
     } else if (this.state._tag === "Completed") {
-      this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: 0 })
+      const firstLineTime = this.state.lyrics.lines[0]?.startTime ?? 0
+      this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: firstLineTime })
       this.startPlaybackLoop()
     }
   }

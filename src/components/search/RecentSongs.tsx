@@ -1,6 +1,6 @@
 "use client"
 
-import { recentSongsStore, useRecentSongs, type RecentSong } from "@/core"
+import { type RecentSong, recentSongsStore, useRecentSongs } from "@/core"
 import { makeCanonicalPath } from "@/lib/slug"
 import { ClockCounterClockwise, MusicNote, Play } from "@phosphor-icons/react"
 import { useRouter } from "next/navigation"
@@ -24,7 +24,8 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
   const handleClick = useCallback(
     (song: RecentSong) => {
       const path = makeCanonicalPath({ id: song.id, title: song.title, artist: song.artist })
-      router.push(path)
+      const hasValidPosition = recentSongsStore.isPositionValidForResume(song)
+      router.push(hasValidPosition ? `${path}?resume=1` : path)
     },
     [router],
   )

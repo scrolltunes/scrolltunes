@@ -329,5 +329,3 @@ export const getLyricsBySpotifyId = (trackId: string): Effect.Effect<Lyrics, Lyr
     }),
   )
 }
-
-

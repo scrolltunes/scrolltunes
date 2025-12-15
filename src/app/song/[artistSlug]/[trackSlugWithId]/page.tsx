@@ -41,7 +41,7 @@ import {
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 
 type LoadState =
@@ -51,6 +51,8 @@ type LoadState =
 
 export default function SongPage() {
   const params = useParams<{ artistSlug: string; trackSlugWithId: string }>()
+  const searchParams = useSearchParams()
+  const shouldResume = searchParams.get("resume") === "1"
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
   const [showControls, setShowControls] = useState(false)
 
@@ -133,14 +135,16 @@ export default function SongPage() {
           durationSeconds: cached.lyrics.duration,
         })
 
-        // Check for resume position
-        const recent = recentSongsStore.getRecent(id)
-        if (
-          recent &&
-          recentSongsStore.isPositionValidForResume(recent) &&
-          recent.lastPositionSeconds != null
-        ) {
-          lyricsPlayer.seek(recent.lastPositionSeconds)
+        // Resume position only if explicitly requested via ?resume=1
+        if (shouldResume) {
+          const recent = recentSongsStore.getRecent(id)
+          if (
+            recent &&
+            recentSongsStore.isPositionValidForResume(recent) &&
+            recent.lastPositionSeconds != null
+          ) {
+            lyricsPlayer.seek(recent.lastPositionSeconds)
+          }
         }
         return
       }
@@ -178,14 +182,16 @@ export default function SongPage() {
           durationSeconds: data.lyrics.duration,
         })
 
-        // Check for resume position
-        const recent = recentSongsStore.getRecent(id)
-        if (
-          recent &&
-          recentSongsStore.isPositionValidForResume(recent) &&
-          recent.lastPositionSeconds != null
-        ) {
-          lyricsPlayer.seek(recent.lastPositionSeconds)
+        // Resume position only if explicitly requested via ?resume=1
+        if (shouldResume) {
+          const recent = recentSongsStore.getRecent(id)
+          if (
+            recent &&
+            recentSongsStore.isPositionValidForResume(recent) &&
+            recent.lastPositionSeconds != null
+          ) {
+            lyricsPlayer.seek(recent.lastPositionSeconds)
+          }
         }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
@@ -200,7 +206,7 @@ export default function SongPage() {
     return () => {
       controller.abort()
     }
-  }, [lrclibId])
+  }, [lrclibId, shouldResume])
 
   // Save position when leaving the page
   useEffect(() => {
