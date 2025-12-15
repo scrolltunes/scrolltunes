@@ -89,12 +89,46 @@ export default function TermsOfService() {
 
           <section>
             <h2 className="mb-4 text-2xl font-semibold">Intellectual Property</h2>
-            <p className="leading-relaxed text-neutral-300">
+            <p className="mb-4 leading-relaxed text-neutral-300">
               Song lyrics displayed through ScrollTunes are sourced from third-party providers and
               remain the intellectual property of their respective owners, including songwriters,
               publishers, and rights holders. ScrollTunes does not claim ownership of any lyrics
               content. The ScrollTunes application, including its design, code, and features, is the
               property of its creators.
+            </p>
+            <p className="mb-4 leading-relaxed text-neutral-300">
+              ScrollTunes does not guarantee the right to display lyrics in all jurisdictions. You
+              are responsible for ensuring your use of lyrics complies with applicable copyright and
+              licensing laws in your location.
+            </p>
+            <p className="leading-relaxed text-neutral-300">
+              <strong>Public performance:</strong> If you use ScrollTunes for live performances,
+              public events, or commercial purposes, you may be required to obtain appropriate
+              public performance licenses from the relevant rights holders or licensing
+              organizations (such as ASCAP, BMI, SESAC, or equivalent in your country).
+            </p>
+          </section>
+
+          <section>
+            <h2 className="mb-4 text-2xl font-semibold">Copyright Complaints</h2>
+            <p className="mb-4 leading-relaxed text-neutral-300">
+              ScrollTunes respects the intellectual property rights of others. If you are a
+              copyright owner or authorized agent and believe that content accessible through
+              ScrollTunes infringes your copyright, please contact us on Twitter at{" "}
+              <a
+                href="https://twitter.com/ScrollTunes"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 underline hover:text-blue-300"
+              >
+                @ScrollTunes
+              </a>
+              .
+            </p>
+            <p className="leading-relaxed text-neutral-300">
+              Please include a description of the copyrighted work, identification of the allegedly
+              infringing content, and your contact information. We will review all valid complaints
+              and, where feasible, remove or block access to infringing content.
             </p>
           </section>
 
@@ -128,26 +162,48 @@ export default function TermsOfService() {
                 — Song tempo and metadata
               </li>
             </ul>
+            <p className="mt-4 leading-relaxed text-neutral-300">
+              ScrollTunes is not affiliated with, endorsed by, or partnered with LRCLIB, GetSongBPM,
+              or any other third-party service. We are not responsible for the availability,
+              accuracy, or data practices of these external services. Your use of third-party
+              services accessed through ScrollTunes is at your own risk.
+            </p>
           </section>
 
           <section>
             <h2 className="mb-4 text-2xl font-semibold">Disclaimer of Warranties</h2>
-            <p className="leading-relaxed text-neutral-300">
+            <p className="mb-4 leading-relaxed text-neutral-300">
               ScrollTunes is provided &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; without
               warranties of any kind, either express or implied. We do not guarantee that the
               service will be uninterrupted, error-free, or that lyrics will be accurate or
               complete. Voice detection performance may vary based on environmental conditions and
               device capabilities.
             </p>
+            <p className="leading-relaxed text-neutral-300">
+              <strong>User responsibility:</strong> You are responsible for maintaining backup
+              copies of any lyrics you rely on for performances. We recommend verifying that lyrics
+              content is accurate and suitable for your intended use before any performance or
+              event.
+            </p>
           </section>
 
           <section>
             <h2 className="mb-4 text-2xl font-semibold">Limitation of Liability</h2>
-            <p className="leading-relaxed text-neutral-300">
+            <p className="mb-4 leading-relaxed text-neutral-300">
               To the fullest extent permitted by law, ScrollTunes and its creators shall not be
               liable for any indirect, incidental, special, consequential, or punitive damages
               arising from your use of the service. This includes, but is not limited to, damages
               for loss of profits, data, or other intangible losses.
+            </p>
+            <p className="mb-4 leading-relaxed text-neutral-300">
+              In no event shall our total liability for any direct damages exceed the greater of (a)
+              the amount you paid to use ScrollTunes in the twelve months preceding the claim, or
+              (b) fifty US dollars ($50 USD).
+            </p>
+            <p className="leading-relaxed text-neutral-300">
+              Some jurisdictions do not allow the exclusion or limitation of certain damages. If
+              these laws apply to you, some or all of the above disclaimers, exclusions, or
+              limitations may not apply, and you may have additional rights.
             </p>
           </section>
 

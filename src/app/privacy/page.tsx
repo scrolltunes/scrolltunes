@@ -46,7 +46,7 @@ export default function PrivacyPage() {
               </div>
               <div className="flex items-center gap-2 text-green-400">
                 <span>✓</span>
-                <span>No tracking, analytics, or cookies</span>
+                <span>No first-party tracking, analytics, or cookies</span>
               </div>
               <div className="flex items-center gap-2 text-green-400">
                 <span>✓</span>
@@ -85,6 +85,24 @@ export default function PrivacyPage() {
                 </p>
               </div>
             </div>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-semibold">Technical Logs</h2>
+            <p className="text-neutral-300 leading-relaxed">
+              Our hosting provider,{" "}
+              <a
+                href="https://vercel.com/legal/privacy-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-400 hover:text-indigo-300 underline"
+              >
+                Vercel
+              </a>
+              , may automatically collect technical information such as IP addresses, browser type,
+              and request timestamps as part of standard web server operations. ScrollTunes does not
+              use these logs to identify individual users.
+            </p>
           </section>
 
           <section className="space-y-4">
@@ -136,8 +154,10 @@ export default function PrivacyPage() {
               </li>
             </ul>
             <p className="text-neutral-300 leading-relaxed">
-              These services have their own privacy policies. We recommend reviewing them if you
-              have concerns.
+              When you search for songs, the artist name, track title, and your IP address are sent
+              to LRCLIB and GetSongBPM. These services may log this information according to their
+              own privacy policies. Third-party services may use cookies or other tracking
+              technologies for their own purposes.
             </p>
           </section>
 
@@ -157,13 +177,41 @@ export default function PrivacyPage() {
               localStorage or using your browser&apos;s &quot;Clear site data&quot; feature. You can
               also revoke microphone permissions through your browser settings.
             </p>
+            <p className="text-neutral-300 leading-relaxed">
+              Depending on your location, you may have additional rights under laws like GDPR or
+              CCPA. Since ScrollTunes does not maintain user accounts or persistent identifiers,
+              most of your data exists only in your browser and is under your control. For any data
+              that may be collected by our hosting provider or third-party services, please refer to
+              their respective privacy policies. For privacy-related requests, contact us at{" "}
+              <a
+                href="https://twitter.com/ScrollTunes"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-400 hover:text-indigo-300 underline"
+              >
+                @ScrollTunes
+              </a>{" "}
+              on Twitter.
+            </p>
           </section>
 
           <section className="space-y-4">
             <h2 className="text-xl font-semibold">Children&apos;s Privacy</h2>
             <p className="text-neutral-300 leading-relaxed">
-              ScrollTunes is not directed at children under the age of 13. We do not knowingly
-              collect any information from children.
+              ScrollTunes is intended for users who are 13 years of age or older. If you are under
+              13, please do not use this service. If we learn that a child under 13 has used
+              ScrollTunes, we will take appropriate steps to remove any associated data from
+              third-party services where possible. If you believe a child has used our service,
+              please contact us at{" "}
+              <a
+                href="https://twitter.com/ScrollTunes"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-400 hover:text-indigo-300 underline"
+              >
+                @ScrollTunes
+              </a>{" "}
+              on Twitter.
             </p>
           </section>
 

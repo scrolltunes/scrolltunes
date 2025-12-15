@@ -58,7 +58,7 @@ export default function Home() {
               GetSongBPM
             </a>
           </div>
-          <div className="flex justify-center gap-3">
+          <div className="flex justify-center gap-3 mb-1">
             <Link href="/about" className="text-neutral-500 hover:text-neutral-400">
               About
             </Link>
@@ -69,6 +69,16 @@ export default function Home() {
             <span className="text-neutral-700">·</span>
             <Link href="/privacy" className="text-neutral-500 hover:text-neutral-400">
               Privacy
+            </Link>
+          </div>
+          <div className="text-neutral-700">
+            By using ScrollTunes you agree to our{" "}
+            <Link href="/terms" className="underline underline-offset-2 hover:text-neutral-500">
+              Terms
+            </Link>
+            {" and "}
+            <Link href="/privacy" className="underline underline-offset-2 hover:text-neutral-500">
+              Privacy Policy
             </Link>
           </div>
         </footer>
