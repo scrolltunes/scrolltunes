@@ -247,69 +247,59 @@ export const SongSearch = memo(function SongSearch({
             <span className="text-sm">Search by song title or artist name</span>
           </div>
         )}
-
-        {!error && isPending && results.length === 0 && query && <SearchSkeleton />}
-
-        {!error && results.length > 0 && (
-          <motion.ul
-            key="results"
-            initial={false}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800"
-            aria-label="Search results"
-          >
-            {results.map((track, index) => (
-              <motion.li
-                key={track.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ ...springs.default, delay: index * 0.03 }}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleTrackClick(track)}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:bg-neutral-800 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
-                  aria-label={`${track.name} by ${track.artist}`}
-                >
-                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-800 overflow-hidden flex items-center justify-center">
-                    {track.albumArt ? (
-                      <img
-                        src={track.albumArt}
-                        alt={track.album}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <MusicNote size={24} weight="fill" className="text-neutral-600" />
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="text-white font-medium truncate">{track.name}</p>
-                    <p className="text-sm text-neutral-500 truncate">
-                      {track.artist} • {track.album}
-                    </p>
-                  </div>
-
-                  <span className="flex-shrink-0 text-sm text-neutral-600 tabular-nums">
-                    {formatDuration(track.duration)}
-                  </span>
-
-                  {track.hasLyrics && (
-                    <span
-                      className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-xs font-medium text-green-400 bg-green-400/10 rounded"
-                      title="Synced lyrics available"
-                    >
-                      <TextAa size={14} weight="bold" className="inline" />
-                    </span>
-                  )}
-                </button>
-              </motion.li>
-            ))}
-          </motion.ul>
-        )}
       </AnimatePresence>
+
+      {!error && isPending && results.length === 0 && query && <SearchSkeleton />}
+
+      {!error && results.length > 0 && (
+        <ul
+          className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800"
+          aria-label="Search results"
+        >
+          {results.map(track => (
+            <li key={track.id}>
+              <button
+                type="button"
+                onClick={() => handleTrackClick(track)}
+                className="w-full flex items-center gap-3 p-3 hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:bg-neutral-800 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                aria-label={`${track.name} by ${track.artist}`}
+              >
+                <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-800 overflow-hidden flex items-center justify-center">
+                  {track.albumArt ? (
+                    <img
+                      src={track.albumArt}
+                      alt={track.album}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <MusicNote size={24} weight="fill" className="text-neutral-600" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-white font-medium truncate">{track.name}</p>
+                  <p className="text-sm text-neutral-500 truncate">
+                    {track.artist} • {track.album}
+                  </p>
+                </div>
+
+                <span className="flex-shrink-0 text-sm text-neutral-600 tabular-nums">
+                  {formatDuration(track.duration)}
+                </span>
+
+                {track.hasLyrics && (
+                  <span
+                    className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-xs font-medium text-green-400 bg-green-400/10 rounded"
+                    title="Synced lyrics available"
+                  >
+                    <TextAa size={14} weight="bold" className="inline" />
+                  </span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 })
