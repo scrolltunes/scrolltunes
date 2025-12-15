@@ -4,12 +4,15 @@ import { useSyncExternalStore } from "react"
 
 const STORAGE_KEY = "scrolltunes-preferences"
 
+export type ThemeMode = "system" | "light" | "dark"
+
 export interface Preferences {
   readonly wakeLockEnabled: boolean
   readonly doubleTapEnabled: boolean
   readonly shakeToRestartEnabled: boolean
   readonly autoHideControlsMs: number
   readonly distractionFreeMode: boolean
+  readonly themeMode: ThemeMode
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -18,6 +21,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   shakeToRestartEnabled: false,
   autoHideControlsMs: 5000,
   distractionFreeMode: false,
+  themeMode: "system",
 }
 
 export class PreferencesStore {
@@ -117,6 +121,14 @@ export class PreferencesStore {
 
   setDistractionFreeMode(value: boolean): void {
     this.setState({ distractionFreeMode: value })
+  }
+
+  getThemeMode(): ThemeMode {
+    return this.state.themeMode
+  }
+
+  setThemeMode(value: ThemeMode): void {
+    this.setState({ themeMode: value })
   }
 
   reset(): void {

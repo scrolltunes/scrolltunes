@@ -40,4 +40,5 @@ export {
   usePreferences,
   usePreference,
   type Preferences,
+  type ThemeMode,
 } from "./PreferencesStore"
