@@ -1,0 +1,42 @@
+{
+  "name": "scrolltunes",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "biome check . && bun run typecheck && bun run test",
+    "tokens:build": "echo 'Token build not yet configured'"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "^2",
+    "effect": "^3",
+    "motion": "^11",
+    "next": "16.0.10",
+    "react": "19.2.1",
+    "react-dom": "19.2.1",
+    "tone": "^15"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1",
+    "@effect/language-service": "^0",
+    "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10",
+    "@testing-library/react": "^16",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4",
+    "@vitest/ui": "^3",
+    "jsdom": "^26",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^3"
+  }
+}

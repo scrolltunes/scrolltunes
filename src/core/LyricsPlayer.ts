@@ -1,0 +1,373 @@
+"use client"
+
+import { Effect, Data } from "effect"
+import { useSyncExternalStore } from "react"
+
+// --- Types ---
+
+/**
+ * A single line of lyrics with timing information
+ */
+export interface LyricLine {
+  readonly id: string
+  readonly text: string
+  readonly startTime: number // in seconds
+  readonly endTime: number // in seconds
+  readonly words?: readonly LyricWord[]
+}
+
+/**
+ * Word-level timing (optional, for karaoke mode)
+ */
+export interface LyricWord {
+  readonly text: string
+  readonly startTime: number
+  readonly endTime: number
+}
+
+/**
+ * Full lyrics data for a song
+ */
+export interface Lyrics {
+  readonly songId: string
+  readonly title: string
+  readonly artist: string
+  readonly lines: readonly LyricLine[]
+  readonly duration: number // total duration in seconds
+}
+
+/**
+ * Player state type using tagged union pattern (Effect.ts style)
+ */
+export type PlayerState =
+  | { readonly _tag: "Idle" }
+  | { readonly _tag: "Ready"; readonly lyrics: Lyrics }
+  | { readonly _tag: "Playing"; readonly lyrics: Lyrics; readonly currentTime: number }
+  | { readonly _tag: "Paused"; readonly lyrics: Lyrics; readonly currentTime: number }
+  | { readonly _tag: "Completed"; readonly lyrics: Lyrics }
+
+/**
+ * Player events for state transitions
+ */
+export class LoadLyrics extends Data.TaggedClass("LoadLyrics")<{
+  readonly lyrics: Lyrics
+}> {}
+
+export class Play extends Data.TaggedClass("Play")<object> {}
+export class Pause extends Data.TaggedClass("Pause")<object> {}
+export class Seek extends Data.TaggedClass("Seek")<{ readonly time: number }> {}
+export class Reset extends Data.TaggedClass("Reset")<object> {}
+export class Tick extends Data.TaggedClass("Tick")<{ readonly time: number }> {}
+
+export type PlayerEvent = LoadLyrics | Play | Pause | Seek | Reset | Tick
+
+// --- LyricsPlayer Class ---
+
+/**
+ * LyricsPlayer - Manages lyrics scrolling state
+ *
+ * Uses Effect.ts patterns with useSyncExternalStore for React integration.
+ * Reference: kitlangton/visual-effect VisualEffect.ts
+ */
+export class LyricsPlayer {
+  private listeners = new Set<() => void>()
+  private state: PlayerState = { _tag: "Idle" }
+  private scrollSpeed = 1.0
+  private animationFrameId: number | null = null
+
+  constructor(private now: () => number = () => performance.now() / 1000) {}
+
+  // --- Observable pattern (for useSyncExternalStore) ---
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  getSnapshot = (): PlayerState => this.state
+
+  private notify(): void {
+    for (const listener of this.listeners) {
+      listener()
+    }
+  }
+
+  // --- State management ---
+
+  private setState(newState: PlayerState): void {
+    this.state = newState
+    this.notify()
+  }
+
+  /**
+   * Get current line index based on time
+   */
+  getCurrentLineIndex(): number {
+    if (this.state._tag !== "Playing" && this.state._tag !== "Paused") {
+      return 0
+    }
+    const { lyrics, currentTime } = this.state
+    for (let i = lyrics.lines.length - 1; i >= 0; i--) {
+      const line = lyrics.lines[i]
+      if (line && currentTime >= line.startTime) {
+        return i
+      }
+    }
+    return 0
+  }
+
+  /**
+   * Get current lyrics if loaded
+   */
+  getLyrics(): Lyrics | null {
+    switch (this.state._tag) {
+      case "Idle":
+        return null
+      case "Ready":
+      case "Playing":
+      case "Paused":
+      case "Completed":
+        return this.state.lyrics
+    }
+  }
+
+  /**
+   * Get current playback time
+   */
+  getCurrentTime(): number {
+    if (this.state._tag === "Playing" || this.state._tag === "Paused") {
+      return this.state.currentTime
+    }
+    return 0
+  }
+
+  /**
+   * Set scroll speed multiplier
+   */
+  setScrollSpeed(speed: number): void {
+    this.scrollSpeed = Math.max(0.5, Math.min(2.0, speed))
+  }
+
+  getScrollSpeed(): number {
+    return this.scrollSpeed
+  }
+
+  // --- Event handlers ---
+
+  /**
+   * Process a player event (Effect-style command pattern)
+   */
+  readonly dispatch = (event: PlayerEvent): Effect.Effect<void> => {
+    return Effect.sync(() => {
+      switch (event._tag) {
+        case "LoadLyrics":
+          this.handleLoadLyrics(event.lyrics)
+          break
+        case "Play":
+          this.handlePlay()
+          break
+        case "Pause":
+          this.handlePause()
+          break
+        case "Seek":
+          this.handleSeek(event.time)
+          break
+        case "Reset":
+          this.handleReset()
+          break
+        case "Tick":
+          this.handleTick(event.time)
+          break
+      }
+    })
+  }
+
+  private handleLoadLyrics(lyrics: Lyrics): void {
+    this.stopPlaybackLoop()
+    this.setState({ _tag: "Ready", lyrics })
+  }
+
+  private handlePlay(): void {
+    if (this.state._tag === "Ready") {
+      this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: 0 })
+      this.startPlaybackLoop()
+    } else if (this.state._tag === "Paused") {
+      this.setState({
+        _tag: "Playing",
+        lyrics: this.state.lyrics,
+        currentTime: this.state.currentTime,
+      })
+      this.startPlaybackLoop()
+    } else if (this.state._tag === "Completed") {
+      this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: 0 })
+      this.startPlaybackLoop()
+    }
+  }
+
+  private handlePause(): void {
+    if (this.state._tag === "Playing") {
+      this.stopPlaybackLoop()
+      this.setState({
+        _tag: "Paused",
+        lyrics: this.state.lyrics,
+        currentTime: this.state.currentTime,
+      })
+    }
+  }
+
+  private handleSeek(time: number): void {
+    if (this.state._tag === "Playing") {
+      this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: time })
+    } else if (this.state._tag === "Paused") {
+      this.setState({ _tag: "Paused", lyrics: this.state.lyrics, currentTime: time })
+    } else if (this.state._tag === "Ready") {
+      this.setState({ _tag: "Paused", lyrics: this.state.lyrics, currentTime: time })
+    }
+  }
+
+  private handleReset(): void {
+    this.stopPlaybackLoop()
+    const lyrics = this.getLyrics()
+    if (this.state._tag !== "Idle" && lyrics) {
+      this.setState({ _tag: "Ready", lyrics })
+    }
+  }
+
+  private handleTick(deltaTime: number): void {
+    if (this.state._tag === "Playing") {
+      const newTime = this.state.currentTime + deltaTime * this.scrollSpeed
+      if (newTime >= this.state.lyrics.duration) {
+        this.stopPlaybackLoop()
+        this.setState({ _tag: "Completed", lyrics: this.state.lyrics })
+      } else {
+        this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: newTime })
+      }
+    }
+  }
+
+  // --- Playback loop ---
+
+  private lastTickTime: number | null = null
+
+  private startPlaybackLoop(): void {
+    if (this.animationFrameId !== null) return
+
+    this.lastTickTime = this.now()
+
+    const tick = () => {
+      const currentTime = this.now()
+      const deltaTime = this.lastTickTime !== null ? currentTime - this.lastTickTime : 0
+      this.lastTickTime = currentTime
+
+      // Only tick if delta is reasonable (avoid huge jumps after tab switch)
+      if (deltaTime > 0 && deltaTime < 0.5) {
+        Effect.runSync(this.dispatch(new Tick({ time: deltaTime })))
+      }
+
+      if (this.state._tag === "Playing") {
+        this.animationFrameId = requestAnimationFrame(tick)
+      }
+    }
+
+    this.animationFrameId = requestAnimationFrame(tick)
+  }
+
+  private stopPlaybackLoop(): void {
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId)
+      this.animationFrameId = null
+    }
+    this.lastTickTime = null
+  }
+
+  // --- Convenience methods ---
+
+  /**
+   * Load lyrics and optionally auto-play
+   */
+  load(lyrics: Lyrics, autoPlay = false): void {
+    Effect.runSync(this.dispatch(new LoadLyrics({ lyrics })))
+    if (autoPlay) {
+      Effect.runSync(this.dispatch(new Play({})))
+    }
+  }
+
+  play(): void {
+    Effect.runSync(this.dispatch(new Play({})))
+  }
+
+  pause(): void {
+    Effect.runSync(this.dispatch(new Pause({})))
+  }
+
+  seek(time: number): void {
+    Effect.runSync(this.dispatch(new Seek({ time })))
+  }
+
+  reset(): void {
+    Effect.runSync(this.dispatch(new Reset({})))
+  }
+
+  /**
+   * Jump to a specific line
+   */
+  jumpToLine(lineIndex: number): void {
+    const lyrics = this.getLyrics()
+    if (lyrics && lineIndex >= 0 && lineIndex < lyrics.lines.length) {
+      const line = lyrics.lines[lineIndex]
+      if (line) {
+        this.seek(line.startTime)
+      }
+    }
+  }
+
+  /**
+   * Dispose of resources
+   */
+  dispose(): void {
+    this.stopPlaybackLoop()
+    this.listeners.clear()
+    this.setState({ _tag: "Idle" })
+  }
+}
+
+// --- Singleton instance ---
+
+export const lyricsPlayer = new LyricsPlayer()
+
+// --- React hooks ---
+
+/**
+ * Hook to subscribe to player state
+ */
+export function usePlayerState(): PlayerState {
+  return useSyncExternalStore(
+    lyricsPlayer.subscribe,
+    lyricsPlayer.getSnapshot,
+    lyricsPlayer.getSnapshot, // SSR fallback
+  )
+}
+
+/**
+ * Hook to get current line index
+ */
+export function useCurrentLineIndex(): number {
+  usePlayerState()
+  return lyricsPlayer.getCurrentLineIndex()
+}
+
+/**
+ * Hook to get player controls
+ */
+export function usePlayerControls() {
+  return {
+    play: () => lyricsPlayer.play(),
+    pause: () => lyricsPlayer.pause(),
+    seek: (time: number) => lyricsPlayer.seek(time),
+    reset: () => lyricsPlayer.reset(),
+    jumpToLine: (index: number) => lyricsPlayer.jumpToLine(index),
+    load: (lyrics: Lyrics, autoPlay?: boolean) => lyricsPlayer.load(lyrics, autoPlay),
+    setScrollSpeed: (speed: number) => lyricsPlayer.setScrollSpeed(speed),
+    getScrollSpeed: () => lyricsPlayer.getScrollSpeed(),
+  }
+}

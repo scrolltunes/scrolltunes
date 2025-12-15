@@ -2,39 +2,40 @@
 
 > Track progress by checking off items: `- [x]`
 
-## Phase 0: Project Setup
+## Phase 0: Project Setup ✅
 
-- [ ] Initialize Next.js 15 project with App Router
-- [ ] Configure TypeScript (strict mode, path aliases)
-- [ ] Set up Biome for linting/formatting
-- [ ] Configure Tailwind CSS 4
-- [ ] Set up Vitest for testing
-- [ ] Create initial folder structure (`src/`, `app/`, etc.)
-- [ ] Add Motion (motion.dev) dependency
-- [ ] Add Tone.js dependency
-- [ ] Configure Vercel deployment
-- [ ] Create `.env.example` with required variables
+- [x] Initialize Next.js 15 project with App Router
+- [x] Configure TypeScript (strict mode, path aliases)
+- [x] Set up Biome for linting/formatting
+- [x] Configure Tailwind CSS 4
+- [x] Set up Vitest for testing
+- [x] Create initial folder structure (`src/`, `app/`, etc.)
+- [x] Add Motion (motion.dev) dependency
+- [x] Add Tone.js dependency
+- [x] Add Effect.ts dependency
+- [x] Configure Vercel deployment
+- [x] Create `.env.example` with required variables
 
-## Phase 1: Core Infrastructure
+## Phase 1: Core Infrastructure ✅
 
 ### Design Tokens
-- [ ] Install Style Dictionary
-- [ ] Add `tokens:build` script to package.json
-- [ ] Generate initial Tailwind config from tokens
-- [ ] Create `src/theme.ts` with token exports
-- [ ] Create `src/animations.ts` with spring configs
+- [x] Create `src/theme.ts` with token exports
+- [x] Create `src/animations.ts` with spring configs
+- [x] Create `src/constants/index.ts` with app constants
 
 ### Audio System
-- [ ] Create `src/sounds/SoundSystem.ts` (singleton, owns AudioContext)
-- [ ] Implement lazy initialization pattern
-- [ ] Add mute/unmute functionality
-- [ ] Create basic UI feedback sounds
+- [x] Create `src/sounds/SoundSystem.ts` (singleton, owns AudioContext)
+- [x] Implement lazy initialization pattern
+- [x] Add mute/unmute functionality
+- [x] Create basic UI feedback sounds
+- [x] Add microphone analyser for VAD
 
-### State Management
-- [ ] Create `src/core/` folder
-- [ ] Implement base store pattern with `useSyncExternalStore`
-- [ ] Create `src/core/LyricsPlayer.ts` skeleton
-- [ ] Create `src/core/VoiceActivityStore.ts` skeleton
+### State Management (Effect.ts)
+- [x] Create `src/core/` folder
+- [x] Implement base store pattern with `useSyncExternalStore`
+- [x] Create `src/core/LyricsPlayer.ts` with tagged events
+- [x] Create `src/core/VoiceActivityStore.ts` with VAD logic
+- [x] Export React hooks for state subscription
 
 ## Phase 2: Lyrics Display (MVP)
 
@@ -188,8 +189,10 @@
 
 > Update this section with what you're currently working on
 
-**Active:** Phase 0 - Project Setup
+**Completed:** Phase 0 & 1
+
+**Active:** Phase 2 - Lyrics Display (MVP)
 
 **Blocked:** Nothing
 
-**Next:** Phase 1 - Core Infrastructure
+**Next:** Phase 3 - Voice Detection
