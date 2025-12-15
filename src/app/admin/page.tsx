@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import { Play, Pause, ArrowCounterClockwise, MusicNote } from "@phosphor-icons/react"
-import { LyricsDisplay } from "@/components/display"
 import { VoiceIndicator } from "@/components/audio"
+import { LyricsDisplay } from "@/components/display"
+import { usePlayerControls, usePlayerState } from "@/core"
 import { useVoiceTrigger } from "@/hooks"
-import { usePlayerState, usePlayerControls } from "@/core"
-import { getMockLyrics, MOCK_SONGS } from "@/lib/mock-lyrics"
+import { MOCK_SONGS, getMockLyrics } from "@/lib/mock-lyrics"
+import { ArrowCounterClockwise, MusicNote, Pause, Play } from "@phosphor-icons/react"
+import { useState } from "react"
 
 export default function AdminPage() {
   const [selectedSong, setSelectedSong] = useState<string | null>(null)

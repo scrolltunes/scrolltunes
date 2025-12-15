@@ -5,10 +5,10 @@
  */
 
 import {
-  VAD_THRESHOLD_ON,
-  VAD_THRESHOLD_OFF,
   VAD_HOLD_TIME_MS,
   VAD_SMOOTHING_FACTOR,
+  VAD_THRESHOLD_OFF,
+  VAD_THRESHOLD_ON,
 } from "@/constants"
 
 /**

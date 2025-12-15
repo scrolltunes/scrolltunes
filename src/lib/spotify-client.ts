@@ -81,7 +81,7 @@ const getCredentials = (): Effect.Effect<
       return Effect.fail(
         new SpotifyConfigError({
           message: "Missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET environment variables",
-        })
+        }),
       )
     }
 
@@ -90,7 +90,7 @@ const getCredentials = (): Effect.Effect<
 
 async function fetchTokenFromSpotify(
   clientId: string,
-  clientSecret: string
+  clientSecret: string,
 ): Promise<{ access_token: string; expires_in: number }> {
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
 
@@ -130,7 +130,7 @@ const fetchAccessToken = (): Effect.Effect<string, SpotifyError> =>
           if (e instanceof SpotifyAPIError) return e
           return new SpotifyAuthError({ cause: e })
         },
-      })
+      }),
     )
 
     tokenCache = {
@@ -161,7 +161,7 @@ async function fetchFromSpotifyAPI<T>(accessToken: string, url: string): Promise
 
 const spotifyFetch = <T>(
   path: string,
-  params?: Record<string, string>
+  params?: Record<string, string>,
 ): Effect.Effect<T, SpotifyError> =>
   Effect.gen(function* (_) {
     const accessToken = yield* _(fetchAccessToken())
@@ -180,7 +180,7 @@ const spotifyFetch = <T>(
           if (e instanceof SpotifyAPIError) return e
           return new SpotifyAPIError({ status: 0, message: String(e) })
         },
-      })
+      }),
     )
   })
 
@@ -188,7 +188,7 @@ const spotifyFetch = <T>(
 
 export const searchTracksEffect = (
   query: string,
-  limit = 20
+  limit = 20,
 ): Effect.Effect<SpotifySearchResult, SpotifyError> =>
   spotifyFetch<SpotifySearchResult>("/search", {
     q: query,
@@ -217,7 +217,7 @@ export function clearTokenCache(): void {
 
 export function getAlbumImageUrl(
   album: SpotifyAlbum,
-  size: "small" | "medium" | "large" = "medium"
+  size: "small" | "medium" | "large" = "medium",
 ): string | null {
   const images = [...album.images].sort((a, b) => (b.width ?? 0) - (a.width ?? 0))
 

@@ -1,7 +1,7 @@
 "use client"
 
+import { lyricsPlayer, usePlayerState, useVoiceActivity, voiceActivityStore } from "@/core"
 import { useEffect, useRef } from "react"
-import { voiceActivityStore, lyricsPlayer, usePlayerState, useVoiceActivity } from "@/core"
 
 export interface UseVoiceTriggerOptions {
   /** Auto-start playback when voice is first detected */

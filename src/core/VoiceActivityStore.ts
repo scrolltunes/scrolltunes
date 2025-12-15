@@ -1,17 +1,17 @@
 "use client"
 
-import { Effect, Data } from "effect"
-import { useSyncExternalStore } from "react"
-import { soundSystem, type AudioError } from "@/sounds"
 import {
-  computeRMSFromByteFrequency,
-  smoothLevel,
-  detectVoiceActivity,
   DEFAULT_VAD_CONFIG,
   INITIAL_VAD_RUNTIME,
   type VADConfig,
   type VADRuntimeState,
+  computeRMSFromByteFrequency,
+  detectVoiceActivity,
+  smoothLevel,
 } from "@/lib"
+import { type AudioError, soundSystem } from "@/sounds"
+import { Data, Effect } from "effect"
+import { useSyncExternalStore } from "react"
 
 export type { VADConfig } from "@/lib"
 

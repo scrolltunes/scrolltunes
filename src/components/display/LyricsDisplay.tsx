@@ -1,8 +1,8 @@
 "use client"
 
-import { useRef, useEffect, useState, useCallback } from "react"
+import { useCurrentLineIndex, usePlayerControls, usePlayerState } from "@/core"
 import { motion } from "motion/react"
-import { usePlayerState, useCurrentLineIndex, usePlayerControls } from "@/core"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
 
 const LINE_HEIGHT = 64 // Approximate height of each line in pixels
@@ -122,7 +122,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
-aria-label="Lyrics display"
+      aria-label="Lyrics display"
     >
       {/* Manual scroll indicator */}
       {isManualScrolling && (

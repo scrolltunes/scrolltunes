@@ -1,9 +1,9 @@
 "use client"
 
-import { memo, useState, useCallback, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "motion/react"
-import { MagnifyingGlass, MusicNote, SpinnerGap, X } from "@phosphor-icons/react"
 import { springs } from "@/animations"
+import { MagnifyingGlass, MusicNote, SpinnerGap, X } from "@phosphor-icons/react"
+import { AnimatePresence, motion } from "motion/react"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
 
 export interface SearchResultTrack {
   readonly id: string
@@ -26,7 +26,10 @@ function formatDuration(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`
 }
 
-export const SongSearch = memo(function SongSearch({ onSelectTrack, className = "" }: SongSearchProps) {
+export const SongSearch = memo(function SongSearch({
+  onSelectTrack,
+  className = "",
+}: SongSearchProps) {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResultTrack[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -50,10 +53,9 @@ export const SongSearch = memo(function SongSearch({ onSelectTrack, className = 
     setError(null)
 
     try {
-      const response = await fetch(
-        `/api/search?q=${encodeURIComponent(searchQuery)}&limit=10`,
-        { signal: abortControllerRef.current.signal }
-      )
+      const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&limit=10`, {
+        signal: abortControllerRef.current.signal,
+      })
 
       if (!response.ok) {
         throw new Error("Search failed")
@@ -86,7 +88,7 @@ export const SongSearch = memo(function SongSearch({ onSelectTrack, className = 
         searchTracks(value)
       }, 300)
     },
-    [searchTracks]
+    [searchTracks],
   )
 
   const handleClear = useCallback(() => {
@@ -104,7 +106,7 @@ export const SongSearch = memo(function SongSearch({ onSelectTrack, className = 
     (track: SearchResultTrack) => {
       onSelectTrack(track)
     },
-    [onSelectTrack]
+    [onSelectTrack],
   )
 
   useEffect(() => {

@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeEach } from "vitest"
-import { LyricsPlayer, type Lyrics } from "../LyricsPlayer"
+import { beforeEach, describe, expect, test } from "vitest"
+import { type Lyrics, LyricsPlayer } from "../LyricsPlayer"
 
 const mockLyrics: Lyrics = {
   songId: "test-song",

@@ -1,5 +1,6 @@
+import { LyricsAPIError, LyricsNotFoundError, getLyrics, searchLyrics } from "@/lib/lyrics-client"
+import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
-import { getLyrics } from "@/lib/lyrics-client"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -8,46 +9,52 @@ export async function GET(request: NextRequest) {
   const id = searchParams.get("id")
 
   if (id) {
-    return NextResponse.json(
-      { error: "Lookup by Spotify ID not yet implemented" },
-      { status: 501 }
-    )
+    return NextResponse.json({ error: "Lookup by Spotify ID not yet implemented" }, { status: 501 })
   }
 
   if (!track || !artist) {
     return NextResponse.json(
       { error: "Missing required parameters: track and artist" },
-      { status: 400 }
+      { status: 400 },
     )
   }
 
-  try {
-    const lyrics = await getLyrics(track, artist)
+  const effect = Effect.orElse(getLyrics(track, artist), () => searchLyrics(track, artist))
 
-    if (!lyrics) {
-      return NextResponse.json(
-        { error: "Lyrics not found" },
-        { status: 404 }
-      )
-    }
+  const result = await Effect.runPromiseExit(effect)
 
-    return NextResponse.json(
-      {
-        lyrics,
-        attribution: "Lyrics provided by lrclib.net",
-      },
-      {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET",
-        },
+  if (result._tag === "Failure") {
+    const error = result.cause
+    if (error._tag === "Fail") {
+      const failure = error.error
+      if (failure instanceof LyricsNotFoundError) {
+        return NextResponse.json(
+          { error: `No synced lyrics found for "${track}" by ${artist}` },
+          { status: 404 },
+        )
       }
-    )
-  } catch (error) {
-    console.error("Lyrics API error:", error)
-    return NextResponse.json(
-      { error: "Failed to fetch lyrics" },
-      { status: 500 }
-    )
+      if (failure instanceof LyricsAPIError) {
+        console.error("Lyrics API error:", failure.message)
+        return NextResponse.json(
+          { error: "Lyrics service temporarily unavailable" },
+          { status: failure.status >= 500 ? 502 : 500 },
+        )
+      }
+    }
+    console.error("Lyrics fetch failed:", error)
+    return NextResponse.json({ error: "Failed to fetch lyrics" }, { status: 500 })
   }
+
+  return NextResponse.json(
+    {
+      lyrics: result.value,
+      attribution: "Lyrics provided by lrclib.net",
+    },
+    {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET",
+      },
+    },
+  )
 }

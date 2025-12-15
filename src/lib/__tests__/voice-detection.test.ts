@@ -1,10 +1,10 @@
-import { describe, test, expect } from "vitest"
+import { describe, expect, test } from "vitest"
 import {
-  computeRMSFromByteFrequency,
-  smoothLevel,
-  detectVoiceActivity,
   DEFAULT_VAD_CONFIG,
   INITIAL_VAD_RUNTIME,
+  computeRMSFromByteFrequency,
+  detectVoiceActivity,
+  smoothLevel,
 } from "../voice-detection"
 
 describe("computeRMSFromByteFrequency", () => {

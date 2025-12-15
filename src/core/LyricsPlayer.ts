@@ -1,8 +1,8 @@
 "use client"
 
-import { Effect, Data } from "effect"
+import { DEFAULT_SCROLL_SPEED, MAX_SCROLL_SPEED, MIN_SCROLL_SPEED } from "@/constants"
+import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
-import { DEFAULT_SCROLL_SPEED, MIN_SCROLL_SPEED, MAX_SCROLL_SPEED } from "@/constants"
 
 // --- Types ---
 
@@ -235,14 +235,22 @@ export class LyricsPlayer {
   }
 
   private handleTick(deltaTime: number): void {
-    if (this.state._tag === "Playing") {
-      const newTime = this.state.currentTime + deltaTime * this.scrollSpeed
-      if (newTime >= this.state.lyrics.duration) {
-        this.stopPlaybackLoop()
-        this.setState({ _tag: "Completed", lyrics: this.state.lyrics })
-      } else {
-        this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: newTime })
-      }
+    if (this.state._tag !== "Playing") return
+
+    const oldLineIndex = this.getCurrentLineIndex()
+    const newTime = this.state.currentTime + deltaTime * this.scrollSpeed
+
+    if (newTime >= this.state.lyrics.duration) {
+      this.stopPlaybackLoop()
+      this.setState({ _tag: "Completed", lyrics: this.state.lyrics })
+      return
+    }
+
+    this.state = { _tag: "Playing", lyrics: this.state.lyrics, currentTime: newTime }
+
+    const newLineIndex = this.getCurrentLineIndex()
+    if (newLineIndex !== oldLineIndex) {
+      this.notify()
     }
   }
 

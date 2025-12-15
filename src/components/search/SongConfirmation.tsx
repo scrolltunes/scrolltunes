@@ -185,7 +185,14 @@ export const SongConfirmation = memo(function SongConfirmation({
                         title: track.name,
                         artist: track.artist,
                         duration: track.duration / 1000,
-                        lines: [{ id: "placeholder", text: "No synced lyrics available", startTime: 0, endTime: track.duration / 1000 }],
+                        lines: [
+                          {
+                            id: "placeholder",
+                            text: "No synced lyrics available",
+                            startTime: 0,
+                            endTime: track.duration / 1000,
+                          },
+                        ],
                       })
                     }
                     className="w-full px-6 py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-xl transition-colors"

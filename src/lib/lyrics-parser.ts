@@ -5,7 +5,7 @@
  * Reference: https://en.wikipedia.org/wiki/LRC_(file_format)
  */
 
-import type { Lyrics, LyricLine } from "@/core"
+import type { LyricLine, Lyrics } from "@/core"
 
 /**
  * LRC metadata that can be extracted from the file
@@ -78,7 +78,11 @@ export function parseLRC(
     let match: RegExpExecArray | null
     let lastIndex = 0
 
-    for (match = timestampRegex.exec(trimmed); match !== null; match = timestampRegex.exec(trimmed)) {
+    for (
+      match = timestampRegex.exec(trimmed);
+      match !== null;
+      match = timestampRegex.exec(trimmed)
+    ) {
       timestamps.push(parseTimestamp(match[0]))
       lastIndex = match.index + match[0].length
     }

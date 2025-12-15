@@ -236,7 +236,149 @@ components/
 
 Top-level shared components (used across domains) live alongside folders.
 
-### 2. State Management
+### 2. Effect-First Architecture
+
+**All domain logic MUST use Effect.ts patterns.** This is a core architectural requirement.
+
+#### Why Effect-First?
+
+- Type-safe error handling with tagged error classes
+- Composable async operations
+- Explicit dependency tracking
+- Testable and mockable
+- Consistent patterns across the codebase
+
+#### Tagged Error Classes
+
+All errors MUST be defined as `Data.TaggedClass`:
+
+```typescript
+import { Data } from "effect"
+
+// ✅ Correct: Tagged error classes
+export class LyricsNotFoundError extends Data.TaggedClass("LyricsNotFoundError")<{
+  readonly trackName: string
+  readonly artistName: string
+}> {}
+
+export class LyricsAPIError extends Data.TaggedClass("LyricsAPIError")<{
+  readonly status: number
+  readonly message: string
+}> {}
+
+export type LyricsError = LyricsNotFoundError | LyricsAPIError
+```
+
+#### Domain Functions Return Effects
+
+All domain/library functions MUST return `Effect.Effect<T, E>`:
+
+```typescript
+import { Effect } from "effect"
+
+// ✅ Correct: Returns Effect with typed error
+export const getLyrics = (
+  trackName: string,
+  artistName: string,
+): Effect.Effect<Lyrics, LyricsError> => {
+  return Effect.gen(function* () {
+    const response = yield* Effect.tryPromise({
+      try: () => fetch(`${API_URL}?track=${trackName}`),
+      catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
+    })
+    
+    if (response.status === 404) {
+      return yield* Effect.fail(new LyricsNotFoundError({ trackName, artistName }))
+    }
+    
+    // ... rest of implementation
+  })
+}
+
+// ❌ Wrong: Returns Promise directly
+export async function getLyrics(trackName: string): Promise<Lyrics> {
+  // Don't do this in domain code
+}
+```
+
+#### Async Wrappers at Boundaries
+
+Provide async wrappers for use at system boundaries (API routes, React event handlers):
+
+```typescript
+// Effect-based function (primary)
+export const getLyrics = (track: string, artist: string): Effect.Effect<Lyrics, LyricsError> => ...
+
+// Async wrapper for boundaries
+export async function fetchLyrics(track: string, artist: string): Promise<Lyrics> {
+  return Effect.runPromise(getLyrics(track, artist))
+}
+```
+
+#### API Routes Use Effect Properly
+
+API routes MUST use `Effect.runPromiseExit()` for proper error handling:
+
+```typescript
+import { Effect } from "effect"
+
+export async function GET(request: NextRequest) {
+  const effect = getLyrics(track, artist)
+  const result = await Effect.runPromiseExit(effect)
+  
+  if (result._tag === "Failure") {
+    const error = result.cause
+    if (error._tag === "Fail") {
+      if (error.error instanceof LyricsNotFoundError) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 })
+      }
+    }
+    return NextResponse.json({ error: "Server error" }, { status: 500 })
+  }
+  
+  return NextResponse.json({ data: result.value })
+}
+```
+
+#### Core Store Events
+
+Core stores use Effect-based event dispatch with tagged events:
+
+```typescript
+import { Data, Effect } from "effect"
+
+// Tagged events
+export class Play extends Data.TaggedClass("Play")<object> {}
+export class Pause extends Data.TaggedClass("Pause")<object> {}
+export class Seek extends Data.TaggedClass("Seek")<{ readonly time: number }> {}
+
+export type PlayerEvent = Play | Pause | Seek
+
+class LyricsPlayer {
+  readonly dispatch = (event: PlayerEvent): Effect.Effect<void> => {
+    return Effect.sync(() => {
+      switch (event._tag) {
+        case "Play":
+          this.handlePlay()
+          break
+        case "Pause":
+          this.handlePause()
+          break
+        case "Seek":
+          this.handleSeek(event.time)
+          break
+      }
+    })
+  }
+  
+  // Convenience methods wrap dispatch
+  play(): void {
+    Effect.runSync(this.dispatch(new Play({})))
+  }
+}
+```
+
+### 3. State Management
 
 **No external state management library** — each component/hook manages its own state:
 
@@ -244,7 +386,7 @@ Top-level shared components (used across domains) live alongside folders.
 // Each domain object manages its own state internally
 class LyricsPlayer {
   private listeners = new Set<() => void>()
-  state: PlayerState = { type: "idle" }
+  state: PlayerState = { _tag: "Idle" }
 
   subscribe(listener: () => void) {
     this.listeners.add(listener)
@@ -252,15 +394,18 @@ class LyricsPlayer {
   }
 
   private notify() {
-    this.listeners.forEach(l => l())
+    for (const listener of this.listeners) {
+      listener()
+    }
   }
 }
 
 // React components subscribe via useSyncExternalStore
-function useLyricsState(player: LyricsPlayer) {
+function usePlayerState(): PlayerState {
   return useSyncExternalStore(
-    player.subscribe.bind(player),
-    () => player.state
+    lyricsPlayer.subscribe,
+    lyricsPlayer.getSnapshot,
+    lyricsPlayer.getSnapshot, // SSR fallback
   )
 }
 ```
@@ -271,8 +416,9 @@ Key principles:
 - Lightweight hooks handle UI-specific state
 - No global state for playback/detection
 - State persists across component re-renders
+- **Only notify on semantic state changes** (e.g., line index changes, not every frame)
 
-### 3. Animation System
+### 4. Animation System
 
 Centralized animation config using Motion (Framer Motion successor):
 
@@ -309,7 +455,7 @@ Usage:
 - Different animations for different state transitions
 - All tokens centralized in `animations.ts`
 
-### 4. Sound System
+### 5. Sound System
 
 Centralized audio using Tone.js singleton pattern:
 
@@ -357,7 +503,7 @@ Key principles:
 - Distinct sounds for different events
 - User-friendly mute control
 
-### 5. Theme Tokens
+### 6. Theme Tokens
 
 Minimal design tokens:
 
@@ -381,7 +527,7 @@ export const theme = {
 }
 ```
 
-### 6. Custom Hooks Pattern
+### 7. Custom Hooks Pattern
 
 ```typescript
 // src/hooks/useVoiceDetection.ts
@@ -403,7 +549,7 @@ export function useVoiceDetection(options: UseVoiceDetectionOptions = {}) {
 }
 ```
 
-### 7. Responsive Design
+### 8. Responsive Design
 
 Mobile-first with Tailwind utilities:
 

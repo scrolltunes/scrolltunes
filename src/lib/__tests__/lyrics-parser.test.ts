@@ -1,5 +1,5 @@
-import { describe, test, expect } from "vitest"
-import { parseLRC, parseTimestamp, formatTimestamp } from "../lyrics-parser"
+import { describe, expect, test } from "vitest"
+import { formatTimestamp, parseLRC, parseTimestamp } from "../lyrics-parser"
 
 describe("parseTimestamp", () => {
   test("parses [mm:ss.xx] format", () => {

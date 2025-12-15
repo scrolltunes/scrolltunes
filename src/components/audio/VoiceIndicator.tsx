@@ -1,9 +1,9 @@
 "use client"
 
-import { memo } from "react"
-import { motion, AnimatePresence } from "motion/react"
-import { Microphone, MicrophoneSlash, Waveform } from "@phosphor-icons/react"
 import { springs } from "@/animations"
+import { Microphone, MicrophoneSlash, Waveform } from "@phosphor-icons/react"
+import { AnimatePresence, motion } from "motion/react"
+import { memo } from "react"
 
 export interface VoiceIndicatorProps {
   /** Whether currently listening for voice */

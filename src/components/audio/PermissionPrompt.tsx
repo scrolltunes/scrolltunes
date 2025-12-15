@@ -1,9 +1,9 @@
 "use client"
 
-import { memo } from "react"
-import { motion } from "motion/react"
-import { MicrophoneSlash, ArrowSquareOut } from "@phosphor-icons/react"
 import { springs } from "@/animations"
+import { ArrowSquareOut, MicrophoneSlash } from "@phosphor-icons/react"
+import { motion } from "motion/react"
+import { memo } from "react"
 
 export interface PermissionPromptProps {
   /** Called when user wants to retry */

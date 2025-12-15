@@ -1,337 +1,321 @@
 # ScrollTunes Architecture Review
 
 > Analysis of architecture.md against the visual-effect reference, with recommended improvements.
+> 
+> **Last updated**: Phase 4 implementation complete
+
+## Implementation Status Summary
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Project setup | ✅ Complete | Next.js 15, TypeScript strict, Biome, Tailwind 4, Vitest |
+| `src/core/` layer | ✅ Complete | LyricsPlayer, VoiceActivityStore with Effect.ts patterns |
+| `src/lib/` pure functions | ✅ Complete | lyrics-parser, voice-detection, spotify-client, lyrics-client |
+| Single AudioContext | ✅ Complete | SoundSystem owns context, VAD receives AnalyserNode |
+| API routes | ⚠️ Needs fixes | Response normalization, Effect usage consistency |
+| State publishing | ⚠️ Needs optimization | Per-frame updates should be throttled |
+| Tests | ⚠️ Partial | lyrics-parser, voice-detection, LyricsPlayer tested |
+
+---
 
 ## Structure Improvements
 
-### Add `src/core/` Layer
+### Add `src/core/` Layer ✅ IMPLEMENTED
 
-The architecture implies core state classes (LyricsPlayer, VoiceDetector) but doesn't give them a clear home. Following visual-effect's pattern of top-level core files:
+The architecture now has a clear `src/core/` layer:
 
 ```
 src/
   core/
     LyricsPlayer.ts          # Scrolling + timing state machine
     VoiceActivityStore.ts    # VAD state (speaking, level, events)
-    TempoTracker.ts          # Beat detection state
-    SessionManager.ts        # Jam session queue, guests
     __tests__/
-      LyricsPlayer.test.ts
-      VoiceActivityStore.test.ts
+      LyricsPlayer.test.ts   # ✅ Implemented
 ```
 
-Keep `lib/` for **pure functions only**:
+`lib/` contains **pure functions only**:
 
 ```
 src/
   lib/
-    lyrics-parser.ts         # Pure LRC parsing
-    voice-detection.ts       # Pure signal processing math
-    tempo-tracker.ts         # Pure beat detection algorithms
-    songs-manifest.ts        # Registry
+    lyrics-parser.ts         # Pure LRC parsing ✅
+    voice-detection.ts       # Pure signal processing math ✅
+    spotify-client.ts        # Spotify API with Effect.ts ✅
+    lyrics-client.ts         # LRCLIB API with Effect.ts ✅
     __tests__/
-      lyrics-parser.test.ts
-      voice-detection.test.ts
+      lyrics-parser.test.ts  # ✅ Implemented
+      voice-detection.test.ts # ✅ Implemented
 ```
 
-### Fix API Route Paths
+### API Route Paths
 
-Current doc shows mismatched patterns. Use Next.js 15 conventions:
+Current implementation uses simplified paths:
 
 ```
 app/api/
-  lyrics/[songId]/route.ts       # GET /api/lyrics/:songId
-  spotify/
-    search/route.ts              # GET /api/spotify/search
-    track/[id]/route.ts          # GET /api/spotify/track/:id
-  session/
-    create/route.ts              # POST /api/session/create
-    [id]/
-      route.ts                   # GET /api/session/:id
-      join/route.ts              # POST /api/session/:id/join
-      queue/route.ts             # GET/POST /api/session/:id/queue
+  search/route.ts              # GET /api/search?q=...&limit=...
+  lyrics/route.ts              # GET /api/lyrics?track=...&artist=...
 ```
 
-### Single Audio Owner
+**Deviation from docs**: Original spec called for `/api/spotify/search` and `/api/lyrics/[songId]`. Current approach is acceptable for MVP but differs from documented REST-style paths.
 
-Risk: Multiple AudioContexts from Tone.js, VAD, and metronome cause mobile issues.
+### Single Audio Owner ✅ IMPLEMENTED
 
-**Solution**: `SoundSystem` owns the single `AudioContext`:
+`SoundSystem` owns the single `AudioContext`:
 
 ```
 src/
   sounds/
-    SoundSystem.ts           # Single AudioContext owner
-    audio-input.ts           # Mic access, reuses SoundSystem context
-    metronome.ts             # Uses SoundSystem
-    notifications.ts         # Uses SoundSystem
+    SoundSystem.ts           # Single AudioContext owner ✅
 ```
 
-VAD should receive an `AnalyserNode` from SoundSystem, not create its own context.
+VAD receives an `AnalyserNode` from SoundSystem via `getMicrophoneAnalyserEffect`, not creating its own context.
 
 ---
 
 ## State Management Refinements
 
-### `useSyncExternalStore` — Right Tool, Right Granularity
+### `useSyncExternalStore` — Right Tool, Right Granularity ✅
 
-✅ Correct for: `LyricsPlayer`, `VoiceActivityStore`, `SessionManager`
+Correctly used for: `LyricsPlayer`, `VoiceActivityStore`
 
-❌ Wrong for: Per-frame audio samples, raw amplitude values
+### ⚠️ ISSUE: Per-Frame State Updates
 
-**Pattern to follow:**
+**Current implementation**: `LyricsPlayer.handleTick()` calls `setState` on every animation frame:
 
 ```typescript
-// src/core/VoiceActivityStore.ts
-type VoiceState = {
-  speaking: boolean
-  level: number        // Smoothed 0-1, not raw samples
-  lastStartAt: number | null
-}
-
-class VoiceActivityStore {
-  private listeners = new Set<() => void>()
-  private state: VoiceState = { speaking: false, level: 0, lastStartAt: null }
-
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
+private handleTick(deltaTime: number): void {
+  if (this.state._tag === "Playing") {
+    const newTime = this.state.currentTime + deltaTime * this.scrollSpeed
+    // This publishes every frame!
+    this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: newTime })
   }
-
-  getSnapshot = () => this.state
-
-  setState(partial: Partial<VoiceState>) {
-    this.state = { ...this.state, ...partial }
-    this.listeners.forEach(l => l())
-  }
-}
-
-export const voiceActivityStore = new VoiceActivityStore()
-
-export function useVoiceActivity() {
-  return useSyncExternalStore(
-    voiceActivityStore.subscribe,
-    voiceActivityStore.getSnapshot,
-  )
 }
 ```
 
-**Key constraint**: Only update stores on **semantic transitions**:
-- `silence → speaking`
-- `speaking → silence`
-- Coarse level buckets (every 50ms, only if `|Δlevel| > 0.05`)
+**Problem**: Every frame while playing triggers React re-renders in all subscribers.
 
-Never push 60fps audio data into React state.
+**Recommended fix**: Only notify listeners when `currentLineIndex` changes:
 
-### Singleton Lifecycle
+```typescript
+private handleTick(deltaTime: number): void {
+  if (this.state._tag !== "Playing") return
+  
+  const oldLineIndex = this.getCurrentLineIndex()
+  const newTime = this.state.currentTime + deltaTime * this.scrollSpeed
+  
+  // Update internal state
+  this.state = { _tag: "Playing", lyrics: this.state.lyrics, currentTime: newTime }
+  
+  // Only notify on semantic changes
+  if (this.getCurrentLineIndex() !== oldLineIndex) {
+    this.notify()
+  }
+}
+```
 
-Singletons are fine but need lifecycle methods for tests and hot-reload:
+### Singleton Lifecycle ✅ IMPLEMENTED
+
+Both `LyricsPlayer` and `VoiceActivityStore` have lifecycle methods:
 
 ```typescript
 class LyricsPlayer {
-  constructor(private now: () => number = () => performance.now()) {}
-  
-  reset() { /* clear state, stop timers */ }
-  dispose() { /* cleanup for tests */ }
+  constructor(private now: () => number = () => performance.now() / 1000) {}
+  reset() { /* implemented */ }
+  dispose() { /* implemented */ }
+  hardReset() { /* for tests and hot-reload */ }
 }
-
-export const lyricsPlayer = new LyricsPlayer()
 ```
 
-Inject clock for deterministic tests.
+Clock injection is supported for deterministic tests.
 
 ---
 
 ## Audio / Real-Time Considerations
 
-### Single AudioContext + Lazy Init
+### Single AudioContext + Lazy Init ✅ IMPLEMENTED
 
 ```typescript
 // src/sounds/SoundSystem.ts
 class SoundSystem {
-  private context: AudioContext | null = null
   private initialized = false
-
-  async initialize(): Promise<AudioContext> {
-    if (this.initialized && this.context) return this.context
-    
+  
+  async initialize(): Promise<void> {
+    if (this.initialized) return
     await Tone.start()
-    this.context = Tone.getContext().rawContext
+    // ... setup synths
     this.initialized = true
-    return this.context
   }
-
-  getAnalyserForVAD(): AnalyserNode {
-    // Returns analyser connected to mic input
-    // VAD uses this, doesn't create own context
+  
+  getAudioContext(): AudioContext | null {
+    return Tone.getContext().rawContext as AudioContext
   }
 }
 ```
 
-### VAD Architecture
+### VAD Architecture ✅ IMPLEMENTED
 
-Keep `lib/voice-detection.ts` **pure** (math only):
+`lib/voice-detection.ts` is **pure** (math only):
 
 ```typescript
-// Pure functions - no Web Audio
-export function computeRMS(samples: Float32Array): number
+export function computeRMSFromByteFrequency(data: Uint8Array): number
+export function smoothLevel(current: number, target: number, factor: number): number
 export function detectVoiceActivity(
-  energy: number,
-  state: VoiceState,
-  config: VADConfig
-): VoiceState
+  level: number,
+  state: VADRuntimeState,
+  config: VADConfig,
+  now: number
+): VADRuntimeState
 ```
 
-Put Web Audio wiring in `core/VoiceActivityStore.ts`:
+Web Audio wiring is in `core/VoiceActivityStore.ts`:
 
 ```typescript
-// Side effects - mic access, audio nodes
 class VoiceActivityStore {
   private analyser: AnalyserNode | null = null
   
   async startListening() {
-    const context = await soundSystem.initialize()
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    // Wire up analyser, start detection loop
+    const analyser = await soundSystem.getMicrophoneAnalyserEffect
+    // Wire up detection loop
   }
 }
 ```
 
-### Smoothing & Hysteresis
-
-In `lib/voice-detection.ts`:
+### Smoothing & Hysteresis ✅ IMPLEMENTED
 
 ```typescript
-export const DEFAULT_VAD_CONFIG = {
-  thresholdOn: 0.15,       // Energy to trigger "speaking"
-  thresholdOff: 0.08,      // Energy to trigger "silent" (hysteresis)
-  holdTimeMs: 150,         // Min time before state change
-  smoothingWindow: 5,      // Moving average samples
+// src/lib/voice-detection.ts
+export const DEFAULT_VAD_CONFIG: VADConfig = {
+  thresholdOn: 0.15,
+  thresholdOff: 0.08,
+  holdTimeMs: 150,
+  smoothingFactor: 0.3,
 }
 ```
 
-### Permission & Recovery
+### Permission & Recovery ⚠️ PARTIAL
 
-Handle these failure paths:
-
-| Scenario | Handling |
-|----------|----------|
-| Mic denied | Degrade to manual scroll, show prompt |
-| Mic lost (Bluetooth disconnect) | Detect, show notification, don't crash |
-| Tab backgrounded | Detect AudioContext suspend, reinit on resume |
-| iOS Safari quirks | Test early, handle `interrupted` state |
+| Scenario | Status |
+|----------|--------|
+| Mic denied | ✅ Sets `permissionDenied: true` in store |
+| UI feedback for denied | ⚠️ VoiceIndicator shows state, but no guidance text |
+| Mic lost (Bluetooth disconnect) | ❌ Not handled |
+| Tab backgrounded | ❌ Not handled |
+| iOS Safari quirks | ❌ Not tested |
 
 ---
 
 ## Performance Optimizations
 
-### Transform-Based Scrolling
-
-Don't use `scrollTop`. Use GPU-accelerated transforms:
+### Transform-Based Scrolling ✅ IMPLEMENTED
 
 ```tsx
-// ❌ Avoid
-containerRef.current.scrollTop = targetY
-
-// ✅ Prefer
+// LyricsDisplay.tsx
 <motion.div
-  style={{ y: scrollYMotion }}
-  transition={springs.scroll}
-/>
+  animate={{ y: -scrollY }}
+  transition={{ type: "tween", duration: 0.5, ease: "easeOut" }}
+>
 ```
 
-Where `scrollYMotion` updates only on semantic events (line change), not per-frame.
+Uses GPU-accelerated transforms, not `scrollTop`.
 
-### Cheap Lyrics DOM
+### Cheap Lyrics DOM ✅ IMPLEMENTED
 
-- Don't wrap every word in a span
-- Group by **line** or **phrase**
-- Only split **current line** into spans for highlight
-- Precompute chord positions ahead of time
+Only current line gets special treatment:
 
 ```tsx
-// Cheap: only current line has word spans
-{lines.map((line, i) => 
-  i === currentIndex 
-    ? <HighlightedLine words={line.words} /> 
-    : <PlainLine text={line.text} />
-)}
+{lyrics.lines.map((line, index) => (
+  <LyricLine
+    isActive={index === currentLineIndex}
+    isPast={index < currentLineIndex}
+  />
+))}
 ```
 
-### Throttle React Updates
+### ⚠️ Throttle React Updates
 
-`LyricsPlayer` should use its own timing loop and only publish coarse events:
-
-```typescript
-class LyricsPlayer {
-  // Internal: runs at 60fps or via requestAnimationFrame
-  private tick() {
-    const now = this.now()
-    const newIndex = this.computeLineIndex(now)
-    
-    // Only notify React on actual changes
-    if (newIndex !== this.state.currentLineIndex) {
-      this.setState({ currentLineIndex: newIndex })
-    }
-  }
-}
-```
-
-Target 10-30Hz for React updates; Motion handles interpolation.
-
-### Motion Layout Sparingly
-
-- Use `layout` prop only on container/line elements that need reflow
-- Avoid animating width/height; prefer translate/scale
-- Test on mid-range Android devices
+As noted above, `LyricsPlayer` publishes every frame. This needs to be fixed per the state management section.
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests (Vitest)
+### Unit Tests
 
-| Module | Test Cases |
-|--------|------------|
-| `lib/lyrics-parser.ts` | Basic LRC, overlapping tags, missing tags, unsorted, empty lines |
-| `lib/voice-detection.ts` | Energy samples → state machine transitions |
-| `lib/tempo-tracker.ts` | Synthetic click tracks → BPM accuracy |
-| `core/LyricsPlayer.ts` | Time source → correct line indices, snap behavior |
+| Module | Status |
+|--------|--------|
+| `lib/lyrics-parser.ts` | ✅ 14 tests |
+| `lib/voice-detection.ts` | ✅ 12 tests |
+| `core/LyricsPlayer.ts` | ✅ 10 tests |
 
-**Inject clock for determinism:**
+Total: 36 tests passing
 
+### Missing Tests
+
+- `VoiceActivityStore` integration tests
+- Hook tests (`useVoiceTrigger`)
+- E2E tests (Playwright, deferred)
+
+---
+
+## API Integration Issues
+
+### ⚠️ CRITICAL: Lyrics Route Effect Misuse
+
+**Current (BROKEN)**:
 ```typescript
-const mockClock = { now: 0 }
-const player = new LyricsPlayer(() => mockClock.now)
-
-mockClock.now = 5000
-player.tick()
-expect(player.state.currentLineIndex).toBe(2)
+// src/app/api/lyrics/route.ts
+const lyrics = await getLyrics(track, artist) // getLyrics returns Effect, not Promise!
 ```
 
-### Hook Tests (Vitest + jsdom)
-
+**Fix**: Use the async wrapper:
 ```typescript
-// Mock Web Audio
-vi.mock('navigator.mediaDevices', () => ({
-  getUserMedia: vi.fn().mockResolvedValue(mockStream)
+import { fetchLyricsWithFallback } from "@/lib/lyrics-client"
+const lyrics = await fetchLyricsWithFallback(track, artist)
+```
+
+### ⚠️ CRITICAL: Search Route Response Shape
+
+**Current**: Returns raw `SpotifySearchResult`:
+```typescript
+const tracks = await searchTracks(query, parsedLimit)
+return NextResponse.json({ tracks }) // tracks is SpotifySearchResult, not array!
+```
+
+**Client expects**: Array of `SearchResultTrack`:
+```typescript
+const data = await response.json()
+setResults(data.tracks ?? []) // Expects SearchResultTrack[]
+```
+
+**Fix**: Normalize in route:
+```typescript
+import { formatArtists, getAlbumImageUrl } from "@/lib/spotify-client"
+
+const result = await searchTracks(query, parsedLimit)
+const tracks = result.tracks.items.map(t => ({
+  id: t.id,
+  name: t.name,
+  artist: formatArtists(t.artists),
+  album: t.album.name,
+  albumArt: getAlbumImageUrl(t.album, "small") ?? undefined,
+  duration: t.duration_ms,
 }))
-
-test('useVoiceDetection starts listening on mount', async () => {
-  const { result } = renderHook(() => useVoiceDetection())
-  await result.current.start()
-  expect(result.current.isListening).toBe(true)
-})
+return NextResponse.json({ tracks })
 ```
 
-### E2E Tests (Playwright, later)
+---
 
-Defer but plan for:
+## Effect.ts Usage Consistency
 
-- Load test song
-- Simulate voice trigger via test flag
-- Assert lyrics advance at mobile viewport
-- Test wake lock behavior
+**Decision**: Domain logic uses Effect, routes use async wrappers.
+
+| Module | Pattern | Status |
+|--------|---------|--------|
+| `spotify-client.ts` | Effect + async wrappers | ✅ Correct |
+| `lyrics-client.ts` | Effect + async wrappers | ✅ Correct |
+| `/api/search` | Uses async wrapper | ✅ Correct |
+| `/api/lyrics` | Awaits Effect directly | ❌ Bug |
 
 ---
 
@@ -339,7 +323,7 @@ Defer but plan for:
 
 ### Manifest-Driven Registries
 
-Extend `songs-manifest.ts`:
+Not yet implemented. Future addition:
 
 ```typescript
 // src/lib/songs-manifest.ts
@@ -347,60 +331,41 @@ export const songsManifest = {
   "demo-wonderwall": {
     title: "Wonderwall",
     artist: "Oasis",
-    source: "local",
     defaultTempo: 87,
-    scrollMode: "voice-triggered",
   },
-  // ...
 }
 ```
 
 ### Helper Modules
 
-Add `src/lib/song-helpers.ts`:
+Partially implemented:
+
+- ✅ `formatArtists()`, `getAlbumImageUrl()` in spotify-client
+- ❌ `normalizeLyrics()`, `normalizeChords()` not yet needed
+
+### Repository Interfaces
+
+Not yet implemented (Phase 8 - User Accounts):
 
 ```typescript
-export function normalizeLyrics(raw: APILyricsResponse): Lyrics
-export function normalizeChords(raw: APIChordResponse): ChordChart
-export function estimateWordTimings(line: LyricLine): WordTiming[]
-```
-
-### Repository Interfaces (for future DB)
-
-Even with DB TBD, define interfaces now:
-
-```typescript
-// src/lib/repositories.ts
 export interface UserProfileRepository {
   get(id: string): Promise<UserProfile | null>
   save(profile: UserProfile): Promise<void>
-  delete(id: string): Promise<void>
-}
-
-export interface SessionRepository {
-  create(session: Session): Promise<string>
-  get(id: string): Promise<Session | null>
-  update(id: string, data: Partial<Session>): Promise<void>
-}
-
-// In-memory implementation for now
-export class InMemoryUserProfileRepository implements UserProfileRepository {
-  private store = new Map<string, UserProfile>()
-  // ...
 }
 ```
 
 ---
 
-## Technical Debt Risks
+## Technical Debt Summary
 
-| Risk | Mitigation |
-|------|------------|
-| Multiple AudioContexts | Enforce SoundSystem as single owner |
-| Singletons without lifecycle | Add `reset()`, `dispose()` methods |
-| VAD mixing pure + side effects | Keep `lib/` pure, side effects in `core/` |
-| DB "TBD" causing API rewrites | Define repository interfaces now |
-| React render storms from audio | Only publish semantic state changes |
+| Issue | Priority | Effort |
+|-------|----------|--------|
+| Lyrics route awaits Effect instead of async wrapper | 🔴 Critical | S |
+| Search route returns raw SpotifySearchResult | 🔴 Critical | S |
+| LyricsPlayer publishes per-frame, not per-line | 🟡 High | M |
+| No guidance text when mic permission denied | 🟡 Medium | S |
+| Debug `console.log` in LyricsDisplay | 🟢 Low | S |
+| Fixed LINE_HEIGHT may break with different fonts | 🟢 Low | M |
 
 ---
 
@@ -410,7 +375,7 @@ Consider more complex solutions if you see:
 
 - VAD accuracy insufficient in noisy venues
 - Scroll stutters on mid-range Android
-- Need multi-user low-latency audio sync
+- Need multi-user low-latency audio sync (Phase 10 - Jam Session)
 
 At that point, consider:
 
