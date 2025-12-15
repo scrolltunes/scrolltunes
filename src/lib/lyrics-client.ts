@@ -273,6 +273,47 @@ export const searchLyrics = (
 }
 
 /**
+ * Fetch lyrics by LRCLIB numeric ID.
+ *
+ * Uses the `/api/get/{id}` endpoint to fetch lyrics by database ID.
+ * Useful when you already have a track ID from a previous search.
+ */
+export const getLyricsById = (id: number): Effect.Effect<Lyrics, LyricsError> => {
+  return Effect.gen(function* () {
+    const response = yield* Effect.tryPromise({
+      try: () => fetch(`${LRCLIB_BASE_URL}/get/${id}`, { headers }),
+      catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
+    })
+
+    if (response.status === 404) {
+      return yield* Effect.fail(
+        new LyricsNotFoundError({ trackName: `ID: ${id}`, artistName: "unknown" }),
+      )
+    }
+
+    if (!response.ok) {
+      return yield* Effect.fail(
+        new LyricsAPIError({ status: response.status, message: response.statusText }),
+      )
+    }
+
+    const data = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<LRCLibResponse>,
+      catch: () => new LyricsAPIError({ status: 0, message: "Failed to parse response" }),
+    })
+
+    if (!data.syncedLyrics) {
+      return yield* Effect.fail(
+        new LyricsNotFoundError({ trackName: data.trackName, artistName: data.artistName }),
+      )
+    }
+
+    const songId = `lrclib-${data.id}`
+    return parseLRC(data.syncedLyrics, songId, data.trackName, data.artistName)
+  })
+}
+
+/**
  * Get lyrics by Spotify track ID.
  *
  * Currently returns Effect.fail since LRCLIB doesn't support Spotify IDs.
@@ -306,6 +347,13 @@ export async function fetchLyrics(
   durationSeconds: number,
 ): Promise<Lyrics> {
   return Effect.runPromise(getLyrics(trackName, artistName, albumName, durationSeconds))
+}
+
+/**
+ * Fetch lyrics by LRCLIB ID (async wrapper).
+ */
+export async function fetchLyricsById(id: number): Promise<Lyrics> {
+  return Effect.runPromise(getLyricsById(id))
 }
 
 /**

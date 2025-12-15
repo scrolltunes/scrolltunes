@@ -1,6 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
+import { extractLrclibId, makeCanonicalPath } from "@/lib/slug"
 import {
   CircleNotch,
   MagnifyingGlass,
@@ -11,6 +12,7 @@ import {
   X,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
+import { useRouter } from "next/navigation"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 
 export interface SearchResultTrack {
@@ -29,7 +31,7 @@ interface SearchApiResponse {
 }
 
 export interface SongSearchProps {
-  readonly onSelectTrack: (track: SearchResultTrack) => void
+  readonly onSelectTrack?: (track: SearchResultTrack) => void
   readonly className?: string
 }
 
@@ -64,6 +66,7 @@ export const SongSearch = memo(function SongSearch({
   onSelectTrack,
   className = "",
 }: SongSearchProps) {
+  const router = useRouter()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResultTrack[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -157,9 +160,19 @@ export const SongSearch = memo(function SongSearch({
 
   const handleTrackClick = useCallback(
     (track: SearchResultTrack) => {
-      onSelectTrack(track)
+      const numericId = extractLrclibId(track.id)
+      if (numericId === null) {
+        onSelectTrack?.(track)
+        return
+      }
+      const canonicalPath = makeCanonicalPath({
+        id: numericId,
+        title: track.name,
+        artist: track.artist,
+      })
+      router.push(canonicalPath)
     },
-    [onSelectTrack],
+    [router, onSelectTrack],
   )
 
   useEffect(() => {

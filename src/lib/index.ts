@@ -77,3 +77,10 @@ export {
   hasMockBpm,
   mockBpmProvider,
 } from "./bpm"
+
+export {
+  toSlug,
+  makeCanonicalPath,
+  parseTrackSlugWithId,
+  extractLrclibId,
+} from "./slug"
