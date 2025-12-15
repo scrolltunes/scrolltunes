@@ -42,3 +42,13 @@ export {
   type Preferences,
   type ThemeMode,
 } from "./PreferencesStore"
+
+export {
+  MetronomeStore,
+  metronomeStore,
+  useMetronome,
+  useMetronomeControls,
+  type MetronomeState,
+  type MetronomeMode,
+  type MetronomeControls,
+} from "./MetronomeStore"

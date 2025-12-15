@@ -1,6 +1,6 @@
 "use client"
 
-import { preferencesStore, type ThemeMode, usePreferences } from "@/core"
+import { type ThemeMode, preferencesStore, usePreferences } from "@/core"
 import {
   ArrowCounterClockwise,
   ArrowLeft,

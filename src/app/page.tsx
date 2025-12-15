@@ -1,6 +1,11 @@
 "use client"
 
-import { ProgressIndicator, TempoControl, VoiceIndicator } from "@/components/audio"
+import {
+  FloatingMetronome,
+  ProgressIndicator,
+  TempoControl,
+  VoiceIndicator,
+} from "@/components/audio"
 import { LyricsDisplay } from "@/components/display"
 import { type SearchResultTrack, SongConfirmation, SongSearch } from "@/components/search"
 import { Attribution } from "@/components/ui"
@@ -34,6 +39,7 @@ export default function Home() {
   const [viewState, setViewState] = useState<ViewState>("search")
   const [selectedTrack, setSelectedTrack] = useState<SearchResultTrack | null>(null)
   const [showControls, setShowControls] = useState(false)
+  const [currentBpm, setCurrentBpm] = useState<number | null>(null)
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
@@ -87,11 +93,7 @@ export default function Home() {
   const handleConfirm = useCallback(
     (lyrics: Lyrics, bpm: number | null, _key: string | null) => {
       load(lyrics)
-      // TODO: Use BPM to adjust scroll speed via setScrollSpeed(bpmToSpeed(bpm))
-      if (bpm) {
-        // Store BPM for potential future use
-        console.log("Song BPM:", bpm)
-      }
+      setCurrentBpm(bpm)
       setViewState("playing")
     },
     [load],
@@ -105,6 +107,7 @@ export default function Home() {
   const handleReset = useCallback(() => {
     reset()
     setSelectedTrack(null)
+    setCurrentBpm(null)
     setViewState("search")
   }, [reset])
 
@@ -229,7 +232,9 @@ export default function Home() {
           </div>
         )}
 
-        {isPlayingView && <LyricsDisplay className={showControls ? "flex-1 pb-48" : "flex-1"} />}
+        {isPlayingView && <LyricsDisplay className="flex-1 pb-12" />}
+
+        {isPlayingView && <FloatingMetronome bpm={currentBpm} position="bottom-right" />}
 
         <AnimatePresence>
           {viewState === "confirming" && selectedTrack && (
@@ -244,41 +249,69 @@ export default function Home() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-900/95 backdrop-blur-lg border-t border-neutral-800"
+              className="fixed bottom-10 left-0 right-0 z-20 bg-neutral-900/95 backdrop-blur-lg border-t border-neutral-800"
             >
               <div className="max-w-4xl mx-auto p-4 space-y-4">
                 <ProgressIndicator />
                 <TempoControl />
-                <Attribution
-                  lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}
-                  bpm={{ name: "GetSongBPM", url: "https://getsongbpm.com" }}
-                />
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Static footer for API attribution - required for GetSongBPM API key verification */}
-        <footer className="fixed bottom-2 left-0 right-0 text-center text-xs text-neutral-600">
-          Powered by{" "}
-          <a
-            href="https://lrclib.net"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
-          >
-            LRCLIB
-          </a>
-          {" & "}
-          <a
-            href="https://getsongbpm.com"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
-          >
-            GetSongBPM
-          </a>
-        </footer>
+        {/* Status bar */}
+        {isPlayingView && (
+          <footer className="fixed bottom-0 left-0 right-0 z-10 bg-neutral-950/80 backdrop-blur-lg border-t border-neutral-800 px-4 py-2">
+            <div className="max-w-4xl mx-auto flex items-center justify-between text-sm text-neutral-500">
+              <span>
+                State: <span className="text-neutral-300">{playerState._tag}</span>
+              </span>
+              <span>
+                Voice:{" "}
+                <span
+                  className={
+                    isSpeaking
+                      ? "text-green-400"
+                      : isListening
+                        ? "text-indigo-400"
+                        : "text-neutral-400"
+                  }
+                >
+                  {isSpeaking ? "Speaking" : isListening ? "Listening" : "Off"}
+                </span>
+                {isListening && <span className="ml-2">Level: {(level * 100).toFixed(0)}%</span>}
+              </span>
+              <Attribution
+                lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}
+                bpm={{ name: "GetSongBPM", url: "https://getsongbpm.com" }}
+              />
+            </div>
+          </footer>
+        )}
+
+        {/* Static footer for non-playing views - required for GetSongBPM API key verification */}
+        {!isPlayingView && (
+          <footer className="fixed bottom-2 left-0 right-0 text-center text-xs text-neutral-600">
+            Powered by{" "}
+            <a
+              href="https://lrclib.net"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
+            >
+              LRCLIB
+            </a>
+            {" & "}
+            <a
+              href="https://getsongbpm.com"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
+            >
+              GetSongBPM
+            </a>
+          </footer>
+        )}
       </main>
     </div>
   )

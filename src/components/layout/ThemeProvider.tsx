@@ -1,7 +1,7 @@
 "use client"
 
 import { preferencesStore } from "@/core"
-import { useEffect, type ReactNode } from "react"
+import { type ReactNode, useEffect } from "react"
 
 export function ThemeProvider({ children }: { readonly children: ReactNode }) {
   useEffect(() => {
@@ -9,8 +9,7 @@ export function ThemeProvider({ children }: { readonly children: ReactNode }) {
 
     function applyTheme() {
       const themeMode = preferencesStore.get("themeMode")
-      const isDark =
-        themeMode === "dark" || (themeMode === "system" && mediaQuery.matches)
+      const isDark = themeMode === "dark" || (themeMode === "system" && mediaQuery.matches)
 
       if (isDark) {
         document.documentElement.classList.add("dark")

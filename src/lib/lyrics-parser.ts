@@ -98,11 +98,23 @@ export function parseLRC(
   // Sort by time
   lyricLines.sort((a, b) => a.time - b.time)
 
+  // Remove consecutive empty lines (keep at most one empty line between sections)
+  const dedupedLines: Array<{ time: number; text: string }> = []
+  let lastWasEmpty = false
+  for (const line of lyricLines) {
+    const isEmpty = !line.text.trim()
+    if (isEmpty && lastWasEmpty) {
+      continue // Skip consecutive empty lines
+    }
+    dedupedLines.push(line)
+    lastWasEmpty = isEmpty
+  }
+
   // Convert to LyricLine format with end times
   const result: LyricLine[] = []
-  for (let i = 0; i < lyricLines.length; i++) {
-    const current = lyricLines[i]
-    const next = lyricLines[i + 1]
+  for (let i = 0; i < dedupedLines.length; i++) {
+    const current = dedupedLines[i]
+    const next = dedupedLines[i + 1]
     if (current) {
       result.push({
         id: `line-${i}`,

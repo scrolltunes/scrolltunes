@@ -1,10 +1,10 @@
 "use client"
 
-import { VoiceIndicator } from "@/components/audio"
+import { FloatingMetronome, VoiceIndicator } from "@/components/audio"
 import { LyricsDisplay } from "@/components/display"
 import { usePlayerControls, usePlayerState } from "@/core"
 import { useDebounce, useVoiceTrigger } from "@/hooks"
-import { MOCK_SONGS, getMockLyrics } from "@/lib/mock-lyrics"
+import { MOCK_SONGS, getMockBpmForSong, getMockLyrics } from "@/lib/mock-lyrics"
 import {
   ArrowCounterClockwise,
   CircleNotch,
@@ -19,6 +19,7 @@ const DEBOUNCE_MS = 300
 
 export default function DemoPage() {
   const [selectedSong, setSelectedSong] = useState<string | null>(null)
+  const [currentBpm, setCurrentBpm] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const { debouncedValue: debouncedQuery, isPending: isSearching } = useDebounce(searchQuery, {
     delayMs: DEBOUNCE_MS,
@@ -39,12 +40,14 @@ export default function DemoPage() {
     if (lyrics) {
       load(lyrics)
       setSelectedSong(songId)
+      setCurrentBpm(getMockBpmForSong(songId))
     }
   }
 
   const handleReset = () => {
     unload()
     setSelectedSong(null)
+    setCurrentBpm(null)
   }
 
   const handleToggleListening = async () => {
@@ -174,6 +177,10 @@ export default function DemoPage() {
 
         {/* Lyrics display (when song loaded) */}
         {playerState._tag !== "Idle" && <LyricsDisplay className="flex-1" />}
+
+        {playerState._tag !== "Idle" && (
+          <FloatingMetronome bpm={currentBpm} position="bottom-right" />
+        )}
 
         {/* Status bar */}
         <footer className="fixed bottom-0 left-0 right-0 bg-neutral-950/80 backdrop-blur-lg border-t border-neutral-800 px-4 py-2">

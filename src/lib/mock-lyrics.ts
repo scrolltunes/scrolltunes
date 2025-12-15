@@ -84,3 +84,18 @@ export const MOCK_SONGS = [
   { id: "demo-song", title: "Demo Song", artist: "ScrollTunes" },
   { id: "long-test", title: "Long Test Song", artist: "ScrollTunes Test" },
 ] as const
+
+/**
+ * BPM values for mock songs
+ */
+export const MOCK_BPM: Record<string, number> = {
+  "demo-song": 120,
+  "long-test": 100,
+}
+
+/**
+ * Get BPM for a mock song by ID
+ */
+export function getMockBpmForSong(songId: string): number | null {
+  return MOCK_BPM[songId] ?? null
+}

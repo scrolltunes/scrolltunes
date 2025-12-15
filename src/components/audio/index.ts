@@ -1,3 +1,6 @@
+export { FloatingMetronome, type FloatingMetronomeProps } from "./FloatingMetronome"
+export { Metronome, type MetronomeProps } from "./Metronome"
+export { MetronomeOrb, type MetronomeOrbProps } from "./MetronomeOrb"
 export { ProgressIndicator, type ProgressIndicatorProps } from "./ProgressIndicator"
 export { TempoControl, type TempoControlProps } from "./TempoControl"
 export { VoiceIndicator, type VoiceIndicatorProps } from "./VoiceIndicator"

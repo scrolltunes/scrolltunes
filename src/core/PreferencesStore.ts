@@ -13,6 +13,7 @@ export interface Preferences {
   readonly autoHideControlsMs: number
   readonly distractionFreeMode: boolean
   readonly themeMode: ThemeMode
+  readonly metronomeEnabled: boolean
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -22,6 +23,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   autoHideControlsMs: 0,
   distractionFreeMode: false,
   themeMode: "dark",
+  metronomeEnabled: true,
 }
 
 export class PreferencesStore {
@@ -129,6 +131,14 @@ export class PreferencesStore {
 
   setThemeMode(value: ThemeMode): void {
     this.setState({ themeMode: value })
+  }
+
+  getMetronomeEnabled(): boolean {
+    return this.state.metronomeEnabled
+  }
+
+  setMetronomeEnabled(value: boolean): void {
+    this.setState({ metronomeEnabled: value })
   }
 
   reset(): void {
