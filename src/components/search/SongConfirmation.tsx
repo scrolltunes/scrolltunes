@@ -113,10 +113,10 @@ export const SongConfirmation = memo(function SongConfirmation({
       transition={springs.default}
     >
       <motion.div
-        className="absolute inset-x-0 bottom-0 bg-neutral-950 border-t border-neutral-800 rounded-t-3xl p-6 pb-8 max-h-[85vh] overflow-y-auto"
-        initial={{ y: "100%" }}
+        className="absolute inset-x-0 top-0 bg-neutral-950 border-b border-neutral-800 rounded-b-3xl p-6 pt-8 max-h-[85vh] overflow-y-auto"
+        initial={{ y: "-100%" }}
         animate={{ y: 0 }}
-        exit={{ y: "100%" }}
+        exit={{ y: "-100%" }}
         transition={springs.default}
       >
         <button
