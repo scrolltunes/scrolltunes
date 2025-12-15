@@ -79,6 +79,15 @@ export default function SongPage() {
 
   const isLoaded = loadState._tag === "Loaded"
 
+  // Stop playback when navigating away (unmount only)
+  const resetRef = useRef(reset)
+  resetRef.current = reset
+  useEffect(() => {
+    return () => {
+      resetRef.current()
+    }
+  }, [])
+
   useWakeLock({ enabled: isLoaded && preferences.wakeLockEnabled })
 
   const { isVisible: isHeaderVisible } = useAutoHide({

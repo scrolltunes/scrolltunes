@@ -1,5 +1,7 @@
 "use client"
 
+import { springs } from "@/animations"
+import { AnimatePresence, motion } from "motion/react"
 import { memo } from "react"
 
 export interface LyricLineProps {
@@ -43,13 +45,23 @@ export const LyricLine = memo(function LyricLine({
       aria-label={`Line ${index + 1}: ${text}`}
     >
       <span
-        className={`block ${textSizeClass} font-medium leading-relaxed ${textColorClass}`}
+        className={`relative z-10 block ${textSizeClass} font-medium leading-relaxed ${textColorClass} transition-colors duration-300`}
         style={fontSize !== undefined ? { fontSize: `${fontSize}px` } : undefined}
       >
         {text}
       </span>
 
-      {isActive && <div className="absolute inset-0 z-0 rounded-lg bg-indigo-500/30" />}
+      <AnimatePresence>
+        {isActive && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={springs.lyricHighlight}
+            className="absolute inset-0 z-0 rounded-lg bg-indigo-500/30"
+          />
+        )}
+      </AnimatePresence>
     </button>
   )
 })
