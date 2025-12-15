@@ -1,12 +1,27 @@
 "use client"
 
-import { VoiceIndicator } from "@/components/audio"
+import { ProgressIndicator, TempoControl, VoiceIndicator } from "@/components/audio"
 import { LyricsDisplay } from "@/components/display"
 import { type SearchResultTrack, SongConfirmation, SongSearch } from "@/components/search"
-import { type Lyrics, usePlayerControls, usePlayerState } from "@/core"
-import { useVoiceTrigger } from "@/hooks"
-import { ArrowCounterClockwise, MusicNote, Pause, Play } from "@phosphor-icons/react"
-import { AnimatePresence } from "motion/react"
+import { type Lyrics, usePlayerControls, usePlayerState, usePreferences } from "@/core"
+import {
+  useAutoHide,
+  useDoubleTap,
+  useKeyboardShortcuts,
+  useShakeDetection,
+  useTempoPreference,
+  useVoiceTrigger,
+  useWakeLock,
+} from "@/hooks"
+import {
+  ArrowCounterClockwise,
+  CaretDown,
+  CaretUp,
+  MusicNote,
+  Pause,
+  Play,
+} from "@phosphor-icons/react"
+import { AnimatePresence, motion } from "motion/react"
 import { useCallback, useState } from "react"
 
 type ViewState = "search" | "confirming" | "playing"
@@ -14,13 +29,50 @@ type ViewState = "search" | "confirming" | "playing"
 export default function Home() {
   const [viewState, setViewState] = useState<ViewState>("search")
   const [selectedTrack, setSelectedTrack] = useState<SearchResultTrack | null>(null)
+  const [showControls, setShowControls] = useState(false)
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
+  const preferences = usePreferences()
 
   const { isListening, isSpeaking, level, startListening, stopListening } = useVoiceTrigger({
     autoPlay: true,
     resumeOnVoice: true,
+  })
+
+  useKeyboardShortcuts({ enabled: viewState === "playing" })
+
+  useTempoPreference({
+    songId: selectedTrack?.id ?? null,
+    autoLoad: true,
+    autoSave: true,
+  })
+
+  const isPlayingView = viewState === "playing"
+
+  useWakeLock({ enabled: isPlayingView && preferences.wakeLockEnabled })
+
+  const { isVisible: isHeaderVisible } = useAutoHide({
+    timeoutMs: preferences.autoHideControlsMs,
+    enabled: isPlayingView && preferences.autoHideControlsMs > 0,
+  })
+
+  const handleTogglePlayPause = useCallback(() => {
+    if (playerState._tag === "Playing") {
+      pause()
+    } else {
+      play()
+    }
+  }, [playerState._tag, play, pause])
+
+  const doubleTapRef = useDoubleTap<HTMLDivElement>({
+    onDoubleTap: handleTogglePlayPause,
+    enabled: isPlayingView && preferences.doubleTapEnabled,
+  })
+
+  useShakeDetection({
+    onShake: reset,
+    enabled: isPlayingView && preferences.shakeToRestartEnabled,
   })
 
   const handleSelectTrack = useCallback((track: SearchResultTrack) => {
@@ -58,56 +110,82 @@ export default function Home() {
   const isPlaying = playerState._tag === "Playing"
   const isReady = playerState._tag !== "Idle"
 
+  const shouldShowHeader = !isPlayingView || isHeaderVisible
+
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
-      <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold flex items-center gap-2">
-            <MusicNote size={24} weight="fill" className="text-indigo-500" />
-            ScrollTunes
-          </h1>
+    <div ref={doubleTapRef} className="min-h-screen bg-neutral-950 text-white">
+      <AnimatePresence>
+        {shouldShowHeader && (
+          <motion.header
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -100, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800"
+          >
+            <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="text-lg font-semibold flex items-center gap-2 hover:opacity-80 transition-opacity"
+              >
+                <MusicNote size={24} weight="fill" className="text-indigo-500" />
+                ScrollTunes
+              </button>
 
-          <div className="flex items-center gap-3">
-            {viewState === "playing" && (
-              <>
-                <VoiceIndicator
-                  isListening={isListening}
-                  isSpeaking={isSpeaking}
-                  level={level}
-                  onToggle={handleToggleListening}
-                  size="sm"
-                />
+              <div className="flex items-center gap-3">
+                {isPlayingView && (
+                  <>
+                    <VoiceIndicator
+                      isListening={isListening}
+                      isSpeaking={isSpeaking}
+                      level={level}
+                      onToggle={handleToggleListening}
+                      size="sm"
+                    />
 
-                {isReady && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => (isPlaying ? pause() : play())}
-                      className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center transition-colors"
-                      aria-label={isPlaying ? "Pause" : "Play"}
-                    >
-                      {isPlaying ? (
-                        <Pause size={20} weight="fill" />
-                      ) : (
-                        <Play size={20} weight="fill" />
-                      )}
-                    </button>
+                    {isReady && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleTogglePlayPause}
+                          className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center transition-colors"
+                          aria-label={isPlaying ? "Pause" : "Play"}
+                        >
+                          {isPlaying ? (
+                            <Pause size={20} weight="fill" />
+                          ) : (
+                            <Play size={20} weight="fill" />
+                          )}
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={handleReset}
-                      className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-                      aria-label="Reset"
-                    >
-                      <ArrowCounterClockwise size={20} />
-                    </button>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={handleReset}
+                          className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+                          aria-label="Reset"
+                        >
+                          <ArrowCounterClockwise size={20} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowControls(prev => !prev)}
+                          className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+                          aria-label={showControls ? "Hide controls" : "Show controls"}
+                          aria-expanded={showControls}
+                        >
+                          {showControls ? <CaretUp size={20} /> : <CaretDown size={20} />}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+              </div>
+            </div>
+          </motion.header>
+        )}
+      </AnimatePresence>
 
       <main className="pt-16 h-screen flex flex-col">
         {viewState === "search" && (
@@ -120,11 +198,28 @@ export default function Home() {
           </div>
         )}
 
-        {viewState === "playing" && <LyricsDisplay className="flex-1" />}
+        {isPlayingView && <LyricsDisplay className={showControls ? "flex-1 pb-48" : "flex-1"} />}
 
         <AnimatePresence>
           {viewState === "confirming" && selectedTrack && (
             <SongConfirmation track={selectedTrack} onConfirm={handleConfirm} onBack={handleBack} />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isPlayingView && showControls && (
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-900/95 backdrop-blur-lg border-t border-neutral-800"
+            >
+              <div className="max-w-4xl mx-auto p-4 space-y-4">
+                <ProgressIndicator />
+                <TempoControl />
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
       </main>

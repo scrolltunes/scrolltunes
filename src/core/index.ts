@@ -33,3 +33,11 @@ export {
   VoiceStop,
   UpdateLevel,
 } from "./VoiceActivityStore"
+
+export {
+  PreferencesStore,
+  preferencesStore,
+  usePreferences,
+  usePreference,
+  type Preferences,
+} from "./PreferencesStore"
