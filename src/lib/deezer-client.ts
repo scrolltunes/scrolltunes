@@ -36,6 +36,34 @@ const DEEZER_BASE_URL = "https://api.deezer.com"
 
 export type AlbumArtSize = "small" | "medium" | "big" | "xl"
 
+// --- Helpers ---
+
+/**
+ * Normalize artist/track name for Deezer search.
+ * - Extracts text from parentheses if present (e.g., "✝✝✝ (Crosses)" → "Crosses")
+ * - Removes non-ASCII symbols that Deezer can't search
+ * - Falls back to original if normalization produces empty string
+ */
+function normalizeForSearch(text: string): string {
+  // Try extracting text from parentheses first (common for alt names)
+  const parenMatch = text.match(/\(([^)]+)\)/)
+  if (parenMatch?.[1]) {
+    const extracted = parenMatch[1].trim()
+    // Only use if it contains mostly ASCII letters
+    if (/^[\w\s'-]+$/i.test(extracted)) {
+      return extracted
+    }
+  }
+
+  // Remove non-ASCII characters and special symbols, keep letters/numbers/spaces
+  const cleaned = text
+    .replace(/[^\w\s'-]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  return cleaned || text
+}
+
 // --- Effect-based Functions ---
 
 /**
@@ -50,7 +78,9 @@ export const searchAlbumArt = (
   size: AlbumArtSize = "medium",
 ): Effect.Effect<string | null, DeezerAPIError> => {
   return Effect.gen(function* () {
-    const query = encodeURIComponent(`${artist} ${track}`)
+    const normalizedArtist = normalizeForSearch(artist)
+    const normalizedTrack = normalizeForSearch(track)
+    const query = encodeURIComponent(`${normalizedArtist} ${normalizedTrack}`)
     const url = `${DEEZER_BASE_URL}/search?q=${query}&limit=1`
 
     const response = yield* Effect.tryPromise({
