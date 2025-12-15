@@ -326,6 +326,14 @@ export class LyricsPlayer {
   }
 
   /**
+   * Unload lyrics and return to Idle state
+   */
+  unload(): void {
+    this.stopPlaybackLoop()
+    this.setState({ _tag: "Idle" })
+  }
+
+  /**
    * Jump to a specific line
    */
   jumpToLine(lineIndex: number): void {
@@ -395,6 +403,7 @@ export function usePlayerControls() {
     pause: () => lyricsPlayer.pause(),
     seek: (time: number) => lyricsPlayer.seek(time),
     reset: () => lyricsPlayer.reset(),
+    unload: () => lyricsPlayer.unload(),
     jumpToLine: (index: number) => lyricsPlayer.jumpToLine(index),
     load: (lyrics: Lyrics, autoPlay?: boolean) => lyricsPlayer.load(lyrics, autoPlay),
     setScrollSpeed: (speed: number) => lyricsPlayer.setScrollSpeed(speed),

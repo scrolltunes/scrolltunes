@@ -12,7 +12,7 @@ export default function AdminPage() {
   const [selectedSong, setSelectedSong] = useState<string | null>(null)
 
   const playerState = usePlayerState()
-  const { play, pause, reset, load } = usePlayerControls()
+  const { play, pause, unload, load } = usePlayerControls()
 
   const { isListening, isSpeaking, level, startListening, stopListening } = useVoiceTrigger({
     autoPlay: true,
@@ -27,6 +27,11 @@ export default function AdminPage() {
       load(lyrics)
       setSelectedSong(songId)
     }
+  }
+
+  const handleReset = () => {
+    unload()
+    setSelectedSong(null)
   }
 
   const handleToggleListening = async () => {
@@ -45,10 +50,14 @@ export default function AdminPage() {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleReset}
+            className="text-lg font-semibold flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
             <MusicNote size={24} weight="fill" className="text-indigo-500" />
-            ScrollTunes Admin
-          </h1>
+            ScrollTunes Demo
+          </button>
 
           <div className="flex items-center gap-3">
             {/* Voice indicator */}
@@ -75,7 +84,7 @@ export default function AdminPage() {
 
                 <button
                   type="button"
-                  onClick={reset}
+                  onClick={handleReset}
                   className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
                   aria-label="Reset"
                 >
