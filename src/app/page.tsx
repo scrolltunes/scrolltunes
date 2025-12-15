@@ -207,7 +207,7 @@ export default function Home() {
 
       <main className="pt-16 h-screen flex flex-col">
         {viewState === "search" && (
-          <div className="flex-1 flex flex-col items-center justify-center p-6">
+          <div className="flex-1 flex flex-col items-center p-6 pt-24">
             <div className="w-full max-w-md text-center mb-8">
               <h2 className="text-2xl font-medium mb-2">Find a song</h2>
               <p className="text-neutral-500">Search for any song to get synced lyrics</p>
@@ -251,7 +251,7 @@ export default function Home() {
           <a
             href="https://lrclib.net"
             target="_blank"
-            rel="noopener"
+            rel="noreferrer noopener"
             className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
           >
             LRCLIB
@@ -260,7 +260,7 @@ export default function Home() {
           <a
             href="https://getsongbpm.com"
             target="_blank"
-            rel="noopener"
+            rel="noreferrer noopener"
             className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
           >
             GetSongBPM

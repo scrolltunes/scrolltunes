@@ -42,12 +42,7 @@ function formatDuration(ms: number): string {
 
 function SearchSkeleton() {
   return (
-    <motion.div
-      key="skeleton"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={springs.default}
+    <div
       className="mt-3 rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800"
       aria-label="Loading search results"
     >
@@ -61,7 +56,7 @@ function SearchSkeleton() {
           <div className="flex-shrink-0 h-4 w-10 rounded bg-neutral-800" />
         </div>
       ))}
-    </motion.div>
+    </div>
   )
 }
 
@@ -72,6 +67,7 @@ export const SongSearch = memo(function SongSearch({
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResultTrack[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isPending, setIsPending] = useState(false) // True immediately on typing
   const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -82,6 +78,7 @@ export const SongSearch = memo(function SongSearch({
       setResults([])
       setHasSearched(false)
       setError(null)
+      setIsPending(false)
       return
     }
 
@@ -111,6 +108,7 @@ export const SongSearch = memo(function SongSearch({
       setResults([])
     } finally {
       setIsLoading(false)
+      setIsPending(false)
     }
   }, [])
 
@@ -121,6 +119,16 @@ export const SongSearch = memo(function SongSearch({
 
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)
+      }
+
+      // Show skeleton immediately on typing
+      if (value.trim()) {
+        setIsPending(true)
+        setError(null)
+      } else {
+        setIsPending(false)
+        setResults([])
+        setHasSearched(false)
       }
 
       debounceRef.current = setTimeout(() => {
@@ -135,6 +143,7 @@ export const SongSearch = memo(function SongSearch({
     setResults([])
     setHasSearched(false)
     setError(null)
+    setIsPending(false)
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
     }
@@ -159,7 +168,8 @@ export const SongSearch = memo(function SongSearch({
 
   return (
     <div className={`w-full ${className}`}>
-      <div className="relative">
+      {/* Search input - fixed position at top */}
+      <div className="relative z-10">
         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
           {isLoading ? (
             <CircleNotch size={20} weight="bold" className="text-indigo-500 animate-spin" />
@@ -195,7 +205,7 @@ export const SongSearch = memo(function SongSearch({
         </AnimatePresence>
       </div>
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {error && (
           <motion.div
             key="error"
@@ -238,29 +248,22 @@ export const SongSearch = memo(function SongSearch({
           </motion.div>
         )}
 
-        {!error && !hasSearched && !isLoading && !query && (
-          <motion.div
-            key="initial"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={springs.default}
-            className="mt-3 p-6 flex items-center justify-center gap-2 text-neutral-600"
-          >
+        {!error && !hasSearched && !isPending && !query && (
+          <div className="mt-3 p-6 flex items-center justify-center gap-2 text-neutral-600">
             <MagnifyingGlass size={16} weight="bold" />
             <span className="text-sm">Search by song title or artist name</span>
-          </motion.div>
+          </div>
         )}
 
-        {!error && isLoading && query && <SearchSkeleton />}
+        {!error && isPending && results.length === 0 && query && <SearchSkeleton />}
 
-        {!error && results.length > 0 && !isLoading && (
+        {!error && results.length > 0 && (
           <motion.ul
             key="results"
-            initial={{ opacity: 0 }}
+            initial={false}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={springs.default}
+            transition={{ duration: 0.15 }}
             className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800"
             aria-label="Search results"
           >
