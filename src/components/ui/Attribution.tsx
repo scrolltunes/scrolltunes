@@ -37,7 +37,7 @@ export const Attribution = memo(function Attribution({
           <a
             href={source.url}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className="text-neutral-400 hover:text-white underline underline-offset-2 transition-colors"
           >
             {source.name}

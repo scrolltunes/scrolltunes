@@ -244,6 +244,28 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Static footer for API attribution - required for GetSongBPM API key verification */}
+        <footer className="fixed bottom-2 left-0 right-0 text-center text-xs text-neutral-600">
+          Powered by{" "}
+          <a
+            href="https://lrclib.net"
+            target="_blank"
+            rel="noopener"
+            className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
+          >
+            LRCLIB
+          </a>
+          {" & "}
+          <a
+            href="https://getsongbpm.com"
+            target="_blank"
+            rel="noopener"
+            className="text-neutral-500 hover:text-neutral-400 underline underline-offset-2"
+          >
+            GetSongBPM
+          </a>
+        </footer>
       </main>
     </div>
   )
