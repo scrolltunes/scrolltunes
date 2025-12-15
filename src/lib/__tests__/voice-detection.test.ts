@@ -70,6 +70,7 @@ describe("detectVoiceActivity", () => {
 
   test("transitions to silent when level drops below off threshold after hold time", () => {
     const runtime = {
+      ...INITIAL_VAD_RUNTIME,
       smoothedLevel: 0.2,
       lastStateChangeTime: 0,
       isSpeaking: true,
@@ -81,6 +82,7 @@ describe("detectVoiceActivity", () => {
 
   test("hysteresis: stays speaking when level is between thresholds", () => {
     const runtime = {
+      ...INITIAL_VAD_RUNTIME,
       smoothedLevel: 0.2,
       lastStateChangeTime: 0,
       isSpeaking: true,

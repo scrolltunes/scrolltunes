@@ -19,6 +19,9 @@ export interface VADConfig {
   readonly thresholdOff: number
   readonly holdTimeMs: number
   readonly smoothingFactor: number
+  readonly burstPeakThreshold: number
+  readonly burstDecayThreshold: number
+  readonly burstWindowMs: number
 }
 
 /**
@@ -28,6 +31,9 @@ export interface VADRuntimeState {
   readonly smoothedLevel: number
   readonly lastStateChangeTime: number
   readonly isSpeaking: boolean
+  readonly lastPeakLevel: number
+  readonly lastPeakTime: number
+  readonly burstDetectedUntil: number
 }
 
 /**
@@ -38,6 +44,9 @@ export const DEFAULT_VAD_CONFIG: VADConfig = {
   thresholdOff: VAD_THRESHOLD_OFF,
   holdTimeMs: VAD_HOLD_TIME_MS,
   smoothingFactor: VAD_SMOOTHING_FACTOR,
+  burstPeakThreshold: 0.4,
+  burstDecayThreshold: 0.2,
+  burstWindowMs: 300,
 }
 
 /**
@@ -47,6 +56,9 @@ export const INITIAL_VAD_RUNTIME: VADRuntimeState = {
   smoothedLevel: 0,
   lastStateChangeTime: 0,
   isSpeaking: false,
+  lastPeakLevel: 0,
+  lastPeakTime: 0,
+  burstDetectedUntil: 0,
 }
 
 /**
@@ -70,6 +82,68 @@ export function smoothLevel(previous: number, sample: number, smoothingFactor: n
 }
 
 /**
+ * Check if currently in a burst suppression window
+ */
+export function isInBurstWindow(runtime: VADRuntimeState, nowMs: number): boolean {
+  return runtime.burstDetectedUntil > nowMs
+}
+
+/**
+ * Detect burst transients (guitar strums) vs sustained sounds (singing)
+ *
+ * Guitar has fast attack + rapid decay, singing has slower attack + sustained plateau.
+ * Returns updated runtime with burst detection state.
+ */
+export function detectBurst(
+  level: number,
+  runtime: VADRuntimeState,
+  config: VADConfig,
+  nowMs: number,
+): VADRuntimeState {
+  const { lastPeakLevel, lastPeakTime, burstDetectedUntil } = runtime
+  const timeSincePeak = nowMs - lastPeakTime
+
+  // Reset peak tracking if stale (> 500ms since last peak)
+  if (timeSincePeak > 500) {
+    return {
+      ...runtime,
+      lastPeakLevel: level,
+      lastPeakTime: nowMs,
+    }
+  }
+
+  // Track new peaks
+  if (level > lastPeakLevel) {
+    return {
+      ...runtime,
+      lastPeakLevel: level,
+      lastPeakTime: nowMs,
+    }
+  }
+
+  // Detect burst: 150-350ms since peak, peak was significant, and rapid decay occurred
+  const decay = lastPeakLevel - level
+  const isInBurstDetectionWindow = timeSincePeak >= 150 && timeSincePeak <= 350
+  const peakWasSignificant = lastPeakLevel > config.burstPeakThreshold
+  const hasRapidDecay = decay > config.burstDecayThreshold
+
+  if (isInBurstDetectionWindow && peakWasSignificant && hasRapidDecay) {
+    return {
+      ...runtime,
+      burstDetectedUntil: nowMs + config.burstWindowMs,
+      lastPeakLevel: 0,
+      lastPeakTime: nowMs,
+    }
+  }
+
+  // Preserve existing burst window if still active
+  return {
+    ...runtime,
+    burstDetectedUntil: burstDetectedUntil > nowMs ? burstDetectedUntil : 0,
+  }
+}
+
+/**
  * Detect voice activity with hysteresis
  *
  * Returns the next runtime state based on current level and config
@@ -86,6 +160,7 @@ export function detectVoiceActivity(
   if (!isSpeaking) {
     if (level > config.thresholdOn && timeSinceLastChange > config.holdTimeMs) {
       return {
+        ...runtime,
         smoothedLevel: level,
         isSpeaking: true,
         lastStateChangeTime: nowMs,
@@ -94,6 +169,7 @@ export function detectVoiceActivity(
   } else {
     if (level < config.thresholdOff && timeSinceLastChange > config.holdTimeMs) {
       return {
+        ...runtime,
         smoothedLevel: level,
         isSpeaking: false,
         lastStateChangeTime: nowMs,

@@ -6,7 +6,9 @@ import {
   type VADConfig,
   type VADRuntimeState,
   computeRMSFromByteFrequency,
+  detectBurst,
   detectVoiceActivity,
+  isInBurstWindow,
   smoothLevel,
 } from "@/lib"
 import {
@@ -104,11 +106,14 @@ export class VoiceActivityStore {
   private lastSileroLevelUpdateAt = 0
   private smoothedSileroLevel = 0
 
-  // Energy-based fallback
+  // Energy-based fallback / parallel monitoring
   private analyser: AnalyserNode | null = null
   private animationFrameId: number | null = null
   private dataArray: Uint8Array<ArrayBuffer> | null = null
   private runtime: VADRuntimeState = INITIAL_VAD_RUNTIME
+
+  // Energy gate for Silero AND-gate (both must agree for voice start)
+  private isEnergySpeaking = false
 
   // --- Observable pattern ---
 
@@ -217,9 +222,30 @@ export class VoiceActivityStore {
           this.sileroEngine.initialize(this.sileroConfig, {
             onSpeechStart: () => {
               if (!this.state.isListening) return // Guard against ghost events
-              vadLog("SILERO", "🎤 SPEECH START detected", {
+
+              const now = Date.now()
+
+              // Check burst window (guitar transient detected)
+              if (isInBurstWindow(this.runtime, now)) {
+                vadLog("SILERO", "Speech start ignored - in burst window (likely guitar)", {
+                  burstUntil: this.runtime.burstDetectedUntil,
+                })
+                return
+              }
+
+              // AND-gate: require energy VAD to also detect speech
+              if (!this.isEnergySpeaking) {
+                vadLog("SILERO", "Speech start ignored - energy gate not speaking", {
+                  threshold: this.sileroConfig.positiveSpeechThreshold,
+                  level: this.smoothedSileroLevel.toFixed(3),
+                })
+                return
+              }
+
+              vadLog("SILERO", "🎤 SPEECH START detected (all gates passed)", {
                 threshold: this.sileroConfig.positiveSpeechThreshold,
                 level: this.smoothedSileroLevel.toFixed(3),
+                energySpeaking: this.isEnergySpeaking,
               })
               Effect.runPromise(
                 Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void),
@@ -262,8 +288,86 @@ export class VoiceActivityStore {
       yield* _(Effect.mapError(this.sileroEngine.start(), e => new VADError({ cause: e })))
 
       vadLog("SILERO", "✅ Silero VAD started successfully")
+
+      // Start energy monitoring in parallel for AND-gate
+      yield* _(
+        Effect.catchAll(this.startEnergyMonitoring(), e => {
+          vadLog("SILERO", "⚠️ Energy monitoring failed to start, AND-gate disabled", {
+            error: String(e),
+          })
+          // Set isEnergySpeaking to true so Silero works alone if energy monitoring fails
+          this.isEnergySpeaking = true
+          return Effect.void
+        }),
+      )
+
       return true
     })
+  }
+
+  // --- Energy monitoring for AND-gate (no event dispatching) ---
+
+  private startEnergyMonitoring(): Effect.Effect<void, VADError> {
+    return Effect.gen(this, function* (_) {
+      vadLog("ENERGY", "Starting energy monitoring for AND-gate...")
+
+      const analyser = yield* _(
+        Effect.mapError(soundSystem.getMicrophoneAnalyserEffect, e => new VADError({ cause: e })),
+      )
+
+      this.analyser = analyser
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
+      this.startEnergyMonitoringLoop()
+
+      vadLog("ENERGY", "✅ Energy monitoring started (AND-gate mode)")
+    })
+  }
+
+  private startEnergyMonitoringLoop(): void {
+    if (this.animationFrameId !== null) return
+
+    const analyze = () => {
+      if (!this.analyser || !this.dataArray) return
+
+      this.analyser.getByteFrequencyData(this.dataArray)
+
+      const rms = computeRMSFromByteFrequency(this.dataArray)
+      const smoothed = smoothLevel(this.runtime.smoothedLevel, rms, this.config.smoothingFactor)
+
+      const now = Date.now()
+
+      // Run burst detection (guitar transients)
+      const burstRuntime = detectBurst(smoothed, this.runtime, this.config, now)
+
+      // Log burst detection
+      if (burstRuntime.burstDetectedUntil > this.runtime.burstDetectedUntil) {
+        vadLog("BURST", "🎸 Burst detected (likely guitar strum)", {
+          peakLevel: burstRuntime.lastPeakLevel.toFixed(3),
+          burstUntil: burstRuntime.burstDetectedUntil,
+        })
+      }
+
+      const prevSpeaking = this.runtime.isSpeaking
+      const nextRuntime = detectVoiceActivity(smoothed, burstRuntime, this.config, now)
+
+      this.runtime = nextRuntime
+
+      // Update isEnergySpeaking for AND-gate, but do NOT dispatch VoiceStart/VoiceStop
+      if (prevSpeaking !== nextRuntime.isSpeaking) {
+        this.isEnergySpeaking = nextRuntime.isSpeaking
+        vadLog("ENERGY-GATE", `Energy speaking state: ${this.isEnergySpeaking}`, {
+          level: smoothed.toFixed(3),
+          threshold: this.config.thresholdOn,
+          inBurstWindow: isInBurstWindow(this.runtime, now),
+        })
+      }
+
+      if (this.state.isListening) {
+        this.animationFrameId = requestAnimationFrame(analyze)
+      }
+    }
+
+    this.animationFrameId = requestAnimationFrame(analyze)
   }
 
   // --- Energy-based fallback ---
@@ -325,11 +429,12 @@ export class VoiceActivityStore {
       this.lastSileroLevelUpdateAt = 0
     }
 
-    // Stop energy-based
+    // Stop energy-based / monitoring
     this.stopAnalysisLoop()
     soundSystem.stopMicrophone()
     this.analyser = null
     this.dataArray = null
+    this.isEnergySpeaking = false
 
     this.setState({
       isListening: false,
@@ -472,6 +577,7 @@ export class VoiceActivityStore {
     soundSystem.stopMicrophone()
     this.analyser = null
     this.dataArray = null
+    this.isEnergySpeaking = false
     this.config = DEFAULT_VAD_CONFIG
     this.sileroConfig = DEFAULT_SILERO_VAD_CONFIG
     this.runtime = INITIAL_VAD_RUNTIME

@@ -5,6 +5,8 @@ export {
   computeRMSFromByteFrequency,
   smoothLevel,
   detectVoiceActivity,
+  detectBurst,
+  isInBurstWindow,
   DEFAULT_VAD_CONFIG,
   INITIAL_VAD_RUNTIME,
   type VADConfig,
