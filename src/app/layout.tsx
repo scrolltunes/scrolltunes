@@ -14,7 +14,19 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "ScrollTunes",
-  description: "Live lyrics teleprompter for musicians",
+  description: "Live lyrics teleprompter for musicians. Voice-triggered scrolling, hands-free control.",
+  metadataBase: new URL("https://scrolltunes.vercel.app"),
+  openGraph: {
+    title: "ScrollTunes",
+    description: "Live lyrics teleprompter for musicians. Voice-triggered scrolling, hands-free control.",
+    siteName: "ScrollTunes",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ScrollTunes",
+    description: "Live lyrics teleprompter for musicians. Voice-triggered scrolling, hands-free control.",
+  },
 }
 
 export default function RootLayout({
