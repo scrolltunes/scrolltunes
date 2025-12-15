@@ -52,7 +52,7 @@ describe("parseLRC", () => {
   })
 
   test("handles multiple timestamps on same line", () => {
-    const lrc = `[00:10.00][00:30.00]Repeated chorus`
+    const lrc = "[00:10.00][00:30.00]Repeated chorus"
 
     const result = parseLRC(lrc, "test-id")
 
@@ -76,7 +76,7 @@ describe("parseLRC", () => {
   })
 
   test("uses default title and artist", () => {
-    const lrc = `[00:05.00]Line`
+    const lrc = "[00:05.00]Line"
 
     const result = parseLRC(lrc, "test-id", "Default Title", "Default Artist")
 

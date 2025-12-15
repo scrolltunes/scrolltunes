@@ -1,8 +1,6 @@
 "use client"
 
 import { memo } from "react"
-import { motion } from "motion/react"
-import { springs } from "@/animations"
 
 export interface LyricLineProps {
   readonly text: string
@@ -14,8 +12,6 @@ export interface LyricLineProps {
 
 /**
  * Single lyric line with active highlighting
- *
- * Uses Motion for smooth transitions between states
  */
 export const LyricLine = memo(function LyricLine({
   text,
@@ -29,40 +25,24 @@ export const LyricLine = memo(function LyricLine({
     return <div className="h-8" aria-hidden="true" />
   }
 
+  const opacityClass = isPast ? "opacity-40" : isActive ? "opacity-100" : "opacity-70"
+  const textColorClass = isActive ? "text-white" : isPast ? "text-neutral-600" : "text-neutral-400"
+
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onClick}
-      className="w-full text-left px-4 py-2 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-      initial={false}
-      animate={{
-        scale: isActive ? 1.02 : 1,
-        opacity: isPast ? 0.4 : isActive ? 1 : 0.7,
-      }}
-      transition={springs.lyricHighlight}
+      className={`relative w-full text-center px-4 py-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${opacityClass}`}
       aria-current={isActive ? "true" : undefined}
       aria-label={`Line ${index + 1}: ${text}`}
     >
-      <motion.span
-        className="block text-2xl md:text-3xl lg:text-4xl font-medium leading-relaxed"
-        animate={{
-          color: isActive ? "#ffffff" : isPast ? "#525252" : "#a3a3a3",
-        }}
-        transition={springs.default}
+      <span
+        className={`block text-2xl md:text-3xl lg:text-4xl font-medium leading-relaxed ${textColorClass}`}
       >
         {text}
-      </motion.span>
+      </span>
 
-      {isActive && (
-        <motion.div
-          className="absolute inset-0 -z-10 rounded-lg bg-indigo-500/10"
-          layoutId="activeHighlight"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={springs.lyricHighlight}
-        />
-      )}
-    </motion.button>
+      {isActive && <div className="absolute inset-0 -z-10 rounded-lg bg-indigo-500/15" />}
+    </button>
   )
 })

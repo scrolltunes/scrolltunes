@@ -25,6 +25,7 @@ export interface VoiceState {
   readonly isSpeaking: boolean
   readonly level: number // 0-1, smoothed energy level
   readonly lastSpeakingAt: number | null // timestamp
+  readonly permissionDenied: boolean
 }
 
 /**
@@ -59,6 +60,7 @@ export class VoiceActivityStore {
     isSpeaking: false,
     level: 0,
     lastSpeakingAt: null,
+    permissionDenied: false,
   }
 
   private config: VADConfig = DEFAULT_VAD_CONFIG
@@ -144,7 +146,7 @@ export class VoiceActivityStore {
       if (this.state.isListening) return
 
       const analyser = yield* _(
-        Effect.mapError(soundSystem.getMicrophoneAnalyserEffect, (e) => new VADError({ cause: e })),
+        Effect.mapError(soundSystem.getMicrophoneAnalyserEffect, e => new VADError({ cause: e })),
       )
 
       this.analyser = analyser
@@ -200,20 +202,11 @@ export class VoiceActivityStore {
       this.analyser.getByteFrequencyData(this.dataArray)
 
       const rms = computeRMSFromByteFrequency(this.dataArray)
-      const smoothed = smoothLevel(
-        this.runtime.smoothedLevel,
-        rms,
-        this.config.smoothingFactor,
-      )
+      const smoothed = smoothLevel(this.runtime.smoothedLevel, rms, this.config.smoothingFactor)
 
       const now = Date.now()
       const prevSpeaking = this.runtime.isSpeaking
-      const nextRuntime = detectVoiceActivity(
-        smoothed,
-        this.runtime,
-        this.config,
-        now,
-      )
+      const nextRuntime = detectVoiceActivity(smoothed, this.runtime, this.config, now)
 
       this.runtime = nextRuntime
 
@@ -246,8 +239,11 @@ export class VoiceActivityStore {
 
   async startListening(): Promise<void> {
     await Effect.runPromise(
-      Effect.catchAll(this.startListeningEffect, (e) => {
+      Effect.catchAll(this.startListeningEffect, e => {
         console.error("Failed to start listening:", e)
+        if (e.cause && e.cause._tag === "MicPermissionDenied") {
+          this.setState({ permissionDenied: true })
+        }
         return Effect.void
       }),
     )
@@ -295,6 +291,7 @@ export class VoiceActivityStore {
       isSpeaking: false,
       level: 0,
       lastSpeakingAt: null,
+      permissionDenied: false,
     }
     this.notify()
   }

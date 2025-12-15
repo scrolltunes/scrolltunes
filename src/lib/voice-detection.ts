@@ -65,11 +65,7 @@ export function computeRMSFromByteFrequency(data: Uint8Array): number {
 /**
  * Apply exponential smoothing to a level value
  */
-export function smoothLevel(
-  previous: number,
-  sample: number,
-  smoothingFactor: number,
-): number {
+export function smoothLevel(previous: number, sample: number, smoothingFactor: number): number {
   return smoothingFactor * sample + (1 - smoothingFactor) * previous
 }
 

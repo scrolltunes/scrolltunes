@@ -147,7 +147,7 @@ class SoundSystem {
       yield* _(
         Effect.tryPromise({
           try: () => this.initialize(),
-          catch: (e) => new AudioNotInitialized({}),
+          catch: e => new AudioNotInitialized({}),
         }),
       )
 
@@ -166,7 +166,7 @@ class SoundSystem {
                 autoGainControl: true,
               },
             }),
-          catch: (e) => new MicPermissionDenied({ cause: e }),
+          catch: e => new MicPermissionDenied({ cause: e }),
         }),
       )
 

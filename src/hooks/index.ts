@@ -1,4 +1,1 @@
-// Custom hooks exports
-// Will contain: useVoiceDetection, useLyricsSync, useWakeLock, etc.
-
-export {}
+export { useVoiceTrigger, type UseVoiceTriggerOptions } from "./useVoiceTrigger"

@@ -78,7 +78,7 @@ export function parseLRC(
     let match: RegExpExecArray | null
     let lastIndex = 0
 
-    while ((match = timestampRegex.exec(trimmed)) !== null) {
+    for (match = timestampRegex.exec(trimmed); match !== null; match = timestampRegex.exec(trimmed)) {
       timestamps.push(parseTimestamp(match[0]))
       lastIndex = match.index + match[0].length
     }

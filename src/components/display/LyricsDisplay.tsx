@@ -1,10 +1,9 @@
 "use client"
 
 import { useRef, useEffect, useState, useCallback } from "react"
-import { motion, useMotionValue, useSpring, type MotionValue } from "motion/react"
+import { motion } from "motion/react"
 import { usePlayerState, useCurrentLineIndex, usePlayerControls } from "@/core"
 import { LyricLine } from "./LyricLine"
-import { springs } from "@/animations"
 
 const LINE_HEIGHT = 64 // Approximate height of each line in pixels
 const SCROLL_OVERRIDE_TIMEOUT = 3000 // Resume auto-scroll after 3 seconds
@@ -27,33 +26,25 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   // Manual scroll override state
   const [isManualScrolling, setIsManualScrolling] = useState(false)
+  const [scrollY, setScrollY] = useState(0)
   const manualScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Motion values for smooth scrolling
-  const scrollY = useMotionValue(0)
-  const smoothScrollY = useSpring(scrollY, {
-    stiffness: springs.scroll.stiffness,
-    damping: springs.scroll.damping,
-    mass: springs.scroll.mass,
-  })
 
   // Get lyrics from state
   const lyrics = state._tag !== "Idle" ? state.lyrics : null
 
   // Calculate target scroll position based on current line
+  // With py-[50vh] padding, line 0 starts centered, so we just scroll up by line offset
   const getTargetScrollY = useCallback((lineIndex: number): number => {
-    if (!containerRef.current) return 0
-    const containerHeight = containerRef.current.clientHeight
-    const targetY = lineIndex * LINE_HEIGHT - containerHeight / 2 + LINE_HEIGHT / 2
-    return Math.max(0, targetY)
+    return lineIndex * LINE_HEIGHT
   }, [])
 
   // Update scroll position when current line changes (if not manually scrolling)
   useEffect(() => {
     if (isManualScrolling || !lyrics) return
     const targetY = getTargetScrollY(currentLineIndex)
-    scrollY.set(targetY)
-  }, [currentLineIndex, isManualScrolling, lyrics, scrollY, getTargetScrollY])
+    console.log("Scrolling to line", currentLineIndex, "targetY:", targetY)
+    setScrollY(targetY)
+  }, [currentLineIndex, isManualScrolling, lyrics, getTargetScrollY])
 
   // Handle manual scroll detection
   const handleUserScroll = useCallback(() => {
@@ -74,10 +65,9 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       handleUserScroll()
-      // Manually adjust scroll position
-      scrollY.set(scrollY.get() + e.deltaY)
+      setScrollY(prev => prev + e.deltaY)
     },
-    [handleUserScroll, scrollY],
+    [handleUserScroll],
   )
 
   // Handle touch events for mobile
@@ -91,16 +81,13 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     [handleUserScroll],
   )
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      if (touchStartY.current === null) return
-      const currentY = e.touches[0]?.clientY ?? 0
-      const deltaY = touchStartY.current - currentY
-      touchStartY.current = currentY
-      scrollY.set(scrollY.get() + deltaY)
-    },
-    [scrollY],
-  )
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartY.current === null) return
+    const currentY = e.touches[0]?.clientY ?? 0
+    const deltaY = touchStartY.current - currentY
+    touchStartY.current = currentY
+    setScrollY(prev => prev + deltaY)
+  }, [])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -135,9 +122,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
-      role="region"
-      aria-label="Lyrics display"
-      aria-live="polite"
+aria-label="Lyrics display"
     >
       {/* Manual scroll indicator */}
       {isManualScrolling && (
@@ -147,11 +132,9 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       )}
 
       <motion.div
-        className="py-[50vh]"
-        style={{
-          y: smoothScrollY as unknown as MotionValue<number>,
-          transform: "translateY(calc(var(--motion-translateY) * -1))",
-        }}
+        className="pt-[30vh] pb-[50vh] max-w-4xl mx-auto"
+        animate={{ y: -scrollY }}
+        transition={{ type: "tween", duration: 0.5, ease: "easeOut" }}
       >
         {lyrics.lines.map((line, index) => (
           <LyricLine

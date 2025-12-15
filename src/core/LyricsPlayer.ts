@@ -2,11 +2,7 @@
 
 import { Effect, Data } from "effect"
 import { useSyncExternalStore } from "react"
-import {
-  DEFAULT_SCROLL_SPEED,
-  MIN_SCROLL_SPEED,
-  MAX_SCROLL_SPEED,
-} from "@/constants"
+import { DEFAULT_SCROLL_SPEED, MIN_SCROLL_SPEED, MAX_SCROLL_SPEED } from "@/constants"
 
 // --- Types ---
 
