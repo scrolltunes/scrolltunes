@@ -40,8 +40,8 @@ scrolltunes/
 │   ├── profile/
 │   │   └── page.tsx              # User profile
 │   └── api/                      # API routes
+│       ├── search/route.ts       # LRCLIB song search
 │       ├── lyrics/route.ts
-│       ├── spotify/route.ts
 │       └── session/route.ts
 │
 ├── src/
@@ -90,7 +90,7 @@ scrolltunes/
 │   │
 │   ├── lib/                      # Core library code
 │   │   ├── lyrics-parser.ts      # LRC/timestamp parsing
-│   │   ├── spotify-client.ts     # Spotify API wrapper
+│   │   ├── lrclib-client.ts      # LRCLIB API wrapper
 │   │   ├── voice-detection.ts    # VAD algorithms
 │   │   ├── tempo-tracker.ts      # Beat detection
 │   │   └── songs-manifest.ts     # Song registry (like examples-manifest)
@@ -572,9 +572,8 @@ Key principles:
 ### Internal API Routes
 
 ```
+/api/search              # Search songs via LRCLIB
 /api/lyrics/[songId]     # Fetch lyrics (proxy to avoid CORS)
-/api/spotify/search      # Search songs
-/api/spotify/track/[id]  # Get track metadata
 /api/session/create      # Create jam session
 /api/session/[id]/join   # Join session
 /api/session/[id]/queue  # Manage song queue
@@ -582,11 +581,11 @@ Key principles:
 
 ### External Services
 
-| Service | Purpose | Auth |
-|---------|---------|------|
-| Spotify | Song search, metadata, tempo | OAuth 2.0 |
-| Musixmatch / Genius | Lyrics with timestamps | API Key |
-| Ultimate Guitar | Chord charts | TBD |
+| Service | Purpose | Auth | Status |
+|---------|---------|------|--------|
+| LRCLIB | Song search, synced lyrics | None (public API) | Current |
+| Spotify | Enhanced metadata, tempo, popularity | OAuth 2.0 | Future |
+| Ultimate Guitar | Chord charts | TBD | Future |
 
 ## Development Workflow
 
@@ -654,12 +653,7 @@ bun run check        # lint + typecheck + test (pre-commit)
 ```json
 {
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "env": {
-    "SPOTIFY_CLIENT_ID": "@spotify-client-id",
-    "SPOTIFY_CLIENT_SECRET": "@spotify-client-secret",
-    "LYRICS_API_KEY": "@lyrics-api-key"
-  }
+  "regions": ["iad1"]
 }
 ```
 

@@ -1,4 +1,10 @@
-import { LyricsAPIError, LyricsNotFoundError, getLyrics, searchLyrics } from "@/lib/lyrics-client"
+import {
+  LyricsAPIError,
+  LyricsNotFoundError,
+  getLyrics,
+  getLyricsCached,
+  searchLyrics,
+} from "@/lib/lyrics-client"
 import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
 
@@ -6,6 +12,10 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const track = searchParams.get("track")
   const artist = searchParams.get("artist")
+  const album = searchParams.get("album")
+  const rawDuration = searchParams.get("duration")
+  const parsed = rawDuration !== null ? Number.parseFloat(rawDuration) : undefined
+  const durationSeconds = parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined
   const id = searchParams.get("id")
 
   if (id) {
@@ -19,7 +29,16 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const effect = Effect.orElse(getLyrics(track, artist), () => searchLyrics(track, artist))
+  const effect = Effect.orElse(
+    getLyricsCached(track, artist, album ?? "", durationSeconds ?? 0),
+    () => getLyrics(track, artist, album ?? "", durationSeconds ?? 0),
+  ).pipe(
+    Effect.catchAll((error) =>
+      error instanceof LyricsNotFoundError
+        ? searchLyrics(track, artist, album ?? undefined)
+        : Effect.fail(error),
+    ),
+  )
 
   const result = await Effect.runPromiseExit(effect)
 

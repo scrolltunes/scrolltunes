@@ -6,6 +6,12 @@ import { ArrowLeft, Play, SpinnerGap, Warning } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { memo, useEffect, useState } from "react"
 
+interface LyricsApiResponse {
+  readonly lyrics?: Lyrics
+  readonly attribution?: string
+  readonly error?: string
+}
+
 export interface SongConfirmationProps {
   readonly track: {
     readonly id: string
@@ -41,6 +47,8 @@ export const SongConfirmation = memo(function SongConfirmation({
         const params = new URLSearchParams({
           track: track.name,
           artist: track.artist,
+          album: track.album,
+          duration: (track.duration / 1000).toString(),
         })
         const response = await fetch(`/api/lyrics?${params.toString()}`, {
           signal: controller.signal,
@@ -50,7 +58,7 @@ export const SongConfirmation = memo(function SongConfirmation({
           throw new Error("Failed to fetch lyrics")
         }
 
-        const data = await response.json()
+        const data: LyricsApiResponse = await response.json()
 
         if (!data.lyrics || data.lyrics.lines.length === 0) {
           setFetchState({ _tag: "error", message: "No synced lyrics found for this track" })
@@ -74,7 +82,7 @@ export const SongConfirmation = memo(function SongConfirmation({
     return () => {
       controller.abort()
     }
-  }, [track.name, track.artist])
+  }, [track.name, track.artist, track.album, track.duration])
 
   const formatDuration = (ms: number): string => {
     const totalSeconds = Math.floor(ms / 1000)

@@ -80,19 +80,13 @@
 
 ## Phase 4: Song Search & Lyrics API ✅
 
-### Spotify Integration
-- [x] Set up Spotify OAuth flow (client credentials)
-- [x] Create `src/lib/spotify-client.ts`
-- [x] Implement song search API route
-- [x] Implement track metadata fetch
-- [x] Store tokens securely (in-memory cache with auto-refresh)
-
-### Lyrics API
+### LRCLIB Integration
 - [x] Choose lyrics provider (lrclib.net - free, synced LRC)
 - [x] Create `src/lib/lyrics-client.ts`
 - [x] Implement lyrics fetch API route
 - [x] Handle missing lyrics gracefully
 - [x] Add lyrics attribution as required
+- [x] Implement song search via LRCLIB API
 
 ### UI
 - [x] Create song search component
@@ -146,7 +140,8 @@
 - [x] Improve error states (API failures, no lyrics found)
 - [x] Add loading skeletons for search results
 - [x] Add "no results" empty state with suggestions
-- [ ] Improve lyrics attribution display
+- [ ] Display lyrics attribution in UI (API already returns it)
+- [ ] Skip lyrics fetch when `hasLyrics === false` (show error immediately)
 
 ### Visual Polish
 - [ ] Refine typography and spacing
@@ -224,6 +219,24 @@
 - [ ] Multi-language support
 - [ ] Offline mode / setlist caching
 
+### Code Quality
+- [ ] Wrap client-side fetch calls in Effect for consistency
+- [ ] Add Effect-based caching layer for LyricsPlayer
+- [ ] Use Effect Schema or Zod for API response validation
+
+---
+
+## V3 Features (Future)
+
+### Spotify Integration
+- [ ] Set up Spotify OAuth flow (client credentials)
+- [ ] Create `src/lib/spotify-client.ts`
+- [ ] Implement song search API route with Spotify
+- [ ] Implement track metadata fetch (tempo, BPM)
+- [ ] Store tokens securely (in-memory cache with auto-refresh)
+- [ ] Merge Spotify search results with LRCLIB lyrics availability
+- [ ] Add album art from Spotify to search results
+
 ---
 
 ## Current Focus
@@ -233,13 +246,12 @@
 **Completed:** Phase 0, 1, 2, 3, 4, 5, 6
 
 **Active:** Phase 7 - Single-User Polish
-- Settings UI for preferences
-- Mobile testing
 - UX improvements
+- Mobile testing
 
 **Blocked:** Nothing
 
-**Next:** Phase 8 (Song Management - Local)
+**Next:** Phase 8 (Song Management - Local), then V2 features
 
 ---
 
@@ -266,7 +278,7 @@ User clicks mic → VoiceActivityStore.startListening()
 | Animation | Motion | Spring-based, GPU-accelerated |
 | State | Effect.ts | Tagged events, type-safe |
 | Lyrics Source | LRCLIB | Free, synced LRC format |
-| Song Search | Spotify API | Client credentials flow |
+| Song Search | LRCLIB | Direct search by artist/title |
 
 ### Demo Page
 Access `/demo` to test voice detection with mock lyrics without needing Spotify/LRCLIB integration.

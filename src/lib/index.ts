@@ -27,15 +27,20 @@ export {
 
 export {
   getLyrics,
+  getLyricsCached,
   searchLyrics,
+  searchLRCLibTracks,
   getLyricsBySpotifyId,
   fetchLyrics,
+  fetchLyricsCached,
   fetchLyricsSearch,
+  fetchLRCLibTracks,
   fetchLyricsWithFallback,
   LyricsNotFoundError,
   LyricsAPIError,
   type LyricsError,
   type LRCLibResponse,
+  type LRCLibTrackResult,
 } from "./lyrics-client"
 
 export { haptic, isHapticSupported, type HapticPattern } from "./haptics"

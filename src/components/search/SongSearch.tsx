@@ -6,6 +6,7 @@ import {
   MagnifyingGlass,
   MusicNote,
   MusicNoteSimple,
+  TextAa,
   WarningCircle,
   X,
 } from "@phosphor-icons/react"
@@ -19,6 +20,12 @@ export interface SearchResultTrack {
   readonly album: string
   readonly albumArt?: string
   readonly duration: number
+  readonly hasLyrics?: boolean
+}
+
+interface SearchApiResponse {
+  readonly tracks: SearchResultTrack[]
+  readonly error?: string
 }
 
 export interface SongSearchProps {
@@ -93,7 +100,7 @@ export const SongSearch = memo(function SongSearch({
         throw new Error("Search failed")
       }
 
-      const data = await response.json()
+      const data: SearchApiResponse = await response.json()
       setResults(data.tracks ?? [])
       setHasSearched(true)
     } catch (err) {
@@ -292,6 +299,15 @@ export const SongSearch = memo(function SongSearch({
                   <span className="flex-shrink-0 text-sm text-neutral-600 tabular-nums">
                     {formatDuration(track.duration)}
                   </span>
+
+                  {track.hasLyrics && (
+                    <span
+                      className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-xs font-medium text-green-400 bg-green-400/10 rounded"
+                      title="Synced lyrics available"
+                    >
+                      <TextAa size={14} weight="bold" className="inline" />
+                    </span>
+                  )}
                 </button>
               </motion.li>
             ))}
