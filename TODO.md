@@ -88,6 +88,23 @@
 - [x] Add lyrics attribution as required
 - [x] Implement song search via LRCLIB API
 
+### GetSongBPM Integration ✅
+- [x] Create `src/lib/bpm/` module with provider abstraction
+- [x] Implement GetSongBPM API client (`getsongbpm-client.ts`)
+- [x] Add tagged error classes (BPMNotFoundError, BPMAPIError, BPMRateLimitError)
+- [x] Implement server-side in-memory cache
+- [x] Implement client-side localStorage cache utilities
+- [x] Integrate BPM lookup into `/api/lyrics` route
+- [x] Add required attribution (backlinks to getsongbpm.com)
+- [x] Create shared `LyricsApiResponse` types
+- [x] Add normalization for "feat.", remix suffixes, parentheticals
+- [x] Write comprehensive tests (47 BPM tests)
+
+### BPM Integration (Pending)
+- [ ] Use BPM to auto-adjust scroll speed in LyricsPlayer
+- [ ] Wire localStorage BPM cache on client (getCachedBpm/setCachedBpm)
+- [ ] Add tests for localStorage BPM cache utilities
+
 ### UI
 - [x] Create song search component
 - [x] Create song selection/confirmation screen
@@ -279,6 +296,23 @@ User clicks mic → VoiceActivityStore.startListening()
 | State | Effect.ts | Tagged events, type-safe |
 | Lyrics Source | LRCLIB | Free, synced LRC format |
 | Song Search | LRCLIB | Direct search by artist/title |
+| BPM Data | GetSongBPM | Free tier, API key required, backlink mandatory |
+
+### BPM Integration
+```
+/api/lyrics request
+  → getLyricsCached() || getLyrics() || searchLyrics() [Effect chain]
+  → getBpmWithFallback([withInMemoryCache(getSongBpmProvider)])
+  → normalizeTrackKey() strips "feat.", remixes, parentheticals
+  → GetSongBPM API: https://api.getsong.co/search/
+  → Returns { lyrics, bpm, key, attribution }
+  → SongConfirmation passes bpm to onConfirm
+  → (TODO) LyricsPlayer.setScrollSpeed() based on BPM
+```
+
+**Rate Limit:** 3000 req/hour, enforced at 1.2s intervals
+**Attribution:** Required backlink shown in playback controls
+**API Key:** Set `GETSONGBPM_API_KEY` in `.env` (get from https://getsongbpm.com/api)
 
 ### Demo Page
 Access `/demo` to test voice detection with mock lyrics without needing Spotify/LRCLIB integration.

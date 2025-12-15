@@ -1,16 +1,12 @@
 "use client"
 
 import { springs } from "@/animations"
+import { Attribution } from "@/components/ui"
 import type { Lyrics } from "@/core"
+import { type LyricsApiAttribution, type LyricsApiResponse, isLyricsApiSuccess } from "@/lib"
 import { ArrowLeft, Play, SpinnerGap, Warning } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { memo, useEffect, useState } from "react"
-
-interface LyricsApiResponse {
-  readonly lyrics?: Lyrics
-  readonly attribution?: string
-  readonly error?: string
-}
 
 export interface SongConfirmationProps {
   readonly track: {
@@ -21,14 +17,20 @@ export interface SongConfirmationProps {
     readonly albumArt?: string
     readonly duration: number
   }
-  readonly onConfirm: (lyrics: Lyrics) => void
+  readonly onConfirm: (lyrics: Lyrics, bpm: number | null, key: string | null) => void
   readonly onBack: () => void
   readonly className?: string
 }
 
 type FetchState =
   | { readonly _tag: "loading" }
-  | { readonly _tag: "success"; readonly lyrics: Lyrics }
+  | {
+      readonly _tag: "success"
+      readonly lyrics: Lyrics
+      readonly bpm: number | null
+      readonly key: string | null
+      readonly attribution?: LyricsApiAttribution | undefined
+    }
   | { readonly _tag: "error"; readonly message: string }
 
 export const SongConfirmation = memo(function SongConfirmation({
@@ -60,12 +62,23 @@ export const SongConfirmation = memo(function SongConfirmation({
 
         const data: LyricsApiResponse = await response.json()
 
-        if (!data.lyrics || data.lyrics.lines.length === 0) {
+        if (!isLyricsApiSuccess(data)) {
+          setFetchState({ _tag: "error", message: data.error })
+          return
+        }
+
+        if (data.lyrics.lines.length === 0) {
           setFetchState({ _tag: "error", message: "No synced lyrics found for this track" })
           return
         }
 
-        setFetchState({ _tag: "success", lyrics: data.lyrics })
+        setFetchState({
+          _tag: "success",
+          lyrics: data.lyrics,
+          bpm: data.bpm,
+          key: data.key,
+          attribution: data.attribution,
+        })
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           return
@@ -169,12 +182,19 @@ export const SongConfirmation = memo(function SongConfirmation({
                 <p className="text-green-400 font-medium">Ready to play</p>
                 <button
                   type="button"
-                  onClick={() => onConfirm(fetchState.lyrics)}
+                  onClick={() => onConfirm(fetchState.lyrics, fetchState.bpm, fetchState.key)}
                   className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-colors"
                 >
                   <Play size={24} weight="fill" />
                   <span>Start</span>
                 </button>
+                {fetchState.attribution && (
+                  <Attribution
+                    lyrics={fetchState.attribution.lyrics}
+                    bpm={fetchState.attribution.bpm}
+                    className="mt-2"
+                  />
+                )}
               </div>
             )}
 
@@ -188,20 +208,24 @@ export const SongConfirmation = memo(function SongConfirmation({
                   <button
                     type="button"
                     onClick={() =>
-                      onConfirm({
-                        songId: track.id,
-                        title: track.name,
-                        artist: track.artist,
-                        duration: track.duration / 1000,
-                        lines: [
-                          {
-                            id: "placeholder",
-                            text: "No synced lyrics available",
-                            startTime: 0,
-                            endTime: track.duration / 1000,
-                          },
-                        ],
-                      })
+                      onConfirm(
+                        {
+                          songId: track.id,
+                          title: track.name,
+                          artist: track.artist,
+                          duration: track.duration / 1000,
+                          lines: [
+                            {
+                              id: "placeholder",
+                              text: "No synced lyrics available",
+                              startTime: 0,
+                              endTime: track.duration / 1000,
+                            },
+                          ],
+                        },
+                        null,
+                        null,
+                      )
                     }
                     className="w-full px-6 py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-medium rounded-xl transition-colors"
                   >

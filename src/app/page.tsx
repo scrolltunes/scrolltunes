@@ -3,6 +3,7 @@
 import { ProgressIndicator, TempoControl, VoiceIndicator } from "@/components/audio"
 import { LyricsDisplay } from "@/components/display"
 import { type SearchResultTrack, SongConfirmation, SongSearch } from "@/components/search"
+import { Attribution } from "@/components/ui"
 import { type Lyrics, usePlayerControls, usePlayerState, usePreferences } from "@/core"
 import {
   useAutoHide,
@@ -83,8 +84,13 @@ export default function Home() {
   }, [])
 
   const handleConfirm = useCallback(
-    (lyrics: Lyrics) => {
+    (lyrics: Lyrics, bpm: number | null, _key: string | null) => {
       load(lyrics)
+      // TODO: Use BPM to adjust scroll speed via setScrollSpeed(bpmToSpeed(bpm))
+      if (bpm) {
+        // Store BPM for potential future use
+        console.log("Song BPM:", bpm)
+      }
       setViewState("playing")
     },
     [load],
@@ -230,6 +236,10 @@ export default function Home() {
               <div className="max-w-4xl mx-auto p-4 space-y-4">
                 <ProgressIndicator />
                 <TempoControl />
+                <Attribution
+                  lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}
+                  bpm={{ name: "GetSongBPM", url: "https://getsongbpm.com" }}
+                />
               </div>
             </motion.div>
           )}

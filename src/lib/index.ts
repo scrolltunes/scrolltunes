@@ -44,3 +44,36 @@ export {
 } from "./lyrics-client"
 
 export { haptic, isHapticSupported, type HapticPattern } from "./haptics"
+
+export {
+  type AttributionSource as LyricsAttributionSource,
+  type LyricsApiAttribution,
+  type LyricsApiSuccessResponse,
+  type LyricsApiErrorResponse,
+  type LyricsApiResponse,
+  isLyricsApiSuccess,
+} from "./lyrics-api-types"
+
+// BPM domain
+export {
+  type BPMTrackQuery,
+  type BPMResult,
+  type NormalizedTrackKey,
+  normalizeTrackKey,
+  makeCacheKey,
+  type BPMError,
+  BPMNotFoundError,
+  BPMAPIError,
+  BPMRateLimitError,
+  type BPMProvider,
+  getBpmWithFallback,
+  getSongBpmProvider,
+  withInMemoryCache,
+  clearBpmCache,
+  getCachedBpm,
+  setCachedBpm,
+  clearLocalBpmCache,
+  getMockBpm,
+  hasMockBpm,
+  mockBpmProvider,
+} from "./bpm"

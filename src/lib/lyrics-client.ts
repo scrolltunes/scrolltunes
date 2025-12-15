@@ -210,7 +210,7 @@ export const searchLRCLibTracks = (
       catch: () => new LyricsAPIError({ status: 0, message: "Failed to parse response" }),
     })
 
-    return results.map((r) => ({
+    return results.map(r => ({
       id: r.id,
       trackName: r.trackName,
       artistName: r.artistName,
@@ -257,7 +257,7 @@ export const searchLyrics = (
       catch: () => new LyricsAPIError({ status: 0, message: "Failed to parse response" }),
     })
 
-    const syncedResult = results.find((r) => r.syncedLyrics)
+    const syncedResult = results.find(r => r.syncedLyrics)
     if (!syncedResult?.syncedLyrics) {
       return yield* Effect.fail(new LyricsNotFoundError({ trackName, artistName }))
     }

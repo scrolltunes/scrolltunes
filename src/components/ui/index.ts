@@ -1,4 +1,3 @@
 // UI component exports
-// Will contain: Button, Slider, Modal, etc.
 
-export {}
+export { Attribution, type AttributionProps, type AttributionSource } from "./Attribution"

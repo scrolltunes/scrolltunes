@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const effect = Effect.map(searchLRCLibTracks(query), (results) =>
-    results.slice(0, parsedLimit).map((r) => ({
+  const effect = Effect.map(searchLRCLibTracks(query), results =>
+    results.slice(0, parsedLimit).map(r => ({
       id: `lrclib-${r.id}`,
       name: r.trackName,
       artist: r.artistName,

@@ -1,4 +1,10 @@
 import {
+  type BPMResult,
+  getBpmWithFallback,
+  getSongBpmProvider,
+  withInMemoryCache,
+} from "@/lib/bpm"
+import {
   LyricsAPIError,
   LyricsNotFoundError,
   getLyrics,
@@ -7,6 +13,8 @@ import {
 } from "@/lib/lyrics-client"
 import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
+
+const bpmProviders = [withInMemoryCache(getSongBpmProvider)]
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -17,6 +25,7 @@ export async function GET(request: NextRequest) {
   const parsed = rawDuration !== null ? Number.parseFloat(rawDuration) : undefined
   const durationSeconds = parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined
   const id = searchParams.get("id")
+  const skipBpm = searchParams.get("skipBpm") === "1"
 
   if (id) {
     return NextResponse.json({ error: "Lookup by Spotify ID not yet implemented" }, { status: 501 })
@@ -29,18 +38,34 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const effect = Effect.orElse(
+  const lyricsEffect = Effect.orElse(
     getLyricsCached(track, artist, album ?? "", durationSeconds ?? 0),
     () => getLyrics(track, artist, album ?? "", durationSeconds ?? 0),
   ).pipe(
-    Effect.catchAll((error) =>
+    Effect.catchAll(error =>
       error instanceof LyricsNotFoundError
         ? searchLyrics(track, artist, album ?? undefined)
         : Effect.fail(error),
     ),
   )
 
-  const result = await Effect.runPromiseExit(effect)
+  const bpmEffect: Effect.Effect<BPMResult | null> = skipBpm
+    ? Effect.succeed(null)
+    : getBpmWithFallback(bpmProviders, { title: track, artist }).pipe(
+        Effect.catchAll(error => {
+          if (error._tag === "BPMAPIError") {
+            console.error("BPM API error:", error.status, error.message)
+          }
+          return Effect.succeed(null)
+        }),
+      )
+
+  const combinedEffect = Effect.all({
+    lyrics: lyricsEffect,
+    bpm: bpmEffect,
+  })
+
+  const result = await Effect.runPromiseExit(combinedEffect)
 
   if (result._tag === "Failure") {
     const error = result.cause
@@ -66,8 +91,13 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     {
-      lyrics: result.value,
-      attribution: "Lyrics provided by lrclib.net",
+      lyrics: result.value.lyrics,
+      bpm: result.value.bpm?.bpm ?? null,
+      key: result.value.bpm?.key ?? null,
+      attribution: {
+        lyrics: { name: "LRCLIB", url: "https://lrclib.net" },
+        bpm: result.value.bpm ? { name: "GetSongBPM", url: "https://getsongbpm.com" } : null,
+      },
     },
     {
       headers: {
