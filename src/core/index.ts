@@ -26,6 +26,7 @@ export {
   type VoiceState,
   type VADConfig,
   type VADEvent,
+  type MicPermissionStatus,
   VADError,
   StartListening,
   StopListening,

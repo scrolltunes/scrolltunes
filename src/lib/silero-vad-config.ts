@@ -77,9 +77,9 @@ export const SILERO_PRESET_LOUD: SileroVADConfig = {
 export const SILERO_PRESET_GUITAR: SileroVADConfig = {
   onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/",
   baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/",
-  positiveSpeechThreshold: 0.96, // Extremely high - only confident speech passes
-  negativeSpeechThreshold: 0.6, // Higher hysteresis
-  minSpeechMs: 500, // Require ~500ms sustained detection
+  positiveSpeechThreshold: 0.985, // Near-maximum - only very confident speech passes
+  negativeSpeechThreshold: 0.7, // Higher hysteresis
+  minSpeechMs: 600, // Require ~600ms sustained detection
   redemptionMs: 500, // Wait longer before speech end
 }
 

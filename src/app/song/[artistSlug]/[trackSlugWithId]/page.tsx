@@ -9,6 +9,7 @@ import {
   usePlayerControls,
   usePlayerState,
   usePreferences,
+  voiceActivityStore,
 } from "@/core"
 import {
   useAutoHide,
@@ -90,12 +91,15 @@ export default function SongPage() {
 
   const isLoaded = loadState._tag === "Loaded"
 
-  // Stop playback when navigating away (unmount only)
+  // Stop playback and voice detection when navigating away (unmount only)
   const resetRef = useRef(reset)
+  const stopListeningRef = useRef(stopListening)
   resetRef.current = reset
+  stopListeningRef.current = stopListening
   useEffect(() => {
     return () => {
       resetRef.current()
+      stopListeningRef.current()
     }
   }, [])
 
@@ -116,13 +120,22 @@ export default function SongPage() {
     }
   }, [playerState._tag, play, pause])
 
+  const handleReset = useCallback(async () => {
+    reset()
+    // Restart voice detection if permission was granted
+    const status = await voiceActivityStore.checkPermission()
+    if (status === "granted") {
+      await startListening()
+    }
+  }, [reset, startListening])
+
   const doubleTapRef = useDoubleTap<HTMLDivElement>({
     onDoubleTap: handleTogglePlayPause,
     enabled: isLoaded && preferences.doubleTapEnabled,
   })
 
   useShakeDetection({
-    onShake: reset,
+    onShake: handleReset,
     enabled: isLoaded && preferences.shakeToRestartEnabled,
   })
 
@@ -221,6 +234,31 @@ export default function SongPage() {
       hasMarkedAsPlayed.current = true
     }
   }, [lrclibId, playerState._tag])
+
+  // Request mic permission on first song load, auto-start listening if already granted
+  const hasRequestedPermission = useRef(false)
+  useEffect(() => {
+    if (loadState._tag !== "Loaded" || hasRequestedPermission.current) return
+    hasRequestedPermission.current = true
+
+    async function handleMicPermission() {
+      const status = await voiceActivityStore.checkPermission()
+
+      if (status === "granted") {
+        // Permission already granted - auto-start listening
+        await startListening()
+      } else if (status === "prompt") {
+        // First time - request permission
+        const granted = await voiceActivityStore.requestPermission()
+        if (granted) {
+          await startListening()
+        }
+      }
+      // If denied, do nothing - user can manually enable via button
+    }
+
+    handleMicPermission()
+  }, [loadState._tag, startListening])
 
   const handleToggleListening = useCallback(async () => {
     if (isListening) {
@@ -350,7 +388,7 @@ export default function SongPage() {
 
                     <button
                       type="button"
-                      onClick={reset}
+                      onClick={handleReset}
                       className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
                       aria-label="Reset"
                     >

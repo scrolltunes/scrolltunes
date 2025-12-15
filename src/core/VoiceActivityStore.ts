@@ -28,6 +28,11 @@ export type { SileroPreset, SileroVADConfig } from "@/lib/silero-vad-config"
 type VADEngineType = "silero" | "energy"
 
 /**
+ * Microphone permission status
+ */
+export type MicPermissionStatus = "unknown" | "granted" | "denied" | "prompt"
+
+/**
  * Voice activity state
  */
 export interface VoiceState {
@@ -36,6 +41,7 @@ export interface VoiceState {
   readonly level: number // 0-1, smoothed energy level
   readonly lastSpeakingAt: number | null // timestamp
   readonly permissionDenied: boolean
+  readonly permissionStatus: MicPermissionStatus
   readonly engine: VADEngineType // which engine is active
 }
 
@@ -86,6 +92,7 @@ export class VoiceActivityStore {
     level: 0,
     lastSpeakingAt: null,
     permissionDenied: false,
+    permissionStatus: "unknown",
     engine: "energy",
   }
 
@@ -474,9 +481,67 @@ export class VoiceActivityStore {
       level: 0,
       lastSpeakingAt: null,
       permissionDenied: false,
+      permissionStatus: this.state.permissionStatus, // Preserve permission status
       engine: "energy",
     }
     this.notify()
+  }
+
+  /**
+   * Check microphone permission status using navigator.permissions API
+   * Updates state.permissionStatus and returns the status
+   */
+  async checkPermission(): Promise<MicPermissionStatus> {
+    if (typeof navigator === "undefined" || !navigator.permissions) {
+      vadLog("PERMISSION", "Permissions API not available")
+      return "unknown"
+    }
+
+    try {
+      const result = await navigator.permissions.query({ name: "microphone" as PermissionName })
+      const status = result.state as MicPermissionStatus
+      vadLog("PERMISSION", `Microphone permission: ${status}`)
+      this.setState({ permissionStatus: status, permissionDenied: status === "denied" })
+
+      // Listen for permission changes
+      result.onchange = () => {
+        const newStatus = result.state as MicPermissionStatus
+        vadLog("PERMISSION", `Permission changed to: ${newStatus}`)
+        this.setState({ permissionStatus: newStatus, permissionDenied: newStatus === "denied" })
+      }
+
+      return status
+    } catch (error) {
+      vadLog("PERMISSION", "Failed to query permission", { error: String(error) })
+      return "unknown"
+    }
+  }
+
+  /**
+   * Request microphone permission by briefly accessing the mic
+   * Returns true if permission was granted
+   */
+  async requestPermission(): Promise<boolean> {
+    vadLog("PERMISSION", "Requesting microphone permission...")
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Immediately stop the stream - we just needed to trigger the permission prompt
+      for (const track of stream.getTracks()) {
+        track.stop()
+      }
+      this.setState({ permissionStatus: "granted", permissionDenied: false })
+      vadLog("PERMISSION", "Permission granted")
+      return true
+    } catch (error) {
+      vadLog("PERMISSION", "Permission denied or error", { error: String(error) })
+      this.setState({ permissionStatus: "denied", permissionDenied: true })
+      return false
+    }
+  }
+
+  getPermissionStatus(): MicPermissionStatus {
+    return this.state.permissionStatus
   }
 }
 
@@ -509,5 +574,8 @@ export function useVoiceControls() {
     setSileroConfig: (config: Partial<SileroVADConfig>) =>
       voiceActivityStore.setSileroConfig(config),
     getEngine: () => voiceActivityStore.getEngine(),
+    checkPermission: () => voiceActivityStore.checkPermission(),
+    requestPermission: () => voiceActivityStore.requestPermission(),
+    getPermissionStatus: () => voiceActivityStore.getPermissionStatus(),
   }
 }
