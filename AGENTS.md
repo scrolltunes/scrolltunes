@@ -4,6 +4,8 @@ Live lyrics teleprompter for musicians. Detects singing voice and syncs scrollin
 
 **In this house, we use bun.** All package management and script execution should use `bun` commands, not `npm` or `node`.
 
+**Do not commit unless explicitly asked.** Only run `git commit` when the user explicitly requests it.
+
 ## Commands
 
 ```bash
@@ -94,6 +96,24 @@ Key features:
 - **Mic access**: Provides AnalyserNode for voice detection
 - **UI sounds**: Click, notification, success, metronome sounds
 - **Mute control**: Global mute/unmute with user toggle
+
+### 4. RecentSongsStore
+
+The `RecentSongsStore` manages recent songs with localStorage persistence and lyrics caching.
+
+```typescript
+import { recentSongsStore, useRecentSongs } from "@/core"
+
+recentSongsStore.addSong(song) // Adds to recents, caches lyrics
+const songs = useRecentSongs() // Subscribe to recent songs list
+```
+
+Key features:
+- **localStorage persistence**: `scrolltunes:recents` for song list (max 5 songs)
+- **Lyrics caching**: `scrolltunes:lyrics:{id}` with 7-day TTL
+- **Resume support**: Saves playback position on pause/leave
+- **Position validation**: Age <2h, min >5s, end buffer <duration-10s
+- **useSyncExternalStore pattern**: Same as other stores
 
 ## Key Patterns
 

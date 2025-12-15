@@ -14,6 +14,7 @@
 | Lyrics fetch | 4 | ✅ Complete | Effect-based API with ID endpoint |
 | Permalink support | 7 | ✅ Complete | SEO-friendly URLs with ID suffix |
 | Tempo adjustment | 5 | ⚠️ Partial | UI exists via TempoControl |
+| Recent Songs/Caching | 8 | ✅ Complete | localStorage with 7-day TTL, resume support |
 | Karaoke mode | 9 | ❌ Not started | |
 | Jam session | 10 | ❌ Not started | |
 
@@ -184,7 +185,14 @@
 
 ## Priority Decisions for Next Phases
 
-### Phase 8: Polish & Cleanup
+### Phase 8: Recent Songs ✅ COMPLETE
+
+1. ✅ RecentSongsStore with localStorage persistence (max 5 songs)
+2. ✅ Lyrics caching with 7-day TTL (`scrolltunes:lyrics:{id}`)
+3. ✅ Resume support (saves position on pause/leave, validates age <2h)
+4. ✅ RecentSongs component on home page
+
+### Phase 8.5: Polish & Cleanup
 
 1. Remove dead code (SongConfirmation component)
 2. Unify SearchResultTrack type between API and client

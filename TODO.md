@@ -191,8 +191,11 @@
 ## Phase 8: Song Management (Local)
 
 ### Recent Songs
-- [ ] Store recent songs in localStorage
-- [ ] Create recent songs list on home page
+- [x] Store recent songs in localStorage
+- [x] Create recent songs list on home page
+- [x] Cache lyrics and BPM data locally (7-day TTL)
+- [x] Save and restore playback position
+- [x] Resume from last position on song revisit
 - [ ] Add "clear history" option
 
 ### Favorites
@@ -241,13 +244,20 @@
 - [ ] Implement real-time sync
 - [ ] Add host controls
 
+### Voice Search
+- [ ] **Design doc**: [docs/voice-search-design.md](docs/voice-search-design.md)
+- [ ] Phase 1: Backend streaming to Google STT (Chirp 3)
+- [ ] Phase 2: SpeechRecognitionStore + client streaming
+- [ ] Phase 3: Integrate with VoiceActivityStore for auto-stop
+- [ ] Phase 4: UI integration with SongSearch
+- [ ] Phase 5: Polish, error handling, accessibility
+
 ### Advanced Features
 - [ ] Metronome mode (UI for existing `SoundSystem.playMetronomeTick`)
 - [ ] Word-level detection (Smart Sync) - requires ML-based VAD
 - [ ] Karaoke playback (instrumental tracks)
-- [ ] Voice commands
+- [ ] Voice commands (beyond search)
 - [ ] Foot pedal support
-- [ ] Multi-language support
 - [ ] Offline mode / setlist caching
 
 ### Code Quality
@@ -274,13 +284,13 @@
 
 > Update this section with what you're currently working on
 
-**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core)
+**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs)
 
-**Active:** Code Cleanup, Phase 8 planning
+**Active:** Code Cleanup, Phase 8 (Favorites, Per-Song Settings)
 
 **Blocked:** Nothing
 
-**Next:** Phase 8 (Song Management - Local)
+**Next:** Favorites, Per-Song Settings
 
 ---
 

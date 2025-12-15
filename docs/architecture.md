@@ -65,6 +65,8 @@ scrolltunes/
 │   │   │   ├── NavigationSidebar.tsx
 │   │   │   ├── PageHeader.tsx
 │   │   │   └── MobileNav.tsx
+│   │   ├── search/               # Search and recent songs
+│   │   │   └── RecentSongs.tsx   # Recent songs list for home page
 │   │   ├── session/              # Jam session components
 │   │   │   ├── QRCode.tsx
 │   │   │   ├── SongQueue.tsx
@@ -92,6 +94,8 @@ scrolltunes/
 │   ├── lib/                      # Core library code
 │   │   ├── lyrics-parser.ts      # LRC/timestamp parsing
 │   │   ├── lyrics-client.ts      # LRCLIB API wrapper (Effect.ts)
+│   │   ├── lyrics-cache.ts       # localStorage lyrics caching (7-day TTL)
+│   │   ├── recent-songs-types.ts # Types for recent songs feature
 │   │   ├── slug.ts               # URL slug utilities
 │   │   ├── bpm/                  # BPM provider abstraction
 │   │   │   ├── index.ts

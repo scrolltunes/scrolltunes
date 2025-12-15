@@ -9,12 +9,13 @@
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Project setup | ✅ Complete | Next.js 15, TypeScript strict, Biome, Tailwind 4, Vitest |
-| `src/core/` layer | ✅ Complete | LyricsPlayer, VoiceActivityStore with Effect.ts patterns |
-| `src/lib/` pure functions | ✅ Complete | lyrics-parser, voice-detection, spotify-client, lyrics-client |
+| `src/core/` layer | ✅ Complete | LyricsPlayer, VoiceActivityStore, RecentSongsStore with Effect.ts patterns |
+| `src/lib/` pure functions | ✅ Complete | lyrics-parser, voice-detection, spotify-client, lyrics-client, lyrics-cache |
 | Single AudioContext | ✅ Complete | SoundSystem owns context, VAD receives AnalyserNode |
 | API routes | ✅ Complete | Response normalization, Effect usage consistency |
 | State publishing | ✅ Fixed | LyricsPlayer only notifies on line changes |
 | Permalink routes | ✅ Complete | /song/[artistSlug]/[trackSlugWithId], /s/[id] |
+| Recent songs | ✅ Complete | RecentSongsStore with localStorage, lyrics caching (7-day TTL) |
 | Tests | ⚠️ Partial | lyrics-parser, voice-detection, LyricsPlayer tested |
 
 ---
@@ -43,11 +44,18 @@ src/
     voice-detection.ts       # Pure signal processing math ✅
     spotify-client.ts        # Spotify API with Effect.ts ✅
     lyrics-client.ts         # LRCLIB API with Effect.ts ✅
+    lyrics-cache.ts          # localStorage caching (7-day TTL) ✅
+    recent-songs-types.ts    # Types for recent songs ✅
     slug.ts                  # URL slug generation ✅
     __tests__/
       lyrics-parser.test.ts  # ✅ Implemented
       voice-detection.test.ts # ✅ Implemented
 ```
+
+**localStorage caching strategy**:
+- `scrolltunes:recents` — Recent songs list (max 5 songs)
+- `scrolltunes:lyrics:{id}` — Cached lyrics/BPM data per song (7-day TTL)
+- Resume support: saves position on pause/leave, validates age (<2h), min (>5s), end buffer (<duration-10s)
 
 ### API Route Paths
 
