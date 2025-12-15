@@ -1,7 +1,14 @@
 "use client"
 
 import { springs } from "@/animations"
-import { CircleNotch, MagnifyingGlass, MusicNote, X } from "@phosphor-icons/react"
+import {
+  CircleNotch,
+  MagnifyingGlass,
+  MusicNote,
+  MusicNoteSimple,
+  WarningCircle,
+  X,
+} from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 
@@ -24,6 +31,31 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
   return `${minutes}:${seconds.toString().padStart(2, "0")}`
+}
+
+function SearchSkeleton() {
+  return (
+    <motion.div
+      key="skeleton"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={springs.default}
+      className="mt-3 rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800"
+      aria-label="Loading search results"
+    >
+      {[0, 1, 2, 3].map(i => (
+        <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
+          <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-800" />
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="h-4 w-3/5 rounded bg-neutral-800" />
+            <div className="h-3 w-4/5 rounded bg-neutral-800" />
+          </div>
+          <div className="flex-shrink-0 h-4 w-10 rounded bg-neutral-800" />
+        </div>
+      ))}
+    </motion.div>
+  )
 }
 
 export const SongSearch = memo(function SongSearch({
@@ -164,9 +196,19 @@ export const SongSearch = memo(function SongSearch({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={springs.default}
-            className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm text-center"
+            className="mt-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex flex-col items-center gap-3"
           >
-            {error}
+            <div className="flex items-center gap-2 text-red-400">
+              <WarningCircle size={20} weight="fill" />
+              <span className="text-sm">{error}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => searchTracks(query)}
+              className="px-4 py-1.5 text-sm font-medium text-white bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            >
+              Try again
+            </button>
           </motion.div>
         )}
 
@@ -177,13 +219,35 @@ export const SongSearch = memo(function SongSearch({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={springs.default}
-            className="mt-3 p-6 text-neutral-500 text-center"
+            className="mt-3 p-8 flex flex-col items-center gap-3 text-center"
           >
-            No results found
+            <MusicNoteSimple size={32} weight="duotone" className="text-neutral-600" />
+            <div>
+              <p className="text-neutral-400">No songs found for "{query}"</p>
+              <p className="text-sm text-neutral-600 mt-1">
+                Try a different spelling or search for the artist name
+              </p>
+            </div>
           </motion.div>
         )}
 
-        {results.length > 0 && (
+        {!error && !hasSearched && !isLoading && !query && (
+          <motion.div
+            key="initial"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={springs.default}
+            className="mt-3 p-6 flex items-center justify-center gap-2 text-neutral-600"
+          >
+            <MagnifyingGlass size={16} weight="bold" />
+            <span className="text-sm">Search by song title or artist name</span>
+          </motion.div>
+        )}
+
+        {!error && isLoading && query && <SearchSkeleton />}
+
+        {!error && results.length > 0 && !isLoading && (
           <motion.ul
             key="results"
             initial={{ opacity: 0 }}

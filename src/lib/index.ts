@@ -37,3 +37,5 @@ export {
   type LyricsError,
   type LRCLibResponse,
 } from "./lyrics-client"
+
+export { haptic, isHapticSupported, type HapticPattern } from "./haptics"

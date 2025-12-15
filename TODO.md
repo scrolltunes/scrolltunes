@@ -131,44 +131,82 @@
 - [ ] Create settings UI screen for gesture toggles
 - [ ] Manual mobile testing (iOS Safari, Android Chrome)
 
-## Phase 7: Chords Integration
+## Phase 7: Single-User Polish
 
-### Data Layer
+### Settings UI
+- [x] Create `/settings` page
+- [x] Add toggle for wake lock
+- [x] Add toggle for double-tap pause
+- [x] Add toggle for shake-to-restart
+- [x] Add auto-hide timeout slider
+- [x] Add distraction-free mode toggle
+
+### UX Improvements
+- [ ] Add onboarding/tutorial for first-time users
+- [x] Improve error states (API failures, no lyrics found)
+- [x] Add loading skeletons for search results
+- [x] Add "no results" empty state with suggestions
+- [ ] Improve lyrics attribution display
+
+### Visual Polish
+- [ ] Refine typography and spacing
+- [ ] Add subtle animations for state transitions
+- [x] Improve voice indicator feedback
+- [x] Add haptic feedback on mobile (if supported)
+
+### Testing & Validation
+- [ ] Manual testing on iOS Safari
+- [ ] Manual testing on Android Chrome
+- [ ] Test VAD with various microphones
+- [ ] Verify VAD doesn't trigger on guitar/instruments
+- [ ] Test with background noise
+- [ ] Performance audit (bundle size, FCP, LCP)
+
+## Phase 8: Song Management (Local)
+
+### Recent Songs
+- [ ] Store recent songs in localStorage
+- [ ] Create recent songs list on home page
+- [ ] Add "clear history" option
+
+### Favorites
+- [ ] Add heart/star button to save favorites
+- [ ] Store favorites in localStorage
+- [ ] Create favorites list view
+- [ ] Quick-access from home page
+
+### Per-Song Settings
+- [ ] Persist tempo per song (already done via useTempoPreference)
+- [ ] Add notes field per song (key, capo position, etc.)
+- [ ] Store in localStorage keyed by song ID
+
+---
+
+## V2 Features (Future)
+
+### Chords Integration
 - [ ] Define `ChordChart` type
 - [ ] Research chord API options (Ultimate Guitar, Chordify)
 - [ ] Create `src/lib/chords-client.ts`
-- [ ] Implement chord fetch
-
-### Components
-- [ ] Create `src/components/chords/InlineChord.tsx`
-- [ ] Create `src/components/chords/ChordDiagram.tsx`
-- [ ] Create `src/components/chords/ChordLegend.tsx` (sidebar)
-- [ ] Integrate chords with lyrics display
-
-### Features
+- [ ] Create chord overlay components
 - [ ] Add transpose controls (+/- semitones)
 - [ ] Implement capo indicator
-- [ ] Toggle chords on/off
 
-## Phase 8: User Accounts
-
+### User Accounts
 - [ ] Set up database (Vercel Postgres or alternative)
 - [ ] Implement authentication (OAuth or email)
 - [ ] Create user profile page
-- [ ] Implement song history
-- [ ] Add favorites/setlists
-- [ ] Connect Spotify account
+- [ ] Sync favorites/history across devices
+- [ ] Connect Spotify account for personalized search
 
-## Phase 9: Karaoke Mode
-
+### Karaoke Mode
 - [ ] Create `src/components/display/KaraokeDisplay.tsx`
-- [ ] Implement large text display
+- [ ] Implement large text display (2-3 lines max)
 - [ ] Add per-word highlighting (if timestamps available)
 - [ ] Implement countdown before start
 - [ ] Add color themes
 
-## Phase 10: Jam Session
-
+### Jam Session (Multiplayer)
 - [ ] Set up WebSocket infrastructure
 - [ ] Create session creation flow
 - [ ] Implement QR code generation
@@ -177,8 +215,7 @@
 - [ ] Implement real-time sync
 - [ ] Add host controls
 
-## Future / Backlog
-
+### Advanced Features
 - [ ] Metronome mode (UI for existing `SoundSystem.playMetronomeTick`)
 - [ ] Word-level detection (Smart Sync) - requires ML-based VAD
 - [ ] Karaoke playback (instrumental tracks)
@@ -195,14 +232,14 @@
 
 **Completed:** Phase 0, 1, 2, 3, 4, 5, 6
 
-**Active:** Testing & Polish
-- Manual mobile testing needed
+**Active:** Phase 7 - Single-User Polish
 - Settings UI for preferences
-- Demo page at `/demo` for testing core features
+- Mobile testing
+- UX improvements
 
 **Blocked:** Nothing
 
-**Next:** Phase 7 (Chords) or Phase 8 (User Accounts) based on priority
+**Next:** Phase 8 (Song Management - Local)
 
 ---
 

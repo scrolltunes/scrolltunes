@@ -17,11 +17,13 @@ import {
   ArrowCounterClockwise,
   CaretDown,
   CaretUp,
+  GearSix,
   MusicNote,
   Pause,
   Play,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
+import Link from "next/link"
 import { useCallback, useState } from "react"
 
 type ViewState = "search" | "confirming" | "playing"
@@ -134,6 +136,16 @@ export default function Home() {
               </button>
 
               <div className="flex items-center gap-3">
+                {!isPlayingView && (
+                  <Link
+                    href="/settings"
+                    className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+                    aria-label="Settings"
+                  >
+                    <GearSix size={20} />
+                  </Link>
+                )}
+
                 {isPlayingView && (
                   <>
                     <VoiceIndicator

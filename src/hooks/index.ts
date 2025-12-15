@@ -25,3 +25,4 @@ export {
   type UseDebounceOptions,
   type UseDebounceResult,
 } from "./useDebounce"
+export { useHaptic, type HapticPattern, type UseHapticResult } from "./useHaptic"
