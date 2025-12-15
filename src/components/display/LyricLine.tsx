@@ -9,6 +9,7 @@ export interface LyricLineProps {
   readonly onClick?: () => void
   readonly index: number
   readonly fontSize?: number
+  readonly innerRef?: (el: HTMLButtonElement | null) => void
 }
 
 /**
@@ -21,6 +22,7 @@ export const LyricLine = memo(function LyricLine({
   onClick,
   index,
   fontSize,
+  innerRef,
 }: LyricLineProps) {
   // Empty lines render as spacing
   if (!text.trim()) {
@@ -33,6 +35,7 @@ export const LyricLine = memo(function LyricLine({
 
   return (
     <button
+      ref={innerRef}
       type="button"
       onClick={onClick}
       className={`relative w-full text-center px-4 py-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${opacityClass}`}

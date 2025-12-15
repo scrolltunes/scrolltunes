@@ -29,6 +29,10 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const [scrollY, setScrollY] = useState(0)
   const manualScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Refs for geometry-based scroll calculation
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const lineRefs = useRef<(HTMLButtonElement | null)[]>([])
+
   // Get lyrics from state
   const lyrics = state._tag !== "Idle" ? state.lyrics : null
 
@@ -39,11 +43,42 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     return Math.max(0, lineIndex) * LINE_HEIGHT
   }, [])
 
+  // Store the initial position of line 0 as the target for all lines
+  const initialTargetY = useRef<number | null>(null)
+
   // Update scroll position when current line changes (if not manually scrolling)
   useEffect(() => {
     if (isManualScrolling || !lyrics) return
-    const targetY = getTargetScrollY(currentLineIndex)
-    setScrollY(targetY)
+
+    const container = containerRef.current
+    const lineIndex = Math.max(0, currentLineIndex)
+    const activeLine = lineRefs.current[lineIndex]
+
+    if (container && activeLine) {
+      const containerRect = container.getBoundingClientRect()
+      const lineRect = activeLine.getBoundingClientRect()
+
+      // Where the line currently is (relative to container top)
+      const lineCurrentY = lineRect.top - containerRect.top
+
+      // Capture the initial position of line 0 as our target position (reduced by 40%)
+      if (initialTargetY.current === null && lineIndex === 0 && scrollY === 0) {
+        initialTargetY.current = lineCurrentY * 0.6
+        // Don't scroll on first render - line 0 is already in position
+        return
+      }
+
+      // Use the initial position as target for all lines
+      const targetY = initialTargetY.current ?? containerRect.height * 0.4
+
+      // Adjust scroll by the difference
+      const delta = lineCurrentY - targetY
+      setScrollY(prev => prev + delta)
+    } else {
+      // Fallback to LINE_HEIGHT if refs not ready
+      const targetY = getTargetScrollY(currentLineIndex)
+      setScrollY(targetY)
+    }
   }, [currentLineIndex, isManualScrolling, lyrics, getTargetScrollY])
 
   // Handle manual scroll detection
@@ -117,6 +152,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   return (
     <div
+      ref={containerRef}
       className={`relative overflow-hidden h-full ${className}`}
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
@@ -131,7 +167,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       )}
 
       <motion.div
-        className="pt-[30vh] pb-[75vh] max-w-4xl mx-auto"
+        className="py-[50vh] max-w-4xl mx-auto"
         animate={{ y: -scrollY }}
         transition={{ type: "tween", duration: 0.5, ease: "easeOut" }}
       >
@@ -144,6 +180,9 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
             onClick={() => handleLineClick(index)}
             index={index}
             fontSize={fontSize}
+            innerRef={el => {
+              lineRefs.current[index] = el
+            }}
           />
         ))}
       </motion.div>
