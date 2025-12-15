@@ -10,6 +10,7 @@ import { MetronomeOrb } from "./MetronomeOrb"
 
 export interface MetronomeProps {
   readonly bpm: number | null
+  readonly isPlaying?: boolean
   readonly className?: string
 }
 
@@ -25,9 +26,13 @@ const modeLabels: Record<MetronomeMode, string> = {
   both: "Click and visual",
 }
 
-export const Metronome = memo(function Metronome({ bpm, className = "" }: MetronomeProps) {
-  const { mode, isMuted, volume } = useMetronome()
-  const { setMode, setMuted, setVolume } = useMetronomeControls()
+export const Metronome = memo(function Metronome({
+  bpm,
+  isPlaying = false,
+  className = "",
+}: MetronomeProps) {
+  const { mode, isMuted, volume, isRunning } = useMetronome()
+  const { setMode, setMuted, setVolume, start, stop } = useMetronomeControls()
   const beatCountRef = useRef(0)
 
   const handlePulse = useCallback(() => {
@@ -57,13 +62,31 @@ export const Metronome = memo(function Metronome({ bpm, className = "" }: Metron
     setMuted(!isMuted)
   }, [isMuted, setMuted])
 
+  const handleOrbClick = useCallback(() => {
+    if (isPlaying) return
+    if (isRunning) {
+      stop()
+    } else {
+      beatCountRef.current = 0
+      start()
+    }
+  }, [isPlaying, isRunning, start, stop])
+
   const showVolumeControls = mode !== "visual"
-  const isActive = bpm !== null && bpm > 0
+  const isActive = bpm !== null && bpm > 0 && (isPlaying || isRunning)
   const showVisual = mode === "visual" || mode === "both"
 
   return (
     <div className={`flex items-center gap-4 ${className}`}>
-      <MetronomeOrb bpm={bpm} isActive={isActive && showVisual} size="md" onPulse={handlePulse} />
+      <button
+        type="button"
+        onClick={handleOrbClick}
+        disabled={isPlaying}
+        className="focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-full disabled:cursor-default"
+        aria-label={isActive ? "Stop metronome" : "Start metronome"}
+      >
+        <MetronomeOrb bpm={bpm} isActive={isActive && showVisual} size="md" onPulse={handlePulse} />
+      </button>
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-1">

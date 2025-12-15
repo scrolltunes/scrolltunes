@@ -1,10 +1,16 @@
 "use client"
 
 import { springs } from "@/animations"
-import { type MetronomeMode, useMetronome, useMetronomeControls, usePlayerState } from "@/core"
+import {
+  type MetronomeMode,
+  metronomeStore,
+  useMetronome,
+  useMetronomeControls,
+  usePlayerState,
+} from "@/core"
 import { soundSystem } from "@/sounds"
 import { AnimatePresence, motion } from "motion/react"
-import { memo, useCallback, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { MetronomeOrb } from "./MetronomeOrb"
 
 export interface FloatingMetronomeProps {
@@ -76,7 +82,28 @@ export const FloatingMetronome = memo(function FloatingMetronome({
   )
 
   const isPlaying = playerState._tag === "Playing"
-  const isActive = bpm !== null && bpm > 0 && isPlaying
+
+  const handleToggleMetronome = useCallback(() => {
+    if (isPlaying) return
+    if (metronomeState.isRunning) {
+      controls.stop()
+    } else {
+      beatCountRef.current = 0
+      controls.start()
+    }
+  }, [isPlaying, metronomeState.isRunning, controls])
+
+  const isActive = bpm !== null && bpm > 0 && (isPlaying || metronomeState.isRunning)
+
+  useEffect(() => {
+    if (isPlaying) {
+      beatCountRef.current = 0
+      metronomeStore.start()
+    } else {
+      metronomeStore.stop()
+    }
+  }, [isPlaying])
+
   const showVolumeSlider = metronomeState.mode !== "visual"
 
   return (
@@ -152,9 +179,19 @@ export const FloatingMetronome = memo(function FloatingMetronome({
 
         <button
           type="button"
-          onClick={handleOrbClick}
+          onClick={isPlaying ? handleOrbClick : handleToggleMetronome}
+          onContextMenu={e => {
+            e.preventDefault()
+            setIsOpen(prev => !prev)
+          }}
           className="rounded-full bg-neutral-900/80 p-2 backdrop-blur-sm border border-neutral-700/50"
-          aria-label={`Metronome settings${bpm !== null ? `, ${bpm} BPM` : ""}`}
+          aria-label={
+            isPlaying
+              ? `Metronome settings${bpm !== null ? `, ${bpm} BPM` : ""}`
+              : isActive
+                ? "Stop metronome"
+                : "Start metronome"
+          }
           aria-expanded={isOpen}
         >
           <MetronomeOrb bpm={bpm} isActive={isActive} size="sm" onPulse={handlePulse} />
