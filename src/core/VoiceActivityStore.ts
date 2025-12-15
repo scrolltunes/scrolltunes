@@ -9,11 +9,18 @@ import {
   detectVoiceActivity,
   smoothLevel,
 } from "@/lib"
+import {
+  DEFAULT_SILERO_VAD_CONFIG,
+  type SileroPreset,
+  type SileroVADConfig,
+  getPresetConfig,
+} from "@/lib/silero-vad-config"
 import { type AudioError, soundSystem } from "@/sounds"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
 
 export type { VADConfig } from "@/lib"
+export type { SileroPreset, SileroVADConfig } from "@/lib/silero-vad-config"
 
 // --- Types ---
 
@@ -72,6 +79,7 @@ export class VoiceActivityStore {
   private dataArray: Uint8Array<ArrayBuffer> | null = null
 
   private runtime: VADRuntimeState = INITIAL_VAD_RUNTIME
+  private sileroConfig: SileroVADConfig = DEFAULT_SILERO_VAD_CONFIG
 
   // --- Observable pattern ---
 
@@ -124,6 +132,22 @@ export class VoiceActivityStore {
 
   getConfig(): VADConfig {
     return this.config
+  }
+
+  setSileroConfig(config: Partial<SileroVADConfig>): void {
+    this.sileroConfig = { ...this.sileroConfig, ...config }
+  }
+
+  setSileroPreset(preset: SileroPreset): void {
+    this.sileroConfig = getPresetConfig(preset)
+  }
+
+  getSileroConfig(): SileroVADConfig {
+    return this.sileroConfig
+  }
+
+  getEngine(): "energy" {
+    return "energy"
   }
 
   // --- Event handlers ---
@@ -304,6 +328,7 @@ export class VoiceActivityStore {
     this.analyser = null
     this.dataArray = null
     this.config = DEFAULT_VAD_CONFIG
+    this.sileroConfig = DEFAULT_SILERO_VAD_CONFIG
     this.runtime = INITIAL_VAD_RUNTIME
     this.state = {
       isListening: false,
@@ -350,5 +375,9 @@ export function useVoiceControls() {
     stopListening: () => voiceActivityStore.stopListening(),
     setConfig: (config: Partial<VADConfig>) => voiceActivityStore.setConfig(config),
     getConfig: () => voiceActivityStore.getConfig(),
+    setSileroPreset: (preset: SileroPreset) => voiceActivityStore.setSileroPreset(preset),
+    setSileroConfig: (config: Partial<SileroVADConfig>) =>
+      voiceActivityStore.setSileroConfig(config),
+    getEngine: () => voiceActivityStore.getEngine(),
   }
 }

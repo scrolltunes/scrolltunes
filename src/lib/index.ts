@@ -99,3 +99,13 @@ export {
   hasCachedLyrics,
   clearAllCachedLyrics,
 } from "./lyrics-cache"
+
+export {
+  type SileroVADConfig,
+  type SileroPreset,
+  DEFAULT_SILERO_VAD_CONFIG,
+  SILERO_PRESET_QUIET,
+  SILERO_PRESET_NORMAL,
+  SILERO_PRESET_LOUD,
+  getPresetConfig,
+} from "./silero-vad-config"

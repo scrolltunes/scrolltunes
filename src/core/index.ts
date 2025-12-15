@@ -35,6 +35,13 @@ export {
 } from "./VoiceActivityStore"
 
 export {
+  SileroVADEngine,
+  SileroLoadError,
+  SileroNotSupportedError,
+  type SileroVADCallbacks,
+} from "./SileroVADEngine"
+
+export {
   PreferencesStore,
   preferencesStore,
   usePreferences,
