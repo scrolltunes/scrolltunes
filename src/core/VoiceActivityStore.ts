@@ -3,6 +3,17 @@
 import { Effect, Data } from "effect"
 import { useSyncExternalStore } from "react"
 import { soundSystem, type AudioError } from "@/sounds"
+import {
+  computeRMSFromByteFrequency,
+  smoothLevel,
+  detectVoiceActivity,
+  DEFAULT_VAD_CONFIG,
+  INITIAL_VAD_RUNTIME,
+  type VADConfig,
+  type VADRuntimeState,
+} from "@/lib"
+
+export type { VADConfig } from "@/lib"
 
 // --- Types ---
 
@@ -14,16 +25,6 @@ export interface VoiceState {
   readonly isSpeaking: boolean
   readonly level: number // 0-1, smoothed energy level
   readonly lastSpeakingAt: number | null // timestamp
-}
-
-/**
- * VAD configuration
- */
-export interface VADConfig {
-  readonly thresholdOn: number // Energy threshold to trigger "speaking"
-  readonly thresholdOff: number // Energy threshold to trigger "silent" (hysteresis)
-  readonly holdTimeMs: number // Minimum time before state change
-  readonly smoothingFactor: number // 0-1, for exponential smoothing
 }
 
 /**
@@ -40,15 +41,6 @@ export type VADEvent = StartListening | StopListening | VoiceStart | VoiceStop |
 export class VADError extends Data.TaggedClass("VADError")<{
   readonly cause: AudioError
 }> {}
-
-// --- Default config ---
-
-const DEFAULT_CONFIG: VADConfig = {
-  thresholdOn: 0.15,
-  thresholdOff: 0.08,
-  holdTimeMs: 150,
-  smoothingFactor: 0.3,
-}
 
 // --- VoiceActivityStore Class ---
 
@@ -69,14 +61,12 @@ export class VoiceActivityStore {
     lastSpeakingAt: null,
   }
 
-  private config: VADConfig = DEFAULT_CONFIG
+  private config: VADConfig = DEFAULT_VAD_CONFIG
   private analyser: AnalyserNode | null = null
   private animationFrameId: number | null = null
   private dataArray: Uint8Array<ArrayBuffer> | null = null
 
-  // Hysteresis state
-  private lastStateChangeTime = 0
-  private smoothedLevel = 0
+  private runtime: VADRuntimeState = INITIAL_VAD_RUNTIME
 
   // --- Observable pattern ---
 
@@ -207,49 +197,34 @@ export class VoiceActivityStore {
     const analyze = () => {
       if (!this.analyser || !this.dataArray) return
 
-      // Get frequency data
       this.analyser.getByteFrequencyData(this.dataArray)
 
-      // Calculate RMS energy
-      let sum = 0
-      for (let i = 0; i < this.dataArray.length; i++) {
-        const value = (this.dataArray[i] ?? 0) / 255
-        sum += value * value
-      }
-      const rms = Math.sqrt(sum / this.dataArray.length)
+      const rms = computeRMSFromByteFrequency(this.dataArray)
+      const smoothed = smoothLevel(
+        this.runtime.smoothedLevel,
+        rms,
+        this.config.smoothingFactor,
+      )
 
-      // Exponential smoothing
-      this.smoothedLevel =
-        this.config.smoothingFactor * rms + (1 - this.config.smoothingFactor) * this.smoothedLevel
-
-      // Update level (throttled to avoid too many updates)
       const now = Date.now()
-      if (now - this.lastStateChangeTime > 50) {
-        // 20Hz update rate
-        Effect.runSync(this.dispatch(new UpdateLevel({ level: this.smoothedLevel })))
+      const prevSpeaking = this.runtime.isSpeaking
+      const nextRuntime = detectVoiceActivity(
+        smoothed,
+        this.runtime,
+        this.config,
+        now,
+      )
+
+      this.runtime = nextRuntime
+
+      if (now - this.runtime.lastStateChangeTime > 50 || prevSpeaking !== nextRuntime.isSpeaking) {
+        Effect.runSync(this.dispatch(new UpdateLevel({ level: this.runtime.smoothedLevel })))
       }
 
-      // Voice activity detection with hysteresis
-      const timeSinceLastChange = now - this.lastStateChangeTime
-
-      if (!this.state.isSpeaking) {
-        // Check if we should start speaking
-        if (
-          this.smoothedLevel > this.config.thresholdOn &&
-          timeSinceLastChange > this.config.holdTimeMs
-        ) {
-          this.lastStateChangeTime = now
-          Effect.runPromise(this.dispatch(new VoiceStart({}))).catch(() => {})
-        }
-      } else {
-        // Check if we should stop speaking
-        if (
-          this.smoothedLevel < this.config.thresholdOff &&
-          timeSinceLastChange > this.config.holdTimeMs
-        ) {
-          this.lastStateChangeTime = now
-          Effect.runSync(this.dispatch(new VoiceStop({})))
-        }
+      if (!prevSpeaking && nextRuntime.isSpeaking) {
+        Effect.runPromise(this.dispatch(new VoiceStart({}))).catch(() => {})
+      } else if (prevSpeaking && !nextRuntime.isSpeaking) {
+        Effect.runSync(this.dispatch(new VoiceStop({})))
       }
 
       if (this.state.isListening) {
@@ -300,9 +275,28 @@ export class VoiceActivityStore {
    * Dispose of resources
    */
   dispose(): void {
-    this.stopListening()
+    this.reset()
     this.listeners.clear()
     this.voiceListeners.clear()
+  }
+
+  /**
+   * Reset for tests and hot-reload
+   */
+  reset(): void {
+    this.stopAnalysisLoop()
+    soundSystem.stopMicrophone()
+    this.analyser = null
+    this.dataArray = null
+    this.config = DEFAULT_VAD_CONFIG
+    this.runtime = INITIAL_VAD_RUNTIME
+    this.state = {
+      isListening: false,
+      isSpeaking: false,
+      level: 0,
+      lastSpeakingAt: null,
+    }
+    this.notify()
   }
 }
 

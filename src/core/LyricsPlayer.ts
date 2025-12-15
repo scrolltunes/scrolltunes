@@ -2,6 +2,11 @@
 
 import { Effect, Data } from "effect"
 import { useSyncExternalStore } from "react"
+import {
+  DEFAULT_SCROLL_SPEED,
+  MIN_SCROLL_SPEED,
+  MAX_SCROLL_SPEED,
+} from "@/constants"
 
 // --- Types ---
 
@@ -72,7 +77,7 @@ export type PlayerEvent = LoadLyrics | Play | Pause | Seek | Reset | Tick
 export class LyricsPlayer {
   private listeners = new Set<() => void>()
   private state: PlayerState = { _tag: "Idle" }
-  private scrollSpeed = 1.0
+  private scrollSpeed = DEFAULT_SCROLL_SPEED
   private animationFrameId: number | null = null
 
   constructor(private now: () => number = () => performance.now() / 1000) {}
@@ -145,7 +150,7 @@ export class LyricsPlayer {
    * Set scroll speed multiplier
    */
   setScrollSpeed(speed: number): void {
-    this.scrollSpeed = Math.max(0.5, Math.min(2.0, speed))
+    this.scrollSpeed = Math.max(MIN_SCROLL_SPEED, Math.min(MAX_SCROLL_SPEED, speed))
   }
 
   getScrollSpeed(): number {
@@ -328,6 +333,19 @@ export class LyricsPlayer {
     this.stopPlaybackLoop()
     this.listeners.clear()
     this.setState({ _tag: "Idle" })
+  }
+
+  /**
+   * Hard reset for tests and hot-reload
+   * Unlike reset(), this clears all state including listeners
+   */
+  hardReset(): void {
+    this.stopPlaybackLoop()
+    this.listeners.clear()
+    this.state = { _tag: "Idle" }
+    this.scrollSpeed = DEFAULT_SCROLL_SPEED
+    this.animationFrameId = null
+    this.lastTickTime = null
   }
 }
 

@@ -320,6 +320,15 @@ class SoundSystem {
 
     this.initialized = false
   }
+
+  /**
+   * Reset for tests and hot-reload
+   */
+  async reset(): Promise<void> {
+    await this.dispose()
+    this.initializing = null
+    this.muted = false
+  }
 }
 
 // Singleton instance
