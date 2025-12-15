@@ -133,7 +133,7 @@ export const SongSearch = memo(function SongSearch({
 
       debounceRef.current = setTimeout(() => {
         searchTracks(value)
-      }, 300)
+      }, 150)
     },
     [searchTracks],
   )
