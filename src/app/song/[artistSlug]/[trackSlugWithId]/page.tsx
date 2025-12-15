@@ -9,7 +9,14 @@ import {
 } from "@/components/audio"
 import { LyricsDisplay } from "@/components/display"
 import { Attribution } from "@/components/ui"
-import { type Lyrics, usePlayerControls, usePlayerState, usePreferences } from "@/core"
+import {
+  type Lyrics,
+  lyricsPlayer,
+  recentSongsStore,
+  usePlayerControls,
+  usePlayerState,
+  usePreferences,
+} from "@/core"
 import {
   useAutoHide,
   useDoubleTap,
@@ -19,7 +26,8 @@ import {
   useVoiceTrigger,
   useWakeLock,
 } from "@/hooks"
-import { isLyricsApiSuccess, type LyricsApiResponse } from "@/lib"
+import { type LyricsApiResponse, isLyricsApiSuccess } from "@/lib"
+import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { parseTrackSlugWithId } from "@/lib/slug"
 import {
   ArrowCounterClockwise,
@@ -77,10 +85,19 @@ export default function SongPage() {
   const handleTogglePlayPause = useCallback(() => {
     if (playerState._tag === "Playing") {
       pause()
+      // Save position on pause
+      if (lrclibId !== null) {
+        const time = lyricsPlayer.getCurrentTime()
+        const lyrics = lyricsPlayer.getLyrics()
+        if (lyrics) {
+          const isFinished = time >= lyrics.duration - 3
+          recentSongsStore.updatePosition(lrclibId, isFinished ? undefined : time)
+        }
+      }
     } else {
       play()
     }
-  }, [playerState._tag, play, pause])
+  }, [playerState._tag, play, pause, lrclibId])
 
   const doubleTapRef = useDoubleTap<HTMLDivElement>({
     onDoubleTap: handleTogglePlayPause,
@@ -98,11 +115,40 @@ export default function SongPage() {
       return
     }
 
+    const id = lrclibId
     const controller = new AbortController()
 
     async function fetchLyrics() {
+      // Try cache first
+      const cached = loadCachedLyrics(id)
+      if (cached) {
+        load(cached.lyrics)
+        setLoadState({ _tag: "Loaded", lyrics: cached.lyrics, bpm: cached.bpm })
+
+        recentSongsStore.upsertRecent({
+          id,
+          title: cached.lyrics.title,
+          artist: cached.lyrics.artist,
+          album: "",
+          durationSeconds: cached.lyrics.duration,
+        })
+
+        // Check for resume position
+        const recent = recentSongsStore.getRecent(id)
+        if (
+          recent &&
+          recentSongsStore.isPositionValidForResume(recent) &&
+          recent.lastPositionSeconds != null
+        ) {
+          lyricsPlayer.seek(recent.lastPositionSeconds)
+        }
+        return
+      }
+
+      // Fetch from API
+      setLoadState({ _tag: "Loading" })
       try {
-        const response = await fetch(`/api/lyrics/${lrclibId}`, {
+        const response = await fetch(`/api/lyrics/${id}`, {
           signal: controller.signal,
         })
         const data: LyricsApiResponse = await response.json()
@@ -115,6 +161,32 @@ export default function SongPage() {
 
         load(data.lyrics)
         setLoadState({ _tag: "Loaded", lyrics: data.lyrics, bpm: data.bpm })
+
+        // Cache lyrics
+        saveCachedLyrics(id, {
+          lyrics: data.lyrics,
+          bpm: data.bpm,
+          key: data.key,
+        })
+
+        // Add to recents
+        recentSongsStore.upsertRecent({
+          id,
+          title: data.lyrics.title,
+          artist: data.lyrics.artist,
+          album: "",
+          durationSeconds: data.lyrics.duration,
+        })
+
+        // Check for resume position
+        const recent = recentSongsStore.getRecent(id)
+        if (
+          recent &&
+          recentSongsStore.isPositionValidForResume(recent) &&
+          recent.lastPositionSeconds != null
+        ) {
+          lyricsPlayer.seek(recent.lastPositionSeconds)
+        }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           return
@@ -128,7 +200,21 @@ export default function SongPage() {
     return () => {
       controller.abort()
     }
-  }, [lrclibId, load])
+  }, [lrclibId])
+
+  // Save position when leaving the page
+  useEffect(() => {
+    if (lrclibId === null) return
+
+    return () => {
+      const time = lyricsPlayer.getCurrentTime()
+      const lyrics = lyricsPlayer.getLyrics()
+      if (!lyrics) return
+
+      const isFinished = time >= lyrics.duration - 3
+      recentSongsStore.updatePosition(lrclibId, isFinished ? undefined : time)
+    }
+  }, [lrclibId])
 
   const handleToggleListening = useCallback(async () => {
     if (isListening) {
@@ -199,9 +285,7 @@ export default function SongPage() {
                   <ArrowLeft size={20} />
                 </Link>
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium truncate max-w-[200px]">
-                    {songTitle}
-                  </span>
+                  <span className="text-sm font-medium truncate max-w-[200px]">{songTitle}</span>
                   <span className="text-xs text-neutral-500 truncate max-w-[200px]">
                     {loadState.lyrics.artist}
                   </span>

@@ -1,0 +1,55 @@
+/**
+ * Types for recent songs and lyrics caching
+ */
+
+import type { Lyrics } from "@/core"
+
+/**
+ * A recently played song entry stored in localStorage
+ */
+export interface RecentSong {
+  readonly id: number              // LRCLIB numeric ID
+  readonly title: string
+  readonly artist: string
+  readonly album: string
+  readonly albumArt?: string | undefined
+  readonly durationSeconds: number        // seconds (matching Lyrics.duration)
+  readonly lastPlayedAt: number    // timestamp (ms since epoch)
+  readonly lastPositionSeconds?: number | undefined  // seconds (resume position)
+  readonly lastPositionUpdatedAt?: number | undefined  // timestamp for position freshness
+}
+
+/**
+ * Cached lyrics data with expiry tracking
+ */
+export interface CachedLyrics {
+  readonly lyrics: Lyrics
+  readonly bpm: number | null
+  readonly key: string | null
+  readonly cachedAt: number        // timestamp (ms since epoch)
+}
+
+/**
+ * Configuration for lyrics cache
+ */
+export const LYRICS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000  // 7 days
+
+/**
+ * Configuration for recent songs
+ */
+export const MAX_RECENT_SONGS = 5
+
+/**
+ * Max age for considering a position valid for resume (2 hours)
+ */
+export const POSITION_MAX_AGE_MS = 2 * 60 * 60 * 1000
+
+/**
+ * Minimum position to consider for resume (skip if near start)
+ */
+export const POSITION_MIN_SECONDS = 5
+
+/**
+ * Buffer from end to consider song finished
+ */
+export const POSITION_END_BUFFER_SECONDS = 10

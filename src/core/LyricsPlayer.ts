@@ -2,7 +2,7 @@
 
 import { DEFAULT_SCROLL_SPEED, MAX_SCROLL_SPEED, MIN_SCROLL_SPEED } from "@/constants"
 import { Data, Effect } from "effect"
-import { useSyncExternalStore } from "react"
+import { useMemo, useSyncExternalStore } from "react"
 
 // --- Types ---
 
@@ -394,19 +394,22 @@ export function useCurrentLineIndex(): number {
   return lyricsPlayer.getCurrentLineIndex()
 }
 
+// Stable controls object (singleton methods don't change)
+const playerControls = {
+  play: () => lyricsPlayer.play(),
+  pause: () => lyricsPlayer.pause(),
+  seek: (time: number) => lyricsPlayer.seek(time),
+  reset: () => lyricsPlayer.reset(),
+  unload: () => lyricsPlayer.unload(),
+  jumpToLine: (index: number) => lyricsPlayer.jumpToLine(index),
+  load: (lyrics: Lyrics, autoPlay?: boolean) => lyricsPlayer.load(lyrics, autoPlay),
+  setScrollSpeed: (speed: number) => lyricsPlayer.setScrollSpeed(speed),
+  getScrollSpeed: () => lyricsPlayer.getScrollSpeed(),
+}
+
 /**
- * Hook to get player controls
+ * Hook to get player controls (stable reference)
  */
 export function usePlayerControls() {
-  return {
-    play: () => lyricsPlayer.play(),
-    pause: () => lyricsPlayer.pause(),
-    seek: (time: number) => lyricsPlayer.seek(time),
-    reset: () => lyricsPlayer.reset(),
-    unload: () => lyricsPlayer.unload(),
-    jumpToLine: (index: number) => lyricsPlayer.jumpToLine(index),
-    load: (lyrics: Lyrics, autoPlay?: boolean) => lyricsPlayer.load(lyrics, autoPlay),
-    setScrollSpeed: (speed: number) => lyricsPlayer.setScrollSpeed(speed),
-    getScrollSpeed: () => lyricsPlayer.getScrollSpeed(),
-  }
+  return useMemo(() => playerControls, [])
 }

@@ -81,3 +81,21 @@ export {
 } from "./slug"
 
 export type { SearchResultTrack, SearchApiResponse } from "./search-api-types"
+
+export {
+  type RecentSong,
+  type CachedLyrics,
+  LYRICS_CACHE_TTL_MS,
+  MAX_RECENT_SONGS,
+  POSITION_MAX_AGE_MS,
+  POSITION_MIN_SECONDS,
+  POSITION_END_BUFFER_SECONDS,
+} from "./recent-songs-types"
+
+export {
+  loadCachedLyrics,
+  saveCachedLyrics,
+  removeCachedLyrics,
+  hasCachedLyrics,
+  clearAllCachedLyrics,
+} from "./lyrics-cache"

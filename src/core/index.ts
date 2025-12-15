@@ -52,3 +52,10 @@ export {
   type MetronomeMode,
   type MetronomeControls,
 } from "./MetronomeStore"
+
+export {
+  recentSongsStore,
+  useRecentSongs,
+  useRecentSong,
+  type RecentSong,
+} from "./RecentSongsStore"

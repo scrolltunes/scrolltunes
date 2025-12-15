@@ -1,6 +1,6 @@
 "use client"
 
-import { SongSearch } from "@/components/search"
+import { RecentSongs, SongSearch } from "@/components/search"
 import { GearSix, MusicNote } from "@phosphor-icons/react"
 import Link from "next/link"
 
@@ -33,6 +33,7 @@ export default function Home() {
             <p className="text-neutral-500">Search for any song to get synced lyrics</p>
           </div>
           <SongSearch className="w-full max-w-md" />
+          <RecentSongs className="w-full max-w-md mt-8" />
         </div>
 
         {/* Static footer - required for GetSongBPM API key verification */}
