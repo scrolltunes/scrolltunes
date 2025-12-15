@@ -10,3 +10,17 @@ export {
   type VADConfig,
   type VADRuntimeState,
 } from "./voice-detection"
+
+export {
+  DEMO_LYRICS,
+  LONG_TEST_LYRICS,
+  getMockLyrics,
+  MOCK_SONGS,
+} from "./mock-lyrics"
+
+export {
+  parseLRC,
+  parseTimestamp,
+  formatTimestamp,
+  type LRCMetadata,
+} from "./lyrics-parser"
