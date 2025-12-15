@@ -66,13 +66,7 @@ export const ProgressIndicator = memo(function ProgressIndicator({
   }
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      {showTime && (
-        <span className="text-sm text-neutral-400 tabular-nums min-w-[3.5rem]">
-          {formatTime(currentTime)}
-        </span>
-      )}
-
+    <div className={`flex items-center gap-2 ${className}`}>
       <div
         ref={barRef}
         onClick={handleClick}
@@ -101,7 +95,7 @@ export const ProgressIndicator = memo(function ProgressIndicator({
       </div>
 
       {showTime && (
-        <span className="text-sm text-neutral-400 tabular-nums min-w-[3.5rem] text-right">
+        <span className="text-sm text-neutral-400 tabular-nums min-w-[2.5rem] text-right">
           {formatTime(duration)}
         </span>
       )}

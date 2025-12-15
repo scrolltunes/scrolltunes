@@ -5,7 +5,6 @@ import {
   FloatingMetronome,
   FontSizeControl,
   ProgressIndicator,
-  TempoControl,
   VoiceIndicator,
 } from "@/components/audio"
 import { LyricsDisplay } from "@/components/display"
@@ -33,8 +32,7 @@ import { soundSystem } from "@/sounds"
 import {
   ArrowCounterClockwise,
   ArrowLeft,
-  CaretDown,
-  CaretUp,
+  Gear,
   MusicNote,
   Pause,
   Play,
@@ -58,7 +56,7 @@ type LoadState =
 export default function SongPage() {
   const params = useParams<{ artistSlug: string; trackSlugWithId: string }>()
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
-  const [showControls, setShowControls] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
@@ -291,7 +289,7 @@ export default function SongPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <VoiceIndicator
                   isListening={isListening}
                   isSpeaking={isSpeaking}
@@ -326,12 +324,12 @@ export default function SongPage() {
 
                     <button
                       type="button"
-                      onClick={() => setShowControls(prev => !prev)}
+                      onClick={() => setShowSettings(prev => !prev)}
                       className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-                      aria-label={showControls ? "Hide controls" : "Show controls"}
-                      aria-expanded={showControls}
+                      aria-label={showSettings ? "Hide settings" : "Show settings"}
+                      aria-expanded={showSettings}
                     >
-                      {showControls ? <CaretUp size={20} /> : <CaretDown size={20} />}
+                      <Gear size={20} />
                     </button>
                   </div>
                 )}
@@ -347,7 +345,7 @@ export default function SongPage() {
         <FloatingMetronome bpm={currentBpm} position="bottom-right" />
 
         <AnimatePresence>
-          {showControls && (
+          {showSettings && (
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
@@ -355,9 +353,7 @@ export default function SongPage() {
               transition={springs.default}
               className="fixed bottom-10 left-0 right-0 z-20 bg-neutral-900/95 backdrop-blur-lg border-t border-neutral-800"
             >
-              <div className="max-w-4xl mx-auto p-4 space-y-4">
-                <ProgressIndicator />
-                <TempoControl />
+              <div className="max-w-4xl mx-auto p-4">
                 <FontSizeControl />
               </div>
             </motion.div>
@@ -365,25 +361,9 @@ export default function SongPage() {
         </AnimatePresence>
 
         <footer className="fixed bottom-0 left-0 right-0 z-10 bg-neutral-950/80 backdrop-blur-lg border-t border-neutral-800 px-4 py-2">
-          <div className="max-w-4xl mx-auto flex items-center justify-between text-sm text-neutral-500">
-            <span>
-              State: <span className="text-neutral-300">{playerState._tag}</span>
-            </span>
-            <span>
-              Voice:{" "}
-              <span
-                className={
-                  isSpeaking
-                    ? "text-green-400"
-                    : isListening
-                      ? "text-indigo-400"
-                      : "text-neutral-400"
-                }
-              >
-                {isSpeaking ? "Speaking" : isListening ? "Listening" : "Off"}
-              </span>
-              {isListening && <span className="ml-2">Level: {(level * 100).toFixed(0)}%</span>}
-            </span>
+          <div className="max-w-4xl mx-auto flex items-center gap-4">
+            <ProgressIndicator className="flex-1" />
+
             <Attribution
               lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}
               bpm={{ name: "GetSongBPM", url: "https://getsongbpm.com" }}
