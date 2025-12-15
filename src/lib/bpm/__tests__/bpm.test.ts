@@ -5,6 +5,7 @@ import { BPMAPIError, BPMNotFoundError, BPMRateLimitError } from "../bpm-errors"
 import { type BPMProvider, getBpmWithFallback } from "../bpm-provider"
 import type { BPMTrackQuery } from "../bpm-types"
 import { makeCacheKey, normalizeTrackKey } from "../bpm-types"
+import { deezerBpmProvider } from "../deezer-bpm-client"
 import { getSongBpmProvider } from "../getsongbpm-client"
 import { getMockBpm, hasMockBpm, mockBpmProvider } from "../mock-bpm"
 
@@ -305,6 +306,115 @@ describe("getSongBpmProvider", () => {
     const exit = await Effect.runPromiseExit(effect)
 
     expect(exit._tag).toBe("Failure")
+  })
+})
+
+describe("deezerBpmProvider", () => {
+  const originalFetch = global.fetch
+  const originalEnv = process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS = undefined
+  })
+
+  afterEach(() => {
+    global.fetch = originalFetch
+    process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS = originalEnv
+  })
+
+  test("returns BPM when track found with valid BPM", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [{ id: 123, title: "Song", artist: { name: "Artist" } }],
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ bpm: 120 }),
+      })
+
+    const effect = deezerBpmProvider.getBpm({ title: "Song", artist: "Artist" })
+    const result = await Effect.runPromise(effect)
+
+    expect(result.bpm).toBe(120)
+    expect(result.source).toBe("Deezer")
+    expect(result.key).toBeNull()
+  })
+
+  test("fails with BPMNotFoundError when BPM is 0", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [{ id: 123, title: "Song", artist: { name: "Artist" } }],
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ bpm: 0 }),
+      })
+
+    const effect = deezerBpmProvider.getBpm({ title: "Song", artist: "Artist" })
+    const exit = await Effect.runPromiseExit(effect)
+
+    expect(exit._tag).toBe("Failure")
+    if (exit._tag === "Failure" && exit.cause._tag === "Fail") {
+      expect(exit.cause.error._tag).toBe("BPMNotFoundError")
+    }
+  })
+
+  test("fails with BPMNotFoundError when no search results", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [] }),
+    })
+
+    const effect = deezerBpmProvider.getBpm({ title: "Unknown", artist: "Nobody" })
+    const exit = await Effect.runPromiseExit(effect)
+
+    expect(exit._tag).toBe("Failure")
+    if (exit._tag === "Failure" && exit.cause._tag === "Fail") {
+      expect(exit.cause.error._tag).toBe("BPMNotFoundError")
+    }
+  })
+
+  test("fails with BPMAPIError on network error", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error("Network error"))
+
+    const effect = deezerBpmProvider.getBpm({ title: "Song", artist: "Artist" })
+    const exit = await Effect.runPromiseExit(effect)
+
+    expect(exit._tag).toBe("Failure")
+    if (exit._tag === "Failure" && exit.cause._tag === "Fail") {
+      expect(exit.cause.error._tag).toBe("BPMAPIError")
+    }
+  })
+
+  test("matches by normalized title/artist", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [{ id: 456, title: "HELLO WORLD", artist: { name: "TEST ARTIST" } }],
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ bpm: 100 }),
+      })
+
+    const effect = deezerBpmProvider.getBpm({ title: "hello world", artist: "test artist" })
+    const result = await Effect.runPromise(effect)
+
+    expect(result.bpm).toBe(100)
   })
 })
 

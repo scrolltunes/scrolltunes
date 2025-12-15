@@ -1,5 +1,6 @@
 import {
   type BPMResult,
+  deezerBpmProvider,
   getBpmWithFallback,
   getSongBpmProvider,
   withInMemoryCache,
@@ -10,7 +11,7 @@ import { LyricsAPIError, LyricsNotFoundError, getLyricsById } from "@/lib/lyrics
 import { Effect } from "effect"
 import { NextResponse } from "next/server"
 
-const bpmProviders = [withInMemoryCache(getSongBpmProvider)]
+const bpmProviders = [withInMemoryCache(getSongBpmProvider), withInMemoryCache(deezerBpmProvider)]
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: idParam } = await params
@@ -76,7 +77,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     albumArt: albumArt ?? null,
     attribution: {
       lyrics: { name: "LRCLIB", url: "https://lrclib.net" },
-      bpm: bpmResult ? { name: "GetSongBPM", url: "https://getsongbpm.com" } : null,
+      bpm: bpmResult
+        ? bpmResult.source === "Deezer"
+          ? { name: "Deezer", url: "https://www.deezer.com" }
+          : { name: "GetSongBPM", url: "https://getsongbpm.com" }
+        : null,
     },
   }
   return NextResponse.json(body, {

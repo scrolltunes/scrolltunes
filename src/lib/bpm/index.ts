@@ -9,6 +9,7 @@ export type { BPMProvider } from "./bpm-provider"
 export { getBpmWithFallback } from "./bpm-provider"
 
 export { getSongBpmProvider } from "./getsongbpm-client"
+export { deezerBpmProvider } from "./deezer-bpm-client"
 
 export { getMockBpm, hasMockBpm, mockBpmProvider } from "./mock-bpm"
 

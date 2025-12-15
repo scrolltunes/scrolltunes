@@ -1,5 +1,6 @@
 import {
   type BPMResult,
+  deezerBpmProvider,
   getBpmWithFallback,
   getSongBpmProvider,
   withInMemoryCache,
@@ -15,7 +16,7 @@ import {
 import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
 
-const bpmProviders = [withInMemoryCache(getSongBpmProvider)]
+const bpmProviders = [withInMemoryCache(getSongBpmProvider), withInMemoryCache(deezerBpmProvider)]
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -96,7 +97,11 @@ export async function GET(request: NextRequest) {
     key: result.value.bpm?.key ?? null,
     attribution: {
       lyrics: { name: "LRCLIB", url: "https://lrclib.net" },
-      bpm: result.value.bpm ? { name: "GetSongBPM", url: "https://getsongbpm.com" } : null,
+      bpm: result.value.bpm
+        ? result.value.bpm.source === "Deezer"
+          ? { name: "Deezer", url: "https://www.deezer.com" }
+          : { name: "GetSongBPM", url: "https://getsongbpm.com" }
+        : null,
     },
   }
   return NextResponse.json(body, {

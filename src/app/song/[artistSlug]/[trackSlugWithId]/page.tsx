@@ -17,7 +17,6 @@ import {
   usePlayerState,
   usePreferences,
 } from "@/core"
-import { soundSystem } from "@/sounds"
 import {
   useAutoHide,
   useDoubleTap,
@@ -30,6 +29,7 @@ import {
 import { type LyricsApiResponse, isLyricsApiSuccess } from "@/lib"
 import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { parseTrackSlugWithId } from "@/lib/slug"
+import { soundSystem } from "@/sounds"
 import {
   ArrowCounterClockwise,
   ArrowLeft,
