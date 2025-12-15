@@ -84,6 +84,57 @@ class RecentSongsStore {
   }
 
   /**
+   * Update song metadata without changing position in list.
+   * Use this when loading a song page without actually playing it.
+   * If the song doesn't exist yet, adds it to the end (not top).
+   */
+  updateMetadata(
+    song: Omit<RecentSong, "lastPlayedAt" | "lastPositionSeconds" | "lastPositionUpdatedAt">,
+  ): void {
+    this.setState(prev => {
+      const existingIndex = prev.findIndex(s => s.id === song.id)
+
+      if (existingIndex >= 0) {
+        // Update in place without reordering
+        const existing = prev[existingIndex]
+        if (!existing) return prev
+        const updated: RecentSong = {
+          ...existing,
+          ...song,
+          albumArt: song.albumArt ?? existing.albumArt,
+        }
+        return [...prev.slice(0, existingIndex), updated, ...prev.slice(existingIndex + 1)]
+      }
+
+      // Song not in list - add to end (not top) with current timestamp
+      const newSong: RecentSong = {
+        ...song,
+        lastPlayedAt: Date.now(),
+        lastPositionSeconds: undefined,
+        lastPositionUpdatedAt: undefined,
+      }
+      return [...prev, newSong].slice(0, MAX_RECENT_SONGS)
+    })
+  }
+
+  /**
+   * Move an existing song to the top of the list (mark as played)
+   */
+  markAsPlayed(id: number): void {
+    this.setState(prev => {
+      const existing = prev.find(s => s.id === id)
+      if (!existing) return prev
+
+      const filtered = prev.filter(s => s.id !== id)
+      const updated: RecentSong = {
+        ...existing,
+        lastPlayedAt: Date.now(),
+      }
+      return [updated, ...filtered]
+    })
+  }
+
+  /**
    * Update the last position for a song
    * Pass undefined to clear position (e.g., when song finished)
    */

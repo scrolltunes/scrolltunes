@@ -20,12 +20,9 @@ export function DevTitle() {
 
     prefixTitle()
 
-    // Watch for title changes and re-apply prefix
-    const titleElement = document.querySelector("title")
-    if (!titleElement) return
-
+    // Watch for title changes in <head> (Next.js may replace the title element)
     const observer = new MutationObserver(prefixTitle)
-    observer.observe(titleElement, { childList: true, characterData: true, subtree: true })
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true })
 
     return () => observer.disconnect()
   }, [])

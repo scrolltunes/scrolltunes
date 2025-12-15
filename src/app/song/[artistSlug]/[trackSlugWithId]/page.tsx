@@ -17,6 +17,7 @@ import {
   usePlayerState,
   usePreferences,
 } from "@/core"
+import { soundSystem } from "@/sounds"
 import {
   useAutoHide,
   useDoubleTap,
@@ -42,7 +43,7 @@ import {
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 type LoadState =
   | { readonly _tag: "Loading" }
@@ -89,7 +90,7 @@ export default function SongPage() {
     enabled: isLoaded && preferences.autoHideControlsMs > 0,
   })
 
-  const handleTogglePlayPause = useCallback(() => {
+  const handleTogglePlayPause = useCallback(async () => {
     if (playerState._tag === "Playing") {
       pause()
       // Save position on pause
@@ -102,6 +103,8 @@ export default function SongPage() {
         }
       }
     } else {
+      // Initialize sound system on user gesture (required for metronome)
+      await soundSystem.initialize()
       play()
     }
   }, [playerState._tag, play, pause, lrclibId])
@@ -137,7 +140,7 @@ export default function SongPage() {
           albumArt: cached.albumArt ?? null,
         })
 
-        recentSongsStore.upsertRecent({
+        recentSongsStore.updateMetadata({
           id,
           title: cached.lyrics.title,
           artist: cached.lyrics.artist,
@@ -190,8 +193,8 @@ export default function SongPage() {
           albumArt: data.albumArt ?? undefined,
         })
 
-        // Add to recents
-        recentSongsStore.upsertRecent({
+        // Add to recents (without changing order)
+        recentSongsStore.updateMetadata({
           id,
           title: data.lyrics.title,
           artist: data.lyrics.artist,
@@ -225,6 +228,16 @@ export default function SongPage() {
       controller.abort()
     }
   }, [lrclibId, shouldResume])
+
+  // Mark song as played when playback starts (moves to top of recents)
+  const hasMarkedAsPlayed = useRef(false)
+  useEffect(() => {
+    if (lrclibId === null || hasMarkedAsPlayed.current) return
+    if (playerState._tag === "Playing") {
+      recentSongsStore.markAsPlayed(lrclibId)
+      hasMarkedAsPlayed.current = true
+    }
+  }, [lrclibId, playerState._tag])
 
   // Save position when leaving the page
   useEffect(() => {

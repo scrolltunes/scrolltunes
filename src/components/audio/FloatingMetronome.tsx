@@ -160,7 +160,9 @@ export const FloatingMetronome = memo(function FloatingMetronome({
           <MetronomeOrb bpm={bpm} isActive={isActive} size="sm" onPulse={handlePulse} />
         </button>
 
-        {bpm !== null && <div className="mt-1 text-center text-xs text-neutral-400">{bpm} BPM</div>}
+        <div className="mt-1 text-center text-xs text-neutral-400">
+          {bpm !== null ? `${bpm} BPM` : "No BPM"}
+        </div>
       </div>
     </div>
   )

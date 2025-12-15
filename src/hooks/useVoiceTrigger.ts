@@ -36,6 +36,13 @@ export function useVoiceTrigger(options: UseVoiceTriggerOptions = {}) {
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const wasPlayingBeforeSilence = useRef(false)
 
+  // Stop listening when entering Playing state
+  useEffect(() => {
+    if (playerState._tag === "Playing" && voiceState.isListening) {
+      voiceActivityStore.stopListening()
+    }
+  }, [playerState._tag, voiceState.isListening])
+
   // Handle voice start
   useEffect(() => {
     if (!voiceState.isSpeaking) return
@@ -49,7 +56,6 @@ export function useVoiceTrigger(options: UseVoiceTriggerOptions = {}) {
     // Auto-play from Ready state
     if (playerState._tag === "Ready" && opts.autoPlay) {
       lyricsPlayer.play()
-      voiceActivityStore.stopListening()
       return
     }
 

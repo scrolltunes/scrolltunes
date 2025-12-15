@@ -105,6 +105,10 @@
 - [ ] Wire localStorage BPM cache on client (getCachedBpm/setCachedBpm)
 - [ ] Add tests for localStorage BPM cache utilities
 
+### BPM Fallback Sources (Future)
+- [ ] Implement tap tempo as manual fallback
+- [ ] Prototype strum/beat detection from microphone input
+
 ### UI
 - [x] Create song search component
 - [x] Create song selection/confirmation screen
