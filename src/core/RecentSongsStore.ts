@@ -1,12 +1,6 @@
 "use client"
 
-import {
-  MAX_RECENT_SONGS,
-  POSITION_END_BUFFER_SECONDS,
-  POSITION_MAX_AGE_MS,
-  POSITION_MIN_SECONDS,
-  type RecentSong,
-} from "@/lib/recent-songs-types"
+import { MAX_RECENT_SONGS, type RecentSong } from "@/lib/recent-songs-types"
 import { useSyncExternalStore } from "react"
 
 const STORAGE_KEY = "scrolltunes:recents"
@@ -74,10 +68,7 @@ class RecentSongsStore {
       const newSong: RecentSong = {
         ...song,
         lastPlayedAt: song.lastPlayedAt ?? Date.now(),
-        // Preserve existing data if not provided
         albumArt: song.albumArt ?? existing?.albumArt,
-        lastPositionSeconds: existing?.lastPositionSeconds,
-        lastPositionUpdatedAt: existing?.lastPositionUpdatedAt,
       }
       return [newSong, ...filtered].slice(0, MAX_RECENT_SONGS)
     })
@@ -88,9 +79,7 @@ class RecentSongsStore {
    * Use this when loading a song page without actually playing it.
    * If the song doesn't exist yet, adds it to the end (not top).
    */
-  updateMetadata(
-    song: Omit<RecentSong, "lastPlayedAt" | "lastPositionSeconds" | "lastPositionUpdatedAt">,
-  ): void {
+  updateMetadata(song: Omit<RecentSong, "lastPlayedAt">): void {
     this.setState(prev => {
       const existingIndex = prev.findIndex(s => s.id === song.id)
 
@@ -110,8 +99,6 @@ class RecentSongsStore {
       const newSong: RecentSong = {
         ...song,
         lastPlayedAt: Date.now(),
-        lastPositionSeconds: undefined,
-        lastPositionUpdatedAt: undefined,
       }
       return [...prev, newSong].slice(0, MAX_RECENT_SONGS)
     })
@@ -135,55 +122,10 @@ class RecentSongsStore {
   }
 
   /**
-   * Update the last position for a song
-   * Pass undefined to clear position (e.g., when song finished)
-   */
-  updatePosition(id: number, positionSeconds: number | undefined): void {
-    this.setState(prev =>
-      prev.map(s =>
-        s.id === id
-          ? {
-              ...s,
-              lastPositionSeconds: positionSeconds,
-              lastPositionUpdatedAt: positionSeconds !== undefined ? Date.now() : undefined,
-            }
-          : s,
-      ),
-    )
-  }
-
-  /**
    * Get a specific recent song by ID
    */
   getRecent(id: number): RecentSong | undefined {
     return this.state.find(s => s.id === id)
-  }
-
-  /**
-   * Check if a song's position is valid for resume
-   * Valid if: within max age, position > min, position < duration - buffer
-   */
-  isPositionValidForResume(song: RecentSong): boolean {
-    const lastPosition = song.lastPositionSeconds
-    const lastUpdated = song.lastPositionUpdatedAt
-    if (lastPosition == null || lastUpdated == null) {
-      return false
-    }
-
-    const age = Date.now() - lastUpdated
-    if (age > POSITION_MAX_AGE_MS) {
-      return false
-    }
-
-    if (lastPosition < POSITION_MIN_SECONDS) {
-      return false
-    }
-
-    if (lastPosition > song.durationSeconds - POSITION_END_BUFFER_SECONDS) {
-      return false
-    }
-
-    return true
   }
 
   /**

@@ -12,7 +12,6 @@ import { LyricsDisplay } from "@/components/display"
 import { Attribution } from "@/components/ui"
 import {
   type Lyrics,
-  lyricsPlayer,
   recentSongsStore,
   usePlayerControls,
   usePlayerState,
@@ -43,7 +42,7 @@ import {
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
 
 type LoadState =
@@ -58,8 +57,6 @@ type LoadState =
 
 export default function SongPage() {
   const params = useParams<{ artistSlug: string; trackSlugWithId: string }>()
-  const searchParams = useSearchParams()
-  const shouldResume = searchParams.get("resume") === "1"
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
   const [showControls, setShowControls] = useState(false)
 
@@ -94,21 +91,12 @@ export default function SongPage() {
   const handleTogglePlayPause = useCallback(async () => {
     if (playerState._tag === "Playing") {
       pause()
-      // Save position on pause
-      if (lrclibId !== null) {
-        const time = lyricsPlayer.getCurrentTime()
-        const lyrics = lyricsPlayer.getLyrics()
-        if (lyrics) {
-          const isFinished = time >= lyrics.duration - 3
-          recentSongsStore.updatePosition(lrclibId, isFinished ? undefined : time)
-        }
-      }
     } else {
       // Initialize sound system on user gesture (required for metronome)
       await soundSystem.initialize()
       play()
     }
-  }, [playerState._tag, play, pause, lrclibId])
+  }, [playerState._tag, play, pause])
 
   const doubleTapRef = useDoubleTap<HTMLDivElement>({
     onDoubleTap: handleTogglePlayPause,
@@ -149,18 +137,6 @@ export default function SongPage() {
           durationSeconds: cached.lyrics.duration,
           albumArt: cached.albumArt,
         })
-
-        // Resume position only if explicitly requested via ?resume=1
-        if (shouldResume) {
-          const recent = recentSongsStore.getRecent(id)
-          if (
-            recent &&
-            recentSongsStore.isPositionValidForResume(recent) &&
-            recent.lastPositionSeconds != null
-          ) {
-            lyricsPlayer.seek(recent.lastPositionSeconds)
-          }
-        }
         return
       }
 
@@ -203,18 +179,6 @@ export default function SongPage() {
           durationSeconds: data.lyrics.duration,
           albumArt: data.albumArt ?? undefined,
         })
-
-        // Resume position only if explicitly requested via ?resume=1
-        if (shouldResume) {
-          const recent = recentSongsStore.getRecent(id)
-          if (
-            recent &&
-            recentSongsStore.isPositionValidForResume(recent) &&
-            recent.lastPositionSeconds != null
-          ) {
-            lyricsPlayer.seek(recent.lastPositionSeconds)
-          }
-        }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           return
@@ -228,7 +192,7 @@ export default function SongPage() {
     return () => {
       controller.abort()
     }
-  }, [lrclibId, shouldResume])
+  }, [lrclibId])
 
   // Mark song as played when playback starts (moves to top of recents)
   const hasMarkedAsPlayed = useRef(false)
@@ -239,20 +203,6 @@ export default function SongPage() {
       hasMarkedAsPlayed.current = true
     }
   }, [lrclibId, playerState._tag])
-
-  // Save position when leaving the page
-  useEffect(() => {
-    if (lrclibId === null) return
-
-    return () => {
-      const time = lyricsPlayer.getCurrentTime()
-      const lyrics = lyricsPlayer.getLyrics()
-      if (!lyrics) return
-
-      const isFinished = time >= lyrics.duration - 3
-      recentSongsStore.updatePosition(lrclibId, isFinished ? undefined : time)
-    }
-  }, [lrclibId])
 
   const handleToggleListening = useCallback(async () => {
     if (isListening) {
