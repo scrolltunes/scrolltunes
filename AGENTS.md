@@ -17,6 +17,7 @@ Live lyrics teleprompter for musicians. Detects singing voice and syncs scrollin
 
 - **docs/architecture.md** — Tech stack, project structure, design patterns, config files, API design
 - **docs/design.md** — Features backlog, TODOs, product requirements, open questions
+- **docs/figma-workflow.md** — Design-to-code process, token pipeline, asset management
 
 ## Code Style
 

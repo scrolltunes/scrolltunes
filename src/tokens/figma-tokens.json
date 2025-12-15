@@ -1,0 +1,126 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$description": "ScrollTunes design tokens - exported from Figma",
+  "color": {
+    "$type": "color",
+    "primary": {
+      "$value": "#6366f1",
+      "$description": "Primary brand color (indigo)"
+    },
+    "secondary": {
+      "$value": "#8b5cf6",
+      "$description": "Secondary accent (violet)"
+    },
+    "background": {
+      "default": { "$value": "#0a0a0a" },
+      "surface": { "$value": "#171717" },
+      "elevated": { "$value": "#262626" }
+    },
+    "text": {
+      "primary": { "$value": "#ffffff" },
+      "secondary": { "$value": "#a3a3a3" },
+      "muted": { "$value": "#525252" }
+    },
+    "accent": {
+      "success": { "$value": "#22c55e" },
+      "warning": { "$value": "#eab308" },
+      "error": { "$value": "#ef4444" },
+      "info": { "$value": "#3b82f6" }
+    },
+    "lyrics": {
+      "active": { "$value": "#ffffff" },
+      "upcoming": { "$value": "#a3a3a3" },
+      "past": { "$value": "#525252" },
+      "highlight": { "$value": "rgba(99, 102, 241, 0.3)" }
+    }
+  },
+  "spacing": {
+    "$type": "spacing",
+    "1": { "$value": "4px" },
+    "2": { "$value": "8px" },
+    "3": { "$value": "12px" },
+    "4": { "$value": "16px" },
+    "5": { "$value": "20px" },
+    "6": { "$value": "24px" },
+    "8": { "$value": "32px" },
+    "10": { "$value": "40px" },
+    "12": { "$value": "48px" },
+    "16": { "$value": "64px" }
+  },
+  "typography": {
+    "$type": "typography",
+    "fontSize": {
+      "xs": { "$value": "12px" },
+      "sm": { "$value": "14px" },
+      "base": { "$value": "16px" },
+      "lg": { "$value": "18px" },
+      "xl": { "$value": "20px" },
+      "2xl": { "$value": "24px" },
+      "3xl": { "$value": "30px" },
+      "4xl": { "$value": "36px" },
+      "5xl": { "$value": "48px" },
+      "lyrics": { "$value": "32px", "$description": "Default lyrics size" },
+      "lyrics-karaoke": { "$value": "48px", "$description": "Karaoke mode lyrics" }
+    },
+    "fontWeight": {
+      "normal": { "$value": "400" },
+      "medium": { "$value": "500" },
+      "semibold": { "$value": "600" },
+      "bold": { "$value": "700" }
+    },
+    "lineHeight": {
+      "tight": { "$value": "1.25" },
+      "normal": { "$value": "1.5" },
+      "relaxed": { "$value": "1.75" },
+      "lyrics": { "$value": "1.8", "$description": "Lyrics line height for readability" }
+    }
+  },
+  "radius": {
+    "$type": "dimension",
+    "sm": { "$value": "4px" },
+    "md": { "$value": "8px" },
+    "lg": { "$value": "12px" },
+    "xl": { "$value": "16px" },
+    "full": { "$value": "9999px" }
+  },
+  "shadow": {
+    "$type": "shadow",
+    "sm": {
+      "$value": {
+        "offsetX": "0px",
+        "offsetY": "2px",
+        "blur": "4px",
+        "spread": "0px",
+        "color": "rgba(0, 0, 0, 0.4)"
+      }
+    },
+    "md": {
+      "$value": {
+        "offsetX": "0px",
+        "offsetY": "4px",
+        "blur": "8px",
+        "spread": "0px",
+        "color": "rgba(0, 0, 0, 0.5)"
+      }
+    },
+    "lg": {
+      "$value": {
+        "offsetX": "0px",
+        "offsetY": "8px",
+        "blur": "16px",
+        "spread": "0px",
+        "color": "rgba(0, 0, 0, 0.6)"
+      }
+    },
+    "glow": {
+      "$value": {
+        "offsetX": "0px",
+        "offsetY": "0px",
+        "blur": "20px",
+        "spread": "0px",
+        "color": "rgba(99, 102, 241, 0.4)"
+      },
+      "$description": "Glow effect for active elements"
+    }
+  }
+}
