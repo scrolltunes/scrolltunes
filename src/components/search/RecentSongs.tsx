@@ -1,8 +1,8 @@
 "use client"
 
-import { useRecentSongs } from "@/core"
+import { recentSongsStore, useRecentSongs } from "@/core"
 import { makeCanonicalPath } from "@/lib/slug"
-import { ClockCounterClockwise, MusicNote } from "@phosphor-icons/react"
+import { ClockCounterClockwise, MusicNote, Trash } from "@phosphor-icons/react"
 import { useRouter } from "next/navigation"
 import { memo, useCallback } from "react"
 
@@ -22,15 +22,29 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
     [router],
   )
 
+  const handleClear = useCallback(() => {
+    recentSongsStore.clear()
+  }, [])
+
   if (recents.length === 0) {
     return null
   }
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2 text-neutral-400 mb-3">
-        <ClockCounterClockwise size={16} weight="bold" />
-        <span className="text-sm font-medium">Recently played</span>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-neutral-400">
+          <ClockCounterClockwise size={16} weight="bold" />
+          <span className="text-sm font-medium">Recently played</span>
+        </div>
+        <button
+          type="button"
+          onClick={handleClear}
+          className="text-neutral-500 hover:text-neutral-300 transition-colors p-1"
+          aria-label="Clear history"
+        >
+          <Trash size={16} />
+        </button>
       </div>
 
       <ul className="space-y-2" aria-label="Recently played songs">

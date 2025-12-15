@@ -43,15 +43,32 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
 
+type ErrorType = "invalid-url" | "not-found" | "network"
+
 type LoadState =
   | { readonly _tag: "Loading" }
-  | { readonly _tag: "Error"; readonly message: string }
+  | { readonly _tag: "Error"; readonly errorType: ErrorType }
   | {
       readonly _tag: "Loaded"
       readonly lyrics: Lyrics
       readonly bpm: number | null
       readonly albumArt: string | null
     }
+
+const errorMessages: Record<ErrorType, { title: string; description: string }> = {
+  "invalid-url": {
+    title: "Invalid song URL",
+    description: "Please search for the song again",
+  },
+  "not-found": {
+    title: "Lyrics not available",
+    description: "Try a different version of this song",
+  },
+  network: {
+    title: "Could not load lyrics",
+    description: "Check your internet connection and try again",
+  },
+}
 
 export default function SongPage() {
   const params = useParams<{ artistSlug: string; trackSlugWithId: string }>()
@@ -117,7 +134,7 @@ export default function SongPage() {
 
   useEffect(() => {
     if (lrclibId === null) {
-      setLoadState({ _tag: "Error", message: "Invalid song URL" })
+      setLoadState({ _tag: "Error", errorType: "invalid-url" })
       return
     }
 
@@ -156,8 +173,8 @@ export default function SongPage() {
         const data: LyricsApiResponse = await response.json()
 
         if (!response.ok || !isLyricsApiSuccess(data)) {
-          const errorMessage = "error" in data ? data.error : "Failed to load lyrics"
-          setLoadState({ _tag: "Error", message: errorMessage })
+          const errorType: ErrorType = response.status === 404 ? "not-found" : "network"
+          setLoadState({ _tag: "Error", errorType })
           return
         }
 
@@ -190,7 +207,7 @@ export default function SongPage() {
         if (error instanceof Error && error.name === "AbortError") {
           return
         }
-        setLoadState({ _tag: "Error", message: "Failed to load lyrics" })
+        setLoadState({ _tag: "Error", errorType: "network" })
       }
     }
 
@@ -241,20 +258,35 @@ export default function SongPage() {
   }
 
   if (loadState._tag === "Error") {
+    const { title, description } = errorMessages[loadState.errorType]
+    const canRetry = loadState.errorType === "network" || loadState.errorType === "not-found"
+
     return (
       <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center gap-6 p-6">
         <MusicNote size={64} weight="fill" className="text-neutral-700" />
         <div className="text-center">
-          <h1 className="text-xl font-semibold mb-2">Could not load lyrics</h1>
-          <p className="text-neutral-400">{loadState.message}</p>
+          <h1 className="text-xl font-semibold mb-2">{title}</h1>
+          <p className="text-neutral-400">{description}</p>
         </div>
-        <Link
-          href="/"
-          className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-full font-medium transition-colors flex items-center gap-2"
-        >
-          <ArrowLeft size={20} />
-          Back to search
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-3">
+          {canRetry && (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <ArrowCounterClockwise size={20} />
+              Try again
+            </button>
+          )}
+          <Link
+            href="/"
+            className="px-6 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            <ArrowLeft size={20} />
+            Back to search
+          </Link>
+        </div>
       </div>
     )
   }

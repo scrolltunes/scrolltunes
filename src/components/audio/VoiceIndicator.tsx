@@ -51,9 +51,10 @@ export const VoiceIndicator = memo(function VoiceIndicator({
 }: VoiceIndicatorProps) {
   const baseClasses = `
     relative flex items-center justify-center rounded-full
-    transition-colors cursor-pointer
+    transition-colors
     focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
     ${sizeClasses[size]}
+    ${permissionDenied ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
   `
 
   const getBackgroundColor = () => {
@@ -68,6 +69,13 @@ export const VoiceIndicator = memo(function VoiceIndicator({
     if (isSpeaking) return "text-green-400"
     if (isListening) return "text-indigo-400"
     return "text-neutral-500"
+  }
+
+  const getTooltip = () => {
+    if (permissionDenied) return "Microphone blocked – enable in browser settings"
+    if (isSpeaking) return "Voice detected"
+    if (isListening) return "Listening for voice"
+    return "Start voice detection"
   }
 
   const iconSize = iconSizes[size]
@@ -86,10 +94,12 @@ export const VoiceIndicator = memo(function VoiceIndicator({
   return (
     <motion.button
       type="button"
-      onClick={onToggle}
+      onClick={permissionDenied ? undefined : onToggle}
+      disabled={permissionDenied}
       className={`${baseClasses} ${getBackgroundColor()}`}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
+      whileHover={permissionDenied ? {} : { scale: 1.05 }}
+      whileTap={permissionDenied ? {} : { scale: 0.95 }}
+      title={getTooltip()}
       aria-label={
         permissionDenied
           ? "Microphone permission denied"

@@ -175,16 +175,26 @@ Play instrumental backing tracks for true karaoke experience:
 
 **Priority**: Critical | **Version**: All
 
-**No content storage** — The app never stores:
-- Song lyrics (fetched on-demand, not cached permanently)
+**No server-side content storage** — The app never stores on external servers:
+- Song lyrics (fetched on-demand from providers)
 - Audio files or streams
 - Video content
 - Copyrighted album artwork (use provider CDN URLs)
 
-**What IS stored**:
+**Local Browser Caching**:
+- Lyrics and metadata are cached locally in the browser (localStorage) for performance
+- Cache has a 7-day TTL and is automatically pruned
+- No data is sent to or stored on external servers
+- Users can clear their local cache at any time via browser settings
+
+**What IS stored (server-side)**:
+- Nothing — all user data remains local to the browser
+
+**What IS stored (locally in browser)**:
 - Song metadata: title, artist, album name, duration
+- Cached lyrics (with 7-day expiration)
 - Timecode/sync data (timestamps for lyrics)
-- User preferences and history (song IDs only, not content)
+- User preferences and history (song IDs only)
 - Session data (temporary)
 
 **Compliance**:
