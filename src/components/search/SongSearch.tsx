@@ -229,15 +229,8 @@ export const SongSearch = memo(function SongSearch({
           </motion.div>
         )}
 
-        {!error && hasSearched && results.length === 0 && !isLoading && (
-          <motion.div
-            key="empty"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={springs.default}
-            className="mt-3 p-8 flex flex-col items-center gap-3 text-center"
-          >
+        {!error && hasSearched && results.length === 0 && !isPending && (
+          <div className="mt-3 p-8 flex flex-col items-center gap-3 text-center">
             <MusicNoteSimple size={32} weight="duotone" className="text-neutral-600" />
             <div>
               <p className="text-neutral-400">No songs found for "{query}"</p>
@@ -245,7 +238,7 @@ export const SongSearch = memo(function SongSearch({
                 Try a different spelling or search for the artist name
               </p>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {!error && !hasSearched && !isPending && !query && (
