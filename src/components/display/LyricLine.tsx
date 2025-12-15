@@ -8,6 +8,7 @@ export interface LyricLineProps {
   readonly isPast: boolean
   readonly onClick?: () => void
   readonly index: number
+  readonly fontSize?: number
 }
 
 /**
@@ -19,6 +20,7 @@ export const LyricLine = memo(function LyricLine({
   isPast,
   onClick,
   index,
+  fontSize,
 }: LyricLineProps) {
   // Empty lines render as spacing
   if (!text.trim()) {
@@ -27,6 +29,7 @@ export const LyricLine = memo(function LyricLine({
 
   const opacityClass = isPast ? "opacity-40" : isActive ? "opacity-100" : "opacity-70"
   const textColorClass = isActive ? "text-white" : isPast ? "text-neutral-600" : "text-neutral-400"
+  const textSizeClass = fontSize === undefined ? "text-2xl md:text-3xl lg:text-4xl" : ""
 
   return (
     <button
@@ -37,12 +40,13 @@ export const LyricLine = memo(function LyricLine({
       aria-label={`Line ${index + 1}: ${text}`}
     >
       <span
-        className={`block text-2xl md:text-3xl lg:text-4xl font-medium leading-relaxed ${textColorClass}`}
+        className={`block ${textSizeClass} font-medium leading-relaxed ${textColorClass}`}
+        style={fontSize !== undefined ? { fontSize: `${fontSize}px` } : undefined}
       >
         {text}
       </span>
 
-      {isActive && <div className="absolute inset-0 -z-10 rounded-lg bg-indigo-500/15" />}
+      {isActive && <div className="absolute inset-0 z-0 rounded-lg bg-indigo-500/30" />}
     </button>
   )
 })

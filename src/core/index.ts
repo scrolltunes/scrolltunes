@@ -39,6 +39,9 @@ export {
   preferencesStore,
   usePreferences,
   usePreference,
+  MIN_FONT_SIZE,
+  MAX_FONT_SIZE,
+  FONT_SIZE_STEP,
   type Preferences,
   type ThemeMode,
 } from "./PreferencesStore"

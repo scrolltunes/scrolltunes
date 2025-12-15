@@ -1,6 +1,6 @@
 "use client"
 
-import { useCurrentLineIndex, usePlayerControls, usePlayerState } from "@/core"
+import { useCurrentLineIndex, usePlayerControls, usePlayerState, usePreferences } from "@/core"
 import { motion } from "motion/react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
@@ -23,6 +23,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const state = usePlayerState()
   const currentLineIndex = useCurrentLineIndex()
   const { jumpToLine } = usePlayerControls()
+  const { fontSize } = usePreferences()
 
   // Manual scroll override state
   const [isManualScrolling, setIsManualScrolling] = useState(false)
@@ -34,8 +35,9 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   // Calculate target scroll position based on current line
   // With py-[50vh] padding, line 0 starts centered, so we just scroll up by line offset
+  // Treat -1 (Ready state) as 0 to avoid position shift when starting playback
   const getTargetScrollY = useCallback((lineIndex: number): number => {
-    return lineIndex * LINE_HEIGHT
+    return Math.max(0, lineIndex) * LINE_HEIGHT
   }, [])
 
   // Update scroll position when current line changes (if not manually scrolling)
@@ -143,6 +145,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
             isPast={index < currentLineIndex}
             onClick={() => handleLineClick(index)}
             index={index}
+            fontSize={fontSize}
           />
         ))}
       </motion.div>

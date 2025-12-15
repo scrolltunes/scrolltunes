@@ -4,6 +4,10 @@ import { useSyncExternalStore } from "react"
 
 const STORAGE_KEY = "scrolltunes-preferences"
 
+export const MIN_FONT_SIZE = 16
+export const MAX_FONT_SIZE = 48
+export const FONT_SIZE_STEP = 2
+
 export type ThemeMode = "system" | "light" | "dark"
 
 export interface Preferences {
@@ -14,6 +18,7 @@ export interface Preferences {
   readonly distractionFreeMode: boolean
   readonly themeMode: ThemeMode
   readonly metronomeEnabled: boolean
+  readonly fontSize: number
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -24,6 +29,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   distractionFreeMode: false,
   themeMode: "dark",
   metronomeEnabled: true,
+  fontSize: 24,
 }
 
 export class PreferencesStore {
@@ -139,6 +145,14 @@ export class PreferencesStore {
 
   setMetronomeEnabled(value: boolean): void {
     this.setState({ metronomeEnabled: value })
+  }
+
+  getFontSize(): number {
+    return this.state.fontSize
+  }
+
+  setFontSize(value: number): void {
+    this.setState({ fontSize: value })
   }
 
   reset(): void {

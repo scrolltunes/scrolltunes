@@ -1,4 +1,5 @@
 export { FloatingMetronome, type FloatingMetronomeProps } from "./FloatingMetronome"
+export { FontSizeControl, type FontSizeControlProps } from "./FontSizeControl"
 export { Metronome, type MetronomeProps } from "./Metronome"
 export { MetronomeOrb, type MetronomeOrbProps } from "./MetronomeOrb"
 export { ProgressIndicator, type ProgressIndicatorProps } from "./ProgressIndicator"

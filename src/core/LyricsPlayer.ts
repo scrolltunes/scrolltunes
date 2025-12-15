@@ -107,17 +107,27 @@ export class LyricsPlayer {
    * Get current line index based on time
    */
   getCurrentLineIndex(): number {
-    if (this.state._tag !== "Playing" && this.state._tag !== "Paused") {
+    if (this.state._tag === "Idle" || this.state._tag === "Ready") {
+      return -1
+    }
+    if (this.state._tag === "Completed") {
       return 0
     }
     const { lyrics, currentTime } = this.state
-    for (let i = lyrics.lines.length - 1; i >= 0; i--) {
+
+    // Find the current line by iterating forward and finding the last line
+    // whose startTime we've passed
+    let currentIndex = 0
+    for (let i = 0; i < lyrics.lines.length; i++) {
       const line = lyrics.lines[i]
       if (line && currentTime >= line.startTime) {
-        return i
+        currentIndex = i
+      } else {
+        // Once we find a line we haven't reached yet, stop
+        break
       }
     }
-    return 0
+    return currentIndex
   }
 
   /**
@@ -190,6 +200,13 @@ export class LyricsPlayer {
   }
 
   private handleLoadLyrics(lyrics: Lyrics): void {
+    // Don't reset if already playing the same lyrics
+    if (
+      (this.state._tag === "Playing" || this.state._tag === "Paused") &&
+      this.state.lyrics.songId === lyrics.songId
+    ) {
+      return
+    }
     this.stopPlaybackLoop()
     this.setState({ _tag: "Ready", lyrics })
   }
@@ -198,6 +215,7 @@ export class LyricsPlayer {
     if (this.state._tag === "Ready") {
       const firstLineTime = this.state.lyrics.lines[0]?.startTime ?? 0
       this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: firstLineTime })
+      this.lastNotifiedLineIndex = 0 // Reset to line 0 when starting
       this.startPlaybackLoop()
     } else if (this.state._tag === "Paused") {
       this.setState({
@@ -205,10 +223,12 @@ export class LyricsPlayer {
         lyrics: this.state.lyrics,
         currentTime: this.state.currentTime,
       })
+      this.lastNotifiedLineIndex = this.getCurrentLineIndex()
       this.startPlaybackLoop()
     } else if (this.state._tag === "Completed") {
       const firstLineTime = this.state.lyrics.lines[0]?.startTime ?? 0
       this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: firstLineTime })
+      this.lastNotifiedLineIndex = 0 // Reset to line 0 when restarting
       this.startPlaybackLoop()
     }
   }
@@ -227,10 +247,13 @@ export class LyricsPlayer {
   private handleSeek(time: number): void {
     if (this.state._tag === "Playing") {
       this.setState({ _tag: "Playing", lyrics: this.state.lyrics, currentTime: time })
+      this.lastNotifiedLineIndex = this.getCurrentLineIndex()
     } else if (this.state._tag === "Paused") {
       this.setState({ _tag: "Paused", lyrics: this.state.lyrics, currentTime: time })
+      this.lastNotifiedLineIndex = this.getCurrentLineIndex()
     } else if (this.state._tag === "Ready") {
       this.setState({ _tag: "Paused", lyrics: this.state.lyrics, currentTime: time })
+      this.lastNotifiedLineIndex = this.getCurrentLineIndex()
     }
   }
 
@@ -242,10 +265,11 @@ export class LyricsPlayer {
     }
   }
 
+  private lastNotifiedLineIndex = -1
+
   private handleTick(deltaTime: number): void {
     if (this.state._tag !== "Playing") return
 
-    const oldLineIndex = this.getCurrentLineIndex()
     const newTime = this.state.currentTime + deltaTime * this.scrollSpeed
 
     if (newTime >= this.state.lyrics.duration) {
@@ -254,10 +278,13 @@ export class LyricsPlayer {
       return
     }
 
+    // Update state
     this.state = { _tag: "Playing", lyrics: this.state.lyrics, currentTime: newTime }
 
+    // Compute new line index and notify React only when it changes
     const newLineIndex = this.getCurrentLineIndex()
-    if (newLineIndex !== oldLineIndex) {
+    if (newLineIndex !== this.lastNotifiedLineIndex) {
+      this.lastNotifiedLineIndex = newLineIndex
       this.notify()
     }
   }
@@ -266,18 +293,23 @@ export class LyricsPlayer {
 
   private lastTickTime: number | null = null
 
+  private tickCount = 0
+
   private startPlaybackLoop(): void {
     if (this.animationFrameId !== null) return
 
     this.lastTickTime = this.now()
+    this.tickCount = 0
 
     const tick = () => {
       const currentTime = this.now()
       const deltaTime = this.lastTickTime !== null ? currentTime - this.lastTickTime : 0
       this.lastTickTime = currentTime
 
-      // Only tick if delta is reasonable (avoid huge jumps after tab switch)
-      if (deltaTime > 0 && deltaTime < 0.5) {
+      this.tickCount++
+
+      // Skip first 2 ticks to let React fully render the initial Playing state
+      if (this.tickCount > 2 && deltaTime > 0 && deltaTime < 0.5) {
         Effect.runSync(this.dispatch(new Tick({ time: deltaTime })))
       }
 
@@ -389,11 +421,35 @@ export function usePlayerState(): PlayerState {
 }
 
 /**
- * Hook to get current line index
+ * Compute line index from a player state snapshot (pure function)
+ */
+function computeLineIndex(state: PlayerState): number {
+  if (state._tag === "Idle" || state._tag === "Ready") {
+    return -1
+  }
+  if (state._tag === "Completed") {
+    return 0
+  }
+  const { lyrics, currentTime } = state
+
+  let currentIndex = 0
+  for (let i = 0; i < lyrics.lines.length; i++) {
+    const line = lyrics.lines[i]
+    if (line && currentTime >= line.startTime) {
+      currentIndex = i
+    } else {
+      break
+    }
+  }
+  return currentIndex
+}
+
+/**
+ * Hook to get current line index - derived from the React-controlled snapshot
  */
 export function useCurrentLineIndex(): number {
-  usePlayerState()
-  return lyricsPlayer.getCurrentLineIndex()
+  const state = usePlayerState()
+  return computeLineIndex(state)
 }
 
 // Stable controls object (singleton methods don't change)
