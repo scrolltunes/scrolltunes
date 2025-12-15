@@ -78,27 +78,27 @@
 - [ ] Verify VAD doesn't trigger on guitar/instruments
 - [ ] Test with background noise
 
-## Phase 4: Song Search & Lyrics API
+## Phase 4: Song Search & Lyrics API ✅
 
 ### Spotify Integration
-- [ ] Set up Spotify OAuth flow
-- [ ] Create `src/lib/spotify-client.ts`
-- [ ] Implement song search API route
-- [ ] Implement track metadata fetch
-- [ ] Store tokens securely
+- [x] Set up Spotify OAuth flow (client credentials)
+- [x] Create `src/lib/spotify-client.ts`
+- [x] Implement song search API route
+- [x] Implement track metadata fetch
+- [x] Store tokens securely (in-memory cache with auto-refresh)
 
 ### Lyrics API
-- [ ] Choose lyrics provider (Musixmatch, Genius, etc.)
-- [ ] Create `src/lib/lyrics-client.ts`
-- [ ] Implement lyrics fetch API route
-- [ ] Handle missing lyrics gracefully
-- [ ] Add lyrics attribution as required
+- [x] Choose lyrics provider (lrclib.net - free, synced LRC)
+- [x] Create `src/lib/lyrics-client.ts`
+- [x] Implement lyrics fetch API route
+- [x] Handle missing lyrics gracefully
+- [x] Add lyrics attribution as required
 
 ### UI
-- [ ] Create song search component
-- [ ] Create song selection/confirmation screen
-- [ ] Show loading states
-- [ ] Handle API errors
+- [x] Create song search component
+- [x] Create song selection/confirmation screen
+- [x] Show loading states
+- [x] Handle API errors
 
 ## Phase 5: Tempo & Controls
 
@@ -189,10 +189,10 @@
 
 > Update this section with what you're currently working on
 
-**Completed:** Phase 0 & 1
+**Completed:** Phase 0, 1, 2, 3 & 4
 
-**Active:** Phase 2 - Lyrics Display (MVP)
+**Active:** Phase 5 - Tempo & Controls
 
 **Blocked:** Nothing
 
-**Next:** Phase 3 - Voice Detection
+**Next:** Phase 6 - Mobile & Hands-Free

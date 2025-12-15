@@ -24,3 +24,16 @@ export {
   formatTimestamp,
   type LRCMetadata,
 } from "./lyrics-parser"
+
+export {
+  getLyrics,
+  searchLyrics,
+  getLyricsBySpotifyId,
+  fetchLyrics,
+  fetchLyricsSearch,
+  fetchLyricsWithFallback,
+  LyricsNotFoundError,
+  LyricsAPIError,
+  type LyricsError,
+  type LRCLibResponse,
+} from "./lyrics-client"
