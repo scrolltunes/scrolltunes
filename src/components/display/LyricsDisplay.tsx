@@ -131,7 +131,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       )}
 
       <motion.div
-        className="pt-[30vh] pb-[60vh] max-w-4xl mx-auto"
+        className="pt-[30vh] pb-[75vh] max-w-4xl mx-auto"
         animate={{ y: -scrollY }}
         transition={{ type: "tween", duration: 0.5, ease: "easeOut" }}
       >

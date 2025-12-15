@@ -19,9 +19,9 @@ const DEFAULT_PREFERENCES: Preferences = {
   wakeLockEnabled: true,
   doubleTapEnabled: true,
   shakeToRestartEnabled: false,
-  autoHideControlsMs: 5000,
+  autoHideControlsMs: 0,
   distractionFreeMode: false,
-  themeMode: "system",
+  themeMode: "dark",
 }
 
 export class PreferencesStore {

@@ -30,15 +30,18 @@ export async function GET(request: NextRequest) {
   }
 
   const effect = Effect.map(searchLRCLibTracks(query), results =>
-    results.slice(0, parsedLimit).map(r => ({
-      id: `lrclib-${r.id}`,
-      name: r.trackName,
-      artist: r.artistName,
-      album: r.albumName ?? "",
-      albumArt: undefined,
-      duration: r.duration * 1000,
-      hasLyrics: r.hasSyncedLyrics,
-    })),
+    results
+      .filter(r => r.hasSyncedLyrics)
+      .slice(0, parsedLimit)
+      .map(r => ({
+        id: `lrclib-${r.id}`,
+        name: r.trackName,
+        artist: r.artistName,
+        album: r.albumName ?? "",
+        albumArt: undefined,
+        duration: r.duration * 1000,
+        hasLyrics: r.hasSyncedLyrics,
+      })),
   )
 
   const result = await Effect.runPromiseExit(effect)

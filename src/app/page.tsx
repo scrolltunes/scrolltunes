@@ -16,6 +16,7 @@ import {
 } from "@/hooks"
 import {
   ArrowCounterClockwise,
+  ArrowLeft,
   CaretDown,
   CaretUp,
   GearSix,
@@ -132,14 +133,26 @@ export default function Home() {
             className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800"
           >
             <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="text-lg font-semibold flex items-center gap-2 hover:opacity-80 transition-opacity"
-              >
-                <MusicNote size={24} weight="fill" className="text-indigo-500" />
-                ScrollTunes
-              </button>
+              <div className="flex items-center gap-3">
+                {isPlayingView && (
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+                    aria-label="Back to search"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="text-lg font-semibold flex items-center gap-2 hover:opacity-80 transition-opacity"
+                >
+                  <MusicNote size={24} weight="fill" className="text-indigo-500" />
+                  ScrollTunes
+                </button>
+              </div>
 
               <div className="flex items-center gap-3">
                 {!isPlayingView && (

@@ -32,6 +32,16 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Light mode: invert colors since app is designed dark-first */
+:root.light {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+:root.light img,
+:root.light video {
+  filter: invert(1) hue-rotate(180deg);
+}
+
 /* Custom scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

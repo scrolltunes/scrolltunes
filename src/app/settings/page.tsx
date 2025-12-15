@@ -163,33 +163,15 @@ export default function SettingsPage() {
             <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
               Appearance
             </h2>
-            <div className="p-4 bg-neutral-900 rounded-xl">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center shrink-0 text-indigo-400">
-                  <Moon size={20} weight="duotone" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium">Theme</div>
-                  <div className="text-sm text-neutral-400 mt-0.5">Choose light, dark, or system</div>
-                </div>
-              </div>
-              <div className="mt-4 pl-14 flex gap-2">
-                {(["system", "light", "dark"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => handleThemeModeChange(mode)}
-                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium capitalize transition-colors ${
-                      preferences.themeMode === mode
-                        ? "bg-indigo-500 text-white"
-                        : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
-                    }`}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <Toggle
+              enabled={preferences.themeMode === "dark"}
+              onToggle={() =>
+                handleThemeModeChange(preferences.themeMode === "dark" ? "light" : "dark")
+              }
+              label="Dark Mode"
+              description="Use dark color scheme"
+              icon={<Moon size={20} weight="duotone" />}
+            />
           </section>
 
           {/* Display Section */}
