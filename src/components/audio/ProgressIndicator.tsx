@@ -65,6 +65,11 @@ export const ProgressIndicator = memo(function ProgressIndicator({
     return null
   }
 
+  // Get first lyric line info for marker
+  const firstLine = state.lyrics.lines[0]
+  const firstLinePosition =
+    firstLine && duration > 0 ? (firstLine.startTime / duration) * 100 : null
+
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div
@@ -82,16 +87,28 @@ export const ProgressIndicator = memo(function ProgressIndicator({
         aria-valuemax={100}
         tabIndex={interactive ? 0 : undefined}
         className={`
-          relative flex-1 h-2 bg-neutral-800 rounded-full overflow-hidden
+          relative flex-1 h-2 bg-neutral-800 rounded-full
           ${interactive ? "cursor-pointer" : ""}
         `}
       >
         <motion.div
-          className="absolute inset-y-0 left-0 bg-indigo-500 rounded-full"
+          className="absolute inset-y-0 left-0 bg-indigo-500 rounded-full overflow-hidden"
           initial={false}
           animate={{ width: `${progress * 100}%` }}
           transition={springs.default}
         />
+
+        {firstLinePosition !== null && firstLine?.text && (
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white rounded-full group"
+            style={{ left: `${firstLinePosition}%` }}
+          >
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-2 py-1 bg-neutral-800 text-neutral-200 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              {firstLine.text}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-800" />
+            </div>
+          </div>
+        )}
       </div>
 
       {showTime && (
