@@ -1,7 +1,5 @@
 import { ImageResponse } from "next/og"
 
-export const runtime = "edge"
-
 export const alt = "ScrollTunes - Live lyrics teleprompter for musicians"
 export const size = {
   width: 1200,
