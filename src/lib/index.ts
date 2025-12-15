@@ -31,11 +31,6 @@ export {
   searchLyrics,
   searchLRCLibTracks,
   getLyricsBySpotifyId,
-  fetchLyrics,
-  fetchLyricsCached,
-  fetchLyricsSearch,
-  fetchLRCLibTracks,
-  fetchLyricsWithFallback,
   LyricsNotFoundError,
   LyricsAPIError,
   type LyricsError,
@@ -84,3 +79,5 @@ export {
   parseTrackSlugWithId,
   extractLrclibId,
 } from "./slug"
+
+export type { SearchResultTrack, SearchApiResponse } from "./search-api-types"

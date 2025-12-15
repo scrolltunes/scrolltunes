@@ -1,6 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
+import type { SearchApiResponse, SearchResultTrack } from "@/lib/search-api-types"
 import { extractLrclibId, makeCanonicalPath } from "@/lib/slug"
 import {
   CircleNotch,
@@ -14,21 +15,6 @@ import {
 import { AnimatePresence, motion } from "motion/react"
 import { useRouter } from "next/navigation"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
-
-export interface SearchResultTrack {
-  readonly id: string
-  readonly name: string
-  readonly artist: string
-  readonly album: string
-  readonly albumArt?: string
-  readonly duration: number
-  readonly hasLyrics?: boolean
-}
-
-interface SearchApiResponse {
-  readonly tracks: SearchResultTrack[]
-  readonly error?: string
-}
 
 export interface SongSearchProps {
   readonly onSelectTrack?: (track: SearchResultTrack) => void

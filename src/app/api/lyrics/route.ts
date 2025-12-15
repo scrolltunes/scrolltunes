@@ -4,6 +4,7 @@ import {
   getSongBpmProvider,
   withInMemoryCache,
 } from "@/lib/bpm"
+import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
 import {
   LyricsAPIError,
   LyricsNotFoundError,
@@ -89,21 +90,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch lyrics" }, { status: 500 })
   }
 
-  return NextResponse.json(
-    {
-      lyrics: result.value.lyrics,
-      bpm: result.value.bpm?.bpm ?? null,
-      key: result.value.bpm?.key ?? null,
-      attribution: {
-        lyrics: { name: "LRCLIB", url: "https://lrclib.net" },
-        bpm: result.value.bpm ? { name: "GetSongBPM", url: "https://getsongbpm.com" } : null,
-      },
+  const body: LyricsApiSuccessResponse = {
+    lyrics: result.value.lyrics,
+    bpm: result.value.bpm?.bpm ?? null,
+    key: result.value.bpm?.key ?? null,
+    attribution: {
+      lyrics: { name: "LRCLIB", url: "https://lrclib.net" },
+      bpm: result.value.bpm ? { name: "GetSongBPM", url: "https://getsongbpm.com" } : null,
     },
-    {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET",
-      },
+  }
+  return NextResponse.json(body, {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET",
     },
-  )
+  })
 }

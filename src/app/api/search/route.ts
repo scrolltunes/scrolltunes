@@ -1,16 +1,7 @@
 import { LyricsAPIError, searchLRCLibTracks } from "@/lib/lyrics-client"
+import type { SearchResultTrack } from "@/lib/search-api-types"
 import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
-
-export interface SearchResultTrack {
-  readonly id: string
-  readonly name: string
-  readonly artist: string
-  readonly album: string
-  readonly albumArt?: string | undefined
-  readonly duration: number
-  readonly hasLyrics: boolean
-}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -33,15 +24,17 @@ export async function GET(request: NextRequest) {
     results
       .filter(r => r.hasSyncedLyrics)
       .slice(0, parsedLimit)
-      .map(r => ({
-        id: `lrclib-${r.id}`,
-        name: r.trackName,
-        artist: r.artistName,
-        album: r.albumName ?? "",
-        albumArt: undefined,
-        duration: r.duration * 1000,
-        hasLyrics: r.hasSyncedLyrics,
-      })),
+      .map(
+        (r): SearchResultTrack => ({
+          id: `lrclib-${r.id}`,
+          name: r.trackName,
+          artist: r.artistName,
+          album: r.albumName ?? "",
+          albumArt: undefined,
+          duration: r.duration * 1000,
+          hasLyrics: r.hasSyncedLyrics,
+        }),
+      ),
   )
 
   const result = await Effect.runPromiseExit(effect)
