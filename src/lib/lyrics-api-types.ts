@@ -19,6 +19,7 @@ export interface LyricsApiSuccessResponse {
   readonly lyrics: Lyrics
   readonly bpm: number | null
   readonly key: string | null
+  readonly albumArt?: string | null
   readonly attribution: LyricsApiAttribution
 }
 

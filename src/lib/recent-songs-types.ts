@@ -26,6 +26,7 @@ export interface CachedLyrics {
   readonly lyrics: Lyrics
   readonly bpm: number | null
   readonly key: string | null
+  readonly albumArt?: string | undefined
   readonly cachedAt: number // timestamp (ms since epoch)
 }
 

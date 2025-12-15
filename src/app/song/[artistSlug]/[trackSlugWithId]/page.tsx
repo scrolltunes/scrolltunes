@@ -47,7 +47,12 @@ import { useCallback, useEffect, useState } from "react"
 type LoadState =
   | { readonly _tag: "Loading" }
   | { readonly _tag: "Error"; readonly message: string }
-  | { readonly _tag: "Loaded"; readonly lyrics: Lyrics; readonly bpm: number | null }
+  | {
+      readonly _tag: "Loaded"
+      readonly lyrics: Lyrics
+      readonly bpm: number | null
+      readonly albumArt: string | null
+    }
 
 export default function SongPage() {
   const params = useParams<{ artistSlug: string; trackSlugWithId: string }>()
@@ -125,7 +130,12 @@ export default function SongPage() {
       const cached = loadCachedLyrics(id)
       if (cached) {
         load(cached.lyrics)
-        setLoadState({ _tag: "Loaded", lyrics: cached.lyrics, bpm: cached.bpm })
+        setLoadState({
+          _tag: "Loaded",
+          lyrics: cached.lyrics,
+          bpm: cached.bpm,
+          albumArt: cached.albumArt ?? null,
+        })
 
         recentSongsStore.upsertRecent({
           id,
@@ -133,6 +143,7 @@ export default function SongPage() {
           artist: cached.lyrics.artist,
           album: "",
           durationSeconds: cached.lyrics.duration,
+          albumArt: cached.albumArt,
         })
 
         // Resume position only if explicitly requested via ?resume=1
@@ -164,13 +175,19 @@ export default function SongPage() {
         }
 
         load(data.lyrics)
-        setLoadState({ _tag: "Loaded", lyrics: data.lyrics, bpm: data.bpm })
+        setLoadState({
+          _tag: "Loaded",
+          lyrics: data.lyrics,
+          bpm: data.bpm,
+          albumArt: data.albumArt ?? null,
+        })
 
         // Cache lyrics
         saveCachedLyrics(id, {
           lyrics: data.lyrics,
           bpm: data.bpm,
           key: data.key,
+          albumArt: data.albumArt ?? undefined,
         })
 
         // Add to recents
@@ -180,6 +197,7 @@ export default function SongPage() {
           artist: data.lyrics.artist,
           album: "",
           durationSeconds: data.lyrics.duration,
+          albumArt: data.albumArt ?? undefined,
         })
 
         // Resume position only if explicitly requested via ?resume=1
@@ -290,6 +308,17 @@ export default function SongPage() {
                 >
                   <ArrowLeft size={20} />
                 </Link>
+                {loadState.albumArt ? (
+                  <img
+                    src={loadState.albumArt}
+                    alt=""
+                    className="w-10 h-10 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center">
+                    <MusicNote size={20} weight="fill" className="text-neutral-600" />
+                  </div>
+                )}
                 <div className="flex flex-col">
                   <span className="text-sm font-medium truncate max-w-[200px]">{songTitle}</span>
                   <span className="text-xs text-neutral-500 truncate max-w-[200px]">

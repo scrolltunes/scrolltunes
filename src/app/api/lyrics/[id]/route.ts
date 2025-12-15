@@ -4,6 +4,7 @@ import {
   getSongBpmProvider,
   withInMemoryCache,
 } from "@/lib/bpm"
+import { getAlbumArt } from "@/lib/deezer-client"
 import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
 import { LyricsAPIError, LyricsNotFoundError, getLyricsById } from "@/lib/lyrics-client"
 import { Effect } from "effect"
@@ -60,13 +61,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Failed to fetch lyrics" }, { status: 502 })
   }
 
+  const { lyrics, bpm: bpmResult } = result.value
+
+  const albumArt = await getAlbumArt(lyrics.artist, lyrics.title, "medium")
+
   const body: LyricsApiSuccessResponse = {
-    lyrics: result.value.lyrics,
-    bpm: result.value.bpm?.bpm ?? null,
-    key: result.value.bpm?.key ?? null,
+    lyrics,
+    bpm: bpmResult?.bpm ?? null,
+    key: bpmResult?.key ?? null,
+    albumArt: albumArt ?? null,
     attribution: {
       lyrics: { name: "LRCLIB", url: "https://lrclib.net" },
-      bpm: result.value.bpm ? { name: "GetSongBPM", url: "https://getsongbpm.com" } : null,
+      bpm: bpmResult ? { name: "GetSongBPM", url: "https://getsongbpm.com" } : null,
     },
   }
   return NextResponse.json(body, {

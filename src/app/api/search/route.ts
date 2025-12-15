@@ -1,3 +1,4 @@
+import { getAlbumArt } from "@/lib/deezer-client"
 import { LyricsAPIError, searchLRCLibTracks } from "@/lib/lyrics-client"
 import type { SearchResultTrack } from "@/lib/search-api-types"
 import { Effect } from "effect"
@@ -55,8 +56,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Search failed" }, { status: 500 })
   }
 
+  const tracks = result.value
+
+  const artResults = await Promise.allSettled(
+    tracks.map(t => getAlbumArt(t.artist, t.name, "small")),
+  )
+
+  const tracksWithArt = tracks.map((track, i) => ({
+    ...track,
+    albumArt:
+      artResults[i]?.status === "fulfilled" ? (artResults[i].value ?? undefined) : undefined,
+  }))
+
   return NextResponse.json(
-    { tracks: result.value },
+    { tracks: tracksWithArt },
     {
       headers: {
         "Cache-Control": "public, max-age=60",

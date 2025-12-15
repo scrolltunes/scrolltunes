@@ -74,7 +74,8 @@ class RecentSongsStore {
       const newSong: RecentSong = {
         ...song,
         lastPlayedAt: song.lastPlayedAt ?? Date.now(),
-        // Preserve existing position data if not provided
+        // Preserve existing data if not provided
+        albumArt: song.albumArt ?? existing?.albumArt,
         lastPositionSeconds: existing?.lastPositionSeconds,
         lastPositionUpdatedAt: existing?.lastPositionUpdatedAt,
       }
