@@ -5,7 +5,6 @@ import { motion } from "motion/react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
 
-const LINE_HEIGHT = 64 // Approximate height of each line in pixels
 const SCROLL_OVERRIDE_TIMEOUT = 3000 // Resume auto-scroll after 3 seconds
 
 export interface LyricsDisplayProps {
@@ -36,45 +35,92 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   // Get lyrics from state
   const lyrics = state._tag !== "Idle" ? state.lyrics : null
 
-  // Calculate target scroll position based on current line
-  // With py-[50vh] padding, line 0 starts centered, so we just scroll up by line offset
-  // Treat -1 (Ready state) as 0 to avoid position shift when starting playback
-  const getTargetScrollY = useCallback((lineIndex: number): number => {
-    return Math.max(0, lineIndex) * LINE_HEIGHT
+  // Scroll to position a line at target position
+  const scrollToLine = useCallback((lineIndex: number): boolean => {
+    const container = containerRef.current
+    const activeLine = lineRefs.current[lineIndex]
+
+    // Skip if container or line not ready
+    if (!container || !activeLine) return false
+
+    const containerRect = container.getBoundingClientRect()
+    const lineRect = activeLine.getBoundingClientRect()
+
+    // Where the line currently is (relative to container top)
+    const lineCurrentY = lineRect.top - containerRect.top
+
+    // Target position: 25% from container top for comfortable reading
+    const targetY = containerRect.height * 0.25
+
+    // Adjust scroll by the difference
+    const delta = lineCurrentY - targetY
+    setScrollY(prev => prev + delta)
+    return true
   }, [])
+
+  // Track if initial scroll has happened
+  const hasInitialScroll = useRef(false)
+
+  // Initial scroll when lyrics first render - only needed if first line is empty
+  useEffect(() => {
+    if (!lyrics || hasInitialScroll.current) return
+
+    // Only scroll initially if the first line is empty (to show first non-empty line)
+    const firstLine = lyrics.lines[0]
+    if (firstLine?.text.trim() !== "") {
+      hasInitialScroll.current = true
+      return
+    }
+
+    // Find first non-empty line index
+    const firstLineIndex = lyrics.lines.findIndex(line => line.text.trim() !== "")
+    if (firstLineIndex === -1) return
+
+    // Retry with increasing delays to handle font loading and layout shifts
+    const delays = [50, 100, 200]
+    const timeoutIds: NodeJS.Timeout[] = []
+
+    for (const delay of delays) {
+      const timeoutId = setTimeout(() => {
+        if (!hasInitialScroll.current && scrollToLine(firstLineIndex)) {
+          hasInitialScroll.current = true
+        }
+      }, delay)
+      timeoutIds.push(timeoutId)
+    }
+
+    return () => {
+      for (const id of timeoutIds) {
+        clearTimeout(id)
+      }
+    }
+  }, [lyrics, scrollToLine])
+
+  // Reset initial scroll flag when lyrics change
+  useEffect(() => {
+    hasInitialScroll.current = false
+    setScrollY(0)
+  }, [lyrics])
 
   // Update scroll position when current line changes (if not manually scrolling)
   useEffect(() => {
     if (isManualScrolling || !lyrics) return
 
-    // Wait for layout to stabilize before calculating positions
-    const rafId = requestAnimationFrame(() => {
-      const container = containerRef.current
-      const lineIndex = Math.max(0, currentLineIndex)
-      const activeLine = lineRefs.current[lineIndex]
+    const lineIndex = Math.max(0, currentLineIndex)
 
-      // Skip if container not ready
-      if (!container) return
-
-      // If active line ref is null (empty line), don't scroll - keep current position
-      if (!activeLine) return
-
-      const containerRect = container.getBoundingClientRect()
-      const lineRect = activeLine.getBoundingClientRect()
-
-      // Where the line currently is (relative to container top)
-      const lineCurrentY = lineRect.top - containerRect.top
-
-      // Target position: 25% from container top for comfortable reading
-      const targetY = containerRect.height * 0.25
-
-      // Adjust scroll by the difference
-      const delta = lineCurrentY - targetY
-      setScrollY(prev => prev + delta)
+    // Double RAF to ensure layout is fully settled (fonts loaded, text reflowed)
+    let rafId2: number | undefined
+    const rafId1 = requestAnimationFrame(() => {
+      rafId2 = requestAnimationFrame(() => {
+        scrollToLine(lineIndex)
+      })
     })
 
-    return () => cancelAnimationFrame(rafId)
-  }, [currentLineIndex, isManualScrolling, lyrics, getTargetScrollY])
+    return () => {
+      cancelAnimationFrame(rafId1)
+      if (rafId2 !== undefined) cancelAnimationFrame(rafId2)
+    }
+  }, [currentLineIndex, isManualScrolling, lyrics, scrollToLine])
 
   // Handle manual scroll detection
   const handleUserScroll = useCallback(() => {
@@ -145,6 +191,16 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     )
   }
 
+  // Only show highlight when playing/paused, not in Ready state
+  // When current line is empty, show highlight on next non-empty line
+  const isPlayingOrPaused = state._tag === "Playing" || state._tag === "Paused"
+  const rawActiveIndex = Math.max(0, currentLineIndex)
+  const activeLineIndex = isPlayingOrPaused
+    ? lyrics.lines[rawActiveIndex]?.text.trim() === ""
+      ? lyrics.lines.findIndex((line, i) => i >= rawActiveIndex && line.text.trim() !== "")
+      : rawActiveIndex
+    : -1
+
   return (
     <div
       ref={containerRef}
@@ -170,8 +226,8 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
           <LyricLine
             key={line.id}
             text={line.text}
-            isActive={index === currentLineIndex}
-            isPast={index < currentLineIndex}
+            isActive={index === activeLineIndex}
+            isPast={index < activeLineIndex}
             onClick={() => handleLineClick(index)}
             index={index}
             fontSize={fontSize}
