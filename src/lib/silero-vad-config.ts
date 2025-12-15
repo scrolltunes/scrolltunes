@@ -73,7 +73,17 @@ export const SILERO_PRESET_LOUD: SileroVADConfig = {
   redemptionMs: 400,
 }
 
-export type SileroPreset = "quiet" | "normal" | "loud"
+/** Preset for acoustic guitar + voice - very high threshold, longer sustain required */
+export const SILERO_PRESET_GUITAR: SileroVADConfig = {
+  onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/",
+  baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/",
+  positiveSpeechThreshold: 0.96, // Extremely high - only confident speech passes
+  negativeSpeechThreshold: 0.6, // Higher hysteresis
+  minSpeechMs: 500, // Require ~500ms sustained detection
+  redemptionMs: 500, // Wait longer before speech end
+}
+
+export type SileroPreset = "quiet" | "normal" | "loud" | "guitar"
 
 export function getPresetConfig(preset: SileroPreset): SileroVADConfig {
   switch (preset) {
@@ -83,9 +93,11 @@ export function getPresetConfig(preset: SileroPreset): SileroVADConfig {
       return SILERO_PRESET_NORMAL
     case "loud":
       return SILERO_PRESET_LOUD
+    case "guitar":
+      return SILERO_PRESET_GUITAR
   }
 }
 
 export const DEFAULT_SILERO_VAD_CONFIG: SileroVADConfig = {
-  ...SILERO_PRESET_NORMAL,
+  ...SILERO_PRESET_GUITAR,
 }

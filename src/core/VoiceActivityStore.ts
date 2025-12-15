@@ -18,11 +18,14 @@ import {
 import { type AudioError, soundSystem } from "@/sounds"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
+import { type SileroLoadError, SileroVADEngine } from "./SileroVADEngine"
 
 export type { VADConfig } from "@/lib"
 export type { SileroPreset, SileroVADConfig } from "@/lib/silero-vad-config"
 
 // --- Types ---
+
+type VADEngineType = "silero" | "energy"
 
 /**
  * Voice activity state
@@ -33,6 +36,7 @@ export interface VoiceState {
   readonly level: number // 0-1, smoothed energy level
   readonly lastSpeakingAt: number | null // timestamp
   readonly permissionDenied: boolean
+  readonly engine: VADEngineType // which engine is active
 }
 
 /**
@@ -50,20 +54,31 @@ export type VADEvent = StartListening | StopListening | VoiceStart | VoiceStop |
  * VAD error wrapping audio errors with Effect.ts tagged class pattern
  */
 export class VADError extends Data.TaggedClass("VADError")<{
-  readonly cause: AudioError
+  readonly cause: AudioError | SileroLoadError
 }> {}
+
+// --- Logging Configuration ---
+
+const VAD_DEBUG = true // Set to false to disable logging
+
+function vadLog(category: string, message: string, data?: Record<string, unknown>): void {
+  if (!VAD_DEBUG) return
+  const timestamp = new Date().toISOString().substring(11, 23)
+  const dataStr = data ? ` ${JSON.stringify(data)}` : ""
+  console.log(`[VAD ${timestamp}] [${category}] ${message}${dataStr}`)
+}
 
 // --- VoiceActivityStore Class ---
 
 /**
  * VoiceActivityStore - Manages voice activity detection
  *
- * Uses the SoundSystem for microphone access and provides
- * reactive state via useSyncExternalStore.
+ * Uses Silero VAD as primary engine with energy-based fallback.
+ * Provides reactive state via useSyncExternalStore.
  */
 export class VoiceActivityStore {
   private listeners = new Set<() => void>()
-  private voiceListeners = new Set<() => void>() // Separate listeners for voice events
+  private voiceListeners = new Set<() => void>()
 
   private state: VoiceState = {
     isListening: false,
@@ -71,15 +86,22 @@ export class VoiceActivityStore {
     level: 0,
     lastSpeakingAt: null,
     permissionDenied: false,
+    engine: "energy",
   }
 
   private config: VADConfig = DEFAULT_VAD_CONFIG
+  private sileroConfig: SileroVADConfig = DEFAULT_SILERO_VAD_CONFIG
+
+  // Silero VAD engine
+  private sileroEngine: SileroVADEngine | null = null
+  private lastSileroLevelUpdateAt = 0
+  private smoothedSileroLevel = 0
+
+  // Energy-based fallback
   private analyser: AnalyserNode | null = null
   private animationFrameId: number | null = null
   private dataArray: Uint8Array<ArrayBuffer> | null = null
-
   private runtime: VADRuntimeState = INITIAL_VAD_RUNTIME
-  private sileroConfig: SileroVADConfig = DEFAULT_SILERO_VAD_CONFIG
 
   // --- Observable pattern ---
 
@@ -90,9 +112,6 @@ export class VoiceActivityStore {
 
   getSnapshot = (): VoiceState => this.state
 
-  /**
-   * Subscribe to voice start/stop events only
-   */
   subscribeToVoiceEvents = (listener: () => void): (() => void) => {
     this.voiceListeners.add(listener)
     return () => this.voiceListeners.delete(listener)
@@ -117,15 +136,11 @@ export class VoiceActivityStore {
     this.state = { ...this.state, ...partial }
     this.notify()
 
-    // Notify voice event listeners on speaking state change
     if (previousSpeaking !== this.state.isSpeaking) {
       this.notifyVoiceEvent()
     }
   }
 
-  /**
-   * Update VAD configuration
-   */
   setConfig(config: Partial<VADConfig>): void {
     this.config = { ...this.config, ...config }
   }
@@ -136,29 +151,29 @@ export class VoiceActivityStore {
 
   setSileroConfig(config: Partial<SileroVADConfig>): void {
     this.sileroConfig = { ...this.sileroConfig, ...config }
+    vadLog("CONFIG", "Silero config updated", config)
   }
 
   setSileroPreset(preset: SileroPreset): void {
     this.sileroConfig = getPresetConfig(preset)
+    vadLog("CONFIG", `Silero preset changed to: ${preset}`, {
+      positiveSpeechThreshold: this.sileroConfig.positiveSpeechThreshold,
+      negativeSpeechThreshold: this.sileroConfig.negativeSpeechThreshold,
+      minSpeechMs: this.sileroConfig.minSpeechMs,
+      redemptionMs: this.sileroConfig.redemptionMs,
+    })
   }
 
   getSileroConfig(): SileroVADConfig {
     return this.sileroConfig
   }
 
-  getEngine(): "energy" {
-    return "energy"
+  getEngine(): VADEngineType {
+    return this.state.engine
   }
 
   // --- Event handlers ---
 
-  /**
-   * Dispatch a VAD event using Effect.ts pattern
-   *
-   * All events are handled as Effects for consistent error propagation.
-   * Use Effect.runSync for synchronous events (StopListening, VoiceStop, UpdateLevel)
-   * and Effect.runPromise for async events (StartListening, VoiceStart).
-   */
   readonly dispatch = (event: VADEvent): Effect.Effect<void, VADError> => {
     switch (event._tag) {
       case "StartListening":
@@ -174,10 +189,81 @@ export class VoiceActivityStore {
     }
   }
 
-  private readonly startListeningEffect: Effect.Effect<void, VADError> = Effect.gen(
-    this,
-    function* (_) {
-      if (this.state.isListening) return
+  // --- Silero VAD integration ---
+
+  private tryStartSilero(): Effect.Effect<boolean, VADError> {
+    return Effect.gen(this, function* (_) {
+      if (!SileroVADEngine.isSupported()) {
+        vadLog("SILERO", "AudioWorklet not supported, skipping Silero VAD")
+        return false
+      }
+
+      vadLog("SILERO", "Initializing Silero VAD engine...", {
+        threshold: this.sileroConfig.positiveSpeechThreshold,
+        minSpeechMs: this.sileroConfig.minSpeechMs,
+      })
+
+      this.sileroEngine = new SileroVADEngine()
+
+      yield* _(
+        Effect.mapError(
+          this.sileroEngine.initialize(this.sileroConfig, {
+            onSpeechStart: () => {
+              if (!this.state.isListening) return // Guard against ghost events
+              vadLog("SILERO", "🎤 SPEECH START detected", {
+                threshold: this.sileroConfig.positiveSpeechThreshold,
+                level: this.smoothedSileroLevel.toFixed(3),
+              })
+              Effect.runPromise(
+                Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void),
+              )
+            },
+            onSpeechEnd: () => {
+              if (!this.state.isListening) return
+              vadLog("SILERO", "🔇 SPEECH END detected", {
+                threshold: this.sileroConfig.negativeSpeechThreshold,
+              })
+              Effect.runSync(this.dispatch(new VoiceStop({})))
+            },
+            onFrameProcessed: ({ isSpeech }) => {
+              if (!this.state.isListening) return
+
+              // Throttle level updates to 50ms
+              const now = Date.now()
+              if (now - this.lastSileroLevelUpdateAt < 50) return
+              this.lastSileroLevelUpdateAt = now
+
+              // Exponential smoothing
+              this.smoothedSileroLevel = smoothLevel(this.smoothedSileroLevel, isSpeech, 0.3)
+
+              // Log significant probability values for tuning
+              if (isSpeech > 0.3) {
+                vadLog("FRAME", `Speech probability: ${isSpeech.toFixed(3)}`, {
+                  smoothed: this.smoothedSileroLevel.toFixed(3),
+                  threshold: this.sileroConfig.positiveSpeechThreshold,
+                  wouldTrigger: isSpeech >= this.sileroConfig.positiveSpeechThreshold,
+                })
+              }
+
+              Effect.runSync(this.dispatch(new UpdateLevel({ level: this.smoothedSileroLevel })))
+            },
+          }),
+          e => new VADError({ cause: e }),
+        ),
+      )
+
+      yield* _(Effect.mapError(this.sileroEngine.start(), e => new VADError({ cause: e })))
+
+      vadLog("SILERO", "✅ Silero VAD started successfully")
+      return true
+    })
+  }
+
+  // --- Energy-based fallback ---
+
+  private startEnergyFallback(): Effect.Effect<void, VADError> {
+    return Effect.gen(this, function* (_) {
+      vadLog("ENERGY", "Starting energy-based VAD fallback...")
 
       const analyser = yield* _(
         Effect.mapError(soundSystem.getMicrophoneAnalyserEffect, e => new VADError({ cause: e })),
@@ -185,26 +271,73 @@ export class VoiceActivityStore {
 
       this.analyser = analyser
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
-      this.setState({ isListening: true })
       this.startAnalysisLoop()
+
+      vadLog("ENERGY", "✅ Energy-based VAD started")
+    })
+  }
+
+  private readonly startListeningEffect: Effect.Effect<void, VADError> = Effect.gen(
+    this,
+    function* (_) {
+      if (this.state.isListening) return
+
+      vadLog("START", "Starting voice detection...")
+
+      // Try Silero first
+      const sileroStarted = yield* _(
+        Effect.catchAll(this.tryStartSilero(), e => {
+          vadLog("SILERO", "⚠️ Silero VAD failed to start, falling back to energy-based", {
+            error: String(e),
+          })
+          return Effect.succeed(false)
+        }),
+      )
+
+      if (sileroStarted) {
+        this.setState({ isListening: true, engine: "silero" })
+        vadLog("START", "Using Silero VAD engine")
+        return
+      }
+
+      // Fallback to energy-based
+      yield* _(this.startEnergyFallback())
+      this.setState({ isListening: true, engine: "energy" })
+      vadLog("START", "Using energy-based VAD engine (fallback)")
     },
   )
 
   private handleStopListening(): void {
+    vadLog("STOP", "Stopping voice detection...", { engine: this.state.engine })
+
+    // Stop Silero
+    if (this.sileroEngine) {
+      this.sileroEngine.destroy()
+      this.sileroEngine = null
+      this.smoothedSileroLevel = 0
+      this.lastSileroLevelUpdateAt = 0
+    }
+
+    // Stop energy-based
     this.stopAnalysisLoop()
     soundSystem.stopMicrophone()
     this.analyser = null
     this.dataArray = null
+
     this.setState({
       isListening: false,
       isSpeaking: false,
       level: 0,
+      engine: "energy",
     })
+
+    vadLog("STOP", "Voice detection stopped")
   }
 
   private readonly handleVoiceStartEffect: Effect.Effect<void, VADError> = Effect.gen(
     this,
     function* (_) {
+      vadLog("VOICE", "🎤 Voice activity started", { engine: this.state.engine })
       this.setState({
         isSpeaking: true,
         lastSpeakingAt: Date.now(),
@@ -218,6 +351,7 @@ export class VoiceActivityStore {
   )
 
   private handleVoiceStop(): void {
+    vadLog("VOICE", "🔇 Voice activity stopped", { engine: this.state.engine })
     this.setState({ isSpeaking: false })
   }
 
@@ -225,7 +359,7 @@ export class VoiceActivityStore {
     this.setState({ level })
   }
 
-  // --- Analysis loop ---
+  // --- Energy-based analysis loop ---
 
   private startAnalysisLoop(): void {
     if (this.animationFrameId !== null) return
@@ -244,13 +378,23 @@ export class VoiceActivityStore {
 
       this.runtime = nextRuntime
 
+      // Log significant energy levels
+      if (smoothed > 0.1) {
+        vadLog("ENERGY-FRAME", `RMS level: ${smoothed.toFixed(3)}`, {
+          threshold: this.config.thresholdOn,
+          wouldTrigger: smoothed >= this.config.thresholdOn,
+        })
+      }
+
       if (now - this.runtime.lastStateChangeTime > 50 || prevSpeaking !== nextRuntime.isSpeaking) {
         Effect.runSync(this.dispatch(new UpdateLevel({ level: this.runtime.smoothedLevel })))
       }
 
       if (!prevSpeaking && nextRuntime.isSpeaking) {
+        vadLog("ENERGY", "🎤 Energy threshold crossed - voice start")
         Effect.runPromise(Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void))
       } else if (prevSpeaking && !nextRuntime.isSpeaking) {
+        vadLog("ENERGY", "🔇 Energy threshold crossed - voice stop")
         Effect.runSync(this.dispatch(new VoiceStop({})))
       }
 
@@ -271,17 +415,16 @@ export class VoiceActivityStore {
 
   // --- Convenience methods ---
 
-  /**
-   * Start listening for voice activity
-   *
-   * Runs the Effect-based startListeningEffect with error handling.
-   * On MicPermissionDenied, sets permissionDenied state for UI feedback.
-   */
   async startListening(): Promise<void> {
     await Effect.runPromise(
       Effect.catchAll(this.startListeningEffect, e => {
         console.error("Failed to start listening:", e)
-        if (e.cause && e.cause._tag === "MicPermissionDenied") {
+        if (
+          e.cause &&
+          "cause" in e.cause &&
+          e.cause.cause &&
+          (e.cause.cause as { _tag?: string })._tag === "MicPermissionDenied"
+        ) {
           this.setState({ permissionDenied: true })
         }
         return Effect.void
@@ -289,40 +432,35 @@ export class VoiceActivityStore {
     )
   }
 
-  /**
-   * Stop listening for voice activity (synchronous cleanup)
-   */
   stopListening(): void {
     Effect.runSync(this.dispatch(new StopListening({})))
   }
 
-  /**
-   * Check if currently speaking
-   */
   isSpeaking(): boolean {
     return this.state.isSpeaking
   }
 
-  /**
-   * Get current audio level
-   */
   getLevel(): number {
     return this.state.level
   }
 
-  /**
-   * Dispose of resources
-   */
   dispose(): void {
     this.reset()
     this.listeners.clear()
     this.voiceListeners.clear()
   }
 
-  /**
-   * Reset for tests and hot-reload
-   */
   reset(): void {
+    vadLog("RESET", "Resetting VoiceActivityStore")
+
+    // Stop Silero
+    if (this.sileroEngine) {
+      this.sileroEngine.destroy()
+      this.sileroEngine = null
+      this.smoothedSileroLevel = 0
+      this.lastSileroLevelUpdateAt = 0
+    }
+
     this.stopAnalysisLoop()
     soundSystem.stopMicrophone()
     this.analyser = null
@@ -336,6 +474,7 @@ export class VoiceActivityStore {
       level: 0,
       lastSpeakingAt: null,
       permissionDenied: false,
+      engine: "energy",
     }
     this.notify()
   }
@@ -347,28 +486,19 @@ export const voiceActivityStore = new VoiceActivityStore()
 
 // --- React hooks ---
 
-/**
- * Hook to subscribe to voice activity state
- */
 export function useVoiceActivity(): VoiceState {
   return useSyncExternalStore(
     voiceActivityStore.subscribe,
     voiceActivityStore.getSnapshot,
-    voiceActivityStore.getSnapshot, // SSR fallback
+    voiceActivityStore.getSnapshot,
   )
 }
 
-/**
- * Hook to check if speaking (optimized for fewer re-renders)
- */
 export function useIsSpeaking(): boolean {
   const state = useVoiceActivity()
   return state.isSpeaking
 }
 
-/**
- * Hook to get voice detection controls
- */
 export function useVoiceControls() {
   return {
     startListening: () => voiceActivityStore.startListening(),
