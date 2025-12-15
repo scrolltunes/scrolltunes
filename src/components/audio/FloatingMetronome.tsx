@@ -83,26 +83,28 @@ export const FloatingMetronome = memo(function FloatingMetronome({
 
   const isPlaying = playerState._tag === "Playing"
 
+  const hasBpm = bpm !== null && bpm > 0
+
   const handleToggleMetronome = useCallback(() => {
-    if (isPlaying) return
+    if (isPlaying || !hasBpm) return
     if (metronomeState.isRunning) {
       controls.stop()
     } else {
       beatCountRef.current = 0
       controls.start()
     }
-  }, [isPlaying, metronomeState.isRunning, controls])
+  }, [isPlaying, hasBpm, metronomeState.isRunning, controls])
 
   const isActive = bpm !== null && bpm > 0 && (isPlaying || metronomeState.isRunning)
 
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && hasBpm) {
       beatCountRef.current = 0
       metronomeStore.start()
     } else {
       metronomeStore.stop()
     }
-  }, [isPlaying])
+  }, [isPlaying, hasBpm])
 
   const showVolumeSlider = metronomeState.mode !== "visual"
 
