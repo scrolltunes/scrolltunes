@@ -16,3 +16,20 @@ export {
   Reset,
   Tick,
 } from "./LyricsPlayer"
+
+export {
+  VoiceActivityStore,
+  voiceActivityStore,
+  useVoiceActivity,
+  useIsSpeaking,
+  useVoiceControls,
+  type VoiceState,
+  type VADConfig,
+  type VADEvent,
+  VADError,
+  StartListening,
+  StopListening,
+  VoiceStart,
+  VoiceStop,
+  UpdateLevel,
+} from "./VoiceActivityStore"

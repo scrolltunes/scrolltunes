@@ -1,1 +1,1 @@
-export { soundSystem } from "./SoundSystem"
+export { soundSystem, type AudioError, MicPermissionDenied, AudioNotInitialized } from "./SoundSystem"

@@ -1,6 +1,15 @@
 "use client"
 
+import { Data, Effect } from "effect"
 import * as Tone from "tone"
+
+export class MicPermissionDenied extends Data.TaggedClass("MicPermissionDenied")<{
+  readonly cause: unknown
+}> {}
+
+export class AudioNotInitialized extends Data.TaggedClass("AudioNotInitialized")<object> {}
+
+export type AudioError = MicPermissionDenied | AudioNotInitialized
 
 /**
  * SoundSystem - Centralized audio management for ScrollTunes
@@ -130,6 +139,49 @@ class SoundSystem {
   }
 
   /**
+   * Effect-based microphone analyser acquisition
+   */
+  readonly getMicrophoneAnalyserEffect: Effect.Effect<AnalyserNode, AudioError> = Effect.gen(
+    this,
+    function* (_) {
+      yield* _(
+        Effect.tryPromise({
+          try: () => this.initialize(),
+          catch: (e) => new AudioNotInitialized({}),
+        }),
+      )
+
+      const context = this.getAudioContext()
+      if (!context) {
+        return yield* _(Effect.fail(new AudioNotInitialized({})))
+      }
+
+      const micStream = yield* _(
+        Effect.tryPromise({
+          try: () =>
+            navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
+            }),
+          catch: (e) => new MicPermissionDenied({ cause: e }),
+        }),
+      )
+
+      this.micStream = micStream
+      this.micSource = context.createMediaStreamSource(this.micStream)
+      this.analyser = context.createAnalyser()
+      this.analyser.fftSize = 2048
+      this.analyser.smoothingTimeConstant = 0.8
+
+      this.micSource.connect(this.analyser)
+      return this.analyser
+    },
+  )
+
+  /**
    * Stop microphone access
    */
   stopMicrophone(): void {
@@ -194,6 +246,23 @@ class SoundSystem {
     if (!(await this.ready())) return
     this.synthClick?.triggerAttackRelease("E6", "64n", undefined, 0.2)
   }
+
+  /**
+   * Effect-based voice detected sound
+   */
+  readonly playVoiceDetectedEffect: Effect.Effect<void, AudioNotInitialized> = Effect.gen(
+    this,
+    function* (_) {
+      const ready = yield* _(
+        Effect.tryPromise({
+          try: () => this.ready(),
+          catch: () => new AudioNotInitialized({}),
+        }),
+      )
+      if (!ready) return
+      this.synthClick?.triggerAttackRelease("E6", "64n", undefined, 0.2)
+    },
+  )
 
   // --- Control methods ---
 

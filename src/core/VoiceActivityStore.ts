@@ -2,7 +2,7 @@
 
 import { Effect, Data } from "effect"
 import { useSyncExternalStore } from "react"
-import { soundSystem } from "@/sounds"
+import { soundSystem, type AudioError } from "@/sounds"
 
 // --- Types ---
 
@@ -36,6 +36,10 @@ export class VoiceStop extends Data.TaggedClass("VoiceStop")<object> {}
 export class UpdateLevel extends Data.TaggedClass("UpdateLevel")<{ readonly level: number }> {}
 
 export type VADEvent = StartListening | StopListening | VoiceStart | VoiceStop | UpdateLevel
+
+export class VADError extends Data.TaggedClass("VADError")<{
+  readonly cause: AudioError
+}> {}
 
 // --- Default config ---
 
@@ -129,41 +133,36 @@ export class VoiceActivityStore {
 
   // --- Event handlers ---
 
-  readonly dispatch = (event: VADEvent): Effect.Effect<void> => {
-    return Effect.sync(() => {
-      switch (event._tag) {
-        case "StartListening":
-          this.handleStartListening()
-          break
-        case "StopListening":
-          this.handleStopListening()
-          break
-        case "VoiceStart":
-          this.handleVoiceStart()
-          break
-        case "VoiceStop":
-          this.handleVoiceStop()
-          break
-        case "UpdateLevel":
-          this.handleUpdateLevel(event.level)
-          break
-      }
-    })
-  }
-
-  private async handleStartListening(): Promise<void> {
-    if (this.state.isListening) return
-
-    this.analyser = await soundSystem.getMicrophoneAnalyser()
-    if (!this.analyser) {
-      console.error("Failed to get microphone analyser")
-      return
+  readonly dispatch = (event: VADEvent): Effect.Effect<void, VADError> => {
+    switch (event._tag) {
+      case "StartListening":
+        return this.startListeningEffect
+      case "StopListening":
+        return Effect.sync(() => this.handleStopListening())
+      case "VoiceStart":
+        return this.handleVoiceStartEffect
+      case "VoiceStop":
+        return Effect.sync(() => this.handleVoiceStop())
+      case "UpdateLevel":
+        return Effect.sync(() => this.handleUpdateLevel(event.level))
     }
-
-    this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
-    this.setState({ isListening: true })
-    this.startAnalysisLoop()
   }
+
+  private readonly startListeningEffect: Effect.Effect<void, VADError> = Effect.gen(
+    this,
+    function* (_) {
+      if (this.state.isListening) return
+
+      const analyser = yield* _(
+        Effect.mapError(soundSystem.getMicrophoneAnalyserEffect, (e) => new VADError({ cause: e })),
+      )
+
+      this.analyser = analyser
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
+      this.setState({ isListening: true })
+      this.startAnalysisLoop()
+    },
+  )
 
   private handleStopListening(): void {
     this.stopAnalysisLoop()
@@ -177,14 +176,20 @@ export class VoiceActivityStore {
     })
   }
 
-  private handleVoiceStart(): void {
-    this.setState({
-      isSpeaking: true,
-      lastSpeakingAt: Date.now(),
-    })
-    // Play a subtle sound to confirm detection
-    soundSystem.playVoiceDetected().catch(() => {})
-  }
+  private readonly handleVoiceStartEffect: Effect.Effect<void, VADError> = Effect.gen(
+    this,
+    function* (_) {
+      this.setState({
+        isSpeaking: true,
+        lastSpeakingAt: Date.now(),
+      })
+      yield* _(
+        Effect.catchAll(soundSystem.playVoiceDetectedEffect, () =>
+          Effect.logWarning("Failed to play voice detected sound"),
+        ),
+      )
+    },
+  )
 
   private handleVoiceStop(): void {
     this.setState({ isSpeaking: false })
@@ -234,7 +239,7 @@ export class VoiceActivityStore {
           timeSinceLastChange > this.config.holdTimeMs
         ) {
           this.lastStateChangeTime = now
-          Effect.runSync(this.dispatch(new VoiceStart({})))
+          Effect.runPromise(this.dispatch(new VoiceStart({}))).catch(() => {})
         }
       } else {
         // Check if we should stop speaking
@@ -265,7 +270,12 @@ export class VoiceActivityStore {
   // --- Convenience methods ---
 
   async startListening(): Promise<void> {
-    await this.handleStartListening()
+    await Effect.runPromise(
+      Effect.catchAll(this.startListeningEffect, (e) => {
+        console.error("Failed to start listening:", e)
+        return Effect.void
+      }),
+    )
   }
 
   stopListening(): void {
