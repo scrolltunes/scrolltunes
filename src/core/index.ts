@@ -42,6 +42,7 @@ export {
   MIN_FONT_SIZE,
   MAX_FONT_SIZE,
   FONT_SIZE_STEP,
+  DEFAULT_FONT_SIZE,
   type Preferences,
   type ThemeMode,
 } from "./PreferencesStore"

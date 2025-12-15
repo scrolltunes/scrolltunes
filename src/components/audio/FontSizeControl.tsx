@@ -2,6 +2,7 @@
 
 import { springs } from "@/animations"
 import {
+  DEFAULT_FONT_SIZE,
   FONT_SIZE_STEP,
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
@@ -17,8 +18,6 @@ export interface FontSizeControlProps {
   readonly compact?: boolean
   readonly onFontSizeChange?: (fontSize: number) => void
 }
-
-const DEFAULT_FONT_SIZE = 24
 
 export const FontSizeControl = memo(function FontSizeControl({
   className = "",

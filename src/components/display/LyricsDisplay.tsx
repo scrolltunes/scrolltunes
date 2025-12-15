@@ -19,7 +19,6 @@ export interface LyricsDisplayProps {
  * Detects manual scroll/touch and temporarily disables auto-scroll.
  */
 export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
   const state = usePlayerState()
   const currentLineIndex = useCurrentLineIndex()
   const { jumpToLine } = usePlayerControls()
@@ -118,7 +117,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   return (
     <div
-      ref={containerRef}
       className={`relative overflow-hidden h-full ${className}`}
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}

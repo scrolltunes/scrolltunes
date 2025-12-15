@@ -65,6 +65,32 @@ export class Tick extends Data.TaggedClass("Tick")<{ readonly time: number }> {}
 
 export type PlayerEvent = LoadLyrics | Play | Pause | Seek | Reset | Tick
 
+// --- Helper Functions ---
+
+/**
+ * Compute line index from a player state (pure function)
+ */
+function computeLineIndex(state: PlayerState): number {
+  if (state._tag === "Idle" || state._tag === "Ready") {
+    return -1
+  }
+  if (state._tag === "Completed") {
+    return 0
+  }
+  const { lyrics, currentTime } = state
+
+  let currentIndex = 0
+  for (let i = 0; i < lyrics.lines.length; i++) {
+    const line = lyrics.lines[i]
+    if (line && currentTime >= line.startTime) {
+      currentIndex = i
+    } else {
+      break
+    }
+  }
+  return currentIndex
+}
+
 // --- LyricsPlayer Class ---
 
 /**
@@ -107,27 +133,7 @@ export class LyricsPlayer {
    * Get current line index based on time
    */
   getCurrentLineIndex(): number {
-    if (this.state._tag === "Idle" || this.state._tag === "Ready") {
-      return -1
-    }
-    if (this.state._tag === "Completed") {
-      return 0
-    }
-    const { lyrics, currentTime } = this.state
-
-    // Find the current line by iterating forward and finding the last line
-    // whose startTime we've passed
-    let currentIndex = 0
-    for (let i = 0; i < lyrics.lines.length; i++) {
-      const line = lyrics.lines[i]
-      if (line && currentTime >= line.startTime) {
-        currentIndex = i
-      } else {
-        // Once we find a line we haven't reached yet, stop
-        break
-      }
-    }
-    return currentIndex
+    return computeLineIndex(this.state)
   }
 
   /**
@@ -293,23 +299,17 @@ export class LyricsPlayer {
 
   private lastTickTime: number | null = null
 
-  private tickCount = 0
-
   private startPlaybackLoop(): void {
     if (this.animationFrameId !== null) return
 
     this.lastTickTime = this.now()
-    this.tickCount = 0
 
     const tick = () => {
       const currentTime = this.now()
       const deltaTime = this.lastTickTime !== null ? currentTime - this.lastTickTime : 0
       this.lastTickTime = currentTime
 
-      this.tickCount++
-
-      // Skip first 2 ticks to let React fully render the initial Playing state
-      if (this.tickCount > 2 && deltaTime > 0 && deltaTime < 0.5) {
+      if (deltaTime > 0 && deltaTime < 0.5) {
         Effect.runSync(this.dispatch(new Tick({ time: deltaTime })))
       }
 
@@ -418,30 +418,6 @@ export function usePlayerState(): PlayerState {
     lyricsPlayer.getSnapshot,
     lyricsPlayer.getSnapshot, // SSR fallback
   )
-}
-
-/**
- * Compute line index from a player state snapshot (pure function)
- */
-function computeLineIndex(state: PlayerState): number {
-  if (state._tag === "Idle" || state._tag === "Ready") {
-    return -1
-  }
-  if (state._tag === "Completed") {
-    return 0
-  }
-  const { lyrics, currentTime } = state
-
-  let currentIndex = 0
-  for (let i = 0; i < lyrics.lines.length; i++) {
-    const line = lyrics.lines[i]
-    if (line && currentTime >= line.startTime) {
-      currentIndex = i
-    } else {
-      break
-    }
-  }
-  return currentIndex
 }
 
 /**

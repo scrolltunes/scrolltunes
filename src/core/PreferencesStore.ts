@@ -7,6 +7,7 @@ const STORAGE_KEY = "scrolltunes-preferences"
 export const MIN_FONT_SIZE = 16
 export const MAX_FONT_SIZE = 48
 export const FONT_SIZE_STEP = 2
+export const DEFAULT_FONT_SIZE = 24
 
 export type ThemeMode = "system" | "light" | "dark"
 
@@ -29,7 +30,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   distractionFreeMode: false,
   themeMode: "dark",
   metronomeEnabled: true,
-  fontSize: 24,
+  fontSize: DEFAULT_FONT_SIZE,
 }
 
 export class PreferencesStore {
