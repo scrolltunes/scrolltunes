@@ -9,9 +9,15 @@ import {
   usePlayerState,
 } from "@/core"
 import { soundSystem } from "@/sounds"
+import { Minus, Plus } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { MetronomeOrb } from "./MetronomeOrb"
+
+const DEFAULT_MANUAL_BPM = 120
+const MIN_BPM = 40
+const MAX_BPM = 240
+const BPM_STEP = 5
 
 export interface FloatingMetronomeProps {
   readonly bpm: number | null
@@ -45,10 +51,14 @@ export const FloatingMetronome = memo(function FloatingMetronome({
   className = "",
 }: FloatingMetronomeProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [manualBpm, setManualBpm] = useState<number | null>(null)
   const beatCountRef = useRef(0)
   const metronomeState = useMetronome()
   const controls = useMetronomeControls()
   const playerState = usePlayerState()
+
+  const hasApiBpm = bpm !== null && bpm > 0
+  const effectiveBpm = hasApiBpm ? bpm : manualBpm
 
   const handlePulse = useCallback(() => {
     beatCountRef.current += 1
@@ -81,9 +91,29 @@ export const FloatingMetronome = memo(function FloatingMetronome({
     [controls],
   )
 
+  const handleIncreaseBpm = useCallback(() => {
+    if (hasApiBpm) return
+    setManualBpm(prev => {
+      const current = prev ?? DEFAULT_MANUAL_BPM
+      const next = Math.min(MAX_BPM, current + BPM_STEP)
+      metronomeStore.setBpm(next)
+      return next
+    })
+  }, [hasApiBpm])
+
+  const handleDecreaseBpm = useCallback(() => {
+    if (hasApiBpm) return
+    setManualBpm(prev => {
+      const current = prev ?? DEFAULT_MANUAL_BPM
+      const next = Math.max(MIN_BPM, current - BPM_STEP)
+      metronomeStore.setBpm(next)
+      return next
+    })
+  }, [hasApiBpm])
+
   const isPlaying = playerState._tag === "Playing"
 
-  const hasBpm = bpm !== null && bpm > 0
+  const hasBpm = effectiveBpm !== null && effectiveBpm > 0
 
   const handleToggleMetronome = useCallback(() => {
     if (isPlaying || !hasBpm) return
@@ -95,16 +125,18 @@ export const FloatingMetronome = memo(function FloatingMetronome({
     }
   }, [isPlaying, hasBpm, metronomeState.isRunning, controls])
 
-  const isActive = bpm !== null && bpm > 0 && (isPlaying || metronomeState.isRunning)
+  const isActive =
+    effectiveBpm !== null && effectiveBpm > 0 && (isPlaying || metronomeState.isRunning)
 
   useEffect(() => {
-    if (isPlaying && hasBpm) {
+    if (isPlaying && hasBpm && effectiveBpm !== null) {
       beatCountRef.current = 0
+      metronomeStore.setBpm(effectiveBpm)
       metronomeStore.start()
-    } else {
+    } else if (!isPlaying) {
       metronomeStore.stop()
     }
-  }, [isPlaying, hasBpm])
+  }, [isPlaying, hasBpm, effectiveBpm])
 
   const showVolumeSlider = metronomeState.mode !== "visual"
 
@@ -179,28 +211,52 @@ export const FloatingMetronome = memo(function FloatingMetronome({
           )}
         </AnimatePresence>
 
-        <button
-          type="button"
-          onClick={isPlaying ? handleOrbClick : handleToggleMetronome}
-          onContextMenu={e => {
-            e.preventDefault()
-            setIsOpen(prev => !prev)
-          }}
-          className="rounded-full bg-neutral-900/80 p-2 backdrop-blur-sm border border-neutral-700/50"
-          aria-label={
-            isPlaying
-              ? `Metronome settings${bpm !== null ? `, ${bpm} BPM` : ""}`
-              : isActive
-                ? "Stop metronome"
-                : "Start metronome"
-          }
-          aria-expanded={isOpen}
-        >
-          <MetronomeOrb bpm={bpm} isActive={isActive} size="sm" onPulse={handlePulse} />
-        </button>
+        <div className="flex items-center gap-1">
+          {!hasApiBpm && (
+            <button
+              type="button"
+              onClick={handleDecreaseBpm}
+              className="w-7 h-7 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors border border-neutral-700/50"
+              aria-label="Decrease tempo"
+            >
+              <Minus size={14} weight="bold" className="text-neutral-300" />
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={isPlaying ? handleOrbClick : handleToggleMetronome}
+            onContextMenu={e => {
+              e.preventDefault()
+              setIsOpen(prev => !prev)
+            }}
+            className="rounded-full bg-neutral-900/80 p-2 backdrop-blur-sm border border-neutral-700/50"
+            aria-label={
+              isPlaying
+                ? `Metronome settings${effectiveBpm !== null ? `, ${effectiveBpm} BPM` : ""}`
+                : isActive
+                  ? "Stop metronome"
+                  : "Start metronome"
+            }
+            aria-expanded={isOpen}
+          >
+            <MetronomeOrb bpm={effectiveBpm} isActive={isActive} size="sm" onPulse={handlePulse} />
+          </button>
+
+          {!hasApiBpm && (
+            <button
+              type="button"
+              onClick={handleIncreaseBpm}
+              className="w-7 h-7 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors border border-neutral-700/50"
+              aria-label="Increase tempo"
+            >
+              <Plus size={14} weight="bold" className="text-neutral-300" />
+            </button>
+          )}
+        </div>
 
         <div className="mt-1 text-center text-xs text-neutral-400">
-          {bpm !== null ? `${bpm} BPM` : "No BPM"}
+          {effectiveBpm !== null ? `${effectiveBpm} BPM` : "Set tempo"}
         </div>
       </div>
     </div>
