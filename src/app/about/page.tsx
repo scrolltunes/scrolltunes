@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, XLogo } from "@phosphor-icons/react"
+import { ArrowLeft, EnvelopeSimple, XLogo } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import Link from "next/link"
 
@@ -159,9 +159,18 @@ export default function AboutPage() {
               className="block p-4 bg-neutral-900 rounded-xl hover:bg-neutral-800 transition-colors"
             >
               <div className="font-medium text-white flex items-center gap-2">
-                <XLogo size={18} />X
+                <XLogo size={18} />
+                @ScrollTunes
               </div>
-              <div className="text-sm text-neutral-400 mt-1">@ScrollTunes</div>
+            </a>
+            <a
+              href="mailto:hello@scrolltunes.com"
+              className="block p-4 bg-neutral-900 rounded-xl hover:bg-neutral-800 transition-colors mt-3"
+            >
+              <div className="font-medium text-white flex items-center gap-2">
+                <EnvelopeSimple size={18} />
+                hello@scrolltunes.com
+              </div>
             </a>
           </section>
 

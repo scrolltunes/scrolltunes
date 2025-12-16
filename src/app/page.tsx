@@ -1,8 +1,8 @@
 "use client"
 
 import { RecentSongs, SongSearch } from "@/components/search"
-import { Attribution } from "@/components/ui"
-import { GearSix, MusicNote } from "@phosphor-icons/react"
+import { Attribution, Logo } from "@/components/ui"
+import { GearSix } from "@phosphor-icons/react"
 import Link from "next/link"
 
 export default function Home() {
@@ -12,7 +12,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-lg font-semibold flex items-center gap-2">
-              <MusicNote size={24} weight="fill" className="text-indigo-500" />
+              <Logo size={24} className="text-indigo-500" />
               ScrollTunes
             </span>
           </div>

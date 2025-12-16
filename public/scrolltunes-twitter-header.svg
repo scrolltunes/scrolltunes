@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 500" width="1500" height="500">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0a"/>
+      <stop offset="50%" style="stop-color:#171717"/>
+      <stop offset="100%" style="stop-color:#0a0a0a"/>
+    </linearGradient>
+    
+    <!-- Primary brand gradient -->
+    <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+    
+    <!-- Vertical brand gradient for accent elements -->
+    <linearGradient id="verticalGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+    
+    <!-- Radial glow for center -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:0.15"/>
+      <stop offset="70%" style="stop-color:#6366f1;stop-opacity:0.05"/>
+      <stop offset="100%" style="stop-color:#6366f1;stop-opacity:0"/>
+    </radialGradient>
+    
+    <!-- Glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Text glow -->
+    <filter id="textGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1500" height="500" fill="url(#bgGradient)"/>
+  
+  <!-- Center radial glow -->
+  <ellipse cx="750" cy="250" rx="600" ry="300" fill="url(#centerGlow)"/>
+  
+  <!-- Decorative gradient lines (abstract music/lyrics visualization) -->
+  <g opacity="0.4">
+    <!-- Left side abstract bars -->
+    <rect x="50" y="140" width="120" height="4" rx="2" fill="url(#brandGradient)" opacity="0.3"/>
+    <rect x="80" y="160" width="90" height="4" rx="2" fill="url(#brandGradient)" opacity="0.4"/>
+    <rect x="60" y="180" width="110" height="4" rx="2" fill="url(#brandGradient)" opacity="0.5"/>
+    <rect x="90" y="200" width="80" height="4" rx="2" fill="url(#brandGradient)" opacity="0.6"/>
+    <rect x="70" y="220" width="100" height="4" rx="2" fill="#ffffff" opacity="0.8"/>
+    <rect x="100" y="240" width="70" height="4" rx="2" fill="url(#brandGradient)" opacity="0.6"/>
+    <rect x="80" y="260" width="90" height="4" rx="2" fill="url(#brandGradient)" opacity="0.5"/>
+    <rect x="60" y="280" width="110" height="4" rx="2" fill="url(#brandGradient)" opacity="0.4"/>
+    <rect x="90" y="300" width="80" height="4" rx="2" fill="url(#brandGradient)" opacity="0.3"/>
+    <rect x="70" y="320" width="100" height="4" rx="2" fill="url(#brandGradient)" opacity="0.2"/>
+    <rect x="100" y="340" width="70" height="4" rx="2" fill="url(#brandGradient)" opacity="0.15"/>
+    
+    <!-- Right side abstract bars (mirrored) -->
+    <rect x="1330" y="140" width="120" height="4" rx="2" fill="url(#brandGradient)" opacity="0.3"/>
+    <rect x="1330" y="160" width="90" height="4" rx="2" fill="url(#brandGradient)" opacity="0.4"/>
+    <rect x="1330" y="180" width="110" height="4" rx="2" fill="url(#brandGradient)" opacity="0.5"/>
+    <rect x="1330" y="200" width="80" height="4" rx="2" fill="url(#brandGradient)" opacity="0.6"/>
+    <rect x="1330" y="220" width="100" height="4" rx="2" fill="#ffffff" opacity="0.8"/>
+    <rect x="1330" y="240" width="70" height="4" rx="2" fill="url(#brandGradient)" opacity="0.6"/>
+    <rect x="1330" y="260" width="90" height="4" rx="2" fill="url(#brandGradient)" opacity="0.5"/>
+    <rect x="1330" y="280" width="110" height="4" rx="2" fill="url(#brandGradient)" opacity="0.4"/>
+    <rect x="1330" y="300" width="80" height="4" rx="2" fill="url(#brandGradient)" opacity="0.3"/>
+    <rect x="1330" y="320" width="100" height="4" rx="2" fill="url(#brandGradient)" opacity="0.2"/>
+    <rect x="1330" y="340" width="70" height="4" rx="2" fill="url(#brandGradient)" opacity="0.15"/>
+  </g>
+  
+  <!-- Gradient accent line top -->
+  <rect x="0" y="0" width="1500" height="3" fill="url(#brandGradient)"/>
+  
+  <!-- Gradient accent line bottom -->
+  <rect x="0" y="497" width="1500" height="3" fill="url(#brandGradient)"/>
+  
+  <!-- Music note decorations -->
+  <g transform="translate(280, 250)" opacity="0.2" filter="url(#glow)">
+    <ellipse cx="0" cy="20" rx="18" ry="14" fill="url(#brandGradient)"/>
+    <rect x="16" y="-40" width="5" height="60" fill="url(#brandGradient)"/>
+    <path d="M21 -40 Q45 -55 45 -25 Q45 0 21 -10" fill="url(#brandGradient)"/>
+  </g>
+  
+  <g transform="translate(1220, 250)" opacity="0.2" filter="url(#glow)">
+    <ellipse cx="0" cy="20" rx="18" ry="14" fill="url(#brandGradient)"/>
+    <rect x="16" y="-40" width="5" height="60" fill="url(#brandGradient)"/>
+    <path d="M21 -40 Q45 -55 45 -25 Q45 0 21 -10" fill="url(#brandGradient)"/>
+  </g>
+  
+  <!-- Main logo/icon in center -->
+  <g transform="translate(750, 200)" filter="url(#glow)">
+    <!-- Scroll/page base -->
+    <path d="M-40 -50 Q-55 -50 -55 -35 L-55 35 Q-55 50 -40 50 L40 50 Q55 50 55 35 L55 -35 Q55 -50 40 -50 Z" 
+          fill="none" stroke="url(#brandGradient)" stroke-width="3" opacity="0.7"/>
+    
+    <!-- Scroll curl -->
+    <path d="M-40 -50 Q-25 -65 -10 -50" fill="none" stroke="url(#brandGradient)" stroke-width="3" opacity="0.7"/>
+    
+    <!-- Lyrics lines -->
+    <rect x="-35" y="-30" width="70" height="4" rx="2" fill="url(#brandGradient)" opacity="0.5"/>
+    <rect x="-35" y="-15" width="55" height="4" rx="2" fill="url(#brandGradient)" opacity="0.5"/>
+    <rect x="-35" y="0" width="65" height="5" rx="2" fill="#ffffff" opacity="0.95"/>
+    <rect x="-35" y="18" width="50" height="4" rx="2" fill="url(#brandGradient)" opacity="0.5"/>
+    <rect x="-35" y="33" width="60" height="4" rx="2" fill="url(#brandGradient)" opacity="0.4"/>
+    
+    <!-- Mini music note -->
+    <g transform="translate(42, -30)">
+      <ellipse cx="0" cy="16" rx="8" ry="6" fill="url(#brandGradient)"/>
+      <rect x="7" y="-16" width="3" height="32" fill="url(#brandGradient)"/>
+      <path d="M10 -16 Q22 -24 22 -10 Q22 2 10 -4" fill="url(#brandGradient)"/>
+    </g>
+  </g>
+  
+  <!-- Tagline -->
+  <text x="750" y="380" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" 
+        font-size="36" font-weight="600" fill="#ffffff" filter="url(#textGlow)">Live Lyrics Teleprompter for Musicians</text>
+</svg>
