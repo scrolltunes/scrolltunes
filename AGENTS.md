@@ -101,21 +101,55 @@ Key features:
 
 ### 4. RecentSongsStore
 
-The `RecentSongsStore` manages recent songs with localStorage persistence and lyrics caching.
+The `RecentSongsStore` manages recent songs with localStorage persistence, server sync, and lyrics caching.
 
 ```typescript
 import { recentSongsStore, useRecentSongs } from "@/core"
 
-recentSongsStore.addSong(song) // Adds to recents, caches lyrics
+recentSongsStore.upsertRecent(song) // Adds to recents, syncs to server
 const songs = useRecentSongs() // Subscribe to recent songs list
 ```
 
 Key features:
 - **localStorage persistence**: `scrolltunes:recents` for song list (max 5 songs)
+- **Server sync**: Syncs to `/api/user/history` when authenticated
 - **Lyrics caching**: `scrolltunes:lyrics:{id}` with 7-day TTL
-- **Resume support**: Saves playback position on pause/leave
-- **Position validation**: Age <2h, min >5s, end buffer <duration-10s
+- **Loading states**: `isLoading`, `isInitialized`, `expectedCount` for proper UI
 - **useSyncExternalStore pattern**: Same as other stores
+
+### 5. AccountStore
+
+The `AccountStore` manages authentication state.
+
+```typescript
+import { accountStore, useAccount, useIsAuthenticated } from "@/core"
+
+await accountStore.initialize() // Fetch user session
+const isAuth = useIsAuthenticated() // Subscribe to auth state
+```
+
+### 6. FavoritesStore
+
+The `FavoritesStore` manages favorite songs with localStorage and server sync.
+
+```typescript
+import { favoritesStore, useFavorites, useIsFavorite } from "@/core"
+
+favoritesStore.toggle(song) // Toggle favorite status
+const isFav = useIsFavorite(songId) // Check if song is favorited
+```
+
+### 7. SetlistsStore
+
+The `SetlistsStore` manages user setlists (server-only, requires auth).
+
+```typescript
+import { setlistsStore, useSetlists } from "@/core"
+
+await setlistsStore.fetchAll() // Load user's setlists
+await setlistsStore.create("My Setlist") // Create new setlist
+await setlistsStore.addSong(setlistId, song) // Add song to setlist
+```
 
 ## Key Patterns
 

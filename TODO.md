@@ -308,7 +308,9 @@
 - [x] `/api/auth/[...nextauth]` - Auth.js handlers
 - [x] `/api/user/me` - Get user profile
 - [x] `/api/user/history/sync` - Sync song history
-- [ ] `/api/user/history` DELETE - Clear history
+- [x] `/api/user/history` GET - Fetch history
+- [x] `/api/user/history` DELETE - Clear history
+- [x] `/api/user/history/count` - Get history count (for skeleton)
 - [x] `/api/user/favorites/sync` - Sync favorites
 - [x] `/api/user/favorites/[songId]` DELETE - Remove favorite
 - [ ] `/api/user/song-settings` GET/POST - Per-song settings
@@ -320,8 +322,11 @@
 
 ### Client Integration
 - [x] Create `AccountStore` with useSyncExternalStore
+- [x] Create `FavoritesStore` with useSyncExternalStore
+- [x] Create `SetlistsStore` with useSyncExternalStore
 - [x] Implement localStorage → server merge on first login
 - [x] Add ongoing sync for song plays and favorites
+- [x] Optimized loading: fetch count first, show correct skeleton count
 - [ ] Handle offline mode gracefully
 
 ### UI Components
@@ -329,15 +334,16 @@
 - [x] Create `/login` page with consent flow
 - [ ] Redesign login page to be less dry (more visual, welcoming)
 - [ ] Fix user avatar size to match other header icons visually
-- [ ] Display attribution for fetched song info (album art source, etc.)
+- [x] Display attribution for fetched song info (lyrics/BPM source in info modal)
 - [x] Add user avatar/sign-in button to header
 - [x] Add "Account & Sync" section to Settings page
 - [x] Create export data flow
 - [x] Create delete account flow with confirmation
 - [ ] Add "Sign in to sync" prompt (optional, non-intrusive)
-- [ ] Create setlists management UI (create, edit, delete)
-- [ ] Add "Add to setlist" action on song pages
-- [ ] Create setlist view with drag-to-reorder
+- [x] Create setlists management UI (create, edit, delete) - /setlists page
+- [x] Add "Add to setlist" action on song pages
+- [x] Add favorite button (heart) on song pages
+- [ ] Create setlist detail view with drag-to-reorder (/setlists/[id])
 
 ### Legal Updates
 - [x] Update Privacy Policy with "Accounts and Synced Data" section
@@ -370,16 +376,16 @@
 
 > Update this section with what you're currently working on
 
-**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs partial), Phase 9 (mostly complete)
+**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs), Phase 9 (mostly complete)
 
 **Active:** Phase 9 remaining items:
-- API: `/api/user/history` DELETE, `/api/user/song-settings` GET/POST
-- UI: Setlist detail page with drag-to-reorder, feature comparison screen, login page redesign
+- API: `/api/user/song-settings` GET/POST
+- UI: Setlist detail page with drag-to-reorder (/setlists/[id]), feature comparison screen, login page redesign
 - Infra: Rate limiting, Spotify OAuth (needs production HTTPS), offline mode
 
 **Blocked:** Spotify OAuth requires production HTTPS
 
-**Next:** Setlist detail page (/setlists/[id]) with song list and reordering
+**Next:** Setlist detail page (/setlists/[id]) with song list, reordering, and delete
 
 ---
 

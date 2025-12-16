@@ -22,7 +22,8 @@ ScrollTunes is a web application for live musicians that displays synchronized s
 | **Linting/Formatting** | Biome | Single tool replacing ESLint + Prettier |
 | **Testing** | Vitest + jsdom | Fast unit testing with DOM environment |
 | **Types** | TypeScript (strict) | Full type safety |
-| **Database** | TBD | User profiles, session data |
+| **Database** | Vercel Postgres + Drizzle ORM | User profiles, history, favorites, setlists |
+| **Auth** | Auth.js (NextAuth v5) | Google OAuth, JWT sessions |
 
 ## Project Structure
 
@@ -689,18 +690,37 @@ bun run check        # lint + typecheck + test (pre-commit)
 - Edge functions for API routes
 - Environment variables via Vercel dashboard
 
-## Database / Storage (TBD)
+## Database / Storage
 
-Options under consideration:
+### Vercel Postgres + Drizzle ORM
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **Vercel Postgres** | Integrated, serverless | Cost at scale |
-| **PlanetScale** | MySQL, branching, generous free tier | External service |
-| **Supabase** | Postgres + auth + realtime | More complex |
-| **Upstash Redis** | Session storage, rate limiting | Not relational |
+User accounts and sync data stored in Vercel Postgres with Drizzle ORM for type-safe queries.
 
-Likely: **Vercel Postgres** for user data + **Upstash Redis** for sessions/cache.
+**Schema (see `src/lib/db/schema.ts`):**
+
+| Table | Purpose |
+|-------|---------|
+| `user` | Auth.js managed user records |
+| `account` | OAuth provider accounts (Google, Spotify) |
+| `session` | Active sessions |
+| `app_user_profiles` | Extended user profile (consent, display name) |
+| `user_song_items` | History + favorites with play count |
+| `user_song_settings` | Per-song settings (transpose, capo, notes) |
+| `user_setlists` | User-created setlists |
+| `user_setlist_songs` | Songs in setlists with ordering |
+| `user_spotify_tokens` | Encrypted Spotify OAuth tokens |
+
+### Upstash Redis
+
+Used for rate limiting (RapidAPI daily cap tracking).
+
+### localStorage
+
+Client-side caching for anonymous users:
+- `scrolltunes:recents` - Recent songs list (max 5)
+- `scrolltunes:lyrics:{id}` - Cached lyrics with 7-day TTL
+- `scrolltunes:favorites` - Favorite songs list
+- `scrolltunes:prefs` - User preferences
 
 ## BPM Provider System
 
