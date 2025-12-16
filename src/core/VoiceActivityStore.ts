@@ -117,6 +117,7 @@ export class VoiceActivityStore {
 
   // Energy gate for Silero AND-gate (both must agree for voice start)
   private isEnergySpeaking = false
+  private andGateEnabled = true
 
   // --- Observable pattern ---
 
@@ -187,6 +188,15 @@ export class VoiceActivityStore {
     return this.state.engine
   }
 
+  setAndGateEnabled(enabled: boolean): void {
+    this.andGateEnabled = enabled
+    vadLog("CONFIG", `AND-gate ${enabled ? "enabled" : "disabled"}`)
+  }
+
+  isAndGateEnabled(): boolean {
+    return this.andGateEnabled
+  }
+
   // --- Event handlers ---
 
   readonly dispatch = (event: VADEvent): Effect.Effect<void, VADError> => {
@@ -236,8 +246,8 @@ export class VoiceActivityStore {
                 return
               }
 
-              // AND-gate: require energy VAD to also detect speech
-              if (!this.isEnergySpeaking) {
+              // AND-gate: require energy VAD to also detect speech (can be disabled for voice search)
+              if (this.andGateEnabled && !this.isEnergySpeaking) {
                 vadLog("SILERO", "Speech start ignored - energy gate not speaking", {
                   threshold: this.sileroConfig.positiveSpeechThreshold,
                   level: this.smoothedSileroLevel.toFixed(3),
@@ -581,6 +591,7 @@ export class VoiceActivityStore {
     this.analyser = null
     this.dataArray = null
     this.isEnergySpeaking = false
+    this.andGateEnabled = true
     this.config = DEFAULT_VAD_CONFIG
     this.sileroConfig = DEFAULT_SILERO_VAD_CONFIG
     this.runtime = INITIAL_VAD_RUNTIME
@@ -686,5 +697,7 @@ export function useVoiceControls() {
     checkPermission: () => voiceActivityStore.checkPermission(),
     requestPermission: () => voiceActivityStore.requestPermission(),
     getPermissionStatus: () => voiceActivityStore.getPermissionStatus(),
+    setAndGateEnabled: (enabled: boolean) => voiceActivityStore.setAndGateEnabled(enabled),
+    isAndGateEnabled: () => voiceActivityStore.isAndGateEnabled(),
   }
 }

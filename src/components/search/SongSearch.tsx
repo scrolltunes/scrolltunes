@@ -2,7 +2,7 @@
 
 import { springs } from "@/animations"
 import { VoiceSearchButton } from "@/components/audio"
-import { useIsAuthenticated } from "@/core"
+import { useIsAuthenticated, useVoiceActivity } from "@/core"
 import { useVoiceSearch } from "@/hooks"
 import type { SearchApiResponse, SearchResultTrack } from "@/lib/search-api-types"
 import { makeCanonicalPath } from "@/lib/slug"
@@ -65,6 +65,7 @@ export const SongSearch = memo(function SongSearch({
   const router = useRouter()
   const isAuthenticated = useIsAuthenticated()
   const voiceSearch = useVoiceSearch()
+  const voiceActivity = useVoiceActivity()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResultTrack[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -337,6 +338,8 @@ export const SongSearch = memo(function SongSearch({
               isRecording={voiceSearch.isRecording}
               isConnecting={voiceSearch.isConnecting}
               hasError={!!voiceSearch.error}
+              voiceLevel={voiceActivity.level}
+              isSpeaking={voiceActivity.isSpeaking}
             />
           </div>
         )}

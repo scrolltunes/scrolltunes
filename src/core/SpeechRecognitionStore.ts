@@ -1,5 +1,6 @@
 "use client"
 
+import { voiceActivityStore } from "@/core"
 import { soundSystem } from "@/sounds"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
@@ -99,6 +100,10 @@ export class SpeechRecognitionStore {
 
   // Max duration timeout
   private maxDurationTimeoutId: ReturnType<typeof setTimeout> | null = null
+
+  // VAD integration
+  private hasDetectedSpeech = false
+  private vadUnsubscribe: (() => void) | null = null
 
   // --- Observable pattern ---
 
@@ -275,6 +280,9 @@ export class SpeechRecognitionStore {
       // Set up max duration auto-stop
       this.setupMaxDurationTimeout()
 
+      // Set up VAD for voice-based auto-stop
+      yield* _(Effect.promise(() => this.setupVADIntegration()))
+
       this.setState({
         isConnecting: false,
         isRecording: true,
@@ -419,6 +427,56 @@ export class SpeechRecognitionStore {
     }
   }
 
+  // --- VAD integration ---
+
+  private async setupVADIntegration(): Promise<void> {
+    speechLog("VAD", "Setting up voice activity detection for auto-stop")
+
+    this.hasDetectedSpeech = false
+
+    voiceActivityStore.setSileroPreset("voice-search")
+    voiceActivityStore.setAndGateEnabled(false) // Disable AND-gate for voice search (no guitar)
+
+    // Subscribe BEFORE starting listening to catch all events
+    let wasSpeaking = false
+    this.vadUnsubscribe = voiceActivityStore.subscribeToVoiceEvents(() => {
+      const state = voiceActivityStore.getSnapshot()
+      speechLog("VAD", "Voice event received", {
+        isSpeaking: state.isSpeaking,
+        wasSpeaking,
+        hasDetectedSpeech: this.hasDetectedSpeech,
+        isRecording: this.state.isRecording,
+      })
+
+      if (state.isSpeaking && !wasSpeaking) {
+        speechLog("VAD", "Voice activity detected - speech started")
+        this.hasDetectedSpeech = true
+        this.clearMaxDurationTimeout()
+      } else if (!state.isSpeaking && wasSpeaking && this.hasDetectedSpeech) {
+        speechLog("VAD", "Voice activity stopped after speech - auto-stopping recording")
+        this.setState({ isAutoStopping: true })
+        this.handleStopRecognition()
+      }
+
+      wasSpeaking = state.isSpeaking
+    })
+
+    // Start listening after subscription is set up
+    await voiceActivityStore.startListening()
+    speechLog("VAD", "VAD listening started", { isListening: voiceActivityStore.getSnapshot().isListening })
+  }
+
+  private cleanupVADIntegration(): void {
+    if (this.vadUnsubscribe) {
+      this.vadUnsubscribe()
+      this.vadUnsubscribe = null
+    }
+
+    voiceActivityStore.stopListening()
+    voiceActivityStore.setAndGateEnabled(true) // Re-enable AND-gate for normal use
+    this.hasDetectedSpeech = false
+  }
+
   // --- Stop recognition ---
 
   private handleStopRecognition(): void {
@@ -426,6 +484,9 @@ export class SpeechRecognitionStore {
 
     // Clear max duration timeout
     this.clearMaxDurationTimeout()
+
+    // Cleanup VAD
+    this.cleanupVADIntegration()
 
     // Stop MediaRecorder and send final audio
     if (this.mediaRecorder) {
