@@ -1,9 +1,10 @@
 "use client"
 
 import { UserMenu } from "@/components/auth"
+import { LogoMenu } from "@/components/layout"
 import { RecentSongs, SongSearch } from "@/components/search"
-import { Attribution, Logo } from "@/components/ui"
-import { GearSix, Info } from "@phosphor-icons/react"
+import { Attribution } from "@/components/ui"
+import { GearSix } from "@phosphor-icons/react"
 import Link from "next/link"
 
 export default function Home() {
@@ -11,21 +12,9 @@ export default function Home() {
     <div className="min-h-screen bg-neutral-950 text-white pb-7">
       <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-lg font-semibold flex items-center gap-2">
-              <Logo size={24} className="text-indigo-500" />
-              ScrollTunes
-            </span>
-          </div>
+          <LogoMenu />
 
           <div className="flex items-center gap-2">
-            <Link
-              href="/about"
-              className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-              aria-label="About"
-            >
-              <Info size={20} />
-            </Link>
             <Link
               href="/settings"
               className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
