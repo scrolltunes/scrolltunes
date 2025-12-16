@@ -3,6 +3,7 @@
 import { springs } from "@/animations"
 import { FloatingMetronome, FontSizeControl, VoiceIndicator } from "@/components/audio"
 import { LyricsDisplay } from "@/components/display"
+import { useFooterSlot } from "@/components/layout/FooterContext"
 import {
   type Lyrics,
   recentSongsStore,
@@ -36,7 +37,7 @@ import {
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 type ErrorType = "invalid-url" | "not-found" | "network"
 
@@ -73,6 +74,7 @@ export default function SongPage() {
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
   const preferences = usePreferences()
+  const { setSlot } = useFooterSlot()
 
   const { isListening, isSpeaking, level, startListening, stopListening } = useVoiceTrigger({
     autoPlay: true,
@@ -102,6 +104,34 @@ export default function SongPage() {
       stopListeningRef.current()
     }
   }, [])
+
+  // Status text for footer
+  const statusText = useMemo(() => {
+    const parts: string[] = []
+
+    if (playerState._tag === "Playing") {
+      parts.push("Playing")
+    } else if (playerState._tag === "Paused") {
+      parts.push("Paused")
+    } else if (playerState._tag === "Ready") {
+      parts.push("Ready")
+    }
+
+    if (isListening && !isSpeaking && playerState._tag !== "Playing") {
+      parts.push("Listening for voice")
+    }
+
+    return parts.length > 0 ? parts.join(" • ") : null
+  }, [playerState._tag, isListening, isSpeaking])
+
+  useEffect(() => {
+    if (statusText) {
+      setSlot(<span className="text-neutral-400">{statusText}</span>)
+    } else {
+      setSlot(null)
+    }
+    return () => setSlot(null)
+  }, [statusText, setSlot])
 
   useWakeLock({ enabled: isLoaded && preferences.wakeLockEnabled })
 
