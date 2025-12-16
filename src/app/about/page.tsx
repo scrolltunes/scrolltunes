@@ -47,8 +47,8 @@ export default function AboutPage() {
             </h2>
             <div className="p-4 bg-neutral-900 rounded-xl">
               <p className="text-neutral-300 leading-relaxed">
-                Voice detection syncs lyrics to your performance. Start singing and the lyrics
-                scroll automatically. Pause and the scrolling pauses with you
+                Voice detection syncs lyrics to your performance. Start singing and ScrollTunes
+                begins scrolling automatically. Pause with a tap, double-tap, or keyboard shortcut
               </p>
             </div>
           </section>
@@ -61,11 +61,11 @@ export default function AboutPage() {
             <div className="p-4 bg-neutral-900 rounded-xl space-y-3">
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Detect voice activity to control scrolling</p>
+                <p className="text-neutral-300">Detect voice activity to start scrolling automatically</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Adjust scroll speed to match your tempo</p>
+                <p className="text-neutral-300">Adjust scroll speed with tempo controls or keyboard</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
@@ -73,11 +73,19 @@ export default function AboutPage() {
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
+                <p className="text-neutral-300">Double-tap anywhere to pause or resume</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
+                <p className="text-neutral-300">Visual and audio metronome synced to song tempo</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
                 <p className="text-neutral-300">Keep screen awake during performance</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Resume where you left off with recent songs</p>
+                <p className="text-neutral-300">Quickly reopen recently played songs</p>
               </div>
             </div>
           </section>

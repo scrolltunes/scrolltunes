@@ -132,8 +132,8 @@
 ## Phase 6: Mobile & Hands-Free ✅
 
 ### Responsive UI
-- [x] Implement distraction-free mode (auto-hide controls)
 - [x] Add wake lock (`useWakeLock` hook)
+- [x] Implement auto-hide controls
 - [x] Test all screens on mobile viewports (pending manual testing)
 - [x] Ensure large touch targets
 
@@ -143,7 +143,7 @@
 - [x] Create preferences store for gesture toggles (`PreferencesStore`)
 
 ### Pending
-- [ ] Create settings UI screen for gesture toggles
+- [ ] Wire distraction-free mode preference to song page UI
 - [ ] Manual mobile testing (iOS Safari, Android Chrome)
 
 ## Phase 7: Single-User Polish ✅
@@ -198,9 +198,9 @@
 - [x] Store recent songs in localStorage
 - [x] Create recent songs list on home page
 - [x] Cache lyrics and BPM data locally (7-day TTL)
-- [x] Save and restore playback position
-- [x] Resume from last position on song revisit
-- [ ] Add "clear history" option
+- [x] Add "clear history" option
+- [ ] Save playback position on pause/leave
+- [ ] Resume from last position on song revisit
 
 ### Favorites
 - [ ] Add heart/star button to save favorites
@@ -209,7 +209,7 @@
 - [ ] Quick-access from home page
 
 ### Per-Song Settings
-- [ ] Persist tempo per song (already done via useTempoPreference)
+- [x] Persist tempo per song (via useTempoPreference)
 - [ ] Add notes field per song (key, capo position, etc.)
 - [ ] Store in localStorage keyed by song ID
 
@@ -288,13 +288,13 @@
 
 > Update this section with what you're currently working on
 
-**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs)
+**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs partial)
 
-**Active:** Code Cleanup, Phase 8 (Favorites, Per-Song Settings)
+**Active:** Resume from position, BPM→scroll integration, Code Cleanup
 
 **Blocked:** Nothing
 
-**Next:** Favorites, Per-Song Settings
+**Next:** Resume playback position, Favorites, Distraction-free mode wiring
 
 ---
 

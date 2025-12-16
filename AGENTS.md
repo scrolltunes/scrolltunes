@@ -6,6 +6,8 @@ Live lyrics teleprompter for musicians. Detects singing voice and syncs scrollin
 
 **Do not commit unless explicitly asked.** Only run `git commit` when the user explicitly requests it.
 
+**Use subagents for TODO items.** When implementing TODO items (from TODO.md, Oracle plans, or any task list), always use the Task tool to spawn subagents for each independent task. This enables parallel execution and keeps the main thread focused on coordination.
+
 ## Commands
 
 ```bash
