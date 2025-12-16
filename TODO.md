@@ -219,6 +219,16 @@
 
 ## V2 Features (Future)
 
+### Improved Search Accuracy ✅
+- [x] Treat user input as imprecise - use Spotify search to get canonical metadata
+- [x] Use Spotify's fuzzy matching to resolve typos, spelling variants (Colors/Colours)
+- [x] Pass Spotify's exact title/artist to LRCLIB's `/api/search` endpoint
+- [x] LRCLIB supports separate `track_name` and `artist_name` params for precise matching
+- [x] Search top 8 Spotify results in parallel against LRCLIB
+- [x] Deduplicate results by normalized track+artist
+- [x] Fall back to LRCLIB keyword search (`q=`) if Spotify fails
+- [ ] LRCLIB's `/api/get` can match by exact signature (title, artist, album, duration ±2s)
+
 ### Chords Integration
 - [ ] Define `ChordChart` type
 - [ ] Research chord API options (Ultimate Guitar, Chordify)

@@ -200,7 +200,8 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   // Only show highlight when playing/paused, not in Ready state
   // Empty lines render as spacers without highlight, so no special handling needed
-  const isPlayingOrPaused = state._tag === "Playing" || state._tag === "Paused"
+  const isPlaying = state._tag === "Playing"
+  const isPlayingOrPaused = isPlaying || state._tag === "Paused"
   const activeLineIndex = isPlayingOrPaused ? Math.max(0, currentLineIndex) : -1
 
   return (
@@ -243,6 +244,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
                 lineRefs.current[index] = el
               }}
               isRTL={isRTL}
+              isPlaying={isPlaying}
               {...(duration !== undefined && { duration })}
             />
           )

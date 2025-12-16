@@ -14,6 +14,7 @@ export interface LyricLineProps {
   readonly innerRef?: (el: HTMLButtonElement | null) => void
   readonly duration?: number | undefined
   readonly isRTL?: boolean
+  readonly isPlaying?: boolean
 }
 
 interface WordTiming {
@@ -59,6 +60,7 @@ export const LyricLine = memo(function LyricLine({
   innerRef,
   duration,
   isRTL = false,
+  isPlaying = true,
 }: LyricLineProps) {
   const wordTimings = useMemo(
     () => (duration !== undefined ? calculateWordTimings(text, duration) : []),
@@ -93,28 +95,32 @@ export const LyricLine = memo(function LyricLine({
           className={`relative z-10 block ${textSizeClass} font-medium leading-relaxed transition-colors duration-300`}
           style={fontSize !== undefined ? { fontSize: `${fontSize}px` } : undefined}
         >
-          {wordTimings.map((timing, i) => {
-            if (timing.word.trim() === "") {
-              return timing.word
-            }
-            return (
-              <span key={i} className="relative inline-block">
-                <span className="text-neutral-500">{timing.word}</span>
-                <motion.span
-                  className="absolute inset-0 text-white overflow-hidden"
-                  initial={{ clipPath: isRTL ? "inset(0 0 0 100%)" : "inset(0 100% 0 0)" }}
-                  animate={{ clipPath: "inset(0 0% 0 0)" }}
-                  transition={{
-                    duration: timing.wordDuration,
-                    delay: timing.delay,
-                    ease: "linear",
-                  }}
-                >
-                  {timing.word}
-                </motion.span>
-              </span>
-            )
-          })}
+          {isPlaying ? (
+            wordTimings.map((timing, i) => {
+              if (timing.word.trim() === "") {
+                return timing.word
+              }
+              return (
+                <span key={i} className="relative inline-block">
+                  <span className="text-neutral-500">{timing.word}</span>
+                  <motion.span
+                    className="absolute inset-0 text-white overflow-hidden"
+                    initial={{ clipPath: isRTL ? "inset(0 0 0 100%)" : "inset(0 100% 0 0)" }}
+                    animate={{ clipPath: "inset(0 0% 0 0)" }}
+                    transition={{
+                      duration: timing.wordDuration,
+                      delay: timing.delay,
+                      ease: "linear",
+                    }}
+                  >
+                    {timing.word}
+                  </motion.span>
+                </span>
+              )
+            })
+          ) : (
+            <span className="text-white">{text}</span>
+          )}
         </span>
       ) : (
         <span

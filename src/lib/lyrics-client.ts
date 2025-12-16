@@ -25,6 +25,7 @@
 import type { Lyrics } from "@/core"
 import { Data, Effect } from "effect"
 import { parseLRC } from "./lyrics-parser"
+import { formatArtists, searchTracksEffect } from "./spotify-client"
 
 // --- Error Classes ---
 
@@ -353,4 +354,121 @@ export const getLyricsBySpotifyId = (trackId: string): Effect.Effect<Lyrics, Lyr
       message: `Spotify ID lookup not supported by LRCLIB. Track ID: ${trackId}`,
     }),
   )
+}
+
+/**
+ * Search LRCLIB for a single track by name and artist.
+ * Returns empty array on error (for parallel aggregation).
+ */
+const searchLRCLibByTrack = (
+  trackName: string,
+  artistName: string,
+): Effect.Effect<readonly LRCLibTrackResult[], never> => {
+  return Effect.gen(function* () {
+    const params = new URLSearchParams({
+      track_name: trackName,
+      artist_name: artistName,
+    })
+
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        fetch(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
+          headers,
+          cache: "force-cache",
+          next: { revalidate: 600 },
+        }),
+      catch: () => null,
+    })
+
+    if (!response || !response.ok) {
+      return []
+    }
+
+    const results = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<LRCLibResponse[]>,
+      catch: () => [] as LRCLibResponse[],
+    })
+
+    return results.map(r => ({
+      id: r.id,
+      trackName: r.trackName,
+      artistName: r.artistName,
+      albumName: r.albumName,
+      duration: r.duration,
+      hasSyncedLyrics: r.syncedLyrics !== null && r.syncedLyrics.length > 0,
+    }))
+  }).pipe(Effect.catchAll(() => Effect.succeed([] as readonly LRCLibTrackResult[])))
+}
+
+/**
+ * Search LRCLIB using Spotify metadata for improved accuracy.
+ *
+ * Flow:
+ * 1. Search Spotify for top 8 results to get canonical track metadata
+ * 2. Search LRCLIB in parallel for each Spotify result
+ * 3. Merge and deduplicate results
+ * 4. Falls back to regular LRCLIB search if Spotify fails
+ *
+ * This improves search accuracy by using Spotify's fuzzy matching
+ * to normalize user queries into canonical track/artist names.
+ */
+export const searchLRCLibBySpotifyMetadata = (
+  query: string,
+): Effect.Effect<readonly LRCLibTrackResult[], LyricsError> => {
+  // Try to get canonical metadata from Spotify (top 8 results)
+  // Falls back to null if Spotify fails (config error, rate limit, network, etc.)
+  const getSpotifyTracks = searchTracksEffect(query, 8).pipe(
+    Effect.map(result =>
+      result.tracks.items.map(track => ({
+        trackName: track.name,
+        artistName: formatArtists(track.artists),
+      })),
+    ),
+    Effect.catchAll(error => {
+      console.log(`[Search] Spotify failed, falling back to direct LRCLIB search: ${error._tag}`)
+      return Effect.succeed(null)
+    }),
+  )
+
+  return Effect.gen(function* () {
+    const spotifyTracks = yield* getSpotifyTracks
+
+    // If Spotify failed or returned no results, use direct LRCLIB search
+    if (!spotifyTracks || spotifyTracks.length === 0) {
+      return yield* searchLRCLibTracks(query)
+    }
+
+    // Search LRCLIB in parallel for each Spotify track
+    const allResults = yield* Effect.all(
+      spotifyTracks.map(track => searchLRCLibByTrack(track.trackName, track.artistName)),
+      { concurrency: 8 },
+    )
+
+    // Flatten and deduplicate by normalized track name + artist
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^\w\s]/g, "") // Remove punctuation
+        .replace(/\s+/g, " ")
+        .trim()
+
+    const seen = new Set<string>()
+    const deduped: LRCLibTrackResult[] = []
+
+    for (const results of allResults) {
+      for (const r of results) {
+        const key = `${normalize(r.trackName)}|${normalize(r.artistName)}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        deduped.push(r)
+      }
+    }
+
+    // If no results from Spotify-based search, fall back to direct search
+    if (deduped.length === 0) {
+      return yield* searchLRCLibTracks(query)
+    }
+
+    return deduped
+  })
 }

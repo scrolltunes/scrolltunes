@@ -1,5 +1,9 @@
 import { getAlbumArt } from "@/lib/deezer-client"
-import { LyricsAPIError, type LyricsError, searchLRCLibTracks } from "@/lib/lyrics-client"
+import {
+  LyricsAPIError,
+  type LyricsError,
+  searchLRCLibBySpotifyMetadata,
+} from "@/lib/lyrics-client"
 import type { SearchResultTrack } from "@/lib/search-api-types"
 import { formatArtists, getAlbumImageUrl, searchTracksEffect } from "@/lib/spotify-client"
 import { Effect } from "effect"
@@ -85,14 +89,30 @@ function getAlbumArtRace(
   )
 }
 
+/**
+ * Create a deduplication key from track name and artist.
+ * Normalizes to lowercase and removes non-alphanumeric chars.
+ */
+function dedupeKey(trackName: string, artistName: string): string {
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+  return `${normalize(trackName)}|${normalize(artistName)}`
+}
+
 function searchLRCLib(
   query: string,
   limit: number,
 ): Effect.Effect<SearchResultTrack[], LyricsError> {
   return Effect.gen(function* () {
-    const results = yield* searchLRCLibTracks(query)
+    // Use Spotify-first flow for better accuracy
+    const results = yield* searchLRCLibBySpotifyMetadata(query)
     const synced = results.filter(r => r.hasSyncedLyrics)
 
+    // Sort studio versions first
     const sorted = [...synced].sort((a, b) => {
       const aIsStudio = isStudioVersion(a.trackName, a.albumName)
       const bIsStudio = isStudioVersion(b.trackName, b.albumName)
@@ -101,12 +121,14 @@ function searchLRCLib(
       return 0
     })
 
-    const seenIds = new Set<number>()
+    // Deduplicate by track name + artist (not just ID)
+    const seenKeys = new Set<string>()
     const uniqueTracks: typeof sorted = []
 
     for (const r of sorted) {
-      if (seenIds.has(r.id)) continue
-      seenIds.add(r.id)
+      const key = dedupeKey(r.trackName, r.artistName)
+      if (seenKeys.has(key)) continue
+      seenKeys.add(key)
       uniqueTracks.push(r)
       if (uniqueTracks.length >= limit) break
     }

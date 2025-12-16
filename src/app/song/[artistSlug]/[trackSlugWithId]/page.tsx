@@ -2,7 +2,7 @@
 
 import { springs } from "@/animations"
 import { FloatingMetronome, FontSizeControl, VoiceIndicator } from "@/components/audio"
-import { LyricsDisplay, SongInfoModal } from "@/components/display"
+import { FloatingInfoButton, LyricsDisplay, SongInfoModal } from "@/components/display"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import {
   type Lyrics,
@@ -29,12 +29,10 @@ import {
   ArrowCounterClockwise,
   ArrowLeft,
   Gear,
-  Info,
   MusicNote,
   Pause,
   Play,
   SpinnerGap,
-  Warning,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
@@ -454,23 +452,6 @@ export default function SongPage() {
                     >
                       <Gear size={20} />
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowInfo(true)}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                        loadState.bpm
-                          ? "bg-neutral-800 hover:bg-neutral-700"
-                          : "bg-amber-500/20 hover:bg-amber-500/30"
-                      }`}
-                      aria-label={loadState.bpm ? "Song info" : "Song info - BPM missing"}
-                    >
-                      {loadState.bpm ? (
-                        <Info size={20} />
-                      ) : (
-                        <Warning size={20} className="text-amber-500" />
-                      )}
-                    </button>
                   </div>
                 )}
               </div>
@@ -482,6 +463,11 @@ export default function SongPage() {
       <main className="pt-16 h-screen flex flex-col">
         <LyricsDisplay className="flex-1 pb-12" />
 
+        <FloatingInfoButton
+          hasBpm={loadState.bpm !== null}
+          onPress={() => setShowInfo(true)}
+          position="bottom-left"
+        />
         <FloatingMetronome bpm={currentBpm} position="bottom-right" />
 
         <AnimatePresence>
