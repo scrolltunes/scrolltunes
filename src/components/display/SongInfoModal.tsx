@@ -16,6 +16,7 @@ export interface SongInfoModalProps {
   readonly musicalKey: string | null
   readonly spotifyId: string | null
   readonly bpmSource: string | null
+  readonly albumArt: string | null
 }
 
 function formatDuration(seconds: number): string {
@@ -34,6 +35,7 @@ export function SongInfoModal({
   musicalKey,
   spotifyId,
   bpmSource,
+  albumArt,
 }: SongInfoModalProps) {
   const [showReportModal, setShowReportModal] = useState(false)
 
@@ -74,9 +76,20 @@ export function SongInfoModal({
                 <X size={20} weight="bold" />
               </button>
 
-              <div className="mb-4 pr-8">
-                <h2 className="text-xl font-semibold text-white">{title}</h2>
-                <p className="text-neutral-400">{artist}</p>
+              <div className="mb-4 flex gap-4 pr-8">
+                {albumArt && (
+                  <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-neutral-800">
+                    <img
+                      src={albumArt}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold text-white">{title}</h2>
+                  <p className="text-neutral-400">{artist}</p>
+                </div>
               </div>
 
               <div className="space-y-3">

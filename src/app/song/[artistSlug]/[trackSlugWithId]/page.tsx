@@ -512,6 +512,7 @@ export default function SongPage() {
           musicalKey={loadState.key}
           spotifyId={loadState.spotifyId}
           bpmSource={loadState.bpmSource}
+          albumArt={loadState.albumArt}
         />
       )}
     </div>

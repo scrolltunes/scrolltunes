@@ -55,11 +55,22 @@ function getWarnedKey(threshold: number): string {
   return `${KV_WARNED_PREFIX}${getToday()}:${threshold}`
 }
 
-async function sendUsageWarning(current: number, threshold: number): Promise<void> {
+interface SongContext {
+  readonly title: string
+  readonly artist: string
+  readonly spotifyId: string
+}
+
+async function sendUsageWarning(
+  current: number,
+  threshold: number,
+  song: SongContext,
+): Promise<void> {
   const accessKey = process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY
   if (!accessKey) return
 
   const percentage = Math.round(threshold * 100)
+  const spotifyUrl = `https://open.spotify.com/track/${song.spotifyId}`
 
   try {
     await fetch("https://api.web3forms.com/submit", {
@@ -69,7 +80,18 @@ async function sendUsageWarning(current: number, threshold: number): Promise<voi
         access_key: accessKey,
         subject: `[ScrollTunes] RapidAPI usage at ${percentage}%`,
         from_name: "ScrollTunes Rate Limiter",
-        message: `RapidAPI Spotify Audio Features usage warning:\n\nCurrent usage: ${current}/${DAILY_REQUEST_CAP} requests (${percentage}%)\nDate: ${getToday()}\n\nThe free tier allows 20 requests/day. Exceeding this will incur $0.50/request charges.`,
+        message: `RapidAPI Spotify Audio Features usage warning:
+
+Current usage: ${current}/${DAILY_REQUEST_CAP} requests (${percentage}%)
+Date: ${getToday()}
+
+Triggered by:
+  Song: ${song.title}
+  Artist: ${song.artist}
+  Spotify ID: ${song.spotifyId}
+  Spotify URL: ${spotifyUrl}
+
+The free tier allows 20 requests/day. Exceeding this will incur $0.50/request charges.`,
       }),
     })
   } catch {
@@ -77,7 +99,11 @@ async function sendUsageWarning(current: number, threshold: number): Promise<voi
   }
 }
 
-async function checkAndSendWarnings(redis: Redis, current: number): Promise<void> {
+async function checkAndSendWarnings(
+  redis: Redis,
+  current: number,
+  song: SongContext,
+): Promise<void> {
   for (const threshold of WARNING_THRESHOLDS) {
     const thresholdCount = Math.floor(DAILY_REQUEST_CAP * threshold)
     if (current >= thresholdCount) {
@@ -85,13 +111,13 @@ async function checkAndSendWarnings(redis: Redis, current: number): Promise<void
       const alreadyWarned = await redis.get<boolean>(warnedKey)
       if (!alreadyWarned) {
         await redis.set(warnedKey, true, { ex: 48 * 60 * 60 })
-        await sendUsageWarning(current, threshold)
+        await sendUsageWarning(current, threshold, song)
       }
     }
   }
 }
 
-const checkAndIncrementUsage = (): Effect.Effect<boolean, BPMAPIError> =>
+const checkAndIncrementUsage = (song: SongContext): Effect.Effect<boolean, BPMAPIError> =>
   Effect.tryPromise({
     try: async () => {
       const redis = getRedisClient()
@@ -107,7 +133,7 @@ const checkAndIncrementUsage = (): Effect.Effect<boolean, BPMAPIError> =>
       if (current === null) {
         await redis.expire(key, 48 * 60 * 60)
       }
-      await checkAndSendWarnings(redis, newCount)
+      await checkAndSendWarnings(redis, newCount, song)
       return true
     },
     catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
@@ -173,7 +199,13 @@ export const rapidApiSpotifyProvider: BPMProvider = {
         )
       }
 
-      const allowed = yield* checkAndIncrementUsage()
+      const songContext: SongContext = {
+        title: query.title,
+        artist: query.artist,
+        spotifyId,
+      }
+
+      const allowed = yield* checkAndIncrementUsage(songContext)
       if (!allowed) {
         return yield* Effect.fail(
           new BPMNotFoundError({ title: query.title, artist: query.artist }),
