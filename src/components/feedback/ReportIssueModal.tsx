@@ -1,0 +1,223 @@
+"use client"
+
+import { springs } from "@/animations"
+import { Bug, PaperPlaneTilt, X } from "@phosphor-icons/react"
+import { AnimatePresence, motion } from "motion/react"
+import { useCallback, useState } from "react"
+
+export interface SongContext {
+  readonly title: string
+  readonly artist: string
+  readonly duration: number
+  readonly bpm: number | null
+  readonly key: string | null
+  readonly spotifyId: string | null
+  readonly bpmSource: string | null
+}
+
+export interface ReportIssueModalProps {
+  readonly isOpen: boolean
+  readonly onClose: () => void
+  readonly songContext?: SongContext
+}
+
+type SubmitState = "idle" | "submitting" | "success" | "error"
+
+const WEB3FORMS_ACCESS_KEY = process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY ?? ""
+
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, "0")}`
+}
+
+export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueModalProps) {
+  const [description, setDescription] = useState("")
+  const [email, setEmail] = useState("")
+  const [submitState, setSubmitState] = useState<SubmitState>("idle")
+
+  const handleBackdropClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) {
+        onClose()
+      }
+    },
+    [onClose],
+  )
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+      if (!description.trim()) return
+
+      setSubmitState("submitting")
+
+      const pageUrl = typeof window !== "undefined" ? window.location.href : ""
+
+      const formData: Record<string, string> = {
+        access_key: WEB3FORMS_ACCESS_KEY,
+        subject: songContext
+          ? `[ScrollTunes] Issue: ${songContext.title} - ${songContext.artist}`
+          : "[ScrollTunes] Issue Report",
+        from_name: "ScrollTunes Bug Reporter",
+        url: pageUrl,
+        description: description.trim(),
+      }
+
+      if (email.trim()) {
+        formData.email = email.trim()
+      }
+
+      if (songContext) {
+        formData.song_title = songContext.title
+        formData.song_artist = songContext.artist
+        formData.song_duration = formatDuration(songContext.duration)
+        formData.spotify_id = songContext.spotifyId ?? "N/A"
+        formData.bpm = songContext.bpm?.toString() ?? "Missing"
+        formData.key = songContext.key ?? "Missing"
+        formData.bpm_source = songContext.bpmSource ?? "N/A"
+      }
+
+      try {
+        const response = await fetch("https://api.web3forms.com/submit", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(formData),
+        })
+
+        if (response.ok) {
+          setSubmitState("success")
+          setDescription("")
+          setEmail("")
+          setTimeout(() => {
+            onClose()
+            setSubmitState("idle")
+          }, 2000)
+        } else {
+          setSubmitState("error")
+        }
+      } catch {
+        setSubmitState("error")
+      }
+    },
+    [description, email, songContext, onClose],
+  )
+
+  const handleClose = useCallback(() => {
+    if (submitState !== "submitting") {
+      onClose()
+      setSubmitState("idle")
+      setDescription("")
+      setEmail("")
+    }
+  }, [submitState, onClose])
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={handleBackdropClick}
+        >
+          <motion.div
+            className="relative w-full max-w-md rounded-xl bg-neutral-900 border border-neutral-800 shadow-xl"
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={springs.default}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <Bug size={20} className="text-amber-500" />
+                <h2 className="text-lg font-semibold text-white">Report an Issue</h2>
+              </div>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="rounded-full p-1 text-neutral-400 hover:bg-neutral-800 hover:text-white transition-colors"
+                aria-label="Close"
+                disabled={submitState === "submitting"}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-4 space-y-4">
+              {songContext && (
+                <div className="rounded-lg bg-neutral-800/50 p-3 text-sm">
+                  <div className="text-neutral-400 mb-1">Reporting issue for:</div>
+                  <div className="text-white font-medium">{songContext.title}</div>
+                  <div className="text-neutral-500">{songContext.artist}</div>
+                  {!songContext.bpm && (
+                    <div className="mt-2 text-amber-500 text-xs">⚠ BPM data is missing</div>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="description" className="block text-sm text-neutral-400 mb-1">
+                  Describe the issue *
+                </label>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="What went wrong?"
+                  rows={4}
+                  required
+                  disabled={submitState === "submitting"}
+                  className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="email" className="block text-sm text-neutral-400 mb-1">
+                  Email (optional, for follow-up)
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  disabled={submitState === "submitting"}
+                  className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                />
+              </div>
+
+              {submitState === "error" && (
+                <div className="text-red-400 text-sm">Failed to submit. Please try again.</div>
+              )}
+
+              {submitState === "success" && (
+                <div className="text-green-400 text-sm">
+                  Thank you! Your report has been submitted.
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitState === "submitting" || !description.trim()}
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-neutral-700 disabled:cursor-not-allowed px-4 py-2.5 text-white font-medium transition-colors"
+              >
+                {submitState === "submitting" ? (
+                  "Submitting..."
+                ) : (
+                  <>
+                    <PaperPlaneTilt size={18} />
+                    Submit Report
+                  </>
+                )}
+              </button>
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
