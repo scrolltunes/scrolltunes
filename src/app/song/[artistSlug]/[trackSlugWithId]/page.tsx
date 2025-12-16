@@ -36,7 +36,7 @@ import {
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 type ErrorType = "invalid-url" | "not-found" | "network"
@@ -68,6 +68,8 @@ const errorMessages: Record<ErrorType, { title: string; description: string }> =
 
 export default function SongPage() {
   const params = useParams<{ artistSlug: string; trackSlugWithId: string }>()
+  const searchParams = useSearchParams()
+  const spotifyId = searchParams.get("spotifyId")
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
   const [showSettings, setShowSettings] = useState(false)
 
@@ -181,7 +183,9 @@ export default function SongPage() {
     async function fetchLyrics() {
       // Try cache first
       const cached = loadCachedLyrics(id)
-      if (cached) {
+
+      // Use cache if it has BPM data, otherwise refetch to get BPM
+      if (cached && cached.bpm !== null) {
         load(cached.lyrics)
         setLoadState({
           _tag: "Loaded",
@@ -201,10 +205,16 @@ export default function SongPage() {
         return
       }
 
+      // Prefer spotifyId from: URL param > cached > none
+      const resolvedSpotifyId = spotifyId ?? cached?.spotifyId
+
       // Fetch from API
       setLoadState({ _tag: "Loading" })
       try {
-        const response = await fetch(`/api/lyrics/${id}`, {
+        const url = resolvedSpotifyId
+          ? `/api/lyrics/${id}?spotifyId=${resolvedSpotifyId}`
+          : `/api/lyrics/${id}`
+        const response = await fetch(url, {
           signal: controller.signal,
         })
         const data: LyricsApiResponse = await response.json()
@@ -223,12 +233,13 @@ export default function SongPage() {
           albumArt: data.albumArt ?? null,
         })
 
-        // Cache lyrics
+        // Cache lyrics with spotifyId from API response (or URL param as fallback)
         saveCachedLyrics(id, {
           lyrics: data.lyrics,
           bpm: data.bpm,
           key: data.key,
           albumArt: data.albumArt ?? undefined,
+          spotifyId: data.spotifyId ?? spotifyId ?? undefined,
         })
 
         // Add to recents (without changing order)
@@ -253,7 +264,7 @@ export default function SongPage() {
     return () => {
       controller.abort()
     }
-  }, [lrclibId])
+  }, [lrclibId, spotifyId])
 
   // Mark song as played when playback starts (moves to top of recents)
   const hasMarkedAsPlayed = useRef(false)

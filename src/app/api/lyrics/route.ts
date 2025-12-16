@@ -1,8 +1,10 @@
 import {
   type BPMResult,
   deezerBpmProvider,
+  getBpmRace,
   getBpmWithFallback,
   getSongBpmProvider,
+  reccoBeatsProvider,
   withInMemoryCache,
 } from "@/lib/bpm"
 import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
@@ -17,6 +19,11 @@ import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
 
 const bpmProviders = [withInMemoryCache(getSongBpmProvider), withInMemoryCache(deezerBpmProvider)]
+const bpmRaceProviders = [
+  withInMemoryCache(reccoBeatsProvider),
+  withInMemoryCache(getSongBpmProvider),
+  withInMemoryCache(deezerBpmProvider),
+]
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -28,6 +35,7 @@ export async function GET(request: NextRequest) {
   const durationSeconds = parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined
   const id = searchParams.get("id")
   const skipBpm = searchParams.get("skipBpm") === "1"
+  const spotifyId = searchParams.get("spotifyId")
 
   if (id) {
     return NextResponse.json({ error: "Lookup by Spotify ID not yet implemented" }, { status: 501 })
@@ -51,9 +59,13 @@ export async function GET(request: NextRequest) {
     ),
   )
 
+  const bpmQuery = { title: track, artist, spotifyId: spotifyId ?? undefined }
   const bpmEffect: Effect.Effect<BPMResult | null> = skipBpm
     ? Effect.succeed(null)
-    : getBpmWithFallback(bpmProviders, { title: track, artist }).pipe(
+    : (spotifyId
+        ? getBpmRace(bpmRaceProviders, bpmQuery)
+        : getBpmWithFallback(bpmProviders, bpmQuery)
+      ).pipe(
         Effect.catchAll(error => {
           if (error._tag === "BPMAPIError") {
             console.error("BPM API error:", error.status, error.message)
@@ -98,9 +110,11 @@ export async function GET(request: NextRequest) {
     attribution: {
       lyrics: { name: "LRCLIB", url: "https://lrclib.net" },
       bpm: result.value.bpm
-        ? result.value.bpm.source === "Deezer"
-          ? { name: "Deezer", url: "https://www.deezer.com" }
-          : { name: "GetSongBPM", url: "https://getsongbpm.com" }
+        ? result.value.bpm.source === "ReccoBeats"
+          ? { name: "ReccoBeats", url: "https://reccobeats.com" }
+          : result.value.bpm.source === "Deezer"
+            ? { name: "Deezer", url: "https://www.deezer.com" }
+            : { name: "GetSongBPM", url: "https://getsongbpm.com" }
         : null,
     },
   }

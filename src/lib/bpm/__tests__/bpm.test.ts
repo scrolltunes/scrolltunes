@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { clearBpmCache, withInMemoryCache } from "../bpm-cache"
 import { BPMAPIError, BPMNotFoundError, BPMRateLimitError } from "../bpm-errors"
-import { type BPMProvider, getBpmWithFallback } from "../bpm-provider"
+import { type BPMProvider, getBpmRace, getBpmWithFallback } from "../bpm-provider"
 import type { BPMTrackQuery } from "../bpm-types"
 import { makeCacheKey, normalizeTrackKey } from "../bpm-types"
 import { deezerBpmProvider } from "../deezer-bpm-client"
@@ -164,6 +164,56 @@ describe("getBpmWithFallback", () => {
     const result = await Effect.runPromise(effect)
     expect(result.bpm).toBe(100)
     expect(result.source).toBe("Third")
+  })
+})
+
+describe("getBpmRace", () => {
+  test("returns first successful result", async () => {
+    const providers = [successProvider(120, "First"), successProvider(140, "Second")]
+    const effect = getBpmRace(providers, query)
+    const result = await Effect.runPromise(effect)
+    expect(result.bpm).toBeGreaterThan(0)
+  })
+
+  test("returns result from second provider if first fails with not found", async () => {
+    const providers = [notFoundProvider("ReccoBeats"), successProvider(140, "GetSongBPM")]
+    const effect = getBpmRace(providers, query)
+    const result = await Effect.runPromise(effect)
+    expect(result.bpm).toBe(140)
+    expect(result.source).toBe("GetSongBPM")
+  })
+
+  test("returns first successful result in order", async () => {
+    const providers = [successProvider(120, "First"), successProvider(140, "Second")]
+    const effect = getBpmRace(providers, query)
+    const result = await Effect.runPromise(effect)
+    expect(result.bpm).toBe(120)
+    expect(result.source).toBe("First")
+  })
+
+  test("succeeds if any provider succeeds (others fail)", async () => {
+    const providers = [
+      notFoundProvider("ReccoBeats"),
+      apiErrorProvider("Deezer"),
+      successProvider(100, "GetSongBPM"),
+    ]
+    const effect = getBpmRace(providers, query)
+    const result = await Effect.runPromise(effect)
+    expect(result.bpm).toBe(100)
+    expect(result.source).toBe("GetSongBPM")
+  })
+
+  test("fails with BPMNotFoundError when all providers fail", async () => {
+    const providers = [notFoundProvider("First"), notFoundProvider("Second")]
+    const effect = getBpmRace(providers, query)
+    const exit = await Effect.runPromiseExit(effect)
+    expect(exit._tag).toBe("Failure")
+  })
+
+  test("fails with BPMNotFoundError when no providers", async () => {
+    const effect = getBpmRace([], query)
+    const exit = await Effect.runPromiseExit(effect)
+    expect(exit._tag).toBe("Failure")
   })
 })
 

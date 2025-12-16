@@ -62,3 +62,36 @@ export function getBpmWithFallback(
       ),
     )
 }
+
+/**
+ * Race multiple providers concurrently, returning the first success.
+ *
+ * Uses Effect.firstSuccessOf to run all providers in parallel.
+ * Only fails if ALL providers fail.
+ */
+export function getBpmRace(
+  providers: readonly BPMProvider[],
+  query: BPMTrackQuery,
+): Effect.Effect<BPMResult, BPMError> {
+  if (providers.length === 0) {
+    return Effect.fail(
+      new BPMNotFoundError({
+        title: query.title,
+        artist: query.artist,
+      }),
+    )
+  }
+
+  const effects = providers.map(provider => provider.getBpm(query))
+
+  return Effect.firstSuccessOf(effects).pipe(
+    Effect.catchAll(() =>
+      Effect.fail(
+        new BPMNotFoundError({
+          title: query.title,
+          artist: query.artist,
+        }),
+      ),
+    ),
+  )
+}

@@ -18,9 +18,7 @@ const nowFeatures = [
   "Metronome",
 ]
 
-const nextFeatures = [
-  { title: "Auto tempo", description: "Scroll speed based on song BPM" },
-]
+const nextFeatures = [{ title: "Auto tempo", description: "Scroll speed based on song BPM" }]
 
 const laterFeatures = [
   { title: "Chord charts", description: "See chords alongside lyrics" },

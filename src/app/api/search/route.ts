@@ -1,6 +1,7 @@
 import { getAlbumArt } from "@/lib/deezer-client"
-import { LyricsAPIError, searchLRCLibTracks } from "@/lib/lyrics-client"
+import { LyricsAPIError, type LyricsError, searchLRCLibTracks } from "@/lib/lyrics-client"
 import type { SearchResultTrack } from "@/lib/search-api-types"
+import { formatArtists, getAlbumImageUrl, searchTracksEffect } from "@/lib/spotify-client"
 import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
 
@@ -25,6 +26,122 @@ function isStudioVersion(trackName: string, albumName: string | null): boolean {
   return !NON_STUDIO_PATTERNS.some(pattern => pattern.test(text))
 }
 
+function normalizeForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+interface SpotifyMatch {
+  readonly spotifyId: string
+  readonly albumArt: string | null
+}
+
+function findSpotifyMatch(
+  query: string,
+  trackName: string,
+  artistName: string,
+): Effect.Effect<SpotifyMatch | null, never> {
+  return searchTracksEffect(query, 10).pipe(
+    Effect.map(result => {
+      const normalizedTrack = normalizeForMatch(trackName)
+      const normalizedArtist = normalizeForMatch(artistName)
+
+      const match = result.tracks.items.find(track => {
+        const spotifyTrack = normalizeForMatch(track.name)
+        const spotifyArtist = normalizeForMatch(formatArtists(track.artists))
+        return spotifyTrack.includes(normalizedTrack) || normalizedTrack.includes(spotifyTrack)
+          ? spotifyArtist.includes(normalizedArtist) || normalizedArtist.includes(spotifyArtist)
+          : false
+      })
+
+      if (!match) return null
+      return {
+        spotifyId: match.id,
+        albumArt: getAlbumImageUrl(match.album, "small"),
+      }
+    }),
+    Effect.catchAll(() => Effect.succeed(null)),
+  )
+}
+
+function getAlbumArtRace(
+  artist: string,
+  track: string,
+  spotifyAlbumArt: string | null,
+): Effect.Effect<string | null, never> {
+  if (spotifyAlbumArt) {
+    return Effect.succeed(spotifyAlbumArt)
+  }
+
+  return Effect.tryPromise({
+    try: () => getAlbumArt(artist, track, "small"),
+    catch: () => null,
+  }).pipe(
+    Effect.map(art => art ?? null),
+    Effect.catchAll(() => Effect.succeed(null)),
+  )
+}
+
+function searchLRCLib(
+  query: string,
+  limit: number,
+): Effect.Effect<SearchResultTrack[], LyricsError> {
+  return Effect.gen(function* () {
+    const results = yield* searchLRCLibTracks(query)
+    const synced = results.filter(r => r.hasSyncedLyrics)
+
+    const sorted = [...synced].sort((a, b) => {
+      const aIsStudio = isStudioVersion(a.trackName, a.albumName)
+      const bIsStudio = isStudioVersion(b.trackName, b.albumName)
+      if (aIsStudio && !bIsStudio) return -1
+      if (!aIsStudio && bIsStudio) return 1
+      return 0
+    })
+
+    const seenIds = new Set<number>()
+    const uniqueTracks: typeof sorted = []
+
+    for (const r of sorted) {
+      if (seenIds.has(r.id)) continue
+      seenIds.add(r.id)
+      uniqueTracks.push(r)
+      if (uniqueTracks.length >= limit) break
+    }
+
+    const enrichedTracks = yield* Effect.all(
+      uniqueTracks.map(r =>
+        Effect.gen(function* () {
+          const searchQuery = `${r.trackName} ${r.artistName}`
+          const spotifyMatch = yield* findSpotifyMatch(searchQuery, r.trackName, r.artistName)
+          const albumArt = yield* getAlbumArtRace(
+            r.artistName,
+            r.trackName,
+            spotifyMatch?.albumArt ?? null,
+          )
+
+          return {
+            id: `lrclib-${r.id}`,
+            lrclibId: r.id,
+            spotifyId: spotifyMatch?.spotifyId,
+            name: r.trackName,
+            artist: r.artistName,
+            album: r.albumName ?? "",
+            albumArt: albumArt ?? undefined,
+            duration: r.duration * 1000,
+            hasLyrics: true,
+          } satisfies SearchResultTrack
+        }),
+      ),
+      { concurrency: 5 },
+    )
+
+    return enrichedTracks
+  })
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const query = searchParams.get("q")?.trim()
@@ -42,40 +159,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const effect = Effect.map(searchLRCLibTracks(query), results => {
-    const synced = results.filter(r => r.hasSyncedLyrics)
-
-    const sorted = [...synced].sort((a, b) => {
-      const aIsStudio = isStudioVersion(a.trackName, a.albumName)
-      const bIsStudio = isStudioVersion(b.trackName, b.albumName)
-      if (aIsStudio && !bIsStudio) return -1
-      if (!aIsStudio && bIsStudio) return 1
-      return 0
-    })
-
-    const seenIds = new Set<number>()
-    const tracks: SearchResultTrack[] = []
-
-    for (const r of sorted) {
-      if (seenIds.has(r.id)) continue
-      seenIds.add(r.id)
-      tracks.push({
-        id: `lrclib-${r.id}`,
-        lrclibId: r.id,
-        name: r.trackName,
-        artist: r.artistName,
-        album: r.albumName ?? "",
-        albumArt: undefined,
-        duration: r.duration * 1000,
-        hasLyrics: true,
-      })
-      if (tracks.length >= parsedLimit) break
-    }
-
-    return tracks
-  })
-
-  const result = await Effect.runPromiseExit(effect)
+  const result = await Effect.runPromiseExit(searchLRCLib(query, parsedLimit))
 
   if (result._tag === "Failure") {
     const cause = result.cause
@@ -93,23 +177,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Search failed" }, { status: 500 })
   }
 
-  const tracks = result.value
-
-  const MAX_ALBUM_ART = 5
-  const artResults = await Promise.allSettled(
-    tracks.map((t, i) =>
-      i < MAX_ALBUM_ART ? getAlbumArt(t.artist, t.name, "small") : Promise.resolve(null),
-    ),
-  )
-
-  const tracksWithArt = tracks.map((track, i) => ({
-    ...track,
-    albumArt:
-      artResults[i]?.status === "fulfilled" ? (artResults[i].value ?? undefined) : undefined,
-  }))
-
   return NextResponse.json(
-    { tracks: tracksWithArt },
+    { tracks: result.value },
     {
       headers: {
         "Cache-Control": "public, max-age=60",

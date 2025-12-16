@@ -6,10 +6,11 @@ export type { BPMError } from "./bpm-errors"
 export { BPMNotFoundError, BPMAPIError, BPMRateLimitError } from "./bpm-errors"
 
 export type { BPMProvider } from "./bpm-provider"
-export { getBpmWithFallback } from "./bpm-provider"
+export { getBpmWithFallback, getBpmRace } from "./bpm-provider"
 
 export { getSongBpmProvider } from "./getsongbpm-client"
 export { deezerBpmProvider } from "./deezer-bpm-client"
+export { reccoBeatsProvider } from "./reccobeats-client"
 
 export { getMockBpm, hasMockBpm, mockBpmProvider } from "./mock-bpm"
 

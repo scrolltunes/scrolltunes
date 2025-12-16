@@ -190,7 +190,7 @@ const withRetry = <T>(
   maxRetries = 3,
 ): Effect.Effect<T, SpotifyError> => {
   const loop = (attempt: number): Effect.Effect<T, SpotifyError> =>
-    Effect.catchTag(makeEffect(), "SpotifyRateLimitError", (error) => {
+    Effect.catchTag(makeEffect(), "SpotifyRateLimitError", error => {
       if (attempt >= maxRetries) {
         console.log(`[Spotify] Rate limit: max retries (${maxRetries}) exceeded`)
         return Effect.fail(error)

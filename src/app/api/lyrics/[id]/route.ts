@@ -1,21 +1,73 @@
 import {
   type BPMResult,
   deezerBpmProvider,
+  getBpmRace,
   getBpmWithFallback,
   getSongBpmProvider,
+  reccoBeatsProvider,
   withInMemoryCache,
 } from "@/lib/bpm"
 import { getAlbumArt } from "@/lib/deezer-client"
 import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
 import { LyricsAPIError, LyricsNotFoundError, getLyricsById } from "@/lib/lyrics-client"
+import { formatArtists, getAlbumImageUrl, searchTracksEffect } from "@/lib/spotify-client"
 import { Effect } from "effect"
 import { NextResponse } from "next/server"
 
 const bpmProviders = [withInMemoryCache(getSongBpmProvider), withInMemoryCache(deezerBpmProvider)]
+const bpmRaceProviders = [
+  withInMemoryCache(reccoBeatsProvider),
+  withInMemoryCache(getSongBpmProvider),
+  withInMemoryCache(deezerBpmProvider),
+]
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+function normalizeForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+interface SpotifyLookupResult {
+  readonly spotifyId: string
+  readonly albumArt: string | null
+}
+
+function lookupSpotifyId(
+  title: string,
+  artist: string,
+): Effect.Effect<SpotifyLookupResult | null, never> {
+  return searchTracksEffect(`${title} ${artist}`, 5).pipe(
+    Effect.map(result => {
+      const normalizedTitle = normalizeForMatch(title)
+      const normalizedArtist = normalizeForMatch(artist)
+
+      const match = result.tracks.items.find(track => {
+        const spotifyTitle = normalizeForMatch(track.name)
+        const spotifyArtist = normalizeForMatch(formatArtists(track.artists))
+        const titleMatch =
+          spotifyTitle.includes(normalizedTitle) || normalizedTitle.includes(spotifyTitle)
+        const artistMatch =
+          spotifyArtist.includes(normalizedArtist) || normalizedArtist.includes(spotifyArtist)
+        return titleMatch && artistMatch
+      })
+
+      if (!match) return null
+      return {
+        spotifyId: match.id,
+        albumArt: getAlbumImageUrl(match.album, "medium"),
+      }
+    }),
+    Effect.catchAll(() => Effect.succeed(null)),
+  )
+}
+
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: idParam } = await params
   const id = Number.parseInt(idParam, 10)
+  const url = new URL(request.url)
+  const spotifyId = url.searchParams.get("spotifyId")
 
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: "Invalid ID: must be a positive integer" }, { status: 400 })
@@ -25,23 +77,43 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const combinedEffect = lyricsEffect.pipe(
     Effect.flatMap(lyrics => {
-      const bpmEffect: Effect.Effect<BPMResult | null> = getBpmWithFallback(bpmProviders, {
-        title: lyrics.title,
-        artist: lyrics.artist,
-      }).pipe(
-        Effect.catchAll(error => {
-          if (error._tag === "BPMAPIError") {
-            console.error("BPM API error:", error.status, error.message)
-          }
-          return Effect.succeed(null)
-        }),
-        Effect.catchAllDefect(defect => {
-          console.error("BPM defect:", defect)
-          return Effect.succeed(null)
-        }),
-      )
+      const spotifyLookupEffect: Effect.Effect<SpotifyLookupResult | null, never> = spotifyId
+        ? Effect.succeed({ spotifyId, albumArt: null })
+        : lookupSpotifyId(lyrics.title, lyrics.artist)
 
-      return Effect.map(bpmEffect, bpm => ({ lyrics, bpm }))
+      return Effect.flatMap(spotifyLookupEffect, spotifyResult => {
+        const resolvedSpotifyId = spotifyResult?.spotifyId
+        const spotifyAlbumArt = spotifyResult?.albumArt ?? null
+
+        const bpmQuery = {
+          title: lyrics.title,
+          artist: lyrics.artist,
+          spotifyId: resolvedSpotifyId,
+        }
+        const bpmEffect: Effect.Effect<BPMResult | null> = (
+          resolvedSpotifyId
+            ? getBpmRace(bpmRaceProviders, bpmQuery)
+            : getBpmWithFallback(bpmProviders, bpmQuery)
+        ).pipe(
+          Effect.catchAll(error => {
+            if (error._tag === "BPMAPIError") {
+              console.error("BPM API error:", error.status, error.message)
+            }
+            return Effect.succeed(null)
+          }),
+          Effect.catchAllDefect(defect => {
+            console.error("BPM defect:", defect)
+            return Effect.succeed(null)
+          }),
+        )
+
+        return Effect.map(bpmEffect, bpm => ({
+          lyrics,
+          bpm,
+          spotifyAlbumArt,
+          resolvedSpotifyId,
+        }))
+      })
     }),
   )
 
@@ -66,21 +138,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Failed to fetch lyrics" }, { status: 502 })
   }
 
-  const { lyrics, bpm: bpmResult } = result.value
+  const { lyrics, bpm: bpmResult, spotifyAlbumArt, resolvedSpotifyId } = result.value
 
-  const albumArt = await getAlbumArt(lyrics.artist, lyrics.title, "medium")
+  const albumArt = spotifyAlbumArt ?? (await getAlbumArt(lyrics.artist, lyrics.title, "medium"))
 
   const body: LyricsApiSuccessResponse = {
     lyrics,
     bpm: bpmResult?.bpm ?? null,
     key: bpmResult?.key ?? null,
     albumArt: albumArt ?? null,
+    spotifyId: resolvedSpotifyId ?? null,
     attribution: {
       lyrics: { name: "LRCLIB", url: "https://lrclib.net" },
       bpm: bpmResult
-        ? bpmResult.source === "Deezer"
-          ? { name: "Deezer", url: "https://www.deezer.com" }
-          : { name: "GetSongBPM", url: "https://getsongbpm.com" }
+        ? bpmResult.source === "ReccoBeats"
+          ? { name: "ReccoBeats", url: "https://reccobeats.com" }
+          : bpmResult.source === "Deezer"
+            ? { name: "Deezer", url: "https://www.deezer.com" }
+            : { name: "GetSongBPM", url: "https://getsongbpm.com" }
         : null,
     },
   }

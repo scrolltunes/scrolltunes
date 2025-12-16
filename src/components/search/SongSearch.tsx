@@ -2,7 +2,7 @@
 
 import { springs } from "@/animations"
 import type { SearchApiResponse, SearchResultTrack } from "@/lib/search-api-types"
-import { extractLrclibId, makeCanonicalPath } from "@/lib/slug"
+import { makeCanonicalPath } from "@/lib/slug"
 import {
   CircleNotch,
   MagnifyingGlass,
@@ -15,6 +15,13 @@ import {
 import { AnimatePresence, motion } from "motion/react"
 import { useRouter } from "next/navigation"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
+
+interface VerifyResponse {
+  readonly found: boolean
+  readonly lrclibId?: number
+  readonly trackName?: string
+  readonly artistName?: string
+}
 
 export interface SongSearchProps {
   readonly onSelectTrack?: (track: SearchResultTrack) => void
@@ -59,9 +66,12 @@ export const SongSearch = memo(function SongSearch({
   const [isPending, setIsPending] = useState(false) // True immediately on typing
   const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  const [_verifyingTrackId, setVerifyingTrackId] = useState<string | null>(null)
+  const [_inlineMessage, setInlineMessage] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const cacheRef = useRef(new Map<string, SearchResultTrack[]>())
+  const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const searchTracks = useCallback(async (searchQuery: string) => {
     const trimmed = searchQuery.trim()
@@ -165,21 +175,75 @@ export const SongSearch = memo(function SongSearch({
     abortControllerRef.current?.abort()
   }, [])
 
+  const showInlineMessage = useCallback((message: string) => {
+    if (messageTimeoutRef.current) {
+      clearTimeout(messageTimeoutRef.current)
+    }
+    setInlineMessage(message)
+    messageTimeoutRef.current = setTimeout(() => {
+      setInlineMessage(null)
+    }, 4000)
+  }, [])
+
   const handleTrackClick = useCallback(
-    (track: SearchResultTrack) => {
-      const numericId = extractLrclibId(track.id)
-      if (numericId === null) {
-        onSelectTrack?.(track)
+    async (track: SearchResultTrack) => {
+      if (track.id.startsWith("spotify-")) {
+        if (!track.spotifyId) {
+          onSelectTrack?.(track)
+          return
+        }
+
+        setVerifyingTrackId(track.id)
+        setInlineMessage(null)
+
+        try {
+          const response = await fetch(
+            `/api/search/verify?title=${encodeURIComponent(track.name)}&artist=${encodeURIComponent(track.artist)}`,
+          )
+
+          if (!response.ok) {
+            throw new Error("Verification failed")
+          }
+
+          const data: VerifyResponse = await response.json()
+
+          if (data.found && data.lrclibId !== undefined) {
+            const canonicalPath = makeCanonicalPath({
+              id: data.lrclibId,
+              title: data.trackName ?? track.name,
+              artist: data.artistName ?? track.artist,
+            })
+            router.push(`${canonicalPath}?spotifyId=${track.spotifyId}`)
+          } else {
+            showInlineMessage("No synced lyrics available for this song")
+          }
+        } catch {
+          showInlineMessage("Unable to verify lyrics. Please try again")
+        } finally {
+          setVerifyingTrackId(null)
+        }
         return
       }
-      const canonicalPath = makeCanonicalPath({
-        id: numericId,
-        title: track.name,
-        artist: track.artist,
-      })
-      router.push(canonicalPath)
+
+      if (track.id.startsWith("lrclib-")) {
+        const numericId = Number(track.id.replace("lrclib-", ""))
+        if (!Number.isNaN(numericId)) {
+          const canonicalPath = makeCanonicalPath({
+            id: numericId,
+            title: track.name,
+            artist: track.artist,
+          })
+          const url = track.spotifyId
+            ? `${canonicalPath}?spotifyId=${track.spotifyId}`
+            : canonicalPath
+          router.push(url)
+          return
+        }
+      }
+
+      onSelectTrack?.(track)
     },
-    [router, onSelectTrack],
+    [router, onSelectTrack, showInlineMessage],
   )
 
   useEffect(() => {

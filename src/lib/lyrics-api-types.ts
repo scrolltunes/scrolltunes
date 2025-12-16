@@ -20,6 +20,7 @@ export interface LyricsApiSuccessResponse {
   readonly bpm: number | null
   readonly key: string | null
   readonly albumArt?: string | null
+  readonly spotifyId?: string | null
   readonly attribution: LyricsApiAttribution
 }
 
