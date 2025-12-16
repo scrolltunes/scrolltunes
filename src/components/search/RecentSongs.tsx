@@ -5,6 +5,7 @@ import {
   recentSongsStore,
   useAlbumArtLoadingIds,
   useExpectedRecentsCount,
+  useIsRecentsInitialized,
   useIsRecentsLoading,
   useRecentSongs,
 } from "@/core"
@@ -23,10 +24,11 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
   const recents = useRecentSongs()
   const loadingAlbumArtIds = useAlbumArtLoadingIds()
   const isLoading = useIsRecentsLoading()
+  const isInitialized = useIsRecentsInitialized()
   const expectedCount = useExpectedRecentsCount()
   const router = useRouter()
 
-  const skeletonCount = expectedCount !== null ? Math.min(expectedCount, MAX_RECENT_SONGS) : 0
+  const skeletonCount = expectedCount !== null && expectedCount > 0 ? Math.min(expectedCount, MAX_RECENT_SONGS) : 0
 
   const handleClick = useCallback(
     (song: { id: number; title: string; artist: string }) => {
@@ -68,24 +70,7 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
         )}
       </div>
 
-      {isLoading && recents.length === 0 && expectedCount !== null && expectedCount > 0 ? (
-        <ul className="space-y-2" aria-label="Loading recently played songs">
-          {Array.from({ length: skeletonCount }, (_, i) => (
-            <li
-              key={i}
-              className="flex items-center gap-3 p-3 rounded-xl bg-neutral-900 animate-pulse"
-            >
-              <div className="w-10 h-10 rounded-lg bg-neutral-800" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 w-32 bg-neutral-800 rounded" />
-                <div className="h-3 w-24 bg-neutral-800 rounded" />
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : recents.length === 0 ? (
-        <p className="text-sm text-neutral-500">No recently played songs</p>
-      ) : (
+      {recents.length > 0 ? (
         <ul className="space-y-2" aria-label="Recently played songs">
           {recents.map(song => {
             const isLoadingAlbumArt = loadingAlbumArtIds.has(song.id)
@@ -116,6 +101,26 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
             )
           })}
         </ul>
+      ) : !isInitialized ? (
+        // Still initializing - show nothing until we know the count
+        null
+      ) : isLoading && skeletonCount > 0 ? (
+        <ul className="space-y-2" aria-label="Loading recently played songs">
+          {Array.from({ length: skeletonCount }, (_, i) => (
+            <li
+              key={i}
+              className="flex items-center gap-3 p-3 rounded-xl bg-neutral-900 animate-pulse"
+            >
+              <div className="w-10 h-10 rounded-lg bg-neutral-800" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-32 bg-neutral-800 rounded" />
+                <div className="h-3 w-24 bg-neutral-800 rounded" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-neutral-500">No recently played songs</p>
       )}
     </div>
   )

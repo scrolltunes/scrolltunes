@@ -359,6 +359,8 @@ class RecentSongsStore {
           key: data.key ?? null,
           albumArt: albumArt ?? undefined,
           spotifyId: data.spotifyId ?? undefined,
+          bpmSource: data.attribution?.bpm ?? undefined,
+          lyricsSource: data.attribution?.lyrics ?? undefined,
         })
 
         if (albumArt) {
