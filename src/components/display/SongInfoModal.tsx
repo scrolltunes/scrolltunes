@@ -79,11 +79,7 @@ export function SongInfoModal({
               <div className="mb-4 flex gap-4 pr-8">
                 {albumArt && (
                   <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-neutral-800">
-                    <img
-                      src={albumArt}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={albumArt} alt="" className="h-full w-full object-cover" />
                   </div>
                 )}
                 <div className="min-w-0">

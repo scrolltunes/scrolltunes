@@ -14,22 +14,65 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "ScrollTunes",
+  title: {
+    default: "ScrollTunes — Live Lyrics Teleprompter for Musicians",
+    template: "%s | ScrollTunes",
+  },
   description:
-    "Live lyrics teleprompter for musicians. Voice-triggered scrolling, hands-free control.",
-  metadataBase: new URL("https://scrolltunes.vercel.app"),
+    "Live lyrics teleprompter for musicians. Voice-activated scrolling syncs lyrics to your performance. Hands-free, distraction-free.",
+  keywords: [
+    "lyrics teleprompter",
+    "live lyrics",
+    "singing teleprompter",
+    "musician tools",
+    "karaoke",
+    "song lyrics",
+    "hands-free lyrics",
+    "voice activated",
+  ],
+  authors: [{ name: "ScrollTunes" }],
+  creator: "ScrollTunes",
+  metadataBase: new URL("https://scrolltunes.com"),
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
-    title: "ScrollTunes",
+    title: "ScrollTunes — Live Lyrics Teleprompter",
     description:
-      "Live lyrics teleprompter for musicians. Voice-triggered scrolling, hands-free control.",
+      "Voice-activated scrolling syncs lyrics to your performance. Hands-free, distraction-free.",
     siteName: "ScrollTunes",
     type: "website",
+    locale: "en_US",
+    url: "https://scrolltunes.com",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "ScrollTunes — Live Lyrics Teleprompter for Musicians",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ScrollTunes",
+    title: "ScrollTunes — Live Lyrics Teleprompter",
     description:
-      "Live lyrics teleprompter for musicians. Voice-triggered scrolling, hands-free control.",
+      "Voice-activated scrolling syncs lyrics to your performance. Hands-free, distraction-free.",
+    site: "@ScrollTunes",
+    creator: "@ScrollTunes",
+    images: ["/og-image.png"],
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  manifest: "/manifest.json",
+  other: {
+    "msapplication-TileColor": "#0a0a0a",
   },
 }
 
