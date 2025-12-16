@@ -12,6 +12,7 @@ export interface LyricLineProps {
   readonly index: number
   readonly fontSize?: number
   readonly innerRef?: (el: HTMLButtonElement | null) => void
+  readonly duration?: number | undefined
 }
 
 /**
@@ -25,6 +26,7 @@ export const LyricLine = memo(function LyricLine({
   index,
   fontSize,
   innerRef,
+  duration,
 }: LyricLineProps) {
   // Empty lines render as spacing
   if (!text.trim()) {
@@ -44,12 +46,29 @@ export const LyricLine = memo(function LyricLine({
       aria-current={isActive ? "true" : undefined}
       aria-label={`Line ${index + 1}: ${text}`}
     >
-      <span
-        className={`relative z-10 block ${textSizeClass} font-medium leading-relaxed ${textColorClass} transition-colors duration-300`}
-        style={fontSize !== undefined ? { fontSize: `${fontSize}px` } : undefined}
-      >
-        {text}
-      </span>
+      {isActive && duration !== undefined ? (
+        <span
+          className={`relative z-10 block ${textSizeClass} font-medium leading-relaxed transition-colors duration-300`}
+          style={fontSize !== undefined ? { fontSize: `${fontSize}px` } : undefined}
+        >
+          <span className="text-neutral-500">{text}</span>
+          <motion.span
+            className="absolute inset-0 text-white"
+            initial={{ clipPath: "inset(0 100% 0 0)" }}
+            animate={{ clipPath: "inset(0 0% 0 0)" }}
+            transition={{ duration, ease: "linear" }}
+          >
+            {text}
+          </motion.span>
+        </span>
+      ) : (
+        <span
+          className={`relative z-10 block ${textSizeClass} font-medium leading-relaxed ${textColorClass} transition-colors duration-300`}
+          style={fontSize !== undefined ? { fontSize: `${fontSize}px` } : undefined}
+        >
+          {text}
+        </span>
+      )}
 
       <AnimatePresence>
         {isActive && (

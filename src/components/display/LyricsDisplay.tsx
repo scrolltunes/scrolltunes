@@ -222,20 +222,28 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
         animate={{ y: -scrollY }}
         transition={{ type: "tween", duration: 0.5, ease: "easeOut" }}
       >
-        {lyrics.lines.map((line, index) => (
-          <LyricLine
-            key={line.id}
-            text={line.text}
-            isActive={index === activeLineIndex}
-            isPast={index < activeLineIndex}
-            onClick={() => handleLineClick(index)}
-            index={index}
-            fontSize={fontSize}
-            innerRef={el => {
-              lineRefs.current[index] = el
-            }}
-          />
-        ))}
+        {lyrics.lines.map((line, index) => {
+          const isActive = index === activeLineIndex
+          const duration = isActive
+            ? (lyrics.lines[index + 1]?.startTime ?? lyrics.duration) - line.startTime
+            : undefined
+
+          return (
+            <LyricLine
+              key={line.id}
+              text={line.text}
+              isActive={isActive}
+              isPast={index < activeLineIndex}
+              onClick={() => handleLineClick(index)}
+              index={index}
+              fontSize={fontSize}
+              innerRef={el => {
+                lineRefs.current[index] = el
+              }}
+              {...(duration !== undefined && { duration })}
+            />
+          )
+        })}
       </motion.div>
     </div>
   )
