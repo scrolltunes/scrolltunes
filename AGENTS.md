@@ -2,6 +2,8 @@
 
 Live lyrics teleprompter for musicians. Detects singing voice and syncs scrolling lyrics.
 
+**Domain:** https://scrolltunes.com
+
 **In this house, we use bun.** All package management and script execution should use `bun` commands, not `npm` or `node`.
 
 **Do not commit unless explicitly asked.** Never run `git commit` or `git push` unless the user explicitly requests it. This is critical — no exceptions.

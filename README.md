@@ -23,6 +23,7 @@ Live musicians need lyrics on stage, but traditional karaoke apps require playin
 ### Core
 - **Voice-triggered sync** — Microphone detects vocal onset and starts scrolling
 - **Synced lyrics** — Timestamped lyrics from LRCLIB scroll at the song's tempo
+- **Voice search** — Say a song name to search hands-free (requires sign-in)
 - **Click-to-seek** — Tap any line to jump to that position
 - **Manual scroll override** — Swipe to take control, auto-scroll resumes after 3 seconds
 
@@ -192,6 +193,7 @@ See [docs/architecture.md](docs/architecture.md) for details.
 - ✅ Mobile-optimized UI
 - ✅ Hands-free gestures
 - ✅ Recent songs & caching
+- ✅ Voice search (Google Speech-to-Text)
 
 ### V2 (Planned)
 - Karaoke mode (large text, word highlighting)

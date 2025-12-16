@@ -9,6 +9,7 @@ import Link from "next/link"
 const benefits = [
   "Sync favorites and history across devices",
   "Create and manage setlists",
+  "Voice search — say a song name to find it",
   "Keep your preferences everywhere",
 ]
 

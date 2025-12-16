@@ -260,13 +260,14 @@
 - [ ] Implement real-time sync
 - [ ] Add host controls
 
-### Voice Search
-- [ ] **Design doc**: [docs/voice-search-design.md](docs/voice-search-design.md)
-- [ ] Phase 1: Backend streaming to Google STT (Chirp 3)
-- [ ] Phase 2: SpeechRecognitionStore + client streaming
-- [ ] Phase 3: Integrate with VoiceActivityStore for auto-stop
-- [ ] Phase 4: UI integration with SongSearch
-- [ ] Phase 5: Polish, error handling, accessibility
+### Voice Search ✅
+- [x] **Design doc**: [docs/voice-search-design.md](docs/voice-search-design.md)
+- [x] Phase 1: Backend transcription via Google STT V2 (latest_short model)
+- [x] Phase 2: SpeechRecognitionStore + audio capture (MediaRecorder)
+- [x] Phase 3: Integrate with VoiceActivityStore for auto-stop on 2s silence
+- [x] Phase 4: UI integration with SongSearch (mic button with VAD animation)
+- [x] Phase 5: Quota tracking, error handling, usage alerts
+- [ ] Use named recognizer instead of `_` to enable `audio_durations` metric for Google Cloud monitoring
 
 ### Advanced Features
 - [x] Metronome mode (UI for existing `SoundSystem.playMetronomeTick`)

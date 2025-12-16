@@ -110,6 +110,12 @@ export default function AboutPage() {
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
                 <p className="text-neutral-300">Quickly reopen recently played songs</p>
               </div>
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
+                <p className="text-neutral-300">
+                  Voice search to find songs hands-free (sign in required)
+                </p>
+              </div>
             </div>
           </section>
 
