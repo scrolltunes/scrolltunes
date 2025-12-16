@@ -8,18 +8,26 @@ import { accountStore } from "./AccountStore"
 
 const STORAGE_KEY = "scrolltunes:recents"
 
+interface RecentSongsState {
+  readonly recents: readonly RecentSong[]
+  readonly isLoading: boolean
+  readonly isInitialized: boolean
+  readonly expectedCount: number | null
+  readonly loadingAlbumArtIds: ReadonlySet<number>
+}
+
+const EMPTY_STATE: RecentSongsState = {
+  recents: [],
+  isLoading: false,
+  isInitialized: false,
+  expectedCount: null,
+  loadingAlbumArtIds: new Set(),
+}
+
 class RecentSongsStore {
   private listeners = new Set<() => void>()
-  private albumArtListeners = new Set<() => void>()
-  private syncListeners = new Set<() => void>()
-  private initializedListeners = new Set<() => void>()
-  private expectedCountListeners = new Set<() => void>()
-  private state: readonly RecentSong[] = []
-  private loadingAlbumArtIds = new Set<number>()
-  private isSyncingFromServer = false
-  private isInitializedState = false
+  private state: RecentSongsState = { ...EMPTY_STATE }
   private hadLocalCache = false
-  private expectedCount: number | null = null
 
   constructor() {
     this.loadFromStorage()
@@ -34,7 +42,7 @@ class RecentSongsStore {
     return () => this.listeners.delete(listener)
   }
 
-  getSnapshot = (): readonly RecentSong[] => this.state
+  getSnapshot = (): RecentSongsState => this.state
 
   private notify(): void {
     for (const listener of this.listeners) {
@@ -42,85 +50,36 @@ class RecentSongsStore {
     }
   }
 
-  private notifyAlbumArtListeners(): void {
-    for (const listener of this.albumArtListeners) {
-      listener()
-    }
+  private updateState(partial: Partial<RecentSongsState>): void {
+    this.state = { ...this.state, ...partial }
+    this.notify()
   }
-
-  subscribeAlbumArt = (listener: () => void): (() => void) => {
-    this.albumArtListeners.add(listener)
-    return () => this.albumArtListeners.delete(listener)
-  }
-
-  getAlbumArtLoadingSnapshot = (): ReadonlySet<number> => this.loadingAlbumArtIds
 
   setLoadingAlbumArt(id: number, loading: boolean): void {
+    const current = this.state.loadingAlbumArtIds
+    const next = new Set(current)
     if (loading) {
-      this.loadingAlbumArtIds.add(id)
+      next.add(id)
     } else {
-      this.loadingAlbumArtIds.delete(id)
+      next.delete(id)
     }
-    this.loadingAlbumArtIds = new Set(this.loadingAlbumArtIds)
-    this.notifyAlbumArtListeners()
+    this.updateState({ loadingAlbumArtIds: next })
   }
 
   isLoadingAlbumArt(id: number): boolean {
-    return this.loadingAlbumArtIds.has(id)
-  }
-
-  subscribeSyncing = (listener: () => void): (() => void) => {
-    this.syncListeners.add(listener)
-    return () => this.syncListeners.delete(listener)
-  }
-
-  getSyncingSnapshot = (): boolean => this.isSyncingFromServer
-
-  private notifySyncListeners(): void {
-    for (const listener of this.syncListeners) {
-      listener()
-    }
+    return this.state.loadingAlbumArtIds.has(id)
   }
 
   setSyncing(syncing: boolean): void {
-    this.isSyncingFromServer = syncing
-    this.notifySyncListeners()
-  }
-
-  subscribeInitialized = (listener: () => void): (() => void) => {
-    this.initializedListeners.add(listener)
-    return () => this.initializedListeners.delete(listener)
-  }
-
-  getInitializedSnapshot = (): boolean => this.isInitializedState
-
-  private notifyInitializedListeners(): void {
-    for (const listener of this.initializedListeners) {
-      listener()
-    }
+    this.updateState({ isLoading: syncing })
   }
 
   setInitialized(initialized: boolean): void {
-    this.isInitializedState = initialized
-    this.notifyInitializedListeners()
-  }
-
-  subscribeExpectedCount = (listener: () => void): (() => void) => {
-    this.expectedCountListeners.add(listener)
-    return () => this.expectedCountListeners.delete(listener)
-  }
-
-  getExpectedCountSnapshot = (): number | null => this.expectedCount
-
-  private notifyExpectedCountListeners(): void {
-    for (const listener of this.expectedCountListeners) {
-      listener()
-    }
+    this.updateState({ isInitialized: initialized })
   }
 
   setExpectedCount(count: number): void {
-    this.expectedCount = count
-    this.notifyExpectedCountListeners()
+    this.updateState({ expectedCount: count })
   }
 
   private loadFromStorage(): void {
@@ -131,10 +90,11 @@ class RecentSongsStore {
       if (stored) {
         const parsed = JSON.parse(stored) as readonly RecentSong[]
         if (Array.isArray(parsed) && parsed.length > 0) {
-          this.state = [...parsed]
+          const recents = [...parsed]
             .sort((a, b) => b.lastPlayedAt - a.lastPlayedAt)
             .slice(0, MAX_RECENT_SONGS)
           this.hadLocalCache = true
+          this.state = { ...this.state, recents, isInitialized: true }
         }
       }
     } catch {
@@ -146,16 +106,15 @@ class RecentSongsStore {
     if (typeof window === "undefined") return
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state.recents))
     } catch {
       // Failed to save to localStorage
     }
   }
 
-  private setState(updater: (prev: readonly RecentSong[]) => readonly RecentSong[]): void {
-    this.state = updater(this.state)
+  private setRecents(updater: (prev: readonly RecentSong[]) => readonly RecentSong[]): void {
+    this.updateState({ recents: updater(this.state.recents) })
     this.saveToStorage()
-    this.notify()
   }
 
   private async syncToServer(song: RecentSong): Promise<void> {
@@ -176,7 +135,7 @@ class RecentSongsStore {
    * Add or update a song in recents (moves to top if exists)
    */
   upsertRecent(song: Omit<RecentSong, "lastPlayedAt"> & { lastPlayedAt?: number }): void {
-    this.setState(prev => {
+    this.setRecents(prev => {
       const existing = prev.find(s => s.id === song.id)
       const filtered = prev.filter(s => s.id !== song.id)
       const newSong: RecentSong = {
@@ -187,7 +146,7 @@ class RecentSongsStore {
       return [newSong, ...filtered].slice(0, MAX_RECENT_SONGS)
     })
 
-    const fullSong = this.state.find(s => s.id === song.id)
+    const fullSong = this.state.recents.find(s => s.id === song.id)
     if (fullSong) {
       this.syncToServer(fullSong)
     }
@@ -199,11 +158,10 @@ class RecentSongsStore {
    * If the song doesn't exist yet, adds it to the front.
    */
   updateMetadata(song: Omit<RecentSong, "lastPlayedAt">): void {
-    this.setState(prev => {
+    this.setRecents(prev => {
       const existingIndex = prev.findIndex(s => s.id === song.id)
 
       if (existingIndex >= 0) {
-        // Update in place without reordering
         const existing = prev[existingIndex]
         if (!existing) return prev
         const updated: RecentSong = {
@@ -214,7 +172,6 @@ class RecentSongsStore {
         return [...prev.slice(0, existingIndex), updated, ...prev.slice(existingIndex + 1)]
       }
 
-      // Song not in list - add to front with current timestamp
       const newSong: RecentSong = {
         ...song,
         lastPlayedAt: Date.now(),
@@ -227,7 +184,7 @@ class RecentSongsStore {
    * Move an existing song to the top of the list (mark as played)
    */
   markAsPlayed(id: number): void {
-    this.setState(prev => {
+    this.setRecents(prev => {
       const existing = prev.find(s => s.id === id)
       if (!existing) return prev
 
@@ -239,7 +196,7 @@ class RecentSongsStore {
       return [updated, ...filtered]
     })
 
-    const song = this.state.find(s => s.id === id)
+    const song = this.state.recents.find(s => s.id === id)
     if (song) {
       this.syncToServer(song)
     }
@@ -249,7 +206,7 @@ class RecentSongsStore {
    * Get a specific recent song by ID
    */
   getRecent(id: number): RecentSong | undefined {
-    return this.state.find(s => s.id === id)
+    return this.state.recents.find(s => s.id === id)
   }
 
   /**
@@ -263,22 +220,22 @@ class RecentSongsStore {
         // Server delete failed, still clear localStorage
       }
     }
-    this.setState(() => [])
+    this.setRecents(() => [])
   }
 
   /**
    * Remove a specific song from recents
    */
   remove(id: number): void {
-    this.setState(prev => prev.filter(s => s.id !== id))
+    this.setRecents(prev => prev.filter(s => s.id !== id))
   }
 
   async syncAllToServer(): Promise<void> {
     if (!accountStore.isAuthenticated()) return
-    if (this.state.length === 0) return
+    if (this.state.recents.length === 0) return
 
     try {
-      const items = this.state.map(recentSongToHistorySyncItem)
+      const items = this.state.recents.map(recentSongToHistorySyncItem)
       await syncHistory(items)
       accountStore.setLastSyncAt(new Date())
     } catch {
@@ -323,9 +280,8 @@ class RecentSongsStore {
       })
       .filter((s): s is RecentSong => s !== null)
 
-    this.state = recentSongs.slice(0, MAX_RECENT_SONGS)
+    this.updateState({ recents: recentSongs.slice(0, MAX_RECENT_SONGS) })
     this.saveToStorage()
-    this.notify()
 
     if (songsNeedingAlbumArt.length > 0) {
       this.fetchAlbumArtInBackground(songsNeedingAlbumArt)
@@ -364,7 +320,7 @@ class RecentSongsStore {
         })
 
         if (albumArt) {
-          this.setState(prev =>
+          this.setRecents(prev =>
             prev.map(song =>
               song.id === id
                 ? {
@@ -388,16 +344,16 @@ class RecentSongsStore {
 
 export const recentSongsStore = new RecentSongsStore()
 
-// Stable empty array for SSR fallback (must be cached to avoid infinite loop)
-const EMPTY_RECENTS: readonly RecentSong[] = []
-
-// React hooks
-export function useRecentSongs(): readonly RecentSong[] {
+export function useRecentSongsState(): RecentSongsState {
   return useSyncExternalStore(
     recentSongsStore.subscribe,
     recentSongsStore.getSnapshot,
-    () => EMPTY_RECENTS,
+    () => EMPTY_STATE,
   )
+}
+
+export function useRecentSongs(): readonly RecentSong[] {
+  return useRecentSongsState().recents
 }
 
 export function useRecentSong(id: number): RecentSong | undefined {
@@ -405,44 +361,24 @@ export function useRecentSong(id: number): RecentSong | undefined {
   return recents.find(s => s.id === id)
 }
 
-// Stable empty set for SSR fallback
-const EMPTY_LOADING_SET: ReadonlySet<number> = new Set()
-
 export function useAlbumArtLoadingIds(): ReadonlySet<number> {
-  return useSyncExternalStore(
-    recentSongsStore.subscribeAlbumArt,
-    recentSongsStore.getAlbumArtLoadingSnapshot,
-    () => EMPTY_LOADING_SET,
-  )
+  return useRecentSongsState().loadingAlbumArtIds
 }
 
 export function useIsLoadingAlbumArt(id: number): boolean {
-  const loadingIds = useAlbumArtLoadingIds()
-  return loadingIds.has(id)
+  return useRecentSongsState().loadingAlbumArtIds.has(id)
 }
 
 export function useIsRecentsLoading(): boolean {
-  return useSyncExternalStore(
-    recentSongsStore.subscribeSyncing,
-    recentSongsStore.getSyncingSnapshot,
-    () => false,
-  )
+  return useRecentSongsState().isLoading
 }
 
 export function useIsRecentsInitialized(): boolean {
-  return useSyncExternalStore(
-    recentSongsStore.subscribeInitialized,
-    recentSongsStore.getInitializedSnapshot,
-    () => false,
-  )
+  return useRecentSongsState().isInitialized
 }
 
 export function useExpectedRecentsCount(): number | null {
-  return useSyncExternalStore(
-    recentSongsStore.subscribeExpectedCount,
-    recentSongsStore.getExpectedCountSnapshot,
-    () => null,
-  )
+  return useRecentSongsState().expectedCount
 }
 
-export type { RecentSong }
+export type { RecentSong, RecentSongsState }

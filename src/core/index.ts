@@ -67,6 +67,7 @@ export {
 
 export {
   recentSongsStore,
+  useRecentSongsState,
   useRecentSongs,
   useRecentSong,
   useAlbumArtLoadingIds,
@@ -75,6 +76,7 @@ export {
   useIsRecentsInitialized,
   useExpectedRecentsCount,
   type RecentSong,
+  type RecentSongsState,
 } from "./RecentSongsStore"
 
 export {

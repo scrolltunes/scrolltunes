@@ -14,45 +14,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
     async function initAndSync() {
       const hasCache = recentSongsStore.hasLoadedFromCache()
 
-      // If we have cached items, mark as initialized immediately so they show
-      if (hasCache) {
-        recentSongsStore.setInitialized(true)
-      }
-
       await accountStore.initialize()
 
       const isAuth = accountStore.isAuthenticated()
 
       if (!isAuth) {
-        // Not authenticated - mark initialized and done
-        recentSongsStore.setInitialized(true)
+        if (!hasCache) {
+          recentSongsStore.setInitialized(true)
+        }
         return
       }
 
-      // Authenticated - start spinning immediately while we probe for count
       if (!hasCache) {
         recentSongsStore.setSyncing(true)
       }
 
-      // Fetch count first to determine skeleton size
       try {
         const countResponse = await fetch("/api/user/history/count")
         if (countResponse.ok) {
           const { count } = (await countResponse.json()) as { count: number }
           recentSongsStore.setExpectedCount(count)
 
-          // Allow skeleton/empty state to show now that we know the count
-          recentSongsStore.setInitialized(true)
+          if (!hasCache) {
+            recentSongsStore.setInitialized(true)
+          }
 
-          // If no items, stop syncing early
           if (count === 0) {
             recentSongsStore.setSyncing(false)
             return
           }
         }
       } catch {
-        // Failed to fetch count, continue anyway
-        recentSongsStore.setInitialized(true)
+        if (!hasCache) {
+          recentSongsStore.setInitialized(true)
+        }
       }
 
       await recentSongsStore.syncAllToServer()
@@ -66,7 +61,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Failed to fetch server history
       } finally {
         recentSongsStore.setSyncing(false)
-        recentSongsStore.setInitialized(true)
       }
     }
 
