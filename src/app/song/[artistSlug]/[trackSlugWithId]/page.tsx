@@ -2,7 +2,7 @@
 
 import { springs } from "@/animations"
 import { FloatingMetronome, FontSizeControl, VoiceIndicator } from "@/components/audio"
-import { LyricsDisplay } from "@/components/display"
+import { LyricsDisplay, SongInfoModal } from "@/components/display"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import {
   type Lyrics,
@@ -29,10 +29,12 @@ import {
   ArrowCounterClockwise,
   ArrowLeft,
   Gear,
+  Info,
   MusicNote,
   Pause,
   Play,
   SpinnerGap,
+  Warning,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
@@ -48,7 +50,10 @@ type LoadState =
       readonly _tag: "Loaded"
       readonly lyrics: Lyrics
       readonly bpm: number | null
+      readonly key: string | null
       readonly albumArt: string | null
+      readonly spotifyId: string | null
+      readonly bpmSource: string | null
     }
 
 const errorMessages: Record<ErrorType, { title: string; description: string }> = {
@@ -72,6 +77,7 @@ export default function SongPage() {
   const spotifyId = searchParams.get("spotifyId")
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
   const [showSettings, setShowSettings] = useState(false)
+  const [showInfo, setShowInfo] = useState(false)
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
@@ -191,7 +197,10 @@ export default function SongPage() {
           _tag: "Loaded",
           lyrics: cached.lyrics,
           bpm: cached.bpm,
+          key: cached.key ?? null,
           albumArt: cached.albumArt ?? null,
+          spotifyId: cached.spotifyId ?? null,
+          bpmSource: cached.bpmSource ?? null,
         })
 
         recentSongsStore.updateMetadata({
@@ -230,7 +239,10 @@ export default function SongPage() {
           _tag: "Loaded",
           lyrics: data.lyrics,
           bpm: data.bpm,
+          key: data.key,
           albumArt: data.albumArt ?? null,
+          spotifyId: data.spotifyId ?? spotifyId ?? null,
+          bpmSource: data.attribution?.bpm?.name ?? null,
         })
 
         // Cache lyrics with spotifyId from API response (or URL param as fallback)
@@ -240,6 +252,7 @@ export default function SongPage() {
           key: data.key,
           albumArt: data.albumArt ?? undefined,
           spotifyId: data.spotifyId ?? spotifyId ?? undefined,
+          bpmSource: data.attribution?.bpm?.name ?? undefined,
         })
 
         // Add to recents (without changing order)
@@ -441,6 +454,23 @@ export default function SongPage() {
                     >
                       <Gear size={20} />
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowInfo(true)}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                        loadState.bpm
+                          ? "bg-neutral-800 hover:bg-neutral-700"
+                          : "bg-amber-500/20 hover:bg-amber-500/30"
+                      }`}
+                      aria-label={loadState.bpm ? "Song info" : "Song info - BPM missing"}
+                    >
+                      {loadState.bpm ? (
+                        <Info size={20} />
+                      ) : (
+                        <Warning size={20} className="text-amber-500" />
+                      )}
+                    </button>
                   </div>
                 )}
               </div>
@@ -470,6 +500,20 @@ export default function SongPage() {
           )}
         </AnimatePresence>
       </main>
+
+      {loadState._tag === "Loaded" && (
+        <SongInfoModal
+          isOpen={showInfo}
+          onClose={() => setShowInfo(false)}
+          title={loadState.lyrics.title}
+          artist={loadState.lyrics.artist}
+          duration={loadState.lyrics.duration}
+          bpm={loadState.bpm}
+          musicalKey={loadState.key}
+          spotifyId={loadState.spotifyId}
+          bpmSource={loadState.bpmSource}
+        />
+      )}
     </div>
   )
 }
