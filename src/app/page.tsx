@@ -2,7 +2,7 @@
 
 import { RecentSongs, SongSearch } from "@/components/search"
 import { Attribution, Logo } from "@/components/ui"
-import { GearSix } from "@phosphor-icons/react"
+import { GearSix, Info } from "@phosphor-icons/react"
 import Link from "next/link"
 
 export default function Home() {
@@ -17,13 +17,22 @@ export default function Home() {
             </span>
           </div>
 
-          <Link
-            href="/settings"
-            className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-            aria-label="Settings"
-          >
-            <GearSix size={20} />
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/about"
+              className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+              aria-label="About"
+            >
+              <Info size={20} />
+            </Link>
+            <Link
+              href="/settings"
+              className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+              aria-label="Settings"
+            >
+              <GearSix size={20} />
+            </Link>
+          </div>
         </div>
       </header>
 

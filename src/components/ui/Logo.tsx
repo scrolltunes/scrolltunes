@@ -42,8 +42,24 @@ export function Logo({ size = 24, className, ...props }: LogoProps) {
         />
 
         {/* Lyrics lines */}
-        <rect x="-25" y="-25" width="50" height="4" rx="2" fill="url(#logoGradient)" opacity="0.8" />
-        <rect x="-25" y="-14" width="40" height="4" rx="2" fill="url(#logoGradient)" opacity="0.8" />
+        <rect
+          x="-25"
+          y="-25"
+          width="50"
+          height="4"
+          rx="2"
+          fill="url(#logoGradient)"
+          opacity="0.8"
+        />
+        <rect
+          x="-25"
+          y="-14"
+          width="40"
+          height="4"
+          rx="2"
+          fill="url(#logoGradient)"
+          opacity="0.8"
+        />
         <rect x="-25" y="-3" width="45" height="4" rx="2" fill="currentColor" />
         <rect x="-25" y="8" width="35" height="4" rx="2" fill="url(#logoGradient)" opacity="0.8" />
         <rect x="-25" y="19" width="42" height="4" rx="2" fill="url(#logoGradient)" opacity="0.7" />

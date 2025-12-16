@@ -385,9 +385,7 @@ export default function SongPage() {
               )}
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-sm font-medium truncate">{songTitle}</span>
-                <span className="text-xs text-neutral-500 truncate">
-                  {loadState.lyrics.artist}
-                </span>
+                <span className="text-xs text-neutral-500 truncate">{loadState.lyrics.artist}</span>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">

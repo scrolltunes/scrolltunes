@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, EnvelopeSimple, XLogo } from "@phosphor-icons/react"
+import { ArrowLeft, ArrowRight, EnvelopeSimple, XLogo } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import Link from "next/link"
 
@@ -40,6 +40,25 @@ export default function AboutPage() {
             </div>
           </section>
 
+          {/* Roadmap */}
+          <section>
+            <Link
+              href="/roadmap"
+              className="block p-4 bg-neutral-900 rounded-xl hover:bg-neutral-800 transition-colors group"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-white">Roadmap</div>
+                  <div className="text-sm text-neutral-400 mt-1">See what's coming next</div>
+                </div>
+                <ArrowRight
+                  size={20}
+                  className="text-neutral-500 group-hover:text-neutral-300 transition-colors"
+                />
+              </div>
+            </Link>
+          </section>
+
           {/* How it works */}
           <section>
             <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
@@ -61,11 +80,15 @@ export default function AboutPage() {
             <div className="p-4 bg-neutral-900 rounded-xl space-y-3">
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Detect voice activity to start scrolling automatically</p>
+                <p className="text-neutral-300">
+                  Detect voice activity to start scrolling automatically
+                </p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Adjust scroll speed with tempo controls or keyboard</p>
+                <p className="text-neutral-300">
+                  Adjust scroll speed with tempo controls or keyboard
+                </p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />

@@ -199,14 +199,7 @@
 - [x] Create recent songs list on home page
 - [x] Cache lyrics and BPM data locally (7-day TTL)
 - [x] Add "clear history" option
-- [ ] Save playback position on pause/leave
-- [ ] Resume from last position on song revisit
 
-### Favorites
-- [ ] Add heart/star button to save favorites
-- [ ] Store favorites in localStorage
-- [ ] Create favorites list view
-- [ ] Quick-access from home page
 
 ### Per-Song Settings
 - [x] Persist tempo per song (via useTempoPreference)
@@ -257,7 +250,7 @@
 - [ ] Phase 5: Polish, error handling, accessibility
 
 ### Advanced Features
-- [ ] Metronome mode (UI for existing `SoundSystem.playMetronomeTick`)
+- [x] Metronome mode (UI for existing `SoundSystem.playMetronomeTick`)
 - [ ] Word-level detection (Smart Sync) - requires ML-based VAD
 - [ ] Karaoke playback (instrumental tracks)
 - [ ] Voice commands (beyond search)
@@ -290,11 +283,11 @@
 
 **Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs partial)
 
-**Active:** Resume from position, BPM→scroll integration, Code Cleanup
+**Active:** BPM→scroll integration, Code Cleanup
 
 **Blocked:** Nothing
 
-**Next:** Resume playback position, Favorites, Distraction-free mode wiring
+**Next:** Distraction-free mode wiring
 
 ---
 
