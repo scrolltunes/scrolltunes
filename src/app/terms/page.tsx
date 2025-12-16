@@ -40,36 +40,89 @@ export default function TermsOfService() {
           <section>
             <h2 className="mb-4 text-2xl font-semibold">Privacy and Data</h2>
             <p className="mb-4 leading-relaxed text-neutral-300">
-              ScrollTunes is designed with privacy in mind:
+              ScrollTunes operates with a two-tier privacy model:
             </p>
-            <ul className="list-disc space-y-2 pl-6 text-neutral-300">
+            <h3 className="mb-2 text-lg font-medium text-neutral-200">Anonymous Use</h3>
+            <p className="mb-4 leading-relaxed text-neutral-300">
+              You can use ScrollTunes without creating an account. When used anonymously:
+            </p>
+            <ul className="mb-6 list-disc space-y-2 pl-6 text-neutral-300">
               <li>
-                <strong>No account required</strong> — Use the service immediately without
-                registration
-              </li>
-              <li>
-                <strong>No server-side data retention</strong> — We do not store any user data on
-                our servers
+                <strong>No server-side data storage</strong> — We do not store any user data on our
+                servers
               </li>
               <li>
                 <strong>Local storage only</strong> — Preferences and cached lyrics are stored in
                 your browser
               </li>
               <li>
-                <strong>Microphone privacy</strong> — Voice detection runs locally; audio is never
-                recorded, transmitted, or stored
-              </li>
-              <li>
                 <strong>No tracking</strong> — We do not use analytics, tracking cookies, or collect
                 personal information
               </li>
+              <li>
+                <strong>Microphone privacy</strong> — Voice detection runs locally; audio is never
+                recorded, transmitted, or stored
+              </li>
             </ul>
-            <p className="mt-4 leading-relaxed text-neutral-300">
+            <h3 className="mb-2 text-lg font-medium text-neutral-200">Account Holders</h3>
+            <p className="mb-4 leading-relaxed text-neutral-300">
+              If you choose to create an account, you consent to the collection and processing of
+              your data as described in our{" "}
+              <Link href="/privacy" className="text-blue-400 underline hover:text-blue-300">
+                Privacy Policy
+              </Link>
+              , including server-side storage, analytics, and third-party processing.
+            </p>
+            <p className="leading-relaxed text-neutral-300">
               For complete details, see our{" "}
               <Link href="/privacy" className="text-blue-400 underline hover:text-blue-300">
                 Privacy Policy
               </Link>
               .
+            </p>
+          </section>
+
+          <section>
+            <h2 className="mb-4 text-2xl font-semibold">Accounts</h2>
+            <p className="mb-4 leading-relaxed text-neutral-300">
+              You are not required to create an account to use ScrollTunes. The core functionality
+              is available to all users without registration.
+            </p>
+            <h3 className="mb-2 text-lg font-medium text-neutral-200">Creating an Account</h3>
+            <p className="mb-4 leading-relaxed text-neutral-300">
+              By creating an account, you agree to:
+            </p>
+            <ul className="mb-6 list-disc space-y-2 pl-6 text-neutral-300">
+              <li>The collection and processing of your data as described in our Privacy Policy</li>
+              <li>The use of cookies for authentication and analytics</li>
+              <li>Processing of your data by third-party services (analytics, AI features)</li>
+            </ul>
+            <p className="mb-6 leading-relaxed text-neutral-300">
+              You are responsible for maintaining the confidentiality of your login credentials and
+              for any activity that occurs under your account.
+            </p>
+            <h3 className="mb-2 text-lg font-medium text-neutral-200">Account Termination</h3>
+            <p className="mb-4 leading-relaxed text-neutral-300">
+              We may suspend or terminate your account if you:
+            </p>
+            <ul className="mb-6 list-disc space-y-2 pl-6 text-neutral-300">
+              <li>Violate these Terms of Service</li>
+              <li>Engage in abuse, fraud, or activities that harm other users</li>
+              <li>Create security risks for ScrollTunes or its users</li>
+            </ul>
+            <p className="mb-4 leading-relaxed text-neutral-300">
+              You may delete your account at any time from the app&apos;s settings. Deleting your
+              account will remove your personal data from our systems, as described in our{" "}
+              <Link href="/privacy" className="text-blue-400 underline hover:text-blue-300">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+            <h3 className="mb-2 text-lg font-medium text-neutral-200">Data and Privacy</h3>
+            <p className="leading-relaxed text-neutral-300">
+              Account creation requires explicit consent to our data collection practices. Anonymous
+              use of ScrollTunes does not require any such consent and involves no server-side data
+              storage or tracking.
             </p>
           </section>
 

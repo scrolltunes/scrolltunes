@@ -4,9 +4,12 @@ import { springs } from "@/animations"
 import { FloatingMetronome, FontSizeControl, VoiceIndicator } from "@/components/audio"
 import { FloatingInfoButton, LyricsDisplay, SongInfoModal } from "@/components/display"
 import { useFooterSlot } from "@/components/layout/FooterContext"
+import { AddToSetlistModal } from "@/components/setlists"
+import { FavoriteButton } from "@/components/ui"
 import {
   type Lyrics,
   recentSongsStore,
+  useIsAuthenticated,
   usePlayerControls,
   usePlayerState,
   usePreferences,
@@ -32,6 +35,7 @@ import {
   MusicNote,
   Pause,
   Play,
+  Plus,
   SpinnerGap,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
@@ -76,11 +80,13 @@ export default function SongPage() {
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
   const [showSettings, setShowSettings] = useState(false)
   const [showInfo, setShowInfo] = useState(false)
+  const [showAddToSetlist, setShowAddToSetlist] = useState(false)
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
   const preferences = usePreferences()
   const { setSlot } = useFooterSlot()
+  const isAuthenticated = useIsAuthenticated()
 
   const { isListening, isSpeaking, level, startListening, stopListening } = useVoiceTrigger({
     autoPlay: true,
@@ -419,6 +425,27 @@ export default function SongPage() {
                   size="sm"
                 />
 
+                {lrclibId !== null && (
+                  <FavoriteButton
+                    songId={lrclibId}
+                    title={loadState.lyrics.title}
+                    artist={loadState.lyrics.artist}
+                    {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
+                    size="sm"
+                  />
+                )}
+
+                {isAuthenticated && lrclibId !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddToSetlist(true)}
+                    className="w-8 h-8 rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 flex items-center justify-center transition-colors"
+                    aria-label="Add to setlist"
+                  >
+                    <Plus size={20} className="text-neutral-400" />
+                  </button>
+                )}
+
                 {isReady && (
                   <div className="flex items-center gap-2">
                     <button
@@ -499,6 +526,18 @@ export default function SongPage() {
           spotifyId={loadState.spotifyId}
           bpmSource={loadState.bpmSource}
           albumArt={loadState.albumArt}
+        />
+      )}
+
+      {loadState._tag === "Loaded" && lrclibId !== null && (
+        <AddToSetlistModal
+          isOpen={showAddToSetlist}
+          onClose={() => setShowAddToSetlist(false)}
+          song={{
+            songId: lrclibId,
+            title: loadState.lyrics.title,
+            artist: loadState.lyrics.artist,
+          }}
         />
       )}
     </div>

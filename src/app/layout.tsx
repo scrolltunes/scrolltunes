@@ -1,3 +1,4 @@
+import { AuthProvider } from "@/components/auth"
 import { DevTitle, Footer, FooterProvider, ThemeProvider } from "@/components/layout"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
@@ -84,13 +85,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ThemeProvider>
-          <FooterProvider>
-            <DevTitle />
-            {children}
-            <Footer />
-          </FooterProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <FooterProvider>
+              <DevTitle />
+              {children}
+              <Footer />
+            </FooterProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   )

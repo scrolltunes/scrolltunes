@@ -1,13 +1,18 @@
 "use client"
 
+import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { MAX_RECENT_SONGS, type RecentSong } from "@/lib/recent-songs-types"
+import { recentSongToHistorySyncItem, syncHistory } from "@/lib/sync-service"
 import { useSyncExternalStore } from "react"
+import { accountStore } from "./AccountStore"
 
 const STORAGE_KEY = "scrolltunes:recents"
 
 class RecentSongsStore {
   private listeners = new Set<() => void>()
+  private albumArtListeners = new Set<() => void>()
   private state: readonly RecentSong[] = []
+  private loadingAlbumArtIds = new Set<number>()
 
   constructor() {
     this.loadFromStorage()
@@ -26,6 +31,33 @@ class RecentSongsStore {
     }
   }
 
+  private notifyAlbumArtListeners(): void {
+    for (const listener of this.albumArtListeners) {
+      listener()
+    }
+  }
+
+  subscribeAlbumArt = (listener: () => void): (() => void) => {
+    this.albumArtListeners.add(listener)
+    return () => this.albumArtListeners.delete(listener)
+  }
+
+  getAlbumArtLoadingSnapshot = (): ReadonlySet<number> => this.loadingAlbumArtIds
+
+  setLoadingAlbumArt(id: number, loading: boolean): void {
+    if (loading) {
+      this.loadingAlbumArtIds.add(id)
+    } else {
+      this.loadingAlbumArtIds.delete(id)
+    }
+    this.loadingAlbumArtIds = new Set(this.loadingAlbumArtIds)
+    this.notifyAlbumArtListeners()
+  }
+
+  isLoadingAlbumArt(id: number): boolean {
+    return this.loadingAlbumArtIds.has(id)
+  }
+
   private loadFromStorage(): void {
     if (typeof window === "undefined") return
 
@@ -40,7 +72,7 @@ class RecentSongsStore {
         }
       }
     } catch {
-      console.warn("Failed to load recent songs from localStorage")
+      // Failed to load from localStorage
     }
   }
 
@@ -50,7 +82,7 @@ class RecentSongsStore {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state))
     } catch {
-      console.warn("Failed to save recent songs to localStorage")
+      // Failed to save to localStorage
     }
   }
 
@@ -58,6 +90,20 @@ class RecentSongsStore {
     this.state = updater(this.state)
     this.saveToStorage()
     this.notify()
+  }
+
+  private async syncToServer(song: RecentSong): Promise<void> {
+    if (!accountStore.isAuthenticated()) {
+      return
+    }
+
+    try {
+      const item = recentSongToHistorySyncItem(song)
+      await syncHistory([item])
+      accountStore.setLastSyncAt(new Date())
+    } catch {
+      // Failed to sync song to server
+    }
   }
 
   /**
@@ -74,6 +120,11 @@ class RecentSongsStore {
       }
       return [newSong, ...filtered].slice(0, MAX_RECENT_SONGS)
     })
+
+    const fullSong = this.state.find(s => s.id === song.id)
+    if (fullSong) {
+      this.syncToServer(fullSong)
+    }
   }
 
   /**
@@ -121,6 +172,11 @@ class RecentSongsStore {
       }
       return [updated, ...filtered]
     })
+
+    const song = this.state.find(s => s.id === id)
+    if (song) {
+      this.syncToServer(song)
+    }
   }
 
   /**
@@ -143,6 +199,116 @@ class RecentSongsStore {
   remove(id: number): void {
     this.setState(prev => prev.filter(s => s.id !== id))
   }
+
+  async syncAllToServer(): Promise<void> {
+    if (!accountStore.isAuthenticated()) return
+    if (this.state.length === 0) return
+
+    try {
+      const items = this.state.map(recentSongToHistorySyncItem)
+      await syncHistory(items)
+      accountStore.setLastSyncAt(new Date())
+    } catch {
+      // Failed to sync all songs to server
+    }
+  }
+
+  replaceFromServer(
+    songs: Array<{
+      songId: string
+      songProvider: string
+      title: string
+      artist: string
+      lastPlayedAt: string | null
+      playCount: number
+    }>,
+  ): void {
+    const songsNeedingAlbumArt: number[] = []
+
+    const recentSongs: RecentSong[] = songs
+      .map(s => {
+        const numericId = Number.parseInt(s.songId.replace("lrclib:", ""), 10)
+        if (Number.isNaN(numericId)) return null
+
+        const cached = loadCachedLyrics(numericId)
+        const albumArt = cached?.albumArt
+
+        if (!albumArt) {
+          songsNeedingAlbumArt.push(numericId)
+        }
+
+        const song: RecentSong = {
+          id: numericId,
+          title: s.title,
+          artist: s.artist,
+          album: "",
+          albumArt,
+          durationSeconds: cached?.lyrics.duration ?? 0,
+          lastPlayedAt: s.lastPlayedAt ? new Date(s.lastPlayedAt).getTime() : Date.now(),
+        }
+        return song
+      })
+      .filter((s): s is RecentSong => s !== null)
+
+    this.state = recentSongs.slice(0, MAX_RECENT_SONGS)
+    this.saveToStorage()
+    this.notify()
+
+    if (songsNeedingAlbumArt.length > 0) {
+      this.fetchAlbumArtInBackground(songsNeedingAlbumArt)
+    }
+  }
+
+  private async fetchAlbumArtInBackground(songIds: number[]): Promise<void> {
+    for (const id of songIds) {
+      this.setLoadingAlbumArt(id, true)
+    }
+
+    const fetchPromises = songIds.map(async id => {
+      try {
+        const response = await fetch(`/api/lyrics/${id}`)
+        if (!response.ok) {
+          this.setLoadingAlbumArt(id, false)
+          return
+        }
+
+        const data = await response.json()
+        if (!data.lyrics) {
+          this.setLoadingAlbumArt(id, false)
+          return
+        }
+
+        const albumArt = data.albumArt as string | null | undefined
+
+        saveCachedLyrics(id, {
+          lyrics: data.lyrics,
+          bpm: data.bpm ?? null,
+          key: data.key ?? null,
+          albumArt: albumArt ?? undefined,
+          spotifyId: data.spotifyId ?? undefined,
+        })
+
+        if (albumArt) {
+          this.setState(prev =>
+            prev.map(song =>
+              song.id === id
+                ? {
+                    ...song,
+                    albumArt,
+                    durationSeconds: data.lyrics.duration ?? song.durationSeconds,
+                  }
+                : song,
+            ),
+          )
+        }
+        this.setLoadingAlbumArt(id, false)
+      } catch {
+        this.setLoadingAlbumArt(id, false)
+      }
+    })
+
+    await Promise.allSettled(fetchPromises)
+  }
 }
 
 export const recentSongsStore = new RecentSongsStore()
@@ -162,6 +328,22 @@ export function useRecentSongs(): readonly RecentSong[] {
 export function useRecentSong(id: number): RecentSong | undefined {
   const recents = useRecentSongs()
   return recents.find(s => s.id === id)
+}
+
+// Stable empty set for SSR fallback
+const EMPTY_LOADING_SET: ReadonlySet<number> = new Set()
+
+export function useAlbumArtLoadingIds(): ReadonlySet<number> {
+  return useSyncExternalStore(
+    recentSongsStore.subscribeAlbumArt,
+    recentSongsStore.getAlbumArtLoadingSnapshot,
+    () => EMPTY_LOADING_SET,
+  )
+}
+
+export function useIsLoadingAlbumArt(id: number): boolean {
+  const loadingIds = useAlbumArtLoadingIds()
+  return loadingIds.has(id)
 }
 
 export type { RecentSong }

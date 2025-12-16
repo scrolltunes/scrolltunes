@@ -118,28 +118,72 @@ export default function AboutPage() {
             <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
               Privacy First
             </h2>
-            <div className="p-4 bg-neutral-900 rounded-xl space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">No account required — use immediately</p>
+            <div className="space-y-4">
+              {/* Without an account */}
+              <div className="p-4 bg-neutral-900 rounded-xl space-y-3">
+                <h3 className="text-sm font-medium text-neutral-400">Without an account</h3>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
+                  <p className="text-neutral-300">
+                    No server-side data storage — everything stays in your browser
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
+                  <p className="text-neutral-300">No cookies, no tracking, no analytics</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
+                  <p className="text-neutral-300">
+                    Microphone used for voice detection only — never recorded
+                  </p>
+                </div>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">No server-side data storage</p>
+
+              {/* With an account */}
+              <div className="p-4 bg-neutral-900 rounded-xl space-y-3">
+                <h3 className="text-sm font-medium text-neutral-400">With an account</h3>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />
+                  <p className="text-neutral-300">
+                    We store your songs, favorites, and setlists to sync across devices
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />
+                  <p className="text-neutral-300">
+                    We use analytics to improve ScrollTunes (you consent when signing up)
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />
+                  <p className="text-neutral-300">We use a session cookie to keep you logged in</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />
+                  <p className="text-neutral-300">
+                    Microphone is still never recorded — voice detection runs locally
+                  </p>
+                </div>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">
-                  Microphone used for voice detection only — never recorded
-                </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">All data stays in your browser (localStorage)</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">No tracking, no analytics, no cookies</p>
+
+              {/* Always */}
+              <div className="p-4 bg-neutral-900 rounded-xl space-y-3">
+                <h3 className="text-sm font-medium text-neutral-400">Always</h3>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
+                  <p className="text-neutral-300">No advertising or marketing trackers</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
+                  <p className="text-neutral-300">No selling of your data</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
+                  <p className="text-neutral-300">
+                    You control your data — export or delete anytime
+                  </p>
+                </div>
               </div>
             </div>
           </section>

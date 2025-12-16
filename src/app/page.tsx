@@ -1,5 +1,6 @@
 "use client"
 
+import { UserMenu } from "@/components/auth"
 import { RecentSongs, SongSearch } from "@/components/search"
 import { Attribution, Logo } from "@/components/ui"
 import { GearSix, Info } from "@phosphor-icons/react"
@@ -32,6 +33,7 @@ export default function Home() {
             >
               <GearSix size={20} />
             </Link>
+            <UserMenu />
           </div>
         </div>
       </header>

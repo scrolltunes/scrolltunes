@@ -1,18 +1,25 @@
 "use client"
 
-import { type ThemeMode, preferencesStore, usePreferences } from "@/core"
+import { type ThemeMode, preferencesStore, useAccount, usePreferences } from "@/core"
 import {
   ArrowCounterClockwise,
   ArrowLeft,
   DeviceMobile,
+  DownloadSimple,
   Eye,
   Hand,
   Moon,
+  SignOut,
   Timer,
+  Trash,
+  User,
+  Warning,
 } from "@phosphor-icons/react"
 import { motion } from "motion/react"
+import { signOut } from "next-auth/react"
+import Image from "next/image"
 import Link from "next/link"
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 
 interface ToggleProps {
   enabled: boolean
@@ -100,6 +107,224 @@ function SliderSetting({
   )
 }
 
+interface DeleteAccountModalProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
+  const [confirmText, setConfirmText] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleDelete = useCallback(async () => {
+    if (confirmText !== "DELETE") return
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch("/api/user/delete", { method: "POST" })
+      if (response.ok) {
+        await signOut({ callbackUrl: "/" })
+      }
+    } catch {
+      setIsDeleting(false)
+    }
+  }, [confirmText])
+
+  const handleClose = useCallback(() => {
+    setConfirmText("")
+    onClose()
+  }, [onClose])
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md bg-neutral-900 rounded-2xl p-6"
+      >
+        <div className="flex items-center gap-3 mb-4 text-red-400">
+          <Warning size={24} weight="duotone" />
+          <h2 className="text-lg font-semibold">Delete Account</h2>
+        </div>
+
+        <p className="text-neutral-300 mb-4">
+          This action is permanent and cannot be undone. All your data will be deleted.
+        </p>
+
+        <p className="text-sm text-neutral-400 mb-2">
+          Type <span className="font-mono text-red-400">DELETE</span> to confirm:
+        </p>
+
+        <input
+          type="text"
+          value={confirmText}
+          onChange={e => setConfirmText(e.target.value)}
+          placeholder="DELETE"
+          className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-red-500 mb-4"
+          autoComplete="off"
+        />
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="flex-1 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={confirmText !== "DELETE" || isDeleting}
+            className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-500 disabled:bg-neutral-700 disabled:text-neutral-500 rounded-xl text-white transition-colors"
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+function AccountSection() {
+  const account = useAccount()
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+
+  const handleExportData = useCallback(async () => {
+    const link = document.createElement("a")
+    link.href = "/api/user/export"
+    link.download = "scrolltunes-data.json"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }, [])
+
+  const handleSignOut = useCallback(async () => {
+    await signOut({ callbackUrl: "/" })
+  }, [])
+
+  if (account.isLoading) {
+    return (
+      <section>
+        <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+          Account
+        </h2>
+        <div className="p-4 bg-neutral-900 rounded-xl">
+          <div className="animate-pulse flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-neutral-800" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-24 bg-neutral-800 rounded" />
+              <div className="h-3 w-32 bg-neutral-800 rounded" />
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  if (!account.isAuthenticated) {
+    return (
+      <section>
+        <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+          Account
+        </h2>
+        <div className="p-4 bg-neutral-900 rounded-xl">
+          <div className="flex flex-col items-center text-center py-4">
+            <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center mb-3 text-indigo-400">
+              <User size={24} weight="duotone" />
+            </div>
+            <div className="font-medium mb-1">Sign in to sync</div>
+            <div className="text-sm text-neutral-400 mb-4">
+              Sync your history and favorites across devices
+            </div>
+            <Link
+              href="/login"
+              className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-full text-white font-medium transition-colors"
+            >
+              Sign in
+              <ArrowLeft size={16} className="rotate-180" />
+            </Link>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  const providerName = "Google"
+
+  return (
+    <>
+      <section>
+        <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+          Account
+        </h2>
+        <div className="bg-neutral-900 rounded-xl overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-center gap-4">
+              {account.user?.image ? (
+                <Image
+                  src={account.user.image}
+                  alt=""
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-full"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center text-indigo-400">
+                  <User size={24} weight="duotone" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{account.user?.name ?? "User"}</div>
+                <div className="text-sm text-neutral-400 truncate">{account.user?.email}</div>
+                <div className="text-xs text-neutral-500 mt-0.5">Signed in with {providerName}</div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={handleExportData}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm font-medium transition-colors"
+              >
+                <DownloadSimple size={18} />
+                Export my data
+              </button>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm font-medium transition-colors"
+              >
+                <SignOut size={18} />
+                Sign out
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-neutral-800 p-4">
+            <div className="text-sm font-medium text-red-400 mb-3">Danger Zone</div>
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-red-950/50 hover:bg-red-900/50 border border-red-900/50 rounded-xl text-red-400 text-sm font-medium transition-colors"
+            >
+              <Trash size={18} />
+              Delete my account
+            </button>
+            <div className="text-xs text-neutral-500 mt-2">
+              Permanently delete your account and all data
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <DeleteAccountModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} />
+    </>
+  )
+}
+
 export default function SettingsPage() {
   const preferences = usePreferences()
 
@@ -158,6 +383,9 @@ export default function SettingsPage() {
           transition={{ duration: 0.3 }}
           className="space-y-8"
         >
+          {/* Account Section */}
+          <AccountSection />
+
           {/* Appearance Section */}
           <section>
             <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">

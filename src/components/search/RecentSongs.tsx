@@ -1,6 +1,7 @@
 "use client"
 
-import { recentSongsStore, useRecentSongs } from "@/core"
+import { AlbumArtSkeleton } from "@/components/ui"
+import { recentSongsStore, useAlbumArtLoadingIds, useRecentSongs } from "@/core"
 import { makeCanonicalPath } from "@/lib/slug"
 import { ClockCounterClockwise, MusicNote, Trash } from "@phosphor-icons/react"
 import { useRouter } from "next/navigation"
@@ -12,6 +13,7 @@ export interface RecentSongsProps {
 
 export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentSongsProps) {
   const recents = useRecentSongs()
+  const loadingAlbumArtIds = useAlbumArtLoadingIds()
   const router = useRouter()
 
   const handleClick = useCallback(
@@ -49,6 +51,7 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
 
       <ul className="space-y-2" aria-label="Recently played songs">
         {recents.map(song => {
+          const isLoadingAlbumArt = loadingAlbumArtIds.has(song.id)
           return (
             <li key={song.id}>
               <button
@@ -58,7 +61,9 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
                 aria-label={`${song.title} by ${song.artist}`}
               >
                 <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
-                  {song.albumArt ? (
+                  {isLoadingAlbumArt ? (
+                    <AlbumArtSkeleton />
+                  ) : song.albumArt ? (
                     <img src={song.albumArt} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <MusicNote size={20} weight="fill" className="text-neutral-600" />

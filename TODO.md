@@ -283,6 +283,76 @@
 
 ---
 
+## Phase 9: User Accounts
+
+> **Spec:** [docs/user-accounts-spec.md](docs/user-accounts-spec.md)
+
+### Infrastructure
+- [x] Add Auth.js (NextAuth v5) with Drizzle adapter
+- [x] Set up Vercel Postgres database
+- [x] Configure Drizzle ORM with schema
+- [x] Create database migrations (via drizzle-kit push)
+- [x] Add Google OAuth provider
+- [ ] Add Spotify OAuth provider (deferred until production HTTPS)
+- [x] Create token encryption utilities
+
+### Database Schema
+- [x] Create `app_user_profiles` table
+- [x] Create `user_song_items` table (history + favorites + play count)
+- [x] Create `user_song_settings` table
+- [x] Create `user_setlists` table
+- [x] Create `user_setlist_songs` junction table
+- [x] Create `user_spotify_tokens` table (encrypted)
+
+### API Routes
+- [x] `/api/auth/[...nextauth]` - Auth.js handlers
+- [x] `/api/user/me` - Get user profile
+- [x] `/api/user/history/sync` - Sync song history
+- [ ] `/api/user/history` DELETE - Clear history
+- [x] `/api/user/favorites/sync` - Sync favorites
+- [x] `/api/user/favorites/[songId]` DELETE - Remove favorite
+- [ ] `/api/user/song-settings` GET/POST - Per-song settings
+- [x] `/api/user/setlists` GET/POST - List/create setlists
+- [x] `/api/user/setlists/[id]` GET/PATCH/DELETE - Setlist CRUD
+- [x] `/api/user/setlists/[id]/songs` - Add/remove/reorder songs
+- [x] `/api/user/export` - GDPR data export (JSON)
+- [x] `/api/user/delete` - Account deletion
+
+### Client Integration
+- [x] Create `AccountStore` with useSyncExternalStore
+- [x] Implement localStorage → server merge on first login
+- [x] Add ongoing sync for song plays and favorites
+- [ ] Handle offline mode gracefully
+
+### UI Components
+- [ ] Create feature comparison screen (Free vs Account) — A/B test
+- [x] Create `/login` page with consent flow
+- [ ] Redesign login page to be less dry (more visual, welcoming)
+- [ ] Fix user avatar size to match other header icons visually
+- [ ] Display attribution for fetched song info (album art source, etc.)
+- [x] Add user avatar/sign-in button to header
+- [x] Add "Account & Sync" section to Settings page
+- [x] Create export data flow
+- [x] Create delete account flow with confirmation
+- [ ] Add "Sign in to sync" prompt (optional, non-intrusive)
+- [ ] Create setlists management UI (create, edit, delete)
+- [ ] Add "Add to setlist" action on song pages
+- [ ] Create setlist view with drag-to-reorder
+
+### Legal Updates
+- [x] Update Privacy Policy with "Accounts and Synced Data" section
+- [x] Update Terms of Service with "Accounts" section
+- [x] Add Cookie Policy section
+- [x] Update About page "Privacy First" section
+
+### Security & Compliance
+- [ ] Implement rate limiting on user endpoints
+- [x] Add Spotify token encryption at rest
+- [x] GDPR: Verify complete data export
+- [x] GDPR: Verify complete data deletion
+
+---
+
 ## V3 Features (Future)
 
 ### Spotify Integration
@@ -300,13 +370,16 @@
 
 > Update this section with what you're currently working on
 
-**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs partial)
+**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs partial), Phase 9 (mostly complete)
 
-**Active:** BPM→scroll integration, Code Cleanup
+**Active:** Phase 9 remaining items:
+- API: `/api/user/history` DELETE, `/api/user/song-settings` GET/POST
+- UI: Setlist detail page with drag-to-reorder, feature comparison screen, login page redesign
+- Infra: Rate limiting, Spotify OAuth (needs production HTTPS), offline mode
 
-**Blocked:** Nothing
+**Blocked:** Spotify OAuth requires production HTTPS
 
-**Next:** Distraction-free mode wiring
+**Next:** Setlist detail page (/setlists/[id]) with song list and reordering
 
 ---
 
