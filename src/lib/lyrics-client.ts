@@ -94,7 +94,12 @@ export const getLyrics = (
     })
 
     const response = yield* Effect.tryPromise({
-      try: () => fetch(`${LRCLIB_BASE_URL}/get?${params.toString()}`, { headers }),
+      try: () =>
+        fetch(`${LRCLIB_BASE_URL}/get?${params.toString()}`, {
+          headers,
+          cache: "force-cache",
+          next: { revalidate: 600 },
+        }),
       catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
     })
 
@@ -142,7 +147,12 @@ export const getLyricsCached = (
     })
 
     const response = yield* Effect.tryPromise({
-      try: () => fetch(`${LRCLIB_BASE_URL}/get-cached?${params.toString()}`, { headers }),
+      try: () =>
+        fetch(`${LRCLIB_BASE_URL}/get-cached?${params.toString()}`, {
+          headers,
+          cache: "force-cache",
+          next: { revalidate: 600 },
+        }),
       catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
     })
 
@@ -195,7 +205,12 @@ export const searchLRCLibTracks = (
     const params = new URLSearchParams({ q: query })
 
     const response = yield* Effect.tryPromise({
-      try: () => fetch(`${LRCLIB_BASE_URL}/search?${params.toString()}`, { headers }),
+      try: () =>
+        fetch(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
+          headers,
+          cache: "force-cache",
+          next: { revalidate: 600 },
+        }),
       catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
     })
 
@@ -242,7 +257,12 @@ export const searchLyrics = (
     }
 
     const response = yield* Effect.tryPromise({
-      try: () => fetch(`${LRCLIB_BASE_URL}/search?${params.toString()}`, { headers }),
+      try: () =>
+        fetch(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
+          headers,
+          cache: "force-cache",
+          next: { revalidate: 600 },
+        }),
       catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
     })
 
@@ -281,7 +301,12 @@ export const searchLyrics = (
 export const getLyricsById = (id: number): Effect.Effect<Lyrics, LyricsError> => {
   return Effect.gen(function* () {
     const response = yield* Effect.tryPromise({
-      try: () => fetch(`${LRCLIB_BASE_URL}/get/${id}`, { headers }),
+      try: () =>
+        fetch(`${LRCLIB_BASE_URL}/get/${id}`, {
+          headers,
+          cache: "force-cache",
+          next: { revalidate: 600 },
+        }),
       catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
     })
 

@@ -4,6 +4,27 @@ import type { SearchResultTrack } from "@/lib/search-api-types"
 import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
 
+const NON_STUDIO_PATTERNS = [
+  /\bremaster(ed)?\b/i,
+  /\bremix(ed)?\b/i,
+  /\blive\b/i,
+  /\bacoustic\b/i,
+  /\bradio edit\b/i,
+  /\bsingle version\b/i,
+  /\bdemo\b/i,
+  /\bbonus track\b/i,
+  /\bdeluxe\b/i,
+  /\banniversary\b/i,
+  /\bextended\b/i,
+  /\binstrumental\b/i,
+  /\bkaraoke\b/i,
+]
+
+function isStudioVersion(trackName: string, albumName: string | null): boolean {
+  const text = `${trackName} ${albumName ?? ""}`
+  return !NON_STUDIO_PATTERNS.some(pattern => pattern.test(text))
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const query = searchParams.get("q")?.trim()
@@ -21,22 +42,38 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const effect = Effect.map(searchLRCLibTracks(query), results =>
-    results
-      .filter(r => r.hasSyncedLyrics)
-      .slice(0, parsedLimit)
-      .map(
-        (r): SearchResultTrack => ({
-          id: `lrclib-${r.id}`,
-          name: r.trackName,
-          artist: r.artistName,
-          album: r.albumName ?? "",
-          albumArt: undefined,
-          duration: r.duration * 1000,
-          hasLyrics: r.hasSyncedLyrics,
-        }),
-      ),
-  )
+  const effect = Effect.map(searchLRCLibTracks(query), results => {
+    const synced = results.filter(r => r.hasSyncedLyrics)
+
+    const sorted = [...synced].sort((a, b) => {
+      const aIsStudio = isStudioVersion(a.trackName, a.albumName)
+      const bIsStudio = isStudioVersion(b.trackName, b.albumName)
+      if (aIsStudio && !bIsStudio) return -1
+      if (!aIsStudio && bIsStudio) return 1
+      return 0
+    })
+
+    const seenIds = new Set<number>()
+    const tracks: SearchResultTrack[] = []
+
+    for (const r of sorted) {
+      if (seenIds.has(r.id)) continue
+      seenIds.add(r.id)
+      tracks.push({
+        id: `lrclib-${r.id}`,
+        lrclibId: r.id,
+        name: r.trackName,
+        artist: r.artistName,
+        album: r.albumName ?? "",
+        albumArt: undefined,
+        duration: r.duration * 1000,
+        hasLyrics: true,
+      })
+      if (tracks.length >= parsedLimit) break
+    }
+
+    return tracks
+  })
 
   const result = await Effect.runPromiseExit(effect)
 
@@ -58,8 +95,11 @@ export async function GET(request: NextRequest) {
 
   const tracks = result.value
 
+  const MAX_ALBUM_ART = 5
   const artResults = await Promise.allSettled(
-    tracks.map(t => getAlbumArt(t.artist, t.name, "small")),
+    tracks.map((t, i) =>
+      i < MAX_ALBUM_ART ? getAlbumArt(t.artist, t.name, "small") : Promise.resolve(null),
+    ),
   )
 
   const tracksWithArt = tracks.map((track, i) => ({

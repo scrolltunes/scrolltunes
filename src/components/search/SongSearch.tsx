@@ -61,13 +61,33 @@ export const SongSearch = memo(function SongSearch({
   const [hasSearched, setHasSearched] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const cacheRef = useRef(new Map<string, SearchResultTrack[]>())
 
   const searchTracks = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
+    const trimmed = searchQuery.trim()
+
+    if (!trimmed) {
       setResults([])
       setHasSearched(false)
       setError(null)
       setIsPending(false)
+      return
+    }
+
+    if (trimmed.length < 2) {
+      setResults([])
+      setHasSearched(false)
+      setIsPending(false)
+      return
+    }
+
+    const cacheKey = trimmed.toLowerCase()
+    const cached = cacheRef.current.get(cacheKey)
+    if (cached) {
+      setResults(cached)
+      setHasSearched(true)
+      setIsPending(false)
+      setIsLoading(false)
       return
     }
 
@@ -87,8 +107,9 @@ export const SongSearch = memo(function SongSearch({
       }
 
       const data: SearchApiResponse = await response.json()
-      // Batch these updates together to avoid skeleton flicker
-      setResults(data.tracks ?? [])
+      const tracks = data.tracks ?? []
+      cacheRef.current.set(cacheKey, tracks)
+      setResults(tracks)
       setHasSearched(true)
       setIsPending(false)
       setIsLoading(false)
@@ -127,7 +148,7 @@ export const SongSearch = memo(function SongSearch({
 
       debounceRef.current = setTimeout(() => {
         searchTracks(value)
-      }, 150)
+      }, 250)
     },
     [searchTracks],
   )

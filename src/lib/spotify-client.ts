@@ -15,7 +15,15 @@ export class SpotifyConfigError extends Data.TaggedClass("SpotifyConfigError")<{
   readonly message: string
 }> {}
 
-export type SpotifyError = SpotifyAuthError | SpotifyAPIError | SpotifyConfigError
+export class SpotifyRateLimitError extends Data.TaggedClass("SpotifyRateLimitError")<{
+  readonly retryAfter: number
+}> {}
+
+export type SpotifyError =
+  | SpotifyAuthError
+  | SpotifyAPIError
+  | SpotifyConfigError
+  | SpotifyRateLimitError
 
 // --- Spotify Types ---
 
@@ -145,7 +153,7 @@ const fetchAccessToken = (): Effect.Effect<string, SpotifyError> =>
 const fetchFromSpotifyAPI = <T>(
   accessToken: string,
   url: string,
-): Effect.Effect<T, SpotifyAPIError> =>
+): Effect.Effect<T, SpotifyAPIError | SpotifyRateLimitError> =>
   Effect.gen(function* () {
     const response = yield* Effect.tryPromise({
       try: () =>
@@ -156,6 +164,12 @@ const fetchFromSpotifyAPI = <T>(
         }),
       catch: () => new SpotifyAPIError({ status: 0, message: "Network error" }),
     })
+
+    if (response.status === 429) {
+      const retryAfterHeader = response.headers.get("Retry-After")
+      const retryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : 1
+      return yield* Effect.fail(new SpotifyRateLimitError({ retryAfter }))
+    }
 
     if (!response.ok) {
       const text = yield* Effect.tryPromise({
@@ -171,22 +185,44 @@ const fetchFromSpotifyAPI = <T>(
     })
   })
 
+const withRetry = <T>(
+  makeEffect: () => Effect.Effect<T, SpotifyError>,
+  maxRetries = 3,
+): Effect.Effect<T, SpotifyError> => {
+  const loop = (attempt: number): Effect.Effect<T, SpotifyError> =>
+    Effect.catchTag(makeEffect(), "SpotifyRateLimitError", (error) => {
+      if (attempt >= maxRetries) {
+        console.log(`[Spotify] Rate limit: max retries (${maxRetries}) exceeded`)
+        return Effect.fail(error)
+      }
+      const backoffMultiplier = 2 ** attempt
+      const delaySeconds = error.retryAfter * backoffMultiplier
+      console.log(
+        `[Spotify] Rate limit hit, retry ${attempt + 1}/${maxRetries} after ${delaySeconds}s`,
+      )
+      return Effect.flatMap(Effect.sleep(delaySeconds * 1000), () => loop(attempt + 1))
+    })
+  return loop(0)
+}
+
 const spotifyFetch = <T>(
   path: string,
   params?: Record<string, string>,
 ): Effect.Effect<T, SpotifyError> =>
-  Effect.gen(function* () {
-    const accessToken = yield* fetchAccessToken()
+  withRetry(() =>
+    Effect.gen(function* () {
+      const accessToken = yield* fetchAccessToken()
 
-    const url = new URL(`https://api.spotify.com/v1${path}`)
-    if (params) {
-      for (const [key, value] of Object.entries(params)) {
-        url.searchParams.set(key, value)
+      const url = new URL(`https://api.spotify.com/v1${path}`)
+      if (params) {
+        for (const [key, value] of Object.entries(params)) {
+          url.searchParams.set(key, value)
+        }
       }
-    }
 
-    return yield* fetchFromSpotifyAPI<T>(accessToken, url.toString())
-  })
+      return yield* fetchFromSpotifyAPI<T>(accessToken, url.toString())
+    }),
+  )
 
 // --- Public API (Effect-based) ---
 

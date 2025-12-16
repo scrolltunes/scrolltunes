@@ -10,6 +10,8 @@ export interface SearchResultTrack {
   readonly albumArt?: string | undefined
   readonly duration: number
   readonly hasLyrics: boolean
+  readonly spotifyId?: string | undefined
+  readonly lrclibId?: number | undefined
 }
 
 export interface SearchApiResponse {

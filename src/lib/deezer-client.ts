@@ -84,7 +84,11 @@ export const searchAlbumArt = (
     const url = `${DEEZER_BASE_URL}/search?q=${query}&limit=1`
 
     const response = yield* Effect.tryPromise({
-      try: () => fetch(url),
+      try: () =>
+        fetch(url, {
+          cache: "force-cache",
+          next: { revalidate: 86400 }, // 24 hours - album art rarely changes
+        }),
       catch: error =>
         new DeezerAPIError({
           message: error instanceof Error ? error.message : "Network error",
