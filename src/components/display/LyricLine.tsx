@@ -2,7 +2,7 @@
 
 import { springs } from "@/animations"
 import { AnimatePresence, motion } from "motion/react"
-import { memo } from "react"
+import { memo, useMemo } from "react"
 
 export interface LyricLineProps {
   readonly text: string
@@ -13,6 +13,36 @@ export interface LyricLineProps {
   readonly fontSize?: number
   readonly innerRef?: (el: HTMLButtonElement | null) => void
   readonly duration?: number | undefined
+}
+
+interface WordTiming {
+  readonly word: string
+  readonly delay: number
+  readonly wordDuration: number
+}
+
+function calculateWordTimings(text: string, totalDuration: number): WordTiming[] {
+  const words = text.split(/(\s+)/)
+  const nonSpaceWords = words.filter(w => w.trim() !== "")
+  const totalChars = nonSpaceWords.reduce((sum, w) => sum + w.length, 0)
+
+  if (totalChars === 0) return []
+
+  let charsSoFar = 0
+  const result: WordTiming[] = []
+
+  for (const word of words) {
+    if (word.trim() === "") {
+      result.push({ word, delay: 0, wordDuration: 0 })
+    } else {
+      const delay = (charsSoFar / totalChars) * totalDuration
+      const wordDuration = (word.length / totalChars) * totalDuration
+      result.push({ word, delay, wordDuration })
+      charsSoFar += word.length
+    }
+  }
+
+  return result
 }
 
 /**
@@ -28,9 +58,18 @@ export const LyricLine = memo(function LyricLine({
   innerRef,
   duration,
 }: LyricLineProps) {
-  // Empty lines render as spacing
+  const wordTimings = useMemo(
+    () => (duration !== undefined ? calculateWordTimings(text, duration) : []),
+    [text, duration],
+  )
+
+  // Empty lines render as a musical note
   if (!text.trim()) {
-    return <div className="h-8" aria-hidden="true" />
+    return (
+      <div className="py-2 text-center text-neutral-600 text-2xl" aria-hidden="true">
+        ♪
+      </div>
+    )
   }
 
   const opacityClass = isPast ? "opacity-40" : isActive ? "opacity-100" : "opacity-70"
@@ -51,15 +90,28 @@ export const LyricLine = memo(function LyricLine({
           className={`relative z-10 block ${textSizeClass} font-medium leading-relaxed transition-colors duration-300`}
           style={fontSize !== undefined ? { fontSize: `${fontSize}px` } : undefined}
         >
-          <span className="text-neutral-500">{text}</span>
-          <motion.span
-            className="absolute inset-0 text-white"
-            initial={{ clipPath: "inset(0 100% 0 0)" }}
-            animate={{ clipPath: "inset(0 0% 0 0)" }}
-            transition={{ duration, ease: "linear" }}
-          >
-            {text}
-          </motion.span>
+          {wordTimings.map((timing, i) => {
+            if (timing.word.trim() === "") {
+              return timing.word
+            }
+            return (
+              <span key={i} className="relative inline-block">
+                <span className="text-neutral-500">{timing.word}</span>
+                <motion.span
+                  className="absolute inset-0 text-white overflow-hidden"
+                  initial={{ clipPath: "inset(0 100% 0 0)" }}
+                  animate={{ clipPath: "inset(0 0% 0 0)" }}
+                  transition={{
+                    duration: timing.wordDuration,
+                    delay: timing.delay,
+                    ease: "linear",
+                  }}
+                >
+                  {timing.word}
+                </motion.span>
+              </span>
+            )
+          })}
         </span>
       ) : (
         <span

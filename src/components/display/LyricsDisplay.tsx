@@ -192,14 +192,9 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   }
 
   // Only show highlight when playing/paused, not in Ready state
-  // When current line is empty, show highlight on next non-empty line
+  // Empty lines render as spacers without highlight, so no special handling needed
   const isPlayingOrPaused = state._tag === "Playing" || state._tag === "Paused"
-  const rawActiveIndex = Math.max(0, currentLineIndex)
-  const activeLineIndex = isPlayingOrPaused
-    ? lyrics.lines[rawActiveIndex]?.text.trim() === ""
-      ? lyrics.lines.findIndex((line, i) => i >= rawActiveIndex && line.text.trim() !== "")
-      : rawActiveIndex
-    : -1
+  const activeLineIndex = isPlayingOrPaused ? Math.max(0, currentLineIndex) : -1
 
   return (
     <div
