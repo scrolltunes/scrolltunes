@@ -333,7 +333,7 @@
 - [ ] Create feature comparison screen (Free vs Account) — A/B test
 - [x] Create `/login` page with consent flow
 - [ ] Redesign login page to be less dry (more visual, welcoming)
-- [ ] Fix user avatar size to match other header icons visually
+- [x] Fix user avatar size to match other header icons visually
 - [x] Display attribution for fetched song info (lyrics/BPM source in info modal)
 - [x] Add user avatar/sign-in button to header
 - [x] Add "Account & Sync" section to Settings page

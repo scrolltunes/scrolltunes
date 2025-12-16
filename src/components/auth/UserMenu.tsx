@@ -1,7 +1,7 @@
 "use client"
 
 import { useAccount } from "@/core"
-import { MusicNotes, SignOut } from "@phosphor-icons/react"
+import { MusicNotes, SignOut, UserCircle } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { signOut } from "next-auth/react"
 import Image from "next/image"
@@ -50,9 +50,10 @@ export const UserMenu = memo(function UserMenu() {
     return (
       <Link
         href="/login"
-        className="px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors"
+        className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+        aria-label="Sign in"
       >
-        Sign in
+        <UserCircle size={20} />
       </Link>
     )
   }
@@ -60,11 +61,11 @@ export const UserMenu = memo(function UserMenu() {
   const initials = getInitials(user.name, user.email)
 
   return (
-    <div ref={menuRef} className="relative">
+    <div ref={menuRef} className="relative w-10 h-10 flex-shrink-0">
       <button
         type="button"
         onClick={handleToggle}
-        className="w-10 h-10 rounded-full overflow-hidden bg-neutral-800 hover:bg-neutral-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
+        className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden bg-neutral-800 hover:bg-neutral-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
         aria-label="User menu"
         aria-expanded={isOpen}
         aria-haspopup="true"

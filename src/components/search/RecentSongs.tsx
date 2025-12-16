@@ -1,6 +1,6 @@
 "use client"
 
-import { AlbumArtSkeleton } from "@/components/ui"
+import { AlbumArtSkeleton, FavoriteButton } from "@/components/ui"
 import {
   recentSongsStore,
   useAlbumArtLoadingIds,
@@ -11,7 +11,8 @@ import {
 } from "@/core"
 import { MAX_RECENT_SONGS } from "@/lib/recent-songs-types"
 import { makeCanonicalPath } from "@/lib/slug"
-import { ClockCounterClockwise, MusicNote, Trash } from "@phosphor-icons/react"
+
+import { ClockCounterClockwise, MusicNote, Trash, X } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { useRouter } from "next/navigation"
 import { memo, useCallback } from "react"
@@ -40,6 +41,11 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
 
   const handleClear = useCallback(() => {
     recentSongsStore.clear()
+  }, [])
+
+  const handleRemove = useCallback((e: React.MouseEvent, songId: number) => {
+    e.stopPropagation()
+    recentSongsStore.remove(songId)
   }, [])
 
   return (
@@ -76,27 +82,47 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
             const isLoadingAlbumArt = loadingAlbumArtIds.has(song.id)
             return (
               <li key={song.id}>
-                <button
-                  type="button"
-                  onClick={() => handleClick(song)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition-colors text-left"
-                  aria-label={`${song.title} by ${song.artist}`}
-                >
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
-                    {isLoadingAlbumArt ? (
-                      <AlbumArtSkeleton />
-                    ) : song.albumArt ? (
-                      <img src={song.albumArt} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <MusicNote size={20} weight="fill" className="text-neutral-600" />
-                    )}
-                  </div>
+                <div className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => handleClick(song)}
+                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                    aria-label={`${song.title} by ${song.artist}`}
+                  >
+                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
+                      {isLoadingAlbumArt ? (
+                        <AlbumArtSkeleton />
+                      ) : song.albumArt ? (
+                        <img src={song.albumArt} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <MusicNote size={20} weight="fill" className="text-neutral-600" />
+                      )}
+                    </div>
 
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{song.title}</p>
-                    <p className="text-sm text-neutral-500 truncate">{song.artist}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium truncate">{song.title}</p>
+                      <p className="text-sm text-neutral-500 truncate">{song.artist}</p>
+                    </div>
+                  </button>
+
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <FavoriteButton
+                      songId={song.id}
+                      title={song.title}
+                      artist={song.artist}
+                      {...(song.albumArt !== undefined && { albumArt: song.albumArt })}
+                      size="sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={e => handleRemove(e, song.id)}
+                      className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-800/50 hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
+                      aria-label="Remove from history"
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
-                </button>
+                </div>
               </li>
             )
           })}

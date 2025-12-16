@@ -111,7 +111,7 @@ class FavoritesStore {
     if (!accountStore.isAuthenticated()) return
 
     try {
-      const response = await fetch(`/api/user/favorites/${id}`, {
+      const response = await fetch(`/api/user/favorites/lrclib:${id}`, {
         method: "DELETE",
       })
 

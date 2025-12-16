@@ -1,7 +1,6 @@
 "use client"
 
 import { favoritesStore, useIsFavorite } from "@/core"
-import { soundSystem } from "@/sounds"
 import { Heart } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { memo, useCallback } from "react"
@@ -41,7 +40,6 @@ export const FavoriteButton = memo(function FavoriteButton({
       ...(album !== undefined && { album }),
       ...(albumArt !== undefined && { albumArt }),
     })
-    soundSystem.playClick()
   }, [songId, title, artist, album, albumArt])
 
   return (
