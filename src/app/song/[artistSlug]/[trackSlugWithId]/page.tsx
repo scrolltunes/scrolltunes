@@ -364,35 +364,33 @@ export default function SongPage() {
             transition={springs.default}
             className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800"
           >
-            <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/"
-                  className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-                  aria-label="Back to search"
-                >
-                  <ArrowLeft size={20} />
-                </Link>
-                {loadState.albumArt ? (
-                  <img
-                    src={loadState.albumArt}
-                    alt=""
-                    className="w-10 h-10 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center">
-                    <MusicNote size={20} weight="fill" className="text-neutral-600" />
-                  </div>
-                )}
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium truncate max-w-[200px]">{songTitle}</span>
-                  <span className="text-xs text-neutral-500 truncate max-w-[200px]">
-                    {loadState.lyrics.artist}
-                  </span>
+            <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
+              <Link
+                href="/"
+                className="w-10 h-10 shrink-0 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+                aria-label="Back to search"
+              >
+                <ArrowLeft size={20} />
+              </Link>
+              {loadState.albumArt ? (
+                <img
+                  src={loadState.albumArt}
+                  alt=""
+                  className="w-10 h-10 shrink-0 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 shrink-0 rounded-lg bg-neutral-800 flex items-center justify-center">
+                  <MusicNote size={20} weight="fill" className="text-neutral-600" />
                 </div>
+              )}
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-sm font-medium truncate">{songTitle}</span>
+                <span className="text-xs text-neutral-500 truncate">
+                  {loadState.lyrics.artist}
+                </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <VoiceIndicator
                   isListening={isListening}
                   isSpeaking={isSpeaking}

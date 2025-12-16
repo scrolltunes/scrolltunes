@@ -276,6 +276,7 @@ The app must work seamlessly for musicians with occupied hands:
 - Large touch targets for quick glances
 - High contrast text, readable from arm's length (phone on lap/music stand)
 - Landscape and portrait mode optimization
+- Icons replace text labels on small screens to prevent overflow/overlap
 
 **Distraction-Free Mode**:
 - Hide all UI chrome — only lyrics visible

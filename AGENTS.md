@@ -4,7 +4,7 @@ Live lyrics teleprompter for musicians. Detects singing voice and syncs scrollin
 
 **In this house, we use bun.** All package management and script execution should use `bun` commands, not `npm` or `node`.
 
-**Do not commit unless explicitly asked.** Only run `git commit` when the user explicitly requests it.
+**Do not commit unless explicitly asked.** Never run `git commit` or `git push` unless the user explicitly requests it. This is critical — no exceptions.
 
 **Use subagents for TODO items.** When implementing TODO items (from TODO.md, Oracle plans, or any task list), always use the Task tool to spawn subagents for each independent task. This enables parallel execution and keeps the main thread focused on coordination.
 
