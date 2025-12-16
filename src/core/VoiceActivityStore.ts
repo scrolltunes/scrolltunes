@@ -67,10 +67,13 @@ export class VADError extends Data.TaggedClass("VADError")<{
 
 // --- Logging Configuration ---
 
-const VAD_DEBUG = true // Set to false to disable logging
+function isDevMode(): boolean {
+  if (typeof window === "undefined") return false
+  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+}
 
 function vadLog(category: string, message: string, data?: Record<string, unknown>): void {
-  if (!VAD_DEBUG) return
+  if (!isDevMode()) return
   const timestamp = new Date().toISOString().substring(11, 23)
   const dataStr = data ? ` ${JSON.stringify(data)}` : ""
   console.log(`[VAD ${timestamp}] [${category}] ${message}${dataStr}`)

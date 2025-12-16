@@ -26,3 +26,4 @@ export {
   type UseDebounceResult,
 } from "./useDebounce"
 export { useHaptic, type HapticPattern, type UseHapticResult } from "./useHaptic"
+export { useVoiceSearch } from "./useVoiceSearch"

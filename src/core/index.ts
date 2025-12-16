@@ -109,3 +109,19 @@ export {
   type Setlist,
   type SetlistSong,
 } from "./SetlistsStore"
+
+export {
+  SpeechRecognitionStore,
+  speechRecognitionStore,
+  useSpeechState,
+  useSpeechControls,
+  useIsQuotaAvailable,
+  type SpeechState,
+  type SpeechEvent,
+  SpeechRecognitionError,
+  StartRecognition,
+  StopRecognition,
+  ReceivePartial,
+  ReceiveFinal,
+  SetSpeechError,
+} from "./SpeechRecognitionStore"

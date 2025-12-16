@@ -1,6 +1,9 @@
 "use client"
 
 import { springs } from "@/animations"
+import { VoiceSearchButton } from "@/components/audio"
+import { useIsAuthenticated } from "@/core"
+import { useVoiceSearch } from "@/hooks"
 import type { SearchApiResponse, SearchResultTrack } from "@/lib/search-api-types"
 import { makeCanonicalPath } from "@/lib/slug"
 import {
@@ -60,6 +63,8 @@ export const SongSearch = memo(function SongSearch({
   className = "",
 }: SongSearchProps) {
   const router = useRouter()
+  const isAuthenticated = useIsAuthenticated()
+  const voiceSearch = useVoiceSearch()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResultTrack[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -72,6 +77,7 @@ export const SongSearch = memo(function SongSearch({
   const abortControllerRef = useRef<AbortController | null>(null)
   const cacheRef = useRef(new Map<string, SearchResultTrack[]>())
   const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastFinalTranscriptRef = useRef<string | null>(null)
 
   const searchTracks = useCallback(async (searchQuery: string) => {
     const trimmed = searchQuery.trim()
@@ -173,7 +179,11 @@ export const SongSearch = memo(function SongSearch({
       clearTimeout(debounceRef.current)
     }
     abortControllerRef.current?.abort()
-  }, [])
+    if (voiceSearch.isRecording) {
+      voiceSearch.stop()
+    }
+    lastFinalTranscriptRef.current = null
+  }, [voiceSearch])
 
   const showInlineMessage = useCallback((message: string) => {
     if (messageTimeoutRef.current) {
@@ -246,6 +256,30 @@ export const SongSearch = memo(function SongSearch({
     [router, onSelectTrack, showInlineMessage],
   )
 
+  const handleVoiceSearchClick = useCallback(() => {
+    if (voiceSearch.isRecording) {
+      voiceSearch.stop()
+    } else {
+      voiceSearch.start()
+    }
+  }, [voiceSearch])
+
+  useEffect(() => {
+    if (
+      voiceSearch.finalTranscript &&
+      voiceSearch.finalTranscript !== lastFinalTranscriptRef.current
+    ) {
+      lastFinalTranscriptRef.current = voiceSearch.finalTranscript
+      const transcript = voiceSearch.finalTranscript
+      setQuery(transcript)
+      setIsPending(true)
+      setHasSearched(false)
+      setError(null)
+      searchTracks(transcript)
+      voiceSearch.clearTranscript()
+    }
+  }, [voiceSearch.finalTranscript, voiceSearch.clearTranscript, searchTracks])
+
   useEffect(() => {
     return () => {
       if (debounceRef.current) {
@@ -274,26 +308,57 @@ export const SongSearch = memo(function SongSearch({
           value={query}
           onChange={handleInputChange}
           placeholder="Search by song title or artist name"
-          className="w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 pr-10 border border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+          className={`w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 border border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
+            isAuthenticated ? (query ? "pr-20" : "pr-12") : "pr-10"
+          }`}
           aria-label="Search for a song"
         />
 
-        <AnimatePresence>
-          {query && (
-            <motion.button
-              type="button"
-              onClick={handleClear}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={springs.snap}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-500 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-              aria-label="Clear search"
-            >
-              <X size={16} weight="bold" />
-            </motion.button>
-          )}
-        </AnimatePresence>
+        {isAuthenticated && voiceSearch.isQuotaAvailable && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <AnimatePresence>
+              {query && (
+                <motion.button
+                  type="button"
+                  onClick={handleClear}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={springs.snap}
+                  className="p-1 text-neutral-500 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  aria-label="Clear search"
+                >
+                  <X size={16} weight="bold" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+            <VoiceSearchButton
+              onClick={handleVoiceSearchClick}
+              isRecording={voiceSearch.isRecording}
+              isConnecting={voiceSearch.isConnecting}
+              hasError={!!voiceSearch.error}
+            />
+          </div>
+        )}
+
+        {(!isAuthenticated || !voiceSearch.isQuotaAvailable) && (
+          <AnimatePresence>
+            {query && (
+              <motion.button
+                type="button"
+                onClick={handleClear}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={springs.snap}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-500 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                aria-label="Clear search"
+              >
+                <X size={16} weight="bold" />
+              </motion.button>
+            )}
+          </AnimatePresence>
+        )}
         </div>
 
         {/* Floating dropdown for results, error, empty, and loading states */}
