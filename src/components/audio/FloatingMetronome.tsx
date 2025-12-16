@@ -1,8 +1,10 @@
 "use client"
 
 import { springs } from "@/animations"
+import { MAX_SCROLL_SPEED, MIN_SCROLL_SPEED } from "@/constants"
 import {
   type MetronomeMode,
+  lyricsPlayer,
   metronomeStore,
   useMetronome,
   useMetronomeControls,
@@ -18,6 +20,11 @@ const DEFAULT_MANUAL_BPM = 120
 const MIN_BPM = 40
 const MAX_BPM = 240
 const BPM_STEP = 5
+
+function bpmToScrollSpeed(bpm: number): number {
+  const ratio = bpm / DEFAULT_MANUAL_BPM
+  return Math.max(MIN_SCROLL_SPEED, Math.min(MAX_SCROLL_SPEED, ratio))
+}
 
 export interface FloatingMetronomeProps {
   readonly bpm: number | null
@@ -93,23 +100,21 @@ export const FloatingMetronome = memo(function FloatingMetronome({
 
   const handleIncreaseBpm = useCallback(() => {
     if (hasApiBpm) return
-    setManualBpm(prev => {
-      const current = prev ?? DEFAULT_MANUAL_BPM
-      const next = Math.min(MAX_BPM, current + BPM_STEP)
-      metronomeStore.setBpm(next)
-      return next
-    })
-  }, [hasApiBpm])
+    const current = manualBpm ?? DEFAULT_MANUAL_BPM
+    const next = Math.min(MAX_BPM, current + BPM_STEP)
+    setManualBpm(next)
+    metronomeStore.setBpm(next)
+    lyricsPlayer.setScrollSpeed(bpmToScrollSpeed(next))
+  }, [hasApiBpm, manualBpm])
 
   const handleDecreaseBpm = useCallback(() => {
     if (hasApiBpm) return
-    setManualBpm(prev => {
-      const current = prev ?? DEFAULT_MANUAL_BPM
-      const next = Math.max(MIN_BPM, current - BPM_STEP)
-      metronomeStore.setBpm(next)
-      return next
-    })
-  }, [hasApiBpm])
+    const current = manualBpm ?? DEFAULT_MANUAL_BPM
+    const next = Math.max(MIN_BPM, current - BPM_STEP)
+    setManualBpm(next)
+    metronomeStore.setBpm(next)
+    lyricsPlayer.setScrollSpeed(bpmToScrollSpeed(next))
+  }, [hasApiBpm, manualBpm])
 
   const isPlaying = playerState._tag === "Playing"
 
