@@ -1,8 +1,9 @@
 "use client"
 
 import { useCurrentLineIndex, usePlayerControls, usePlayerState, usePreferences } from "@/core"
+import { detectLyricsDirection } from "@/lib"
 import { motion } from "motion/react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
 
 const SCROLL_OVERRIDE_TIMEOUT = 3000 // Resume auto-scroll after 3 seconds
@@ -34,6 +35,12 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   // Get lyrics from state
   const lyrics = state._tag !== "Idle" ? state.lyrics : null
+
+  // Detect RTL direction once per song
+  const isRTL = useMemo(
+    () => (lyrics ? detectLyricsDirection(lyrics.lines) === "rtl" : false),
+    [lyrics],
+  )
 
   // Scroll to position a line at target position
   const scrollToLine = useCallback((lineIndex: number): boolean => {
@@ -235,6 +242,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
               innerRef={el => {
                 lineRefs.current[index] = el
               }}
+              isRTL={isRTL}
               {...(duration !== undefined && { duration })}
             />
           )

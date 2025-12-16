@@ -13,6 +13,7 @@ export interface LyricLineProps {
   readonly fontSize?: number
   readonly innerRef?: (el: HTMLButtonElement | null) => void
   readonly duration?: number | undefined
+  readonly isRTL?: boolean
 }
 
 interface WordTiming {
@@ -57,6 +58,7 @@ export const LyricLine = memo(function LyricLine({
   fontSize,
   innerRef,
   duration,
+  isRTL = false,
 }: LyricLineProps) {
   const wordTimings = useMemo(
     () => (duration !== undefined ? calculateWordTimings(text, duration) : []),
@@ -87,6 +89,7 @@ export const LyricLine = memo(function LyricLine({
     >
       {isActive && duration !== undefined ? (
         <span
+          dir={isRTL ? "rtl" : undefined}
           className={`relative z-10 block ${textSizeClass} font-medium leading-relaxed transition-colors duration-300`}
           style={fontSize !== undefined ? { fontSize: `${fontSize}px` } : undefined}
         >
@@ -99,7 +102,7 @@ export const LyricLine = memo(function LyricLine({
                 <span className="text-neutral-500">{timing.word}</span>
                 <motion.span
                   className="absolute inset-0 text-white overflow-hidden"
-                  initial={{ clipPath: "inset(0 100% 0 0)" }}
+                  initial={{ clipPath: isRTL ? "inset(0 0 0 100%)" : "inset(0 100% 0 0)" }}
                   animate={{ clipPath: "inset(0 0% 0 0)" }}
                   transition={{
                     duration: timing.wordDuration,

@@ -111,3 +111,5 @@ export {
   SILERO_PRESET_LOUD,
   getPresetConfig,
 } from "./silero-vad-config"
+
+export { containsRTL, detectLyricsDirection } from "./text-direction"
