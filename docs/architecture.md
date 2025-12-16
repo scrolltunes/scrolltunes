@@ -98,9 +98,15 @@ scrolltunes/
 │   │   ├── recent-songs-types.ts # Types for recent songs feature
 │   │   ├── slug.ts               # URL slug utilities
 │   │   ├── bpm/                  # BPM provider abstraction
-│   │   │   ├── index.ts
-│   │   │   ├── bpm-types.ts
-│   │   │   └── getsongbpm-client.ts
+│   │   │   ├── index.ts          # Exports all providers
+│   │   │   ├── bpm-types.ts      # Query/result types
+│   │   │   ├── bpm-errors.ts     # Tagged error classes
+│   │   │   ├── bpm-provider.ts   # Interface + fallback/race functions
+│   │   │   ├── bpm-cache.ts      # In-memory caching wrapper
+│   │   │   ├── reccobeats-client.ts     # ReccoBeats provider (Spotify ID)
+│   │   │   ├── getsongbpm-client.ts     # GetSongBPM provider
+│   │   │   ├── deezer-bpm-client.ts     # Deezer provider
+│   │   │   └── rapidapi-spotify-client.ts # RapidAPI last resort (rate limited)
 │   │   └── ...
 │   │
 │   ├── sounds/                   # Audio system (Tone.js)
@@ -695,3 +701,81 @@ Options under consideration:
 | **Upstash Redis** | Session storage, rate limiting | Not relational |
 
 Likely: **Vercel Postgres** for user data + **Upstash Redis** for sessions/cache.
+
+## BPM Provider System
+
+The BPM lookup system uses multiple providers with fallback and racing strategies, implemented using Effect.ts for composable async error handling.
+
+### Provider Priority
+
+```mermaid
+flowchart TD
+    A["/api/lyrics request"] --> B{Has Spotify ID?}
+    
+    B -->|Yes| C["Race: ReccoBeats + GetSongBPM + Deezer<br/>(parallel, first success wins)"]
+    B -->|No| D["Fallback: GetSongBPM → Deezer<br/>(sequential)"]
+    
+    C --> E{BPM Found?}
+    D --> F{BPM Found?}
+    
+    E -->|Yes| G["Return BPM"]
+    E -->|No| H["Last Resort: RapidAPI-Spotify<br/>(requires Spotify ID)"]
+    
+    F -->|Yes| G
+    F -->|No| I["Return null BPM"]
+    
+    H --> J{Daily Cap<br/>< 20 requests?}
+    J -->|Yes| K["Call RapidAPI"]
+    J -->|No| L["Skip silently<br/>(cap exceeded)"]
+    
+    K --> M{BPM Found?}
+    M -->|Yes| G
+    M -->|No| I
+    L --> I
+    
+    subgraph Rate Limiting
+        N["Upstash Redis Counter"]
+        O["Warning emails at 75%, 85%, 95%"]
+    end
+    
+    J -.-> N
+    K -.-> O
+```
+
+### Providers
+
+| Provider | Auth | Rate Limit | Notes |
+|----------|------|------------|-------|
+| **ReccoBeats** | None | None | Requires Spotify ID, most accurate |
+| **GetSongBPM** | API Key | 3000/hour | Title/artist search |
+| **Deezer** | None | None | Less accurate, fallback |
+| **RapidAPI-Spotify** | API Key | 20/day | Last resort, Upstash rate limit |
+
+### Effect.ts Patterns
+
+All providers implement `BPMProvider` interface:
+
+```typescript
+interface BPMProvider {
+  readonly name: string
+  getBpm(query: BPMTrackQuery): Effect.Effect<BPMResult, BPMError>
+}
+```
+
+Error types use `Data.TaggedError` for type-safe error handling:
+- `BPMNotFoundError` - Triggers fallback to next provider
+- `BPMAPIError` - Bubbles up immediately (no fallback)
+- `BPMRateLimitError` - Bubbles up immediately
+
+Composition functions:
+- `getBpmWithFallback(providers, query)` - Sequential fallback on `BPMNotFoundError`
+- `getBpmRace(providers, query)` - Parallel race, first success wins
+
+### RapidAPI Rate Limiting
+
+Uses Upstash Redis to enforce daily cap:
+- Key: `rapidapi:usage:YYYY-MM-DD`
+- TTL: 48 hours
+- Cap: 20 requests/day
+- Warnings: Email via Web3Forms at 75%, 85%, 95%
+- Exceeded: Silently returns `BPMNotFoundError` (no charge)

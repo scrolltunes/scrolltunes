@@ -105,6 +105,15 @@
 - [ ] Wire localStorage BPM cache on client (getCachedBpm/setCachedBpm)
 - [ ] Add tests for localStorage BPM cache utilities
 
+### BPM Providers ✅
+- [x] Implement ReccoBeats provider (Spotify ID → audio features)
+- [x] Implement GetSongBPM provider (title/artist search)
+- [x] Implement Deezer provider (fallback)
+- [x] Implement RapidAPI-Spotify provider (last resort, 20 req/day cap)
+- [x] Add Upstash Redis rate limiting for RapidAPI cap
+- [x] Add warning emails at 75%, 85%, 95% usage via Web3Forms
+- [x] Integrate providers with Effect.ts fallback/race patterns
+
 ### BPM Fallback Sources (Future)
 - [ ] Implement tap tempo as manual fallback
 - [ ] Prototype strum/beat detection from microphone input
@@ -328,24 +337,65 @@ Short URL: /s/[id]
 | State | Effect.ts | Tagged events, type-safe |
 | Lyrics Source | LRCLIB | Free, synced LRC format |
 | Song Search | LRCLIB | Direct search by artist/title |
-| BPM Data | GetSongBPM | Free tier, API key required, backlink mandatory |
+| BPM Data | ReccoBeats | Primary, uses Spotify ID, music-specific |
+| BPM Fallback | GetSongBPM | API key required, backlink mandatory |
+| BPM Fallback | Deezer | No auth, less accurate |
+| BPM Last Resort | RapidAPI-Spotify | 20 req/day cap, Upstash Redis rate limit |
+| Rate Limiting | Upstash Redis | Daily counter for RapidAPI cap |
 | Slug Utilities | Custom | toSlug, makeCanonicalPath for SEO URLs |
 
 ### BPM Integration
-```
-/api/lyrics request
-  → getLyricsCached() || getLyrics() || searchLyrics() [Effect chain]
-  → getBpmWithFallback([withInMemoryCache(getSongBpmProvider)])
-  → normalizeTrackKey() strips "feat.", remixes, parentheticals
-  → GetSongBPM API: https://api.getsong.co/search/
-  → Returns { lyrics, bpm, key, attribution }
-  → SongConfirmation passes bpm to onConfirm
-  → (TODO) LyricsPlayer.setScrollSpeed() based on BPM
+
+```mermaid
+flowchart TD
+    A["/api/lyrics request"] --> B{Has Spotify ID?}
+    
+    B -->|Yes| C["Race: ReccoBeats + GetSongBPM + Deezer<br/>(parallel, first success wins)"]
+    B -->|No| D["Fallback: GetSongBPM → Deezer<br/>(sequential)"]
+    
+    C --> E{BPM Found?}
+    D --> F{BPM Found?}
+    
+    E -->|Yes| G["Return BPM"]
+    E -->|No| H["Last Resort: RapidAPI-Spotify<br/>(requires Spotify ID)"]
+    
+    F -->|Yes| G
+    F -->|No| I["Return null BPM"]
+    
+    H --> J{Daily Cap<br/>< 20 requests?}
+    J -->|Yes| K["Call RapidAPI"]
+    J -->|No| L["Skip silently<br/>(cap exceeded)"]
+    
+    K --> M{BPM Found?}
+    M -->|Yes| G
+    M -->|No| I
+    L --> I
+    
+    subgraph Rate Limiting
+        N["Upstash Redis Counter"]
+        O["Warning emails at 75%, 85%, 95%"]
+    end
+    
+    J -.-> N
+    K -.-> O
 ```
 
-**Rate Limit:** 3000 req/hour, enforced at 1.2s intervals
-**Attribution:** Required backlink shown in playback controls
-**API Key:** Set `GETSONGBPM_API_KEY` in `.env` (get from https://getsongbpm.com/api)
+**BPM Provider Priority:**
+1. **ReccoBeats** - Uses Spotify ID, music-specific data, fastest
+2. **GetSongBPM** - Requires API key, 3000 req/hour
+3. **Deezer** - No auth required, less accurate
+4. **RapidAPI-Spotify** - Last resort, 20 req/day cap, uses Upstash Redis
+
+**Rate Limits:**
+- GetSongBPM: 3000 req/hour (1.2s intervals)
+- RapidAPI-Spotify: 20 req/day (hard cap via Upstash Redis)
+
+**Attribution:** Required backlinks shown in playback controls
+
+**API Keys:**
+- `GETSONGBPM_API_KEY` - https://getsongbpm.com/api
+- `RAPIDAPI_KEY` - https://rapidapi.com/music-metrics-music-metrics-default/api/spotify-audio-features-track-analysis
+- `KV_REST_API_URL` + `KV_REST_API_TOKEN` - Upstash Redis for rate limiting
 
 ### Demo Page
 Access `/demo` to test voice detection with mock lyrics without needing Spotify/LRCLIB integration.

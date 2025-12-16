@@ -4,6 +4,7 @@ import {
   getBpmRace,
   getBpmWithFallback,
   getSongBpmProvider,
+  rapidApiSpotifyProvider,
   reccoBeatsProvider,
   withInMemoryCache,
 } from "@/lib/bpm"
@@ -14,12 +15,31 @@ import { formatArtists, getAlbumImageUrl, searchTracksEffect } from "@/lib/spoti
 import { Effect } from "effect"
 import { NextResponse } from "next/server"
 
-const bpmProviders = [withInMemoryCache(getSongBpmProvider), withInMemoryCache(deezerBpmProvider)]
+const bpmFallbackProviders = [
+  withInMemoryCache(getSongBpmProvider),
+  withInMemoryCache(deezerBpmProvider),
+]
+
 const bpmRaceProviders = [
   withInMemoryCache(reccoBeatsProvider),
   withInMemoryCache(getSongBpmProvider),
   withInMemoryCache(deezerBpmProvider),
 ]
+
+const bpmLastResortProvider = withInMemoryCache(rapidApiSpotifyProvider)
+
+function getBpmAttribution(source: string): { name: string; url: string } {
+  switch (source) {
+    case "ReccoBeats":
+      return { name: "ReccoBeats", url: "https://reccobeats.com" }
+    case "Deezer":
+      return { name: "Deezer", url: "https://www.deezer.com" }
+    case "RapidAPI-Spotify":
+      return { name: "Spotify", url: "https://www.spotify.com" }
+    default:
+      return { name: "GetSongBPM", url: "https://getsongbpm.com" }
+  }
+}
 
 function normalizeForMatch(text: string): string {
   return text
@@ -90,11 +110,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           artist: lyrics.artist,
           spotifyId: resolvedSpotifyId,
         }
-        const bpmEffect: Effect.Effect<BPMResult | null> = (
-          resolvedSpotifyId
-            ? getBpmRace(bpmRaceProviders, bpmQuery)
-            : getBpmWithFallback(bpmProviders, bpmQuery)
-        ).pipe(
+
+        const primaryBpmEffect = resolvedSpotifyId
+          ? getBpmRace(bpmRaceProviders, bpmQuery)
+          : getBpmWithFallback(bpmFallbackProviders, bpmQuery)
+
+        const bpmWithLastResort = resolvedSpotifyId
+          ? primaryBpmEffect.pipe(
+              Effect.catchAll(error =>
+                error._tag === "BPMNotFoundError"
+                  ? bpmLastResortProvider.getBpm(bpmQuery)
+                  : Effect.fail(error),
+              ),
+            )
+          : primaryBpmEffect
+
+        const bpmEffect: Effect.Effect<BPMResult | null> = bpmWithLastResort.pipe(
           Effect.catchAll(error => {
             if (error._tag === "BPMAPIError") {
               console.error("BPM API error:", error.status, error.message)
@@ -150,13 +181,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     spotifyId: resolvedSpotifyId ?? null,
     attribution: {
       lyrics: { name: "LRCLIB", url: "https://lrclib.net" },
-      bpm: bpmResult
-        ? bpmResult.source === "ReccoBeats"
-          ? { name: "ReccoBeats", url: "https://reccobeats.com" }
-          : bpmResult.source === "Deezer"
-            ? { name: "Deezer", url: "https://www.deezer.com" }
-            : { name: "GetSongBPM", url: "https://getsongbpm.com" }
-        : null,
+      bpm: bpmResult ? getBpmAttribution(bpmResult.source) : null,
     },
   }
   return NextResponse.json(body, {

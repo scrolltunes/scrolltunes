@@ -10,7 +10,8 @@ export { getBpmWithFallback, getBpmRace } from "./bpm-provider"
 
 export { getSongBpmProvider } from "./getsongbpm-client"
 export { deezerBpmProvider } from "./deezer-bpm-client"
-export { reccoBeatsProvider } from "./reccobeats-client"
+export { reccoBeatsProvider, type ReccoBeatsQuery } from "./reccobeats-client"
+export { rapidApiSpotifyProvider } from "./rapidapi-spotify-client"
 
 export { getMockBpm, hasMockBpm, mockBpmProvider } from "./mock-bpm"
 
