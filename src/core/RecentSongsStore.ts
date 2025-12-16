@@ -11,8 +11,10 @@ const STORAGE_KEY = "scrolltunes:recents"
 class RecentSongsStore {
   private listeners = new Set<() => void>()
   private albumArtListeners = new Set<() => void>()
+  private syncListeners = new Set<() => void>()
   private state: readonly RecentSong[] = []
   private loadingAlbumArtIds = new Set<number>()
+  private isSyncingFromServer = false
 
   constructor() {
     this.loadFromStorage()
@@ -56,6 +58,24 @@ class RecentSongsStore {
 
   isLoadingAlbumArt(id: number): boolean {
     return this.loadingAlbumArtIds.has(id)
+  }
+
+  subscribeSyncing = (listener: () => void): (() => void) => {
+    this.syncListeners.add(listener)
+    return () => this.syncListeners.delete(listener)
+  }
+
+  getSyncingSnapshot = (): boolean => this.isSyncingFromServer
+
+  private notifySyncListeners(): void {
+    for (const listener of this.syncListeners) {
+      listener()
+    }
+  }
+
+  setSyncing(syncing: boolean): void {
+    this.isSyncingFromServer = syncing
+    this.notifySyncListeners()
   }
 
   private loadFromStorage(): void {
@@ -223,6 +243,7 @@ class RecentSongsStore {
       playCount: number
     }>,
   ): void {
+    this.setSyncing(true)
     const songsNeedingAlbumArt: number[] = []
 
     const recentSongs: RecentSong[] = songs
@@ -253,6 +274,7 @@ class RecentSongsStore {
     this.state = recentSongs.slice(0, MAX_RECENT_SONGS)
     this.saveToStorage()
     this.notify()
+    this.setSyncing(false)
 
     if (songsNeedingAlbumArt.length > 0) {
       this.fetchAlbumArtInBackground(songsNeedingAlbumArt)
@@ -344,6 +366,14 @@ export function useAlbumArtLoadingIds(): ReadonlySet<number> {
 export function useIsLoadingAlbumArt(id: number): boolean {
   const loadingIds = useAlbumArtLoadingIds()
   return loadingIds.has(id)
+}
+
+export function useIsRecentsLoading(): boolean {
+  return useSyncExternalStore(
+    recentSongsStore.subscribeSyncing,
+    recentSongsStore.getSyncingSnapshot,
+    () => false,
+  )
 }
 
 export type { RecentSong }

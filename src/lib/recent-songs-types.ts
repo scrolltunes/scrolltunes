@@ -20,6 +20,14 @@ export interface RecentSong {
 }
 
 /**
+ * Attribution source with name and URL
+ */
+export interface AttributionSource {
+  readonly name: string
+  readonly url: string
+}
+
+/**
  * Cached lyrics data with expiry tracking
  */
 export interface CachedLyrics {
@@ -28,7 +36,8 @@ export interface CachedLyrics {
   readonly key: string | null
   readonly albumArt?: string | undefined
   readonly spotifyId?: string | undefined
-  readonly bpmSource?: string | undefined
+  readonly bpmSource?: AttributionSource | undefined
+  readonly lyricsSource?: AttributionSource | undefined
   readonly cachedAt: number // timestamp (ms since epoch)
 }
 

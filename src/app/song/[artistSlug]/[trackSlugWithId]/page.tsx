@@ -45,6 +45,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 type ErrorType = "invalid-url" | "not-found" | "network"
 
+interface AttributionSource {
+  readonly name: string
+  readonly url: string
+}
+
 type LoadState =
   | { readonly _tag: "Loading" }
   | { readonly _tag: "Error"; readonly errorType: ErrorType }
@@ -55,7 +60,8 @@ type LoadState =
       readonly key: string | null
       readonly albumArt: string | null
       readonly spotifyId: string | null
-      readonly bpmSource: string | null
+      readonly bpmSource: AttributionSource | null
+      readonly lyricsSource: AttributionSource | null
     }
 
 const errorMessages: Record<ErrorType, { title: string; description: string }> = {
@@ -205,6 +211,7 @@ export default function SongPage() {
           albumArt: cached.albumArt ?? null,
           spotifyId: cached.spotifyId ?? null,
           bpmSource: cached.bpmSource ?? null,
+          lyricsSource: cached.lyricsSource ?? null,
         })
 
         recentSongsStore.updateMetadata({
@@ -246,7 +253,8 @@ export default function SongPage() {
           key: data.key,
           albumArt: data.albumArt ?? null,
           spotifyId: data.spotifyId ?? spotifyId ?? null,
-          bpmSource: data.attribution?.bpm?.name ?? null,
+          bpmSource: data.attribution?.bpm ?? null,
+          lyricsSource: data.attribution?.lyrics ?? null,
         })
 
         // Cache lyrics with spotifyId from API response (or URL param as fallback)
@@ -256,7 +264,8 @@ export default function SongPage() {
           key: data.key,
           albumArt: data.albumArt ?? undefined,
           spotifyId: data.spotifyId ?? spotifyId ?? undefined,
-          bpmSource: data.attribution?.bpm?.name ?? undefined,
+          bpmSource: data.attribution?.bpm ?? undefined,
+          lyricsSource: data.attribution?.lyrics ?? undefined,
         })
 
         // Add to recents (without changing order)
@@ -525,6 +534,7 @@ export default function SongPage() {
           musicalKey={loadState.key}
           spotifyId={loadState.spotifyId}
           bpmSource={loadState.bpmSource}
+          lyricsSource={loadState.lyricsSource}
           albumArt={loadState.albumArt}
         />
       )}

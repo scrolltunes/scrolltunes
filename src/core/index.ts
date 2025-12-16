@@ -71,6 +71,7 @@ export {
   useRecentSong,
   useAlbumArtLoadingIds,
   useIsLoadingAlbumArt,
+  useIsRecentsLoading,
   type RecentSong,
 } from "./RecentSongsStore"
 

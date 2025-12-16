@@ -6,6 +6,11 @@ import { Bug, SpotifyLogo, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { useCallback, useState } from "react"
 
+export interface AttributionSource {
+  readonly name: string
+  readonly url: string
+}
+
 export interface SongInfoModalProps {
   readonly isOpen: boolean
   readonly onClose: () => void
@@ -15,7 +20,8 @@ export interface SongInfoModalProps {
   readonly bpm: number | null
   readonly musicalKey: string | null
   readonly spotifyId: string | null
-  readonly bpmSource: string | null
+  readonly bpmSource: AttributionSource | null
+  readonly lyricsSource: AttributionSource | null
   readonly albumArt: string | null
 }
 
@@ -35,6 +41,7 @@ export function SongInfoModal({
   musicalKey,
   spotifyId,
   bpmSource,
+  lyricsSource,
   albumArt,
 }: SongInfoModalProps) {
   const [showReportModal, setShowReportModal] = useState(false)
@@ -97,10 +104,7 @@ export function SongInfoModal({
                 {bpm !== null && (
                   <div className="flex items-center justify-between">
                     <span className="text-neutral-400">BPM</span>
-                    <span className="text-white">
-                      {bpm}
-                      {bpmSource && <span className="ml-1 text-neutral-500">via {bpmSource}</span>}
-                    </span>
+                    <span className="text-white">{bpm}</span>
                   </div>
                 )}
 
@@ -122,6 +126,40 @@ export function SongInfoModal({
                       <SpotifyLogo size={20} weight="fill" />
                       Open in Spotify
                     </a>
+                  </div>
+                )}
+
+                {(lyricsSource || bpmSource) && (
+                  <div className="mt-4 pt-4 border-t border-neutral-800">
+                    <p className="text-xs text-neutral-500">
+                      {lyricsSource && (
+                        <>
+                          Lyrics from{" "}
+                          <a
+                            href={lyricsSource.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-neutral-400 transition-colors"
+                          >
+                            {lyricsSource.name}
+                          </a>
+                        </>
+                      )}
+                      {lyricsSource && bpmSource && " • "}
+                      {bpmSource && (
+                        <>
+                          BPM from{" "}
+                          <a
+                            href={bpmSource.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-neutral-400 transition-colors"
+                          >
+                            {bpmSource.name}
+                          </a>
+                        </>
+                      )}
+                    </p>
                   </div>
                 )}
 
@@ -151,7 +189,7 @@ export function SongInfoModal({
           bpm,
           key: musicalKey,
           spotifyId,
-          bpmSource,
+          bpmSource: bpmSource?.name ?? null,
         }}
       />
     </>
