@@ -1,7 +1,13 @@
 "use client"
 
 import { springs } from "@/animations"
-import { type Setlist, setlistsStore, useIsAuthenticated, useSetlists, useSetlistsLoading } from "@/core"
+import {
+  type Setlist,
+  setlistsStore,
+  useIsAuthenticated,
+  useSetlists,
+  useSetlistsLoading,
+} from "@/core"
 import { Check, MusicNote, Plus, SpinnerGap, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
@@ -67,10 +73,13 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
     [addingToSetlistId, song, onClose],
   )
 
-  const handleCreateSetlist = useCallback((setlist: Setlist) => {
-    setShowCreateModal(false)
-    handleAddToSetlist(setlist.id)
-  }, [handleAddToSetlist])
+  const handleCreateSetlist = useCallback(
+    (setlist: Setlist) => {
+      setShowCreateModal(false)
+      handleAddToSetlist(setlist.id)
+    },
+    [handleAddToSetlist],
+  )
 
   const handleClose = useCallback(() => {
     setAddingToSetlistId(null)

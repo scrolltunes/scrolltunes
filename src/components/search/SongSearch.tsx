@@ -38,7 +38,7 @@ function formatDuration(ms: number): string {
 function SearchSkeleton() {
   return (
     <div
-      className="mt-3 rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800"
+      className="absolute top-full left-0 right-0 z-50 mt-3 rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800 shadow-2xl"
       aria-label="Loading search results"
     >
       {[0, 1, 2, 3].map(i => (
@@ -257,8 +257,10 @@ export const SongSearch = memo(function SongSearch({
 
   return (
     <div className={`w-full ${className}`}>
-      {/* Search input - fixed position at top */}
-      <div className="relative z-10">
+      {/* Search input and results dropdown container */}
+      <div className="relative">
+        {/* Search input */}
+        <div className="relative z-10">
         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
           {isLoading ? (
             <CircleNotch size={20} weight="bold" className="text-indigo-500 animate-spin" />
@@ -292,9 +294,10 @@ export const SongSearch = memo(function SongSearch({
             </motion.button>
           )}
         </AnimatePresence>
-      </div>
+        </div>
 
-      <AnimatePresence>
+        {/* Floating dropdown for results, error, empty, and loading states */}
+        <AnimatePresence>
         {error && (
           <motion.div
             key="error"
@@ -302,7 +305,7 @@ export const SongSearch = memo(function SongSearch({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={springs.default}
-            className="mt-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex flex-col items-center gap-3"
+            className="absolute top-full left-0 right-0 z-50 mt-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex flex-col items-center gap-3 shadow-2xl backdrop-blur-sm"
           >
             <div className="flex items-center gap-2 text-red-400">
               <WarningCircle size={20} weight="fill" />
@@ -319,7 +322,7 @@ export const SongSearch = memo(function SongSearch({
         )}
 
         {!error && hasSearched && results.length === 0 && !isPending && (
-          <div className="mt-3 p-8 flex flex-col items-center gap-3 text-center">
+          <div className="absolute top-full left-0 right-0 z-50 mt-3 p-8 flex flex-col items-center gap-3 text-center bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl">
             <MusicNoteSimple size={32} weight="duotone" className="text-neutral-600" />
             <div>
               <p className="text-neutral-400">No songs found for "{query}"</p>
@@ -335,7 +338,7 @@ export const SongSearch = memo(function SongSearch({
 
       {!error && results.length > 0 && (
         <ul
-          className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800"
+          className="absolute top-full left-0 right-0 z-50 mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800 shadow-2xl"
           aria-label="Search results"
         >
           {results.map(track => (
@@ -382,6 +385,7 @@ export const SongSearch = memo(function SongSearch({
           ))}
         </ul>
       )}
+      </div>
     </div>
   )
 })

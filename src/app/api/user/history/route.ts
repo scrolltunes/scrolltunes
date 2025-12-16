@@ -4,6 +4,22 @@ import { userSongItems } from "@/lib/db/schema"
 import { and, desc, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 
+export async function DELETE() {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const userId = session.user.id
+
+  await db
+    .update(userSongItems)
+    .set({ inHistory: false })
+    .where(and(eq(userSongItems.userId, userId), eq(userSongItems.inHistory, true)))
+
+  return NextResponse.json({ success: true })
+}
+
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) {

@@ -12,12 +12,21 @@ class RecentSongsStore {
   private listeners = new Set<() => void>()
   private albumArtListeners = new Set<() => void>()
   private syncListeners = new Set<() => void>()
+  private initializedListeners = new Set<() => void>()
+  private expectedCountListeners = new Set<() => void>()
   private state: readonly RecentSong[] = []
   private loadingAlbumArtIds = new Set<number>()
   private isSyncingFromServer = false
+  private isInitializedState = false
+  private hadLocalCache = false
+  private expectedCount: number | null = null
 
   constructor() {
     this.loadFromStorage()
+  }
+
+  hasLoadedFromCache(): boolean {
+    return this.hadLocalCache
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -78,6 +87,42 @@ class RecentSongsStore {
     this.notifySyncListeners()
   }
 
+  subscribeInitialized = (listener: () => void): (() => void) => {
+    this.initializedListeners.add(listener)
+    return () => this.initializedListeners.delete(listener)
+  }
+
+  getInitializedSnapshot = (): boolean => this.isInitializedState
+
+  private notifyInitializedListeners(): void {
+    for (const listener of this.initializedListeners) {
+      listener()
+    }
+  }
+
+  setInitialized(initialized: boolean): void {
+    this.isInitializedState = initialized
+    this.notifyInitializedListeners()
+  }
+
+  subscribeExpectedCount = (listener: () => void): (() => void) => {
+    this.expectedCountListeners.add(listener)
+    return () => this.expectedCountListeners.delete(listener)
+  }
+
+  getExpectedCountSnapshot = (): number | null => this.expectedCount
+
+  private notifyExpectedCountListeners(): void {
+    for (const listener of this.expectedCountListeners) {
+      listener()
+    }
+  }
+
+  setExpectedCount(count: number): void {
+    this.expectedCount = count
+    this.notifyExpectedCountListeners()
+  }
+
   private loadFromStorage(): void {
     if (typeof window === "undefined") return
 
@@ -85,10 +130,11 @@ class RecentSongsStore {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored) as readonly RecentSong[]
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           this.state = [...parsed]
             .sort((a, b) => b.lastPlayedAt - a.lastPlayedAt)
             .slice(0, MAX_RECENT_SONGS)
+          this.hadLocalCache = true
         }
       }
     } catch {
@@ -207,9 +253,16 @@ class RecentSongsStore {
   }
 
   /**
-   * Clear all recent songs
+   * Clear all recent songs (local and server-side if authenticated)
    */
-  clear(): void {
+  async clear(): Promise<void> {
+    if (accountStore.isAuthenticated()) {
+      try {
+        await fetch("/api/user/history", { method: "DELETE" })
+      } catch {
+        // Server delete failed, still clear localStorage
+      }
+    }
     this.setState(() => [])
   }
 
@@ -243,7 +296,6 @@ class RecentSongsStore {
       playCount: number
     }>,
   ): void {
-    this.setSyncing(true)
     const songsNeedingAlbumArt: number[] = []
 
     const recentSongs: RecentSong[] = songs
@@ -274,7 +326,6 @@ class RecentSongsStore {
     this.state = recentSongs.slice(0, MAX_RECENT_SONGS)
     this.saveToStorage()
     this.notify()
-    this.setSyncing(false)
 
     if (songsNeedingAlbumArt.length > 0) {
       this.fetchAlbumArtInBackground(songsNeedingAlbumArt)
@@ -373,6 +424,22 @@ export function useIsRecentsLoading(): boolean {
     recentSongsStore.subscribeSyncing,
     recentSongsStore.getSyncingSnapshot,
     () => false,
+  )
+}
+
+export function useIsRecentsInitialized(): boolean {
+  return useSyncExternalStore(
+    recentSongsStore.subscribeInitialized,
+    recentSongsStore.getInitializedSnapshot,
+    () => false,
+  )
+}
+
+export function useExpectedRecentsCount(): number | null {
+  return useSyncExternalStore(
+    recentSongsStore.subscribeExpectedCount,
+    recentSongsStore.getExpectedCountSnapshot,
+    () => null,
   )
 }
 
