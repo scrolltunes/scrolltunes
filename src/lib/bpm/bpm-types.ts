@@ -1,3 +1,5 @@
+import { createSpotifyFilter } from "@web-scrobbler/metadata-filter"
+
 /**
  * BPM domain types
  */
@@ -18,21 +20,19 @@ export interface BPMResult {
   readonly key: string | null
 }
 
-/**
- * Simplify title by removing parenthetical suffixes and remaster labels
- */
+const spotifyFilter = createSpotifyFilter()
+
 function simplifyTitle(raw: string): string {
-  let title = raw.toLowerCase().trim()
+  // First pass: use the Spotify filter to clean up common remaster suffixes
+  let title = spotifyFilter.filterField("track", raw)
 
-  // Remove anything in parentheses/brackets at the end
-  title = title.replace(/\s*[\(\[][^\)\]]*[\)\]]\s*$/g, "")
-
-  // Remove common suffixes
+  // Second pass: remove common parenthetical suffixes the library misses
   title = title
     .replace(
-      /\s*-\s*(remaster(ed)?(\s+\d{4})?|radio edit|single version|live|acoustic|remix).*$/gi,
+      /\s*[\(\[](?:radio edit|single version|acoustic|deluxe(?: edition)?|explicit|clean|instrumental|extended|original mix)[\)\]]\s*$/gi,
       "",
     )
+    .toLowerCase()
     .trim()
 
   // Collapse whitespace and remove punctuation
@@ -41,9 +41,6 @@ function simplifyTitle(raw: string): string {
   return title
 }
 
-/**
- * Simplify artist by removing "feat." and variations
- */
 function simplifyArtist(raw: string): string {
   let artist = raw.toLowerCase().trim()
 

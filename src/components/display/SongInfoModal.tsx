@@ -2,9 +2,10 @@
 
 import { springs } from "@/animations"
 import { ReportIssueModal } from "@/components/feedback"
+import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { Bug, SpotifyLogo, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 
 export interface AttributionSource {
   readonly name: string
@@ -45,6 +46,9 @@ export function SongInfoModal({
   albumArt,
 }: SongInfoModalProps) {
   const [showReportModal, setShowReportModal] = useState(false)
+
+  const displayTitle = useMemo(() => normalizeTrackName(title), [title])
+  const displayArtist = useMemo(() => normalizeArtistName(artist), [artist])
 
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -90,8 +94,8 @@ export function SongInfoModal({
                   </div>
                 )}
                 <div className="min-w-0">
-                  <h2 className="text-xl font-semibold text-white">{title}</h2>
-                  <p className="text-neutral-400">{artist}</p>
+                  <h2 className="text-xl font-semibold text-white">{displayTitle}</h2>
+                  <p className="text-neutral-400">{displayArtist}</p>
                 </div>
               </div>
 

@@ -27,6 +27,7 @@ import {
 } from "@/hooks"
 import { type LyricsApiResponse, isLyricsApiSuccess } from "@/lib"
 import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
+import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { parseTrackSlugWithId } from "@/lib/slug"
 import { soundSystem } from "@/sounds"
 import {
@@ -342,7 +343,8 @@ export default function SongPage() {
 
   const shouldShowHeader = !isLoaded || isHeaderVisible
   const currentBpm = loadState._tag === "Loaded" ? loadState.bpm : null
-  const songTitle = loadState._tag === "Loaded" ? loadState.lyrics.title : null
+  const songTitle = loadState._tag === "Loaded" ? normalizeTrackName(loadState.lyrics.title) : null
+  const songArtist = loadState._tag === "Loaded" ? normalizeArtistName(loadState.lyrics.artist) : null
 
   if (loadState._tag === "Loading") {
     return (
@@ -424,7 +426,7 @@ export default function SongPage() {
               )}
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-sm font-medium truncate">{songTitle}</span>
-                <span className="text-xs text-neutral-500 truncate">{loadState.lyrics.artist}</span>
+                <span className="text-xs text-neutral-500 truncate">{songArtist}</span>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">

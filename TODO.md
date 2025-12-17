@@ -227,6 +227,9 @@
 - [x] Search top 8 Spotify results in parallel against LRCLIB
 - [x] Deduplicate results by normalized track+artist
 - [x] Fall back to LRCLIB keyword search (`q=`) if Spotify fails
+- [x] Normalize display names using `@web-scrobbler/metadata-filter` (strips remaster labels, radio edit, feat., etc.)
+- [x] Show normalized titles/artists/albums in all UI (search, recents, song page, modals)
+- [x] Keep original names for storage, caching, and API lookups
 - [ ] LRCLIB's `/api/get` can match by exact signature (title, artist, album, duration ±2s)
 
 ### Chords Integration

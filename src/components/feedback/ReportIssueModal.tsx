@@ -1,9 +1,10 @@
 "use client"
 
 import { springs } from "@/animations"
+import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { Bug, CheckCircle, PaperPlaneTilt, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 export interface SongContext {
   readonly title: string
@@ -42,6 +43,15 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
 
   const hasMissingBpm = songContext && !songContext.bpm
   const isDescriptionRequired = !hasMissingBpm
+
+  const displayTitle = useMemo(
+    () => (songContext ? normalizeTrackName(songContext.title) : ""),
+    [songContext],
+  )
+  const displayArtist = useMemo(
+    () => (songContext ? normalizeArtistName(songContext.artist) : ""),
+    [songContext],
+  )
 
   useEffect(() => {
     if (submitState !== "success") {
@@ -96,19 +106,16 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
       }
 
       if (songContext) {
-        formData.song_title = songContext.title
-        formData.song_artist = songContext.artist
+        formData.song_title_original = songContext.title
+        formData.song_title_normalized = displayTitle
+        formData.song_artist_original = songContext.artist
+        formData.song_artist_normalized = displayArtist
         formData.song_duration = formatDuration(songContext.duration)
         formData.spotify_id = songContext.spotifyId ?? "N/A"
         formData.bpm = songContext.bpm?.toString() ?? "Missing"
         formData.key = songContext.key ?? "Missing"
         formData.bpm_source = songContext.bpmSource ?? "N/A"
         formData.lrclib_id = songContext.lrclibId?.toString() ?? "N/A"
-        formData.bpm_search_raw = `title: "${songContext.title}", artist: "${songContext.artist}"${songContext.spotifyId ? `, spotifyId: "${songContext.spotifyId}"` : ""}`
-        const normalizedTitle = songContext.title.toLowerCase().trim().replace(/\s*[\(\[][^\)\]]*[\)\]]\s*$/g, "").replace(/\s*-\s*(remaster(ed)?(\s+\d{4})?|radio edit|single version|live|acoustic|remix).*$/gi, "").trim()
-        const normalizedArtist = songContext.artist.toLowerCase().trim().replace(/\s+(feat\.?|ft\.?|featuring|&)\s+.*$/gi, "")
-        formData.bpm_search_artist = normalizedArtist
-        formData.bpm_search_track = normalizedTitle
       }
 
       try {
@@ -131,7 +138,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
         setSubmitState("error")
       }
     },
-    [description, email, songContext, onClose, isDescriptionRequired, hasMissingBpm],
+    [description, email, songContext, isDescriptionRequired, hasMissingBpm, displayTitle, displayArtist],
   )
 
   const handleClose = useCallback(() => {
@@ -180,8 +187,8 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
               {songContext && (
                 <div className="rounded-lg bg-neutral-800/50 p-3 text-sm">
                   <div className="text-neutral-400 mb-1">Reporting issue for:</div>
-                  <div className="text-white font-medium">{songContext.title}</div>
-                  <div className="text-neutral-500">{songContext.artist}</div>
+                  <div className="text-white font-medium">{displayTitle}</div>
+                  <div className="text-neutral-500">{displayArtist}</div>
                   {!songContext.bpm && (
                     <div className="mt-2 text-amber-500 text-xs">⚠ BPM data is missing</div>
                   )}

@@ -2,6 +2,7 @@
 
 import { AlbumArtSkeleton, FavoriteButton } from "@/components/ui"
 import { recentSongsStore, useRecentSongsState } from "@/core"
+import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { MAX_RECENT_SONGS } from "@/lib/recent-songs-types"
 import { makeCanonicalPath } from "@/lib/slug"
 
@@ -101,6 +102,8 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
         <ul className="space-y-2" aria-label="Recently played songs">
           {recents.map(song => {
             const isLoadingAlbumArt = loadingAlbumArtIds.has(song.id)
+            const displayTitle = normalizeTrackName(song.title)
+            const displayArtist = normalizeArtistName(song.artist)
             return (
               <li key={song.id}>
                 <div className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition-colors">
@@ -108,7 +111,7 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
                     type="button"
                     onClick={() => handleClick(song)}
                     className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                    aria-label={`${song.title} by ${song.artist}`}
+                    aria-label={`${displayTitle} by ${displayArtist}`}
                   >
                     <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
                       {isLoadingAlbumArt ? (
@@ -121,8 +124,8 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium truncate">{song.title}</p>
-                      <p className="text-sm text-neutral-500 truncate">{song.artist}</p>
+                      <p className="text-white font-medium truncate">{displayTitle}</p>
+                      <p className="text-sm text-neutral-500 truncate">{displayArtist}</p>
                     </div>
                   </button>
 

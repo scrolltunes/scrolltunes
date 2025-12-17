@@ -8,10 +8,11 @@ import {
   useSetlists,
   useSetlistsLoading,
 } from "@/core"
+import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { Check, MusicNote, Plus, SpinnerGap, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { CreateSetlistModal } from "./CreateSetlistModal"
 
 export interface AddToSetlistModalProps {
@@ -31,6 +32,9 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
   const [addingToSetlistId, setAddingToSetlistId] = useState<string | null>(null)
   const [successSetlistId, setSuccessSetlistId] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+
+  const displayTitle = useMemo(() => normalizeTrackName(song.title), [song.title])
+  const displayArtist = useMemo(() => normalizeArtistName(song.artist), [song.artist])
 
   useEffect(() => {
     if (isOpen && isAuthenticated) {
@@ -117,7 +121,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
 
               <h2 className="text-xl font-semibold text-white mb-2 pr-8">Add to setlist</h2>
               <p className="text-sm text-neutral-400 mb-4 truncate">
-                {song.title} — {song.artist}
+                {displayTitle} — {displayArtist}
               </p>
 
               {!isAuthenticated ? (

@@ -197,6 +197,12 @@ Play instrumental backing tracks for true karaoke experience:
 - User preferences and history (song IDs only)
 - Session data (temporary)
 
+**Display vs. Storage Normalization**:
+- **Display**: Always show normalized titles/artists to users (e.g., "Song" not "Song (2020 Remaster)")
+- **Storage**: Use original names or IDs for storage, caching, and API lookups
+- Normalization uses `@web-scrobbler/metadata-filter` library to strip remaster labels, radio edit suffixes, feat. artists, etc.
+- This ensures consistent user experience while maintaining data integrity for matching across providers
+
 **Compliance**:
 - Adhere to TOS of all integrated services (Spotify, YouTube, lyrics APIs)
 - Display proper attribution as required by API providers

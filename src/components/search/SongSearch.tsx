@@ -4,6 +4,8 @@ import { springs } from "@/animations"
 import { VoiceSearchButton } from "@/components/audio"
 import { useIsAuthenticated, useVoiceActivity } from "@/core"
 import { useVoiceSearch } from "@/hooks"
+import { normalizeTrackKey } from "@/lib/bpm"
+import { normalizeAlbumName } from "@/lib/normalize-track"
 import type { SearchApiResponse, SearchResultTrack } from "@/lib/search-api-types"
 import { makeCanonicalPath } from "@/lib/slug"
 import {
@@ -24,6 +26,38 @@ interface VerifyResponse {
   readonly lrclibId?: number
   readonly trackName?: string
   readonly artistName?: string
+}
+
+interface NormalizedSearchResult extends SearchResultTrack {
+  readonly displayName: string
+  readonly displayArtist: string
+  readonly displayAlbum: string
+}
+
+function deduplicateTracks(tracks: SearchResultTrack[]): NormalizedSearchResult[] {
+  const seen = new Map<string, NormalizedSearchResult>()
+
+  for (const track of tracks) {
+    const normalized = normalizeTrackKey({ title: track.name, artist: track.artist })
+    const key = `${normalized.artist}:${normalized.title}`
+
+    if (!seen.has(key)) {
+      const displayName =
+        normalized.title.charAt(0).toUpperCase() + normalized.title.slice(1)
+      const displayArtist =
+        normalized.artist.charAt(0).toUpperCase() + normalized.artist.slice(1)
+      const displayAlbum = track.album ? normalizeAlbumName(track.album) : ""
+
+      seen.set(key, {
+        ...track,
+        displayName,
+        displayArtist,
+        displayAlbum,
+      })
+    }
+  }
+
+  return Array.from(seen.values())
 }
 
 export interface SongSearchProps {
@@ -67,7 +101,7 @@ export const SongSearch = memo(function SongSearch({
   const voiceSearch = useVoiceSearch()
   const voiceActivity = useVoiceActivity()
   const [query, setQuery] = useState("")
-  const [results, setResults] = useState<SearchResultTrack[]>([])
+  const [results, setResults] = useState<NormalizedSearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isPending, setIsPending] = useState(false) // True immediately on typing
   const [error, setError] = useState<string | null>(null)
@@ -76,7 +110,7 @@ export const SongSearch = memo(function SongSearch({
   const [_inlineMessage, setInlineMessage] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const cacheRef = useRef(new Map<string, SearchResultTrack[]>())
+  const cacheRef = useRef(new Map<string, NormalizedSearchResult[]>())
   const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastFinalTranscriptRef = useRef<string | null>(null)
 
@@ -124,7 +158,7 @@ export const SongSearch = memo(function SongSearch({
       }
 
       const data: SearchApiResponse = await response.json()
-      const tracks = data.tracks ?? []
+      const tracks = deduplicateTracks(data.tracks ?? [])
       cacheRef.current.set(cacheKey, tracks)
       setResults(tracks)
       setHasSearched(true)
@@ -430,9 +464,9 @@ export const SongSearch = memo(function SongSearch({
                 </div>
 
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="text-white font-medium truncate">{track.name}</p>
+                  <p className="text-white font-medium truncate">{track.displayName}</p>
                   <p className="text-sm text-neutral-500 truncate">
-                    {track.artist}{track.album && track.album !== "-" ? ` • ${track.album}` : ""}
+                    {track.displayArtist}{track.displayAlbum && track.displayAlbum !== "-" ? ` • ${track.displayAlbum}` : ""}
                   </p>
                 </div>
 
