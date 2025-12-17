@@ -52,6 +52,10 @@ export default function LoginPage() {
     signIn("google", { callbackUrl: "/" })
   }
 
+  const handleSpotifySignIn = () => {
+    signIn("spotify", { callbackUrl: "/" })
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
       <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
@@ -102,9 +106,8 @@ export default function LoginPage() {
 
               <button
                 type="button"
-                disabled
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#1DB954] text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Coming soon"
+                onClick={handleSpotifySignIn}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#1DB954] text-white font-medium rounded-lg hover:bg-[#1ed760] transition-colors"
               >
                 <SpotifyLogo />
                 Continue with Spotify

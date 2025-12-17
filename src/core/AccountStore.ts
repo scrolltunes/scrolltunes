@@ -71,12 +71,12 @@ export class AccountStore {
       }
 
       const data = (await response.json()) as {
-        user: AccountUser
+        user: AccountUser | null
         profile: AccountProfile | null
       }
 
       this.setState({
-        isAuthenticated: true,
+        isAuthenticated: data.user !== null,
         isLoading: false,
         user: data.user,
         profile: data.profile,

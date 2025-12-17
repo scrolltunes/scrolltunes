@@ -98,6 +98,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             accessTokenEncrypted: encryptToken(account.access_token),
             refreshTokenEncrypted: encryptToken(account.refresh_token),
             expiresAt,
+            scope: account.scope ?? null,
+            tokenType: account.token_type ?? null,
           })
           .onConflictDoUpdate({
             target: schema.userSpotifyTokens.userId,
@@ -105,6 +107,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               accessTokenEncrypted: encryptToken(account.access_token),
               refreshTokenEncrypted: encryptToken(account.refresh_token),
               expiresAt,
+              scope: account.scope ?? null,
+              tokenType: account.token_type ?? null,
               updatedAt: new Date(),
             },
           })

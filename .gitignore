@@ -31,3 +31,6 @@ npm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 .idea
+
+# Local HTTPS certs
+localhost*.pem
