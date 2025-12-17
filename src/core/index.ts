@@ -133,5 +133,6 @@ export {
   useChordsData,
   useTranspose,
   useShowChords,
+  useUniqueChords,
   type ChordsState,
 } from "./ChordsStore"

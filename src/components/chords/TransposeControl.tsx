@@ -1,20 +1,18 @@
 "use client"
 
-import { ArrowCounterClockwise, Minus, Plus } from "@phosphor-icons/react"
+import { Minus, Plus } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { memo, useCallback } from "react"
 
 export interface TransposeControlProps {
   readonly value: number
   readonly onChange: (value: number) => void
-  readonly onReset?: () => void
   readonly disabled?: boolean
 }
 
 export const TransposeControl = memo(function TransposeControl({
   value,
   onChange,
-  onReset,
   disabled,
 }: TransposeControlProps) {
   const canDecrease = value > -12
@@ -31,43 +29,33 @@ export const TransposeControl = memo(function TransposeControl({
   }, [value, onChange, canIncrease])
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-neutral-400">Transpose:</span>
       <motion.button
         type="button"
         onClick={handleDecrease}
         disabled={disabled || !canDecrease}
-        className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="flex items-center justify-center w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         aria-label="Transpose down"
         whileTap={{ scale: 0.9 }}
       >
-        <Minus size={16} className="text-neutral-300" />
+        <Minus size={18} className="text-neutral-200" />
       </motion.button>
 
-      <span className="w-8 text-center text-sm font-mono text-neutral-200">{displayValue}</span>
+      <span className="w-10 text-center text-base font-mono font-medium text-neutral-100">
+        {displayValue}
+      </span>
 
       <motion.button
         type="button"
         onClick={handleIncrease}
         disabled={disabled || !canIncrease}
-        className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="flex items-center justify-center w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         aria-label="Transpose up"
         whileTap={{ scale: 0.9 }}
       >
-        <Plus size={16} className="text-neutral-300" />
+        <Plus size={18} className="text-neutral-200" />
       </motion.button>
-
-      {value !== 0 && onReset && (
-        <motion.button
-          type="button"
-          onClick={onReset}
-          disabled={disabled}
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ml-1"
-          aria-label="Reset transpose"
-          whileTap={{ scale: 0.9 }}
-        >
-          <ArrowCounterClockwise size={16} className="text-neutral-300" />
-        </motion.button>
-      )}
     </div>
   )
 })

@@ -1,7 +1,7 @@
 "use client"
 
-import type { SongsterrChordData } from "@/lib/chords"
-import { useSyncExternalStore } from "react"
+import { type SongsterrChordData, transposeChord } from "@/lib/chords"
+import { useMemo, useSyncExternalStore } from "react"
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const CACHE_KEY_PREFIX = "scrolltunes:chords:"
@@ -215,6 +215,23 @@ export function useTranspose(): number {
 
 export function useShowChords(): boolean {
   return useChordsState().showChords
+}
+
+export function useUniqueChords(): string[] {
+  const state = useChordsState()
+
+  return useMemo(() => {
+    if (!state.data) return []
+
+    const allChords = state.data.lines.flatMap(line => line.chords)
+    const unique = [...new Set(allChords)]
+
+    if (state.transposeSemitones !== 0) {
+      return unique.map(chord => transposeChord(chord, state.transposeSemitones)).sort()
+    }
+
+    return unique.sort()
+  }, [state.data, state.transposeSemitones])
 }
 
 export type { ChordsState }

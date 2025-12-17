@@ -10,7 +10,7 @@ import {
   useSetlistsContainingSong,
   useShowChords,
 } from "@/core"
-import { MusicNote, MusicNotes, Plus } from "@phosphor-icons/react"
+import { CaretUp, MusicNote, MusicNotes, Plus, SlidersHorizontal } from "@phosphor-icons/react"
 import { memo } from "react"
 
 export interface SongActionBarProps {
@@ -19,6 +19,8 @@ export interface SongActionBarProps {
   readonly artist: string
   readonly albumArt?: string
   readonly onAddToSetlist: () => void
+  readonly onChordSettingsClick: () => void
+  readonly isChordPanelOpen: boolean
 }
 
 function SetlistIcon({ setlist }: { readonly setlist: Setlist }) {
@@ -43,6 +45,8 @@ export const SongActionBar = memo(function SongActionBar({
   artist,
   albumArt,
   onAddToSetlist,
+  onChordSettingsClick,
+  isChordPanelOpen,
 }: SongActionBarProps) {
   const isAuthenticated = useIsAuthenticated()
   const containingSetlists = useSetlistsContainingSong(songId)
@@ -104,25 +108,54 @@ export const SongActionBar = memo(function SongActionBar({
       {hasChordsAvailable && (
         <>
           <div className="w-px h-6 bg-neutral-700" />
-          {chordsState.data?.capo !== undefined && chordsState.data.capo > 0 && (
-            <span className="px-2 py-1 rounded-full bg-neutral-800/50 text-neutral-400 text-xs font-medium">
-              Capo {chordsState.data.capo}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => chordsStore.toggleShowChords()}
-            className={`flex items-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
-              showChords
-                ? "bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30"
-                : "bg-neutral-800/50 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
+
+          {/* Split button: Chords toggle + Settings dropdown */}
+          <div
+            className={`flex items-center rounded-full overflow-hidden transition-colors ${
+              showChords ? "bg-indigo-600/20" : "bg-neutral-800/50"
             }`}
-            aria-label={showChords ? "Hide chords" : "Show chords"}
-            aria-pressed={showChords}
           >
-            <MusicNotes size={20} weight={showChords ? "fill" : "regular"} />
-            <span>Chords</span>
-          </button>
+            {/* Main button - toggle chords on/off */}
+            <button
+              type="button"
+              onClick={() => chordsStore.toggleShowChords()}
+              className={`flex items-center gap-1.5 px-3 py-2 transition-colors text-sm font-medium ${
+                showChords
+                  ? "text-indigo-400 hover:bg-indigo-600/30"
+                  : "text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
+              }`}
+              aria-label={showChords ? "Hide chords" : "Show chords"}
+              aria-pressed={showChords}
+            >
+              <MusicNotes size={20} weight={showChords ? "fill" : "regular"} />
+              <span>Chords</span>
+            </button>
+
+            {/* Divider */}
+            <div className={`w-px h-5 ${showChords ? "bg-indigo-500/30" : "bg-neutral-600/50"}`} />
+
+            {/* Settings dropdown */}
+            <button
+              type="button"
+              onClick={onChordSettingsClick}
+              disabled={!showChords}
+              className={`flex items-center justify-center w-8 h-9 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                showChords
+                  ? isChordPanelOpen
+                    ? "text-indigo-300 bg-indigo-600/30"
+                    : "text-indigo-400 hover:bg-indigo-600/30"
+                  : "text-neutral-400"
+              }`}
+              aria-label={isChordPanelOpen ? "Close chord settings" : "Open chord settings"}
+              aria-expanded={isChordPanelOpen}
+            >
+              {isChordPanelOpen ? (
+                <CaretUp size={14} weight="bold" />
+              ) : (
+                <SlidersHorizontal size={16} />
+              )}
+            </button>
+          </div>
         </>
       )}
     </div>

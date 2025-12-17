@@ -98,3 +98,37 @@ body {
     scrollbar-color: #404040 transparent;
   }
 }
+
+/* Chord diagram SVG styling - always black on white */
+.chord-diagram-svg {
+  background: white;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.chord-diagram-svg svg {
+  width: 100%;
+  height: auto;
+}
+
+.chord-diagram-svg text {
+  fill: black !important;
+}
+
+.chord-diagram-svg line,
+.chord-diagram-svg rect {
+  stroke: #404040 !important;
+}
+
+.chord-diagram-svg circle {
+  fill: black !important;
+}
+
+.chord-diagram-svg circle[fill="white"] {
+  fill: transparent !important;
+  stroke: black !important;
+}
+
+.chord-diagram-svg rect[fill="black"] {
+  fill: black !important;
+}

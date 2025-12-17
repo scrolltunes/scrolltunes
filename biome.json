@@ -14,7 +14,8 @@
       "complexity": { "useLiteralKeys": "error" },
       "a11y": {
         "noSvgWithoutTitle": "off",
-        "useKeyWithClickEvents": "off"
+        "useKeyWithClickEvents": "off",
+        "useSemanticElements": "off"
       }
     }
   },

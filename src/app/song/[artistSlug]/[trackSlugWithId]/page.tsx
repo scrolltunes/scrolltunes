@@ -2,7 +2,7 @@
 
 import { springs } from "@/animations"
 import { FloatingMetronome, FontSizeControl, VoiceIndicator } from "@/components/audio"
-import { TransposeControl } from "@/components/chords"
+import { ChordInfoPanel, TransposeControl } from "@/components/chords"
 import {
   FloatingInfoButton,
   LyricsDisplay,
@@ -100,6 +100,7 @@ export default function SongPage() {
   const [showInfo, setShowInfo] = useState(false)
   const [showAddToSetlist, setShowAddToSetlist] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
+  const [showChordPanel, setShowChordPanel] = useState(() => preferencesStore.getEnableChords())
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
@@ -522,13 +523,26 @@ export default function SongPage() {
 
       <main className="pt-16 h-screen flex flex-col">
         {lrclibId !== null && (
-          <SongActionBar
-            songId={lrclibId}
-            title={loadState.lyrics.title}
-            artist={loadState.lyrics.artist}
-            {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
-            onAddToSetlist={() => setShowAddToSetlist(true)}
-          />
+          <div className="relative">
+            <SongActionBar
+              songId={lrclibId}
+              title={loadState.lyrics.title}
+              artist={loadState.lyrics.artist}
+              {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
+              onAddToSetlist={() => setShowAddToSetlist(true)}
+              onChordSettingsClick={() => setShowChordPanel(prev => !prev)}
+              isChordPanelOpen={showChordPanel}
+            />
+            <ChordInfoPanel
+              isOpen={showChordPanel}
+              {...(chordsState.data?.tuning !== undefined && { tuning: chordsState.data.tuning })}
+              {...(loadState._tag === "Loaded" &&
+                loadState.key !== null && { musicalKey: loadState.key })}
+              {...(chordsState.data?.capo !== undefined && { capo: chordsState.data.capo })}
+              transpose={transpose}
+              onTransposeChange={v => chordsStore.setTranspose(v)}
+            />
+          </div>
         )}
         <LyricsDisplay className="flex-1 pb-12" />
 
@@ -567,7 +581,9 @@ export default function SongPage() {
                           type="button"
                           onClick={() => chordsStore.toggleShowChords()}
                           className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                            showChords ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400"
+                            showChords
+                              ? "bg-indigo-600 text-white"
+                              : "bg-neutral-800 text-neutral-400"
                           }`}
                           disabled={chordsState.status !== "ready"}
                         >
@@ -579,7 +595,6 @@ export default function SongPage() {
                           <TransposeControl
                             value={transpose}
                             onChange={v => chordsStore.setTranspose(v)}
-                            onReset={() => chordsStore.resetTranspose()}
                           />
                         )}
                       </div>
