@@ -1,5 +1,6 @@
 "use client"
 
+import type { Session } from "next-auth"
 import { useSyncExternalStore } from "react"
 
 export interface AccountUser {
@@ -25,7 +26,7 @@ export interface AccountState {
 
 const DEFAULT_STATE: AccountState = {
   isAuthenticated: false,
-  isLoading: true,
+  isLoading: false,
   user: null,
   profile: null,
   lastSyncAt: null,
@@ -82,6 +83,28 @@ export class AccountStore {
         profile: data.profile,
       })
     } catch {
+      this.setState({
+        isAuthenticated: false,
+        isLoading: false,
+        user: null,
+        profile: null,
+      })
+    }
+  }
+
+  initializeFromSession(session: Session | null): void {
+    if (session?.user) {
+      this.setState({
+        isAuthenticated: true,
+        isLoading: false,
+        user: {
+          id: session.user.id,
+          email: session.user.email ?? "",
+          name: session.user.name ?? null,
+          image: session.user.image ?? null,
+        },
+      })
+    } else {
       this.setState({
         isAuthenticated: false,
         isLoading: false,

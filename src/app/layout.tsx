@@ -1,3 +1,4 @@
+import { auth } from "@/auth"
 import { AuthProvider } from "@/components/auth"
 import { DevTitle, Footer, FooterProvider, ThemeProvider } from "@/components/layout"
 import type { Metadata } from "next"
@@ -77,15 +78,17 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const session = await auth()
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <AuthProvider>
+        <AuthProvider session={session}>
           <ThemeProvider>
             <FooterProvider>
               <DevTitle />

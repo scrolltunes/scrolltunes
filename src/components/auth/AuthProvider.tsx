@@ -2,21 +2,24 @@
 
 import { accountStore, favoritesStore, recentSongsStore } from "@/core"
 import { fetchFavorites, fetchHistory } from "@/lib/sync-service"
+import type { Session } from "next-auth"
 import { SessionProvider } from "next-auth/react"
 import { type ReactNode, useEffect } from "react"
 
 interface AuthProviderProps {
   readonly children: ReactNode
+  readonly session: Session | null
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children, session }: AuthProviderProps) {
+  useEffect(() => {
+    accountStore.initializeFromSession(session)
+  }, [session])
+
   useEffect(() => {
     async function initAndSync() {
       const hasCache = recentSongsStore.hasLoadedFromCache()
-
-      await accountStore.initialize()
-
-      const isAuth = accountStore.isAuthenticated()
+      const isAuth = session !== null
 
       if (!isAuth) {
         if (!hasCache) {
@@ -73,7 +76,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     initAndSync()
-  }, [])
+  }, [session])
 
   return <SessionProvider>{children}</SessionProvider>
 }
