@@ -7,8 +7,10 @@ import {
   DeviceMobile,
   DownloadSimple,
   Eye,
+  Flask,
   Hand,
   Moon,
+  MusicNotes,
   SignOut,
   Timer,
   Trash,
@@ -340,6 +342,10 @@ export default function SettingsPage() {
     preferencesStore.setShakeToRestartEnabled(!preferences.shakeToRestartEnabled)
   }, [preferences.shakeToRestartEnabled])
 
+  const handleToggleEnableChords = useCallback(() => {
+    preferencesStore.setEnableChords(!preferences.enableChords)
+  }, [preferences.enableChords])
+
   const handleToggleDistractionFree = useCallback(() => {
     preferencesStore.setDistractionFreeMode(!preferences.distractionFreeMode)
   }, [preferences.distractionFreeMode])
@@ -455,6 +461,25 @@ export default function SettingsPage() {
                 label="Shake to restart"
                 description="Shake device to restart from beginning"
                 icon={<DeviceMobile size={20} weight="duotone" />}
+              />
+            </div>
+          </section>
+
+          {/* Experimental Section */}
+          <section>
+            <div className="flex items-center gap-2 mb-3 px-1">
+              <Flask size={16} className="text-amber-500" />
+              <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider">
+                Experimental
+              </h2>
+            </div>
+            <div className="space-y-3">
+              <Toggle
+                enabled={preferences.enableChords}
+                onToggle={handleToggleEnableChords}
+                label="Enable chords"
+                description="Show guitar chords above lyrics"
+                icon={<MusicNotes size={20} weight="duotone" />}
               />
             </div>
           </section>

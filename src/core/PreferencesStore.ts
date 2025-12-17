@@ -20,6 +20,7 @@ export interface Preferences {
   readonly themeMode: ThemeMode
   readonly metronomeEnabled: boolean
   readonly fontSize: number
+  readonly enableChords: boolean
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -31,6 +32,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   themeMode: "dark",
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,
+  enableChords: false,
 }
 
 export class PreferencesStore {
@@ -154,6 +156,14 @@ export class PreferencesStore {
 
   setFontSize(value: number): void {
     this.setState({ fontSize: value })
+  }
+
+  getEnableChords(): boolean {
+    return this.state.enableChords
+  }
+
+  setEnableChords(value: boolean): void {
+    this.setState({ enableChords: value })
   }
 
   reset(): void {

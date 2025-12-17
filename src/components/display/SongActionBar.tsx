@@ -6,6 +6,7 @@ import {
   chordsStore,
   useChordsState,
   useIsAuthenticated,
+  usePreference,
   useSetlistsContainingSong,
   useShowChords,
 } from "@/core"
@@ -46,9 +47,10 @@ export const SongActionBar = memo(function SongActionBar({
   const isAuthenticated = useIsAuthenticated()
   const containingSetlists = useSetlistsContainingSong(songId)
   const isInSetlist = containingSetlists.length > 0
+  const enableChords = usePreference("enableChords")
   const chordsState = useChordsState()
   const showChords = useShowChords()
-  const hasChordsAvailable = chordsState.status === "ready"
+  const hasChordsAvailable = enableChords && chordsState.status === "ready"
 
   return (
     <div className="flex items-center justify-center gap-3 py-4">

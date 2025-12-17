@@ -16,6 +16,7 @@ import { AddToSetlistModal } from "@/components/setlists"
 import {
   type Lyrics,
   chordsStore,
+  preferencesStore,
   recentSongsStore,
   useChordsState,
   usePlayerControls,
@@ -212,6 +213,8 @@ export default function SongPage() {
     const controller = new AbortController()
 
     async function fetchChordsForSong(artist: string, title: string) {
+      if (!preferencesStore.getEnableChords()) return
+
       const normalizedArtist = normalizeArtistName(artist)
       const normalizedTitle = normalizeTrackName(title)
       try {
@@ -549,43 +552,47 @@ export default function SongPage() {
               <div className="max-w-4xl mx-auto p-4 space-y-4">
                 <FontSizeControl />
 
-                {/* Chord controls */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MusicNotes size={20} className="text-neutral-400" />
-                    <span className="text-sm text-neutral-400">Chords</span>
-                  </div>
+                {/* Chord controls - only show when experimental chords feature is enabled */}
+                {preferences.enableChords && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MusicNotes size={20} className="text-neutral-400" />
+                        <span className="text-sm text-neutral-400">Chords</span>
+                      </div>
 
-                  <div className="flex items-center gap-3">
-                    {/* Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => chordsStore.toggleShowChords()}
-                      className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                        showChords ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400"
-                      }`}
-                      disabled={chordsState.status !== "ready"}
-                    >
-                      {showChords ? "On" : "Off"}
-                    </button>
+                      <div className="flex items-center gap-3">
+                        {/* Toggle */}
+                        <button
+                          type="button"
+                          onClick={() => chordsStore.toggleShowChords()}
+                          className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                            showChords ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400"
+                          }`}
+                          disabled={chordsState.status !== "ready"}
+                        >
+                          {showChords ? "On" : "Off"}
+                        </button>
 
-                    {/* Transpose - only show when chords are visible */}
-                    {showChords && chordsState.status === "ready" && (
-                      <TransposeControl
-                        value={transpose}
-                        onChange={v => chordsStore.setTranspose(v)}
-                        onReset={() => chordsStore.resetTranspose()}
-                      />
+                        {/* Transpose - only show when chords are visible */}
+                        {showChords && chordsState.status === "ready" && (
+                          <TransposeControl
+                            value={transpose}
+                            onChange={v => chordsStore.setTranspose(v)}
+                            onReset={() => chordsStore.resetTranspose()}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status indicator */}
+                    {chordsState.status === "loading" && (
+                      <p className="text-xs text-neutral-500">Loading chords...</p>
                     )}
-                  </div>
-                </div>
-
-                {/* Status indicator */}
-                {chordsState.status === "loading" && (
-                  <p className="text-xs text-neutral-500">Loading chords...</p>
-                )}
-                {chordsState.status === "not-found" && (
-                  <p className="text-xs text-neutral-500">No chords available for this song</p>
+                    {chordsState.status === "not-found" && (
+                      <p className="text-xs text-neutral-500">No chords available for this song</p>
+                    )}
+                  </>
                 )}
               </div>
             </motion.div>
