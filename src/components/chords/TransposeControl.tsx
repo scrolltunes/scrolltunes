@@ -1,0 +1,73 @@
+"use client"
+
+import { ArrowCounterClockwise, Minus, Plus } from "@phosphor-icons/react"
+import { motion } from "motion/react"
+import { memo, useCallback } from "react"
+
+export interface TransposeControlProps {
+  readonly value: number
+  readonly onChange: (value: number) => void
+  readonly onReset?: () => void
+  readonly disabled?: boolean
+}
+
+export const TransposeControl = memo(function TransposeControl({
+  value,
+  onChange,
+  onReset,
+  disabled,
+}: TransposeControlProps) {
+  const canDecrease = value > -12
+  const canIncrease = value < 12
+
+  const displayValue = value === 0 ? "0" : value > 0 ? `+${value}` : `${value}`
+
+  const handleDecrease = useCallback(() => {
+    if (canDecrease) onChange(value - 1)
+  }, [value, onChange, canDecrease])
+
+  const handleIncrease = useCallback(() => {
+    if (canIncrease) onChange(value + 1)
+  }, [value, onChange, canIncrease])
+
+  return (
+    <div className="flex items-center gap-1">
+      <motion.button
+        type="button"
+        onClick={handleDecrease}
+        disabled={disabled || !canDecrease}
+        className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        aria-label="Transpose down"
+        whileTap={{ scale: 0.9 }}
+      >
+        <Minus size={16} className="text-neutral-300" />
+      </motion.button>
+
+      <span className="w-8 text-center text-sm font-mono text-neutral-200">{displayValue}</span>
+
+      <motion.button
+        type="button"
+        onClick={handleIncrease}
+        disabled={disabled || !canIncrease}
+        className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        aria-label="Transpose up"
+        whileTap={{ scale: 0.9 }}
+      >
+        <Plus size={16} className="text-neutral-300" />
+      </motion.button>
+
+      {value !== 0 && onReset && (
+        <motion.button
+          type="button"
+          onClick={onReset}
+          disabled={disabled}
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ml-1"
+          aria-label="Reset transpose"
+          whileTap={{ scale: 0.9 }}
+        >
+          <ArrowCounterClockwise size={16} className="text-neutral-300" />
+        </motion.button>
+      )}
+    </div>
+  )
+})

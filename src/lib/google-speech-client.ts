@@ -41,7 +41,7 @@ export function createSpeechClient(): Effect.Effect<SpeechClient, Error> {
       // Fall back to default credentials (ADC)
       return new SpeechClient()
     },
-    catch: (error) =>
+    catch: error =>
       new Error(
         `Failed to create Speech client: ${error instanceof Error ? error.message : String(error)}`,
       ),

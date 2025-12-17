@@ -30,6 +30,4 @@ describe("Spotify-first search", () => {
       console.log(`Top result: "${results[0].trackName}" by ${results[0].artistName}`)
     }
   })
-
-
 })

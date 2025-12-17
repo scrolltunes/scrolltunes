@@ -2,17 +2,27 @@
 
 import { springs } from "@/animations"
 import { FloatingMetronome, FontSizeControl, VoiceIndicator } from "@/components/audio"
-import { FloatingInfoButton, LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
+import { TransposeControl } from "@/components/chords"
+import {
+  FloatingInfoButton,
+  LyricsDisplay,
+  SongActionBar,
+  SongInfoModal,
+} from "@/components/display"
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
 
 import {
   type Lyrics,
+  chordsStore,
   recentSongsStore,
+  useChordsState,
   usePlayerControls,
   usePlayerState,
   usePreferences,
+  useShowChords,
+  useTranspose,
   voiceActivityStore,
 } from "@/core"
 import {
@@ -34,6 +44,7 @@ import {
   ArrowLeft,
   Gear,
   MusicNote,
+  MusicNotes,
   Pause,
   Play,
   SpinnerGap,
@@ -93,6 +104,9 @@ export default function SongPage() {
   const { play, pause, reset, load } = usePlayerControls()
   const preferences = usePreferences()
   const { setSlot } = useFooterSlot()
+  const chordsState = useChordsState()
+  const showChords = useShowChords()
+  const transpose = useTranspose()
 
   const { isListening, isSpeaking, level, startListening, stopListening } = useVoiceTrigger({
     autoPlay: true,
@@ -120,6 +134,7 @@ export default function SongPage() {
     return () => {
       resetRef.current()
       stopListeningRef.current()
+      chordsStore.clear()
     }
   }, [])
 
@@ -327,6 +342,31 @@ export default function SongPage() {
     handleMicPermission()
   }, [loadState._tag, startListening])
 
+  // Fetch chords when lyrics are loaded
+  useEffect(() => {
+    if (loadState._tag !== "Loaded") return
+
+    const { lyrics } = loadState
+
+    async function fetchChords() {
+      try {
+        const searchRes = await fetch(
+          `/api/chords/search?artist=${encodeURIComponent(lyrics.artist)}&title=${encodeURIComponent(lyrics.title)}`,
+        )
+        const searchData = await searchRes.json()
+
+        if (searchData.results && searchData.results.length > 0) {
+          const match = searchData.results[0]
+          await chordsStore.fetchChords(match.songId, match.artist, match.title)
+        }
+      } catch (error) {
+        console.error("Failed to fetch chords:", error)
+      }
+    }
+
+    fetchChords()
+  }, [loadState])
+
   const handleToggleListening = useCallback(async () => {
     if (isListening) {
       stopListening()
@@ -341,7 +381,8 @@ export default function SongPage() {
   const shouldShowHeader = !isLoaded || isHeaderVisible
   const currentBpm = loadState._tag === "Loaded" ? loadState.bpm : null
   const songTitle = loadState._tag === "Loaded" ? normalizeTrackName(loadState.lyrics.title) : null
-  const songArtist = loadState._tag === "Loaded" ? normalizeArtistName(loadState.lyrics.artist) : null
+  const songArtist =
+    loadState._tag === "Loaded" ? normalizeArtistName(loadState.lyrics.artist) : null
 
   if (loadState._tag === "Loading") {
     return (
@@ -505,8 +546,47 @@ export default function SongPage() {
               transition={springs.default}
               className="fixed bottom-7 left-0 right-0 z-20 bg-neutral-900/95 backdrop-blur-lg border-t border-neutral-800"
             >
-              <div className="max-w-4xl mx-auto p-4">
+              <div className="max-w-4xl mx-auto p-4 space-y-4">
                 <FontSizeControl />
+
+                {/* Chord controls */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MusicNotes size={20} className="text-neutral-400" />
+                    <span className="text-sm text-neutral-400">Chords</span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {/* Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => chordsStore.toggleShowChords()}
+                      className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                        showChords ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400"
+                      }`}
+                      disabled={chordsState.status !== "ready"}
+                    >
+                      {showChords ? "On" : "Off"}
+                    </button>
+
+                    {/* Transpose - only show when chords are visible */}
+                    {showChords && chordsState.status === "ready" && (
+                      <TransposeControl
+                        value={transpose}
+                        onChange={v => chordsStore.setTranspose(v)}
+                        onReset={() => chordsStore.resetTranspose()}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Status indicator */}
+                {chordsState.status === "loading" && (
+                  <p className="text-xs text-neutral-500">Loading chords...</p>
+                )}
+                {chordsState.status === "not-found" && (
+                  <p className="text-xs text-neutral-500">No chords available for this song</p>
+                )}
               </div>
             </motion.div>
           )}

@@ -319,7 +319,6 @@ class RecentSongsStore {
   }
 
   private async fetchAlbumArtInBackground(songIds: number[]): Promise<void> {
-
     const fetchPromises = songIds.map(async id => {
       try {
         const response = await fetch(`/api/lyrics/${id}`)

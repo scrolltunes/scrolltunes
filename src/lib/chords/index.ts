@@ -1,0 +1,48 @@
+// Types
+export type {
+  SongsterrSearchResult,
+  ChordProLine,
+  ChordProDocument,
+  ChordData,
+  ChordProElement,
+  ChordProEntry,
+  RawChordProDocument,
+  SongsterrChordLine,
+  SongsterrChordData,
+} from "./songsterr-types"
+
+export {
+  SongsterrError,
+  SongsterrNotFoundError,
+  SongsterrParseError,
+} from "./songsterr-types"
+
+// Client functions
+export {
+  searchSongs,
+  searchSongsAsync,
+  getRawChordProData,
+  getChordData,
+  getChordDataAsync,
+} from "./songsterr-client"
+
+// Parser functions
+export {
+  parseChordProDocument,
+  formatChordName,
+  extractLineText,
+  extractLineChords,
+} from "./chord-parser"
+
+// Matcher functions
+export type { LyricLineWithChords } from "./lyrics-matcher"
+
+export {
+  matchChordsToLyrics,
+  calculateSimilarity,
+  normalizeText,
+  findBestMatch,
+} from "./lyrics-matcher"
+
+// Transpose functions
+export { transposeChord, transposeChordLine } from "./transpose"

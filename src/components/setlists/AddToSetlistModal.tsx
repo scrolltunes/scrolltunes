@@ -54,7 +54,9 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
   const isSongInSetlist = useCallback(
     (setlist: Setlist) => {
       const songIdStr = String(song.songId)
-      return setlist.songs?.some(s => s.songId === songIdStr && s.songProvider === "lrclib") ?? false
+      return (
+        setlist.songs?.some(s => s.songId === songIdStr && s.songProvider === "lrclib") ?? false
+      )
     },
     [song.songId],
   )

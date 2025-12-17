@@ -311,7 +311,7 @@ export class SpeechRecognitionStore {
 
         this.audioChunks = []
 
-        this.mediaRecorder.ondataavailable = (event) => {
+        this.mediaRecorder.ondataavailable = event => {
           if (event.data.size > 0) {
             this.audioChunks.push(event.data)
           }
@@ -323,7 +323,7 @@ export class SpeechRecognitionStore {
           mimeType: this.mediaRecorder.mimeType,
         })
       },
-      catch: (e) =>
+      catch: e =>
         new SpeechRecognitionError({
           code: "AUDIO_CAPTURE_ERROR",
           message: `Failed to set up audio capture: ${String(e)}`,
@@ -332,12 +332,7 @@ export class SpeechRecognitionStore {
   }
 
   private getSupportedMimeType(): string {
-    const mimeTypes = [
-      "audio/webm;codecs=opus",
-      "audio/webm",
-      "audio/ogg;codecs=opus",
-      "audio/mp4",
-    ]
+    const mimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"]
 
     for (const mimeType of mimeTypes) {
       if (MediaRecorder.isTypeSupported(mimeType)) {
@@ -359,7 +354,7 @@ export class SpeechRecognitionStore {
     })
 
     // Convert blob to base64 (browser-compatible)
-    const base64Audio = await new Promise<string>((resolve) => {
+    const base64Audio = await new Promise<string>(resolve => {
       const reader = new FileReader()
       reader.onloadend = () => {
         const dataUrl = reader.result as string
@@ -463,7 +458,9 @@ export class SpeechRecognitionStore {
 
     // Start listening after subscription is set up
     await voiceActivityStore.startListening()
-    speechLog("VAD", "VAD listening started", { isListening: voiceActivityStore.getSnapshot().isListening })
+    speechLog("VAD", "VAD listening started", {
+      isListening: voiceActivityStore.getSnapshot().isListening,
+    })
   }
 
   private cleanupVADIntegration(): void {
@@ -554,7 +551,7 @@ export class SpeechRecognitionStore {
 
   async start(): Promise<void> {
     await Effect.runPromise(
-      Effect.catchAll(this.dispatch(new StartRecognition({})), (e) => {
+      Effect.catchAll(this.dispatch(new StartRecognition({})), e => {
         this.setState({
           errorCode: e.code,
           errorMessage: e.message,

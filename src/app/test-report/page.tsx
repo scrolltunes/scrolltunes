@@ -30,10 +30,14 @@ export default function TestReportPage() {
           <div className="text-lg font-medium">{mockSongContext.title}</div>
           <div className="text-neutral-500">{mockSongContext.artist}</div>
         </div>
-        
+
         <div className="text-sm text-neutral-400 space-y-1">
-          <div><span className="text-neutral-500">LRCLIB ID:</span> {mockSongContext.lrclibId}</div>
-          <div><span className="text-neutral-500">Spotify ID:</span> {mockSongContext.spotifyId}</div>
+          <div>
+            <span className="text-neutral-500">LRCLIB ID:</span> {mockSongContext.lrclibId}
+          </div>
+          <div>
+            <span className="text-neutral-500">Spotify ID:</span> {mockSongContext.spotifyId}
+          </div>
         </div>
 
         <div className="mt-4 text-amber-500 text-sm">⚠ BPM data is missing</div>

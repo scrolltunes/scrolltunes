@@ -138,7 +138,15 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
         setSubmitState("error")
       }
     },
-    [description, email, songContext, isDescriptionRequired, hasMissingBpm, displayTitle, displayArtist],
+    [
+      description,
+      email,
+      songContext,
+      isDescriptionRequired,
+      hasMissingBpm,
+      displayTitle,
+      displayArtist,
+    ],
   )
 
   const handleClose = useCallback(() => {
@@ -244,7 +252,9 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
 
               <button
                 type="submit"
-                disabled={submitState === "submitting" || (isDescriptionRequired && !description.trim())}
+                disabled={
+                  submitState === "submitting" || (isDescriptionRequired && !description.trim())
+                }
                 className="w-full flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-neutral-700 disabled:cursor-not-allowed px-4 py-2.5 text-white font-medium transition-colors"
               >
                 {submitState === "submitting" ? (

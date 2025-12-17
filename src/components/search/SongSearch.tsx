@@ -42,10 +42,8 @@ function deduplicateTracks(tracks: SearchResultTrack[]): NormalizedSearchResult[
     const key = `${normalized.artist}:${normalized.title}`
 
     if (!seen.has(key)) {
-      const displayName =
-        normalized.title.charAt(0).toUpperCase() + normalized.title.slice(1)
-      const displayArtist =
-        normalized.artist.charAt(0).toUpperCase() + normalized.artist.slice(1)
+      const displayName = normalized.title.charAt(0).toUpperCase() + normalized.title.slice(1)
+      const displayArtist = normalized.artist.charAt(0).toUpperCase() + normalized.artist.slice(1)
       const displayAlbum = track.album ? normalizeAlbumName(track.album) : ""
 
       seen.set(key, {
@@ -330,27 +328,55 @@ export const SongSearch = memo(function SongSearch({
       <div className="relative">
         {/* Search input */}
         <div className="relative z-10">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
-          {isLoading ? (
-            <CircleNotch size={20} weight="bold" className="text-indigo-500 animate-spin" />
-          ) : (
-            <MagnifyingGlass size={20} weight="bold" />
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
+            {isLoading ? (
+              <CircleNotch size={20} weight="bold" className="text-indigo-500 animate-spin" />
+            ) : (
+              <MagnifyingGlass size={20} weight="bold" />
+            )}
+          </div>
+
+          <input
+            type="text"
+            value={query}
+            onChange={handleInputChange}
+            placeholder="Search by song title or artist name"
+            className={`w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 border border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
+              isAuthenticated ? (query ? "pr-20" : "pr-12") : "pr-10"
+            }`}
+            aria-label="Search for a song"
+          />
+
+          {isAuthenticated && voiceSearch.isQuotaAvailable && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <AnimatePresence>
+                {query && (
+                  <motion.button
+                    type="button"
+                    onClick={handleClear}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={springs.snap}
+                    className="p-1 text-neutral-500 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    aria-label="Clear search"
+                  >
+                    <X size={16} weight="bold" />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+              <VoiceSearchButton
+                onClick={handleVoiceSearchClick}
+                isRecording={voiceSearch.isRecording}
+                isConnecting={voiceSearch.isConnecting}
+                hasError={!!voiceSearch.error}
+                voiceLevel={voiceActivity.level}
+                isSpeaking={voiceActivity.isSpeaking}
+              />
+            </div>
           )}
-        </div>
 
-        <input
-          type="text"
-          value={query}
-          onChange={handleInputChange}
-          placeholder="Search by song title or artist name"
-          className={`w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 border border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
-            isAuthenticated ? (query ? "pr-20" : "pr-12") : "pr-10"
-          }`}
-          aria-label="Search for a song"
-        />
-
-        {isAuthenticated && voiceSearch.isQuotaAvailable && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {(!isAuthenticated || !voiceSearch.isQuotaAvailable) && (
             <AnimatePresence>
               {query && (
                 <motion.button
@@ -360,133 +386,108 @@ export const SongSearch = memo(function SongSearch({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
                   transition={springs.snap}
-                  className="p-1 text-neutral-500 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-500 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                   aria-label="Clear search"
                 >
                   <X size={16} weight="bold" />
                 </motion.button>
               )}
             </AnimatePresence>
-            <VoiceSearchButton
-              onClick={handleVoiceSearchClick}
-              isRecording={voiceSearch.isRecording}
-              isConnecting={voiceSearch.isConnecting}
-              hasError={!!voiceSearch.error}
-              voiceLevel={voiceActivity.level}
-              isSpeaking={voiceActivity.isSpeaking}
-            />
-          </div>
-        )}
-
-        {(!isAuthenticated || !voiceSearch.isQuotaAvailable) && (
-          <AnimatePresence>
-            {query && (
-              <motion.button
-                type="button"
-                onClick={handleClear}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={springs.snap}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-500 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                aria-label="Clear search"
-              >
-                <X size={16} weight="bold" />
-              </motion.button>
-            )}
-          </AnimatePresence>
-        )}
+          )}
         </div>
 
         {/* Floating dropdown for results, error, empty, and loading states */}
         <AnimatePresence>
-        {error && (
-          <motion.div
-            key="error"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={springs.default}
-            className="absolute top-full left-0 right-0 z-50 mt-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex flex-col items-center gap-3 shadow-2xl backdrop-blur-sm"
-          >
-            <div className="flex items-center gap-2 text-red-400">
-              <WarningCircle size={20} weight="fill" />
-              <span className="text-sm">{error}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => searchTracks(query)}
-              className="px-4 py-1.5 text-sm font-medium text-white bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          {error && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={springs.default}
+              className="absolute top-full left-0 right-0 z-50 mt-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex flex-col items-center gap-3 shadow-2xl backdrop-blur-sm"
             >
-              Try again
-            </button>
-          </motion.div>
-        )}
-
-        {!error && hasSearched && results.length === 0 && !isPending && (
-          <div className="absolute top-full left-0 right-0 z-50 mt-3 p-8 flex flex-col items-center gap-3 text-center bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl">
-            <MusicNoteSimple size={32} weight="duotone" className="text-neutral-600" />
-            <div>
-              <p className="text-neutral-400">No songs found for "{query}"</p>
-              <p className="text-sm text-neutral-600 mt-1">
-                Try a different spelling or search for the artist name
-              </p>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {!error && isPending && results.length === 0 && query && <SearchSkeleton />}
-
-      {!error && results.length > 0 && (
-        <ul
-          className="absolute top-full left-0 right-0 z-50 mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800 shadow-2xl"
-          aria-label="Search results"
-        >
-          {results.map(track => (
-            <li key={track.id}>
+              <div className="flex items-center gap-2 text-red-400">
+                <WarningCircle size={20} weight="fill" />
+                <span className="text-sm">{error}</span>
+              </div>
               <button
                 type="button"
-                onClick={() => handleTrackClick(track)}
-                className="w-full flex items-center gap-3 p-3 hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:bg-neutral-800 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
-                aria-label={`${track.name} by ${track.artist}`}
+                onClick={() => searchTracks(query)}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
               >
-                <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-800 overflow-hidden flex items-center justify-center">
-                  {track.albumArt ? (
-                    <img
-                      src={track.albumArt}
-                      alt={track.album}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <MusicNote size={24} weight="fill" className="text-neutral-600" />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-white font-medium truncate">{track.displayName}</p>
-                  <p className="text-sm text-neutral-500 truncate">
-                    {track.displayArtist}{track.displayAlbum && track.displayAlbum !== "-" ? ` • ${track.displayAlbum}` : ""}
-                  </p>
-                </div>
-
-                <span className="flex-shrink-0 text-sm text-neutral-600 tabular-nums">
-                  {formatDuration(track.duration)}
-                </span>
-
-                {track.hasLyrics && (
-                  <span
-                    className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-xs font-medium text-green-400 bg-green-400/10 rounded"
-                    title="Synced lyrics available"
-                  >
-                    <TextAa size={14} weight="bold" className="inline" />
-                  </span>
-                )}
+                Try again
               </button>
-            </li>
-          ))}
-        </ul>
-      )}
+            </motion.div>
+          )}
+
+          {!error && hasSearched && results.length === 0 && !isPending && (
+            <div className="absolute top-full left-0 right-0 z-50 mt-3 p-8 flex flex-col items-center gap-3 text-center bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl">
+              <MusicNoteSimple size={32} weight="duotone" className="text-neutral-600" />
+              <div>
+                <p className="text-neutral-400">No songs found for "{query}"</p>
+                <p className="text-sm text-neutral-600 mt-1">
+                  Try a different spelling or search for the artist name
+                </p>
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {!error && isPending && results.length === 0 && query && <SearchSkeleton />}
+
+        {!error && results.length > 0 && (
+          <ul
+            className="absolute top-full left-0 right-0 z-50 mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800 shadow-2xl"
+            aria-label="Search results"
+          >
+            {results.map(track => (
+              <li key={track.id}>
+                <button
+                  type="button"
+                  onClick={() => handleTrackClick(track)}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:bg-neutral-800 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                  aria-label={`${track.name} by ${track.artist}`}
+                >
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-800 overflow-hidden flex items-center justify-center">
+                    {track.albumArt ? (
+                      <img
+                        src={track.albumArt}
+                        alt={track.album}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <MusicNote size={24} weight="fill" className="text-neutral-600" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-white font-medium truncate">{track.displayName}</p>
+                    <p className="text-sm text-neutral-500 truncate">
+                      {track.displayArtist}
+                      {track.displayAlbum && track.displayAlbum !== "-"
+                        ? ` • ${track.displayAlbum}`
+                        : ""}
+                    </p>
+                  </div>
+
+                  <span className="flex-shrink-0 text-sm text-neutral-600 tabular-nums">
+                    {formatDuration(track.duration)}
+                  </span>
+
+                  {track.hasLyrics && (
+                    <span
+                      className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-xs font-medium text-green-400 bg-green-400/10 rounded"
+                      title="Synced lyrics available"
+                    >
+                      <TextAa size={14} weight="bold" className="inline" />
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   )

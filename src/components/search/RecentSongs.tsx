@@ -16,10 +16,12 @@ export interface RecentSongsProps {
 }
 
 export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentSongsProps) {
-  const { recents, loadingAlbumArtIds, isLoading, isInitialized, expectedCount } = useRecentSongsState()
+  const { recents, loadingAlbumArtIds, isLoading, isInitialized, expectedCount } =
+    useRecentSongsState()
   const router = useRouter()
 
-  const skeletonCount = expectedCount !== null && expectedCount > 0 ? Math.min(expectedCount, MAX_RECENT_SONGS) : 0
+  const skeletonCount =
+    expectedCount !== null && expectedCount > 0 ? Math.min(expectedCount, MAX_RECENT_SONGS) : 0
 
   const handleClick = useCallback(
     (song: { id: number; title: string; artist: string }) => {

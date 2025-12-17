@@ -24,9 +24,7 @@ export function normalizeTrackName(name: string): string {
  * Clean artist name by removing feat., ft., featuring, etc.
  */
 export function normalizeArtistName(name: string): string {
-  return name
-    .replace(/\s+(feat\.?|ft\.?|featuring|&|,|;|\/)\s+.*/i, "")
-    .trim()
+  return name.replace(/\s+(feat\.?|ft\.?|featuring|&|,|;|\/)\s+.*/i, "").trim()
 }
 
 /**

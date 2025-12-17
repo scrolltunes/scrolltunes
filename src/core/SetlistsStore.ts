@@ -392,6 +392,7 @@ export function useSetlistsContainingSong(songId: number): readonly Setlist[] {
   )
   const songIdStr = String(songId)
   return state.setlists.filter(
-    s => s.songs?.some(song => song.songId === songIdStr && song.songProvider === "lrclib") ?? false,
+    s =>
+      s.songs?.some(song => song.songId === songIdStr && song.songProvider === "lrclib") ?? false,
   )
 }

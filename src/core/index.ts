@@ -126,3 +126,12 @@ export {
   ReceiveFinal,
   SetSpeechError,
 } from "./SpeechRecognitionStore"
+
+export {
+  chordsStore,
+  useChordsState,
+  useChordsData,
+  useTranspose,
+  useShowChords,
+  type ChordsState,
+} from "./ChordsStore"

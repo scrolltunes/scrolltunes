@@ -1,7 +1,7 @@
 "use client"
 
-import { useAccount } from "@/core"
 import { Logo } from "@/components/ui"
+import { useAccount } from "@/core"
 import { CaretDown, GearSix, House, Info, MusicNotes } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
@@ -13,7 +13,7 @@ export const LogoMenu = memo(function LogoMenu() {
   const menuRef = useRef<HTMLDivElement>(null)
 
   const handleToggle = useCallback(() => {
-    setIsOpen((prev) => !prev)
+    setIsOpen(prev => !prev)
   }, [])
 
   const handleClose = useCallback(() => {

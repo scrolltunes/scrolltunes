@@ -1,7 +1,16 @@
 "use client"
 
-import { useCurrentLineIndex, usePlayerControls, usePlayerState, usePreferences } from "@/core"
+import {
+  useChordsData,
+  useCurrentLineIndex,
+  usePlayerControls,
+  usePlayerState,
+  usePreferences,
+  useShowChords,
+  useTranspose,
+} from "@/core"
 import { detectLyricsDirection } from "@/lib"
+import { matchChordsToLyrics, transposeChordLine } from "@/lib/chords"
 import { motion } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
@@ -23,6 +32,9 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const currentLineIndex = useCurrentLineIndex()
   const { jumpToLine } = usePlayerControls()
   const { fontSize } = usePreferences()
+  const chordsData = useChordsData()
+  const showChords = useShowChords()
+  const transposeSemitones = useTranspose()
 
   // Manual scroll override state
   const [isManualScrolling, setIsManualScrolling] = useState(false)
@@ -41,6 +53,28 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     () => (lyrics ? detectLyricsDirection(lyrics.lines) === "rtl" : false),
     [lyrics],
   )
+
+  // Build map of line index → chords (transposed if needed)
+  const lineChords = useMemo(() => {
+    if (!showChords || !chordsData || !lyrics) return new Map<number, string[]>()
+
+    // Match Songsterr chord lines to LRCLIB lyrics
+    const matched = matchChordsToLyrics(chordsData.lines, lyrics.lines)
+
+    // Build map of line index to (transposed) chords
+    const map = new Map<number, string[]>()
+    for (let i = 0; i < matched.length; i++) {
+      const line = matched[i]
+      if (line?.chords && line.chords.length > 0) {
+        const chords =
+          transposeSemitones !== 0
+            ? transposeChordLine(line.chords, transposeSemitones)
+            : [...line.chords]
+        map.set(i, chords)
+      }
+    }
+    return map
+  }, [showChords, chordsData, lyrics, transposeSemitones])
 
   // Scroll to position a line at target position
   const scrollToLine = useCallback((lineIndex: number): boolean => {
@@ -245,6 +279,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
               }}
               isRTL={isRTL}
               isPlaying={isPlaying}
+              chords={lineChords.get(index)}
               {...(duration !== undefined && { duration })}
             />
           )

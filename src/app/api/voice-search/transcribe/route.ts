@@ -33,7 +33,7 @@ function transcribeAudio(
   return Effect.gen(function* () {
     const client = yield* createSpeechClient().pipe(
       Effect.mapError(
-        (err) => new SpeechAPIError({ code: "CLIENT_INIT_FAILED", message: err.message }),
+        err => new SpeechAPIError({ code: "CLIENT_INIT_FAILED", message: err.message }),
       ),
     )
 
@@ -124,7 +124,9 @@ function transcribeAudio(
   })
 }
 
-export async function POST(request: Request): Promise<NextResponse<TranscribeResponse | ErrorResponse>> {
+export async function POST(
+  request: Request,
+): Promise<NextResponse<TranscribeResponse | ErrorResponse>> {
   const session = await auth()
 
   if (!session?.user?.id) {
@@ -170,10 +172,7 @@ export async function POST(request: Request): Promise<NextResponse<TranscribeRes
     if (cause._tag === "Fail") {
       const error = cause.error
       if (error instanceof SpeechQuotaError) {
-        return NextResponse.json(
-          { error: error.message, code: "QUOTA_EXCEEDED" },
-          { status: 429 },
-        )
+        return NextResponse.json({ error: error.message, code: "QUOTA_EXCEEDED" }, { status: 429 })
       }
       if (error instanceof SpeechAPIError) {
         console.error("Speech API error:", error.code, error.message)
@@ -192,7 +191,7 @@ export async function POST(request: Request): Promise<NextResponse<TranscribeRes
 
   await Effect.runPromise(
     incrementUsage({ userId: session.user.id, durationSeconds }).pipe(
-      Effect.catchAll((err) => {
+      Effect.catchAll(err => {
         console.error("Failed to track usage:", err)
         return Effect.void
       }),

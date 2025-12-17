@@ -1,6 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
+import { InlineChord } from "@/components/chords"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useMemo } from "react"
 
@@ -15,6 +16,7 @@ export interface LyricLineProps {
   readonly duration?: number | undefined
   readonly isRTL?: boolean
   readonly isPlaying?: boolean
+  readonly chords?: readonly string[] | undefined
 }
 
 interface WordTiming {
@@ -61,6 +63,7 @@ export const LyricLine = memo(function LyricLine({
   duration,
   isRTL = false,
   isPlaying = true,
+  chords,
 }: LyricLineProps) {
   const wordTimings = useMemo(
     () => (duration !== undefined ? calculateWordTimings(text, duration) : []),
@@ -89,6 +92,7 @@ export const LyricLine = memo(function LyricLine({
       aria-current={isActive ? "true" : undefined}
       aria-label={`Line ${index + 1}: ${text}`}
     >
+      {chords && chords.length > 0 && <InlineChord chords={chords} isCurrentLine={isActive} />}
       {isActive && duration !== undefined ? (
         <span
           dir={isRTL ? "rtl" : undefined}
