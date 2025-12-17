@@ -327,10 +327,11 @@
 ### Client Integration
 - [x] Create `AccountStore` with useSyncExternalStore
 - [x] Create `FavoritesStore` with useSyncExternalStore
-- [x] Create `SetlistsStore` with useSyncExternalStore
+- [x] Create `SetlistsStore` with useSyncExternalStore + localStorage caching
 - [x] Implement localStorage → server merge on first login
 - [x] Add ongoing sync for song plays and favorites
 - [x] Optimized loading: fetch count first, show correct skeleton count
+- [x] Add `useSetlistsContainingSong` hook for song membership check
 - [ ] Handle offline mode gracefully
 
 ### UI Components
@@ -345,8 +346,11 @@
 - [x] Create delete account flow with confirmation
 - [ ] Add "Sign in to sync" prompt (optional, non-intrusive)
 - [x] Create setlists management UI (create, edit, delete) - /setlists page
-- [x] Add "Add to setlist" action on song pages
-- [x] Add favorite button (heart) on song pages
+- [x] Add "Add to setlist" action on song pages (moved to SongActionBar)
+- [x] Add favorite button (heart) on song pages (moved to SongActionBar)
+- [x] Create SongActionBar with favorite + setlist icons in content body
+- [x] Show setlist membership as colored icons (toggle add/remove from modal)
+- [x] Cache setlists in localStorage for instant display
 - [ ] Create setlist detail view with drag-to-reorder (/setlists/[id])
 
 ### Legal Updates
