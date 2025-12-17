@@ -2,15 +2,14 @@
 
 import { springs } from "@/animations"
 import { FloatingMetronome, FontSizeControl, VoiceIndicator } from "@/components/audio"
-import { FloatingInfoButton, LyricsDisplay, SongInfoModal } from "@/components/display"
+import { FloatingInfoButton, LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
-import { FavoriteButton } from "@/components/ui"
+
 import {
   type Lyrics,
   recentSongsStore,
-  useIsAuthenticated,
   usePlayerControls,
   usePlayerState,
   usePreferences,
@@ -37,7 +36,6 @@ import {
   MusicNote,
   Pause,
   Play,
-  Plus,
   SpinnerGap,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
@@ -95,7 +93,6 @@ export default function SongPage() {
   const { play, pause, reset, load } = usePlayerControls()
   const preferences = usePreferences()
   const { setSlot } = useFooterSlot()
-  const isAuthenticated = useIsAuthenticated()
 
   const { isListening, isSpeaking, level, startListening, stopListening } = useVoiceTrigger({
     autoPlay: true,
@@ -438,27 +435,6 @@ export default function SongPage() {
                   size="sm"
                 />
 
-                {lrclibId !== null && (
-                  <FavoriteButton
-                    songId={lrclibId}
-                    title={loadState.lyrics.title}
-                    artist={loadState.lyrics.artist}
-                    {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
-                    size="sm"
-                  />
-                )}
-
-                {isAuthenticated && lrclibId !== null && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddToSetlist(true)}
-                    className="w-8 h-8 rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 flex items-center justify-center transition-colors"
-                    aria-label="Add to setlist"
-                  >
-                    <Plus size={20} className="text-neutral-400" />
-                  </button>
-                )}
-
                 {isReady && (
                   <div className="flex items-center gap-2">
                     <button
@@ -501,6 +477,15 @@ export default function SongPage() {
       </AnimatePresence>
 
       <main className="pt-16 h-screen flex flex-col">
+        {lrclibId !== null && (
+          <SongActionBar
+            songId={lrclibId}
+            title={loadState.lyrics.title}
+            artist={loadState.lyrics.artist}
+            {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
+            onAddToSetlist={() => setShowAddToSetlist(true)}
+          />
+        )}
         <LyricsDisplay className="flex-1 pb-12" />
 
         <FloatingInfoButton

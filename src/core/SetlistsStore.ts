@@ -33,9 +33,15 @@ const DEFAULT_STATE: SetlistsState = {
   activeSetlistId: null,
 }
 
+const STORAGE_KEY = "scrolltunes:setlists"
+
 export class SetlistsStore {
   private listeners = new Set<() => void>()
   private state: SetlistsState = DEFAULT_STATE
+
+  constructor() {
+    this.loadFromStorage()
+  }
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
@@ -55,6 +61,32 @@ export class SetlistsStore {
     this.notify()
   }
 
+  private loadFromStorage(): void {
+    if (typeof window === "undefined") return
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored) as readonly Setlist[]
+        if (Array.isArray(parsed)) {
+          this.state = { ...this.state, setlists: parsed }
+        }
+      }
+    } catch {
+      // Failed to load from localStorage
+    }
+  }
+
+  private saveToStorage(): void {
+    if (typeof window === "undefined") return
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state.setlists))
+    } catch {
+      // Failed to save to localStorage
+    }
+  }
+
   async fetchAll(): Promise<void> {
     this.setState({ isLoading: true })
 
@@ -72,6 +104,7 @@ export class SetlistsStore {
         setlists: data.setlists,
         isLoading: false,
       })
+      this.saveToStorage()
     } catch {
       this.setState({ isLoading: false })
     }
@@ -98,11 +131,12 @@ export class SetlistsStore {
       }
 
       const data = (await response.json()) as { setlist: Setlist }
-      const newSetlist = { ...data.setlist, songCount: 0 }
+      const newSetlist = { ...data.setlist, songCount: 0, songs: [] }
 
       this.setState({
         setlists: [...this.state.setlists, newSetlist],
       })
+      this.saveToStorage()
 
       return newSetlist
     } catch {
@@ -130,6 +164,7 @@ export class SetlistsStore {
       this.setState({
         setlists: this.state.setlists.map(s => (s.id === id ? { ...s, ...data.setlist } : s)),
       })
+      this.saveToStorage()
 
       return true
     } catch {
@@ -151,6 +186,7 @@ export class SetlistsStore {
         setlists: this.state.setlists.filter(s => s.id !== id),
         activeSetlistId: this.state.activeSetlistId === id ? null : this.state.activeSetlistId,
       })
+      this.saveToStorage()
 
       return true
     } catch {
@@ -173,6 +209,7 @@ export class SetlistsStore {
           s.id === setlistId ? { ...s, songs: data.setlist.songs } : s,
         ),
       })
+      this.saveToStorage()
     } catch {
       // Failed to fetch songs
     }
@@ -206,6 +243,7 @@ export class SetlistsStore {
           }
         }),
       })
+      this.saveToStorage()
 
       return true
     } catch {
@@ -213,9 +251,9 @@ export class SetlistsStore {
     }
   }
 
-  async removeSong(setlistId: string, songId: string): Promise<boolean> {
+  async removeSong(setlistId: string, compositeId: string): Promise<boolean> {
     try {
-      const response = await fetch(`/api/user/setlists/${setlistId}/songs/${songId}`, {
+      const response = await fetch(`/api/user/setlists/${setlistId}/songs/${compositeId}`, {
         method: "DELETE",
       })
 
@@ -223,17 +261,24 @@ export class SetlistsStore {
         return false
       }
 
+      // Parse the composite ID to match the songs array format
+      const [provider, ...idParts] = compositeId.split(":")
+      const songId = idParts.join(":")
+
       this.setState({
         setlists: this.state.setlists.map(s => {
           if (s.id !== setlistId) return s
           const currentSongs = s.songs ?? []
           return {
             ...s,
-            songs: currentSongs.filter(song => song.songId !== songId),
+            songs: currentSongs.filter(
+              song => !(song.songId === songId && song.songProvider === provider),
+            ),
             songCount: Math.max(0, s.songCount - 1),
           }
         }),
       })
+      this.saveToStorage()
 
       return true
     } catch {
@@ -265,6 +310,7 @@ export class SetlistsStore {
           return { ...s, songs: reorderedSongs }
         }),
       })
+      this.saveToStorage()
 
       return true
     } catch {
@@ -274,6 +320,17 @@ export class SetlistsStore {
 
   setActiveSetlist(id: string | null): void {
     this.setState({ activeSetlistId: id })
+  }
+
+  clear(): void {
+    this.setState({ setlists: [], activeSetlistId: null })
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(STORAGE_KEY)
+      } catch {
+        // Failed to clear localStorage
+      }
+    }
   }
 
   getSetlist(id: string): Setlist | undefined {
@@ -325,4 +382,16 @@ export function useSetlist(id: string): Setlist | undefined {
     () => DEFAULT_STATE,
   )
   return state.setlists.find(s => s.id === id)
+}
+
+export function useSetlistsContainingSong(songId: number): readonly Setlist[] {
+  const state = useSyncExternalStore(
+    setlistsStore.subscribe,
+    setlistsStore.getSnapshot,
+    () => DEFAULT_STATE,
+  )
+  const songIdStr = String(songId)
+  return state.setlists.filter(
+    s => s.songs?.some(song => song.songId === songIdStr && song.songProvider === "lrclib") ?? false,
+  )
 }

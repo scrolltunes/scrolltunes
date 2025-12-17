@@ -51,38 +51,54 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
     [onClose],
   )
 
-  const handleAddToSetlist = useCallback(
+  const isSongInSetlist = useCallback(
+    (setlist: Setlist) => {
+      const songIdStr = String(song.songId)
+      return setlist.songs?.some(s => s.songId === songIdStr && s.songProvider === "lrclib") ?? false
+    },
+    [song.songId],
+  )
+
+  const handleToggleSetlist = useCallback(
     async (setlistId: string) => {
       if (addingToSetlistId) return
 
+      const setlist = setlists.find(s => s.id === setlistId)
+      if (!setlist) return
+
+      const isInSetlist = isSongInSetlist(setlist)
       setAddingToSetlistId(setlistId)
 
-      const success = await setlistsStore.addSong(setlistId, {
-        songId: String(song.songId),
-        songProvider: "lrclib",
-        title: song.title,
-        artist: song.artist,
-      })
+      let success: boolean
+      if (isInSetlist) {
+        success = await setlistsStore.removeSong(setlistId, `lrclib:${song.songId}`)
+      } else {
+        success = await setlistsStore.addSong(setlistId, {
+          songId: String(song.songId),
+          songProvider: "lrclib",
+          title: song.title,
+          artist: song.artist,
+        })
+      }
 
       setAddingToSetlistId(null)
 
-      if (success) {
+      if (success && !isInSetlist) {
         setSuccessSetlistId(setlistId)
         setTimeout(() => {
           setSuccessSetlistId(null)
-          onClose()
         }, 600)
       }
     },
-    [addingToSetlistId, song, onClose],
+    [addingToSetlistId, song, setlists, isSongInSetlist],
   )
 
   const handleCreateSetlist = useCallback(
     (setlist: Setlist) => {
       setShowCreateModal(false)
-      handleAddToSetlist(setlist.id)
+      handleToggleSetlist(setlist.id)
     },
-    [handleAddToSetlist],
+    [handleToggleSetlist],
   )
 
   const handleClose = useCallback(() => {
@@ -163,14 +179,19 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                   {setlists.map(setlist => {
                     const isAdding = addingToSetlistId === setlist.id
                     const isSuccess = successSetlistId === setlist.id
+                    const isInSetlist = isSongInSetlist(setlist)
 
                     return (
                       <button
                         key={setlist.id}
                         type="button"
-                        onClick={() => handleAddToSetlist(setlist.id)}
+                        onClick={() => handleToggleSetlist(setlist.id)}
                         disabled={addingToSetlistId !== null}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed ${
+                          isInSetlist
+                            ? "bg-indigo-600/20 hover:bg-indigo-600/30"
+                            : "bg-neutral-800 hover:bg-neutral-700"
+                        }`}
                       >
                         <div
                           className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -187,7 +208,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                             >
                               <SpinnerGap size={20} className="text-white" />
                             </motion.div>
-                          ) : isSuccess ? (
+                          ) : isSuccess || isInSetlist ? (
                             <motion.div
                               initial={{ scale: 0 }}
                               animate={{ scale: 1 }}

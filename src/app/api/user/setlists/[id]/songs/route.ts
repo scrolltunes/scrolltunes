@@ -58,6 +58,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Setlist not found" }, { status: 404 })
   }
 
+  // Check if song already exists in this setlist
+  const existing = await db
+    .select({ id: userSetlistSongs.id })
+    .from(userSetlistSongs)
+    .where(
+      and(
+        eq(userSetlistSongs.setlistId, id),
+        eq(userSetlistSongs.songId, songId),
+        eq(userSetlistSongs.songProvider, songProvider),
+      ),
+    )
+    .then(rows => rows[0])
+
+  if (existing) {
+    return NextResponse.json({ error: "Song already in setlist" }, { status: 409 })
+  }
+
   const maxSortOrder = await db
     .select({ max: sql<number>`COALESCE(MAX(${userSetlistSongs.sortOrder}), -1)` })
     .from(userSetlistSongs)

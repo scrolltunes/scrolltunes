@@ -1,0 +1,93 @@
+"use client"
+
+import { FavoriteButton } from "@/components/ui"
+import { type Setlist, useIsAuthenticated, useSetlistsContainingSong } from "@/core"
+import { MusicNote, Plus } from "@phosphor-icons/react"
+import { memo } from "react"
+
+export interface SongActionBarProps {
+  readonly songId: number
+  readonly title: string
+  readonly artist: string
+  readonly albumArt?: string
+  readonly onAddToSetlist: () => void
+}
+
+function SetlistIcon({ setlist }: { readonly setlist: Setlist }) {
+  return (
+    <div
+      className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+      style={{ backgroundColor: setlist.color ?? "#6366f1" }}
+      title={setlist.name}
+    >
+      {setlist.icon ? (
+        <span className="text-[10px]">{setlist.icon}</span>
+      ) : (
+        <MusicNote size={10} weight="fill" className="text-white" />
+      )}
+    </div>
+  )
+}
+
+export const SongActionBar = memo(function SongActionBar({
+  songId,
+  title,
+  artist,
+  albumArt,
+  onAddToSetlist,
+}: SongActionBarProps) {
+  const isAuthenticated = useIsAuthenticated()
+  const containingSetlists = useSetlistsContainingSong(songId)
+  const isInSetlist = containingSetlists.length > 0
+
+  return (
+    <div className="flex items-center justify-center gap-3 py-4">
+      <FavoriteButton
+        songId={songId}
+        title={title}
+        artist={artist}
+        {...(albumArt !== undefined && { albumArt })}
+        size="md"
+      />
+
+      {isAuthenticated && (
+        <button
+          type="button"
+          onClick={onAddToSetlist}
+          className={`flex items-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
+            isInSetlist
+              ? "bg-neutral-800/50 hover:bg-neutral-700/50"
+              : "bg-neutral-800/50 hover:bg-neutral-700/50 text-neutral-400 hover:text-neutral-300"
+          }`}
+          aria-label={isInSetlist ? "Manage setlists" : "Add to setlist"}
+        >
+          {isInSetlist ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-neutral-500 leading-none">
+                {containingSetlists.length}
+              </span>
+              <div className="flex items-center gap-0.5">
+                {containingSetlists.slice(0, 3).map(setlist => (
+                  <SetlistIcon key={setlist.id} setlist={setlist} />
+                ))}
+                {containingSetlists.length > 3 && (
+                  <div
+                    className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 bg-neutral-700 text-neutral-400 text-[10px] font-medium"
+                    title={`${containingSetlists.length - 3} more`}
+                  >
+                    +{containingSetlists.length - 3}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <Plus size={20} />
+              <span>Add to setlist</span>
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  )
+})

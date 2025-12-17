@@ -105,6 +105,7 @@ export {
   useSetlistsLoading,
   useActiveSetlist,
   useSetlist,
+  useSetlistsContainingSong,
   type SetlistsState,
   type Setlist,
   type SetlistSong,

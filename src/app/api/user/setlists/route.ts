@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
 import { userSetlistSongs, userSetlists } from "@/lib/db/schema"
-import { asc, count, eq } from "drizzle-orm"
+import { asc, eq, inArray } from "drizzle-orm"
 import { NextResponse } from "next/server"
 
 export async function GET() {
@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const setlistsWithCounts = await db
+  const setlistRows = await db
     .select({
       id: userSetlists.id,
       name: userSetlists.name,
@@ -18,15 +18,53 @@ export async function GET() {
       color: userSetlists.color,
       icon: userSetlists.icon,
       sortOrder: userSetlists.sortOrder,
-      songCount: count(userSetlistSongs.id),
     })
     .from(userSetlists)
-    .leftJoin(userSetlistSongs, eq(userSetlists.id, userSetlistSongs.setlistId))
     .where(eq(userSetlists.userId, session.user.id))
-    .groupBy(userSetlists.id)
     .orderBy(asc(userSetlists.sortOrder))
 
-  return NextResponse.json({ setlists: setlistsWithCounts })
+  const setlistIds = setlistRows.map(s => s.id)
+
+  const songRows =
+    setlistIds.length > 0
+      ? await db
+          .select({
+            setlistId: userSetlistSongs.setlistId,
+            songId: userSetlistSongs.songId,
+            songProvider: userSetlistSongs.songProvider,
+            songTitle: userSetlistSongs.songTitle,
+            songArtist: userSetlistSongs.songArtist,
+            sortOrder: userSetlistSongs.sortOrder,
+          })
+          .from(userSetlistSongs)
+          .where(inArray(userSetlistSongs.setlistId, setlistIds))
+      : []
+
+  const songsBySetlist = new Map<string, typeof songRows>()
+  for (const song of songRows) {
+    const existing = songsBySetlist.get(song.setlistId) ?? []
+    existing.push(song)
+    songsBySetlist.set(song.setlistId, existing)
+  }
+
+  const setlists = setlistRows.map(setlist => {
+    const songs = songsBySetlist.get(setlist.id) ?? []
+    return {
+      ...setlist,
+      songCount: songs.length,
+      songs: songs
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map(s => ({
+          songId: s.songId,
+          songProvider: s.songProvider,
+          title: s.songTitle,
+          artist: s.songArtist,
+          sortOrder: s.sortOrder,
+        })),
+    }
+  })
+
+  return NextResponse.json({ setlists })
 }
 
 export async function POST(request: Request) {

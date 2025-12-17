@@ -1,6 +1,6 @@
 "use client"
 
-import { accountStore, favoritesStore, recentSongsStore } from "@/core"
+import { accountStore, favoritesStore, recentSongsStore, setlistsStore } from "@/core"
 import { fetchFavorites, fetchHistory } from "@/lib/sync-service"
 import type { Session } from "next-auth"
 import { SessionProvider } from "next-auth/react"
@@ -14,6 +14,11 @@ interface AuthProviderProps {
 export function AuthProvider({ children, session }: AuthProviderProps) {
   useEffect(() => {
     accountStore.initializeFromSession(session)
+
+    // Fetch setlists immediately for authenticated users (no await - fire and forget)
+    if (session !== null) {
+      setlistsStore.fetchAll()
+    }
   }, [session])
 
   useEffect(() => {
