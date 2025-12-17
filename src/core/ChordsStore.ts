@@ -9,10 +9,12 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const CACHE_KEY_PREFIX = "scrolltunes:chords:"
 const SHOW_CHORDS_KEY = "scrolltunes:showChords"
 const TRANSPOSE_KEY = "scrolltunes:transpose"
+const CACHE_VERSION = 2 // Increment when data format changes
 
 interface CachedChords {
   data: SongsterrChordData
   fetchedAt: number
+  version?: number
 }
 
 interface ChordsState {
@@ -48,7 +50,9 @@ function loadFromCache(songId: number): SongsterrChordData | null {
 
     const cached = JSON.parse(stored) as CachedChords
     const age = Date.now() - cached.fetchedAt
-    if (age > CACHE_TTL_MS) {
+
+    // Invalidate cache if expired or outdated version (missing positionedChords)
+    if (age > CACHE_TTL_MS || cached.version !== CACHE_VERSION) {
       localStorage.removeItem(getCacheKey(songId))
       return null
     }
@@ -65,6 +69,7 @@ function saveToCache(songId: number, data: SongsterrChordData): void {
     const cached: CachedChords = {
       data,
       fetchedAt: Date.now(),
+      version: CACHE_VERSION,
     }
     localStorage.setItem(getCacheKey(songId), JSON.stringify(cached))
   } catch {
@@ -177,7 +182,8 @@ class ChordsStore {
 
     const params = new URLSearchParams({ artist, title })
     const requestUrl = `/api/chords/${songsterrSongId}?${params.toString()}`
-    const fullUrl = typeof window !== "undefined" ? `${window.location.origin}${requestUrl}` : requestUrl
+    const fullUrl =
+      typeof window !== "undefined" ? `${window.location.origin}${requestUrl}` : requestUrl
 
     try {
       const response = await fetch(requestUrl)

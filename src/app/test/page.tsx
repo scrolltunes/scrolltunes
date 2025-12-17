@@ -13,7 +13,8 @@ const testPages: TestPageLink[] = [
   {
     href: "/test/chords-states",
     title: "Chords Button States",
-    description: "All possible states of the chords button in SongActionBar (idle, loading, ready, not-found, error)",
+    description:
+      "All possible states of the chords button in SongActionBar (idle, loading, ready, not-found, error)",
   },
   {
     href: "/test/report",

@@ -7,12 +7,18 @@
 import type { LyricLine } from "@/core"
 import type { SongsterrChordLine } from "./songsterr-types"
 
+export interface LyricChordPosition {
+  readonly name: string
+  readonly charIndex: number
+}
+
 export interface LyricLineWithChords {
   readonly id: string
   readonly text: string
   readonly startTime: number
   readonly endTime: number
   readonly chords?: readonly string[]
+  readonly chordPositions?: readonly LyricChordPosition[]
 }
 
 export function normalizeText(text: string): string {
@@ -62,11 +68,51 @@ export function findBestMatch(
   return bestMatch
 }
 
+function mapChordPositionsToLyricLine(
+  chordLine: SongsterrChordLine,
+  lrclibText: string,
+): LyricChordPosition[] {
+  const srcText = chordLine.text
+  const dstText = lrclibText
+
+  const srcLen = srcText.length || 1
+  const dstLen = dstText.length
+  if (dstLen === 0 || !chordLine.positionedChords || chordLine.positionedChords.length === 0) {
+    return []
+  }
+
+  return chordLine.positionedChords.map(ch => {
+    let approxIndex = Math.round((ch.charIndex / srcLen) * dstLen)
+
+    approxIndex = Math.max(0, Math.min(dstLen - 1, approxIndex))
+
+    const isGood = (i: number) => dstText[i] !== " "
+
+    if (!isGood(approxIndex)) {
+      for (let delta = 1; delta <= 4; delta++) {
+        if (approxIndex - delta >= 0 && isGood(approxIndex - delta)) {
+          approxIndex -= delta
+          break
+        }
+        if (approxIndex + delta < dstLen && isGood(approxIndex + delta)) {
+          approxIndex += delta
+          break
+        }
+      }
+    }
+
+    return { name: ch.name, charIndex: approxIndex }
+  })
+}
+
 export function matchChordsToLyrics(
   chordLines: readonly SongsterrChordLine[],
   lrclibLines: readonly LyricLine[],
 ): LyricLineWithChords[] {
-  const chordMap = new Map<string, readonly string[]>()
+  const chordMap = new Map<
+    string,
+    { chords: readonly string[]; chordPositions: readonly LyricChordPosition[] }
+  >()
 
   for (const chordLine of chordLines) {
     const normalizedText = normalizeText(chordLine.text)
@@ -76,14 +122,22 @@ export function matchChordsToLyrics(
 
     const match = findBestMatch(chordLine.text, lrclibLines)
     if (match) {
-      chordMap.set(match.id, chordLine.chords)
+      const chordPositions = mapChordPositionsToLyricLine(chordLine, match.text)
+      chordMap.set(match.id, {
+        chords: chordLine.chords,
+        chordPositions,
+      })
     }
   }
 
   return lrclibLines.map(line => {
-    const chords = chordMap.get(line.id)
-    if (chords) {
-      return { ...line, chords }
+    const chordData = chordMap.get(line.id)
+    if (chordData) {
+      return {
+        ...line,
+        chords: chordData.chords,
+        chordPositions: chordData.chordPositions,
+      }
     }
     return line
   })

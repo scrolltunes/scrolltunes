@@ -7,6 +7,7 @@ export type {
   ChordProElement,
   ChordProEntry,
   RawChordProDocument,
+  PositionedChord,
   SongsterrChordLine,
   SongsterrChordData,
 } from "./songsterr-types"
@@ -35,7 +36,7 @@ export {
 } from "./chord-parser"
 
 // Matcher functions
-export type { LyricLineWithChords } from "./lyrics-matcher"
+export type { LyricLineWithChords, LyricChordPosition } from "./lyrics-matcher"
 
 export {
   matchChordsToLyrics,

@@ -112,7 +112,9 @@ const MockSongActionBar = memo(function MockSongActionBar({
           </button>
 
           {/* Divider */}
-          <div className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`} />
+          <div
+            className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`}
+          />
 
           {/* Settings dropdown */}
           <button
@@ -185,7 +187,9 @@ export default function ChordsStatesTestPage() {
       <div className="max-w-4xl mx-auto space-y-8">
         <div>
           <h1 className="text-2xl font-bold text-white mb-2">Chords Button States</h1>
-          <p className="text-neutral-400">Test page showing all possible states of the chords button in SongActionBar</p>
+          <p className="text-neutral-400">
+            Test page showing all possible states of the chords button in SongActionBar
+          </p>
         </div>
 
         <div className="grid gap-6">

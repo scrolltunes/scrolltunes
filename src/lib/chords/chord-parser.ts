@@ -9,6 +9,7 @@ import type {
   ChordData,
   ChordProElement,
   ChordProEntry,
+  PositionedChord,
   RawChordProDocument,
   SongsterrChordData,
   SongsterrChordLine,
@@ -112,14 +113,41 @@ function processLineEntry(
   entry: Extract<ChordProEntry, { type: "line" }>,
   lines: SongsterrChordLine[],
 ): void {
-  // Use only entry.line - blocks contains duplicate content
   const allElements = entry.line
-  const text = extractLineText(allElements)
 
+  let rawText = ""
+  const chords: string[] = []
+  const positionedChords: PositionedChord[] = []
+
+  for (const el of allElements) {
+    // Treat visible text and "noise" as part of the line text
+    if (el.type === "text" || el.type === "noise") {
+      rawText += el.text ?? ""
+    } else if (el.type === "chord" && el.chord) {
+      const name = formatChordName(el.chord)
+      chords.push(name)
+
+      // Position is "just before the next character we will append"
+      const charIndexInRaw = rawText.length
+      positionedChords.push({ name, charIndex: charIndexInRaw })
+    }
+    // ignore other element types
+  }
+
+  const leadingWsLen = rawText.length - rawText.trimStart().length
+  const text = rawText.trim()
   if (text.length === 0) {
     return
   }
 
-  const chords = extractLineChords(allElements)
-  lines.push({ text, chords })
+  // Adjust positions to account for trimmed leading whitespace
+  const adjustedPositionedChords: PositionedChord[] = positionedChords.map(chord => {
+    const adjustedIndex = Math.max(0, chord.charIndex - leadingWsLen)
+    return {
+      ...chord,
+      charIndex: Math.min(text.length, adjustedIndex),
+    }
+  })
+
+  lines.push({ text, chords, positionedChords: adjustedPositionedChords })
 }

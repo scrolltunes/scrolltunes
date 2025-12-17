@@ -10,7 +10,7 @@ import {
   useTranspose,
 } from "@/core"
 import { detectLyricsDirection } from "@/lib"
-import { matchChordsToLyrics, transposeChordLine } from "@/lib/chords"
+import { type LyricChordPosition, matchChordsToLyrics, transposeChordLine } from "@/lib/chords"
 import { motion } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
@@ -54,15 +54,17 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     [lyrics],
   )
 
-  // Build map of line index → chords (transposed if needed)
-  const lineChords = useMemo(() => {
-    if (!showChords || !chordsData || !lyrics) return new Map<number, string[]>()
+  // Build map of line index → chord data (transposed if needed)
+  const lineChordData = useMemo(() => {
+    if (!showChords || !chordsData || !lyrics) {
+      return new Map<number, { chords: string[]; chordPositions: LyricChordPosition[] }>()
+    }
 
     // Match Songsterr chord lines to LRCLIB lyrics
     const matched = matchChordsToLyrics(chordsData.lines, lyrics.lines)
 
-    // Build map of line index to (transposed) chords
-    const map = new Map<number, string[]>()
+    // Build map of line index to (transposed) chord data
+    const map = new Map<number, { chords: string[]; chordPositions: LyricChordPosition[] }>()
     for (let i = 0; i < matched.length; i++) {
       const line = matched[i]
       if (line?.chords && line.chords.length > 0) {
@@ -70,7 +72,14 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
           transposeSemitones !== 0
             ? transposeChordLine(line.chords, transposeSemitones)
             : [...line.chords]
-        map.set(i, chords.slice(0, 3))
+
+        // Also transpose the positioned chords
+        const chordPositions = (line.chordPositions ?? []).map((pos, idx) => ({
+          ...pos,
+          name: chords[idx] ?? pos.name,
+        }))
+
+        map.set(i, { chords: chords.slice(0, 3), chordPositions: chordPositions.slice(0, 3) })
       }
     }
     return map
@@ -264,6 +273,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
           const duration = isActive
             ? (lyrics.lines[index + 1]?.startTime ?? lyrics.duration) - line.startTime
             : undefined
+          const chordData = lineChordData.get(index)
 
           return (
             <LyricLine
@@ -279,7 +289,8 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
               }}
               isRTL={isRTL}
               isPlaying={isPlaying}
-              chords={lineChords.get(index)}
+              chords={chordData?.chords}
+              chordPositions={chordData?.chordPositions}
               {...(duration !== undefined && { duration })}
             />
           )

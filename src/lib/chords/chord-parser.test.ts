@@ -134,8 +134,16 @@ describe("parseChordProDocument", () => {
     ]
     const result = parseChordProDocument(doc, 123, "Artist", "Title")
     expect(result.lines).toHaveLength(2)
-    expect(result.lines[0]).toEqual({ text: "First line", chords: ["Am"] })
-    expect(result.lines[1]).toEqual({ text: "Second line", chords: ["G"] })
+    expect(result.lines[0]).toEqual({
+      text: "First line",
+      chords: ["Am"],
+      positionedChords: [{ charIndex: 10, name: "Am" }],
+    })
+    expect(result.lines[1]).toEqual({
+      text: "Second line",
+      chords: ["G"],
+      positionedChords: [{ charIndex: 0, name: "G" }],
+    })
   })
 
   it("returns empty lines array for empty document", () => {

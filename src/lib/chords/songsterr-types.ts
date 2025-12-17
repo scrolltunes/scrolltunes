@@ -66,9 +66,15 @@ export type ChordProEntry =
 
 export type RawChordProDocument = ChordProEntry[]
 
+export interface PositionedChord {
+  readonly name: string // formatted chord name, e.g. "Am", "G7"
+  readonly charIndex: number // 0-based index into `text` where the chord applies
+}
+
 export interface SongsterrChordLine {
   readonly text: string
   readonly chords: readonly string[]
+  readonly positionedChords: readonly PositionedChord[]
 }
 
 export interface SongsterrChordData {

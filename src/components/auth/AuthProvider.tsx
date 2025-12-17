@@ -1,6 +1,12 @@
 "use client"
 
-import { accountStore, favoritesStore, preferencesStore, recentSongsStore, setlistsStore } from "@/core"
+import {
+  accountStore,
+  favoritesStore,
+  preferencesStore,
+  recentSongsStore,
+  setlistsStore,
+} from "@/core"
 import { fetchFavorites, fetchHistory } from "@/lib/sync-service"
 import type { Session } from "next-auth"
 import { SessionProvider } from "next-auth/react"

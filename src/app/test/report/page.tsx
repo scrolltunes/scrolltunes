@@ -48,8 +48,12 @@ export default function TestReportPage() {
             <div className="text-neutral-500">{missingBpmContext.artist}</div>
           </div>
           <div className="text-sm text-neutral-400 space-y-1">
-            <div><span className="text-neutral-500">BPM:</span> Missing</div>
-            <div><span className="text-neutral-500">Key:</span> Missing</div>
+            <div>
+              <span className="text-neutral-500">BPM:</span> Missing
+            </div>
+            <div>
+              <span className="text-neutral-500">Key:</span> Missing
+            </div>
           </div>
           <button
             type="button"
@@ -68,8 +72,12 @@ export default function TestReportPage() {
             <div className="text-neutral-500">{chordsErrorContext.artist}</div>
           </div>
           <div className="text-sm text-neutral-400 space-y-1">
-            <div><span className="text-neutral-500">BPM:</span> {chordsErrorContext.bpm}</div>
-            <div><span className="text-neutral-500">Key:</span> {chordsErrorContext.key}</div>
+            <div>
+              <span className="text-neutral-500">BPM:</span> {chordsErrorContext.bpm}
+            </div>
+            <div>
+              <span className="text-neutral-500">Key:</span> {chordsErrorContext.key}
+            </div>
             <div className="text-red-400 text-xs mt-2">⚠ {chordsErrorContext.chordsError}</div>
           </div>
           <button

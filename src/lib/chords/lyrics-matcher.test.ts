@@ -56,7 +56,9 @@ describe("matchChordsToLyrics", () => {
   })
 
   it("attaches chords to matching lines", () => {
-    const chordLines: SongsterrChordLine[] = [{ text: "Hello world", chords: ["C", "G"] }]
+    const chordLines: SongsterrChordLine[] = [
+      { text: "Hello world", chords: ["C", "G"], positionedChords: [] },
+    ]
     const lrclibLines: LyricLine[] = [
       makeLyricLine("1", "Hello world"),
       makeLyricLine("2", "Goodbye moon"),
@@ -70,7 +72,7 @@ describe("matchChordsToLyrics", () => {
 
   it("leaves non-matching lines without chords", () => {
     const chordLines: SongsterrChordLine[] = [
-      { text: "Something completely different", chords: ["Am"] },
+      { text: "Something completely different", chords: ["Am"], positionedChords: [] },
     ]
     const lrclibLines: LyricLine[] = [makeLyricLine("1", "Hello world")]
 
@@ -80,7 +82,9 @@ describe("matchChordsToLyrics", () => {
   })
 
   it("skips chord lines with empty chords array", () => {
-    const chordLines: SongsterrChordLine[] = [{ text: "Hello world", chords: [] }]
+    const chordLines: SongsterrChordLine[] = [
+      { text: "Hello world", chords: [], positionedChords: [] },
+    ]
     const lrclibLines: LyricLine[] = [makeLyricLine("1", "Hello world")]
 
     const result = matchChordsToLyrics(chordLines, lrclibLines)
@@ -89,7 +93,7 @@ describe("matchChordsToLyrics", () => {
   })
 
   it("skips chord lines with empty text", () => {
-    const chordLines: SongsterrChordLine[] = [{ text: "", chords: ["C"] }]
+    const chordLines: SongsterrChordLine[] = [{ text: "", chords: ["C"], positionedChords: [] }]
     const lrclibLines: LyricLine[] = [makeLyricLine("1", "Hello world")]
 
     const result = matchChordsToLyrics(chordLines, lrclibLines)
@@ -98,7 +102,9 @@ describe("matchChordsToLyrics", () => {
   })
 
   it("preserves original line properties", () => {
-    const chordLines: SongsterrChordLine[] = [{ text: "Hello world", chords: ["C"] }]
+    const chordLines: SongsterrChordLine[] = [
+      { text: "Hello world", chords: ["C"], positionedChords: [] },
+    ]
     const lrclibLines: LyricLine[] = [{ id: "1", text: "Hello world", startTime: 10, endTime: 20 }]
 
     const result = matchChordsToLyrics(chordLines, lrclibLines)

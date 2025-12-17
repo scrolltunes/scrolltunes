@@ -14,7 +14,15 @@ import {
   useSetlistsContainingSong,
   useShowChords,
 } from "@/core"
-import { CaretUp, Minus, MusicNote, MusicNotes, Plus, SlidersHorizontal, TextAa } from "@phosphor-icons/react"
+import {
+  CaretUp,
+  Minus,
+  MusicNote,
+  MusicNotes,
+  Plus,
+  SlidersHorizontal,
+  TextAa,
+} from "@phosphor-icons/react"
 import { memo, useCallback } from "react"
 
 export interface SongActionBarProps {
@@ -184,7 +192,9 @@ export const SongActionBar = memo(function SongActionBar({
           </button>
 
           {/* Divider */}
-          <div className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`} />
+          <div
+            className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`}
+          />
 
           {/* Settings dropdown */}
           <button
