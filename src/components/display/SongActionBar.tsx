@@ -104,6 +104,11 @@ export const SongActionBar = memo(function SongActionBar({
       {hasChordsAvailable && (
         <>
           <div className="w-px h-6 bg-neutral-700" />
+          {chordsState.data?.capo !== undefined && chordsState.data.capo > 0 && (
+            <span className="px-2 py-1 rounded-full bg-neutral-800/50 text-neutral-400 text-xs font-medium">
+              Capo {chordsState.data.capo}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => chordsStore.toggleShowChords()}

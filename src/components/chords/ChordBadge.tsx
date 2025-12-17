@@ -66,8 +66,9 @@ export const ChordBadge = memo(function ChordBadge({
       <motion.button
         type="button"
         onClick={onClick}
-        className={`${baseClassName} cursor-pointer hover:brightness-110`}
+        className={`${baseClassName} cursor-pointer hover:brightness-110 max-w-[80px] truncate`}
         aria-label={`Select chord ${chord}`}
+        title={chord}
         whileTap={{ scale: 0.95 }}
         {...animateProps}
       >
@@ -77,7 +78,11 @@ export const ChordBadge = memo(function ChordBadge({
   }
 
   return (
-    <motion.span className={baseClassName} {...animateProps}>
+    <motion.span
+      className={`${baseClassName} max-w-[80px] truncate`}
+      title={chord}
+      {...animateProps}
+    >
       {chord}
     </motion.span>
   )

@@ -72,7 +72,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
           transposeSemitones !== 0
             ? transposeChordLine(line.chords, transposeSemitones)
             : [...line.chords]
-        map.set(i, chords)
+        map.set(i, chords.slice(0, 3))
       }
     }
     return map
