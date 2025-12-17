@@ -3,6 +3,7 @@
 import { springs } from "@/animations"
 import { FloatingMetronome, FontSizeControl, VoiceIndicator } from "@/components/audio"
 import { FloatingInfoButton, LyricsDisplay, SongInfoModal } from "@/components/display"
+import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
 import { FavoriteButton } from "@/components/ui"
@@ -87,6 +88,7 @@ export default function SongPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [showInfo, setShowInfo] = useState(false)
   const [showAddToSetlist, setShowAddToSetlist] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
@@ -502,6 +504,7 @@ export default function SongPage() {
         <FloatingInfoButton
           hasBpm={loadState.bpm !== null}
           onPress={() => setShowInfo(true)}
+          onWarningPress={() => setShowReportModal(true)}
           position="bottom-left"
         />
         <FloatingMetronome bpm={currentBpm} position="bottom-right" />
@@ -536,6 +539,22 @@ export default function SongPage() {
           bpmSource={loadState.bpmSource}
           lyricsSource={loadState.lyricsSource}
           albumArt={loadState.albumArt}
+        />
+      )}
+
+      {loadState._tag === "Loaded" && (
+        <ReportIssueModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          songContext={{
+            title: loadState.lyrics.title,
+            artist: loadState.lyrics.artist,
+            duration: loadState.lyrics.duration,
+            bpm: loadState.bpm,
+            key: loadState.key,
+            spotifyId: loadState.spotifyId,
+            bpmSource: loadState.bpmSource?.name ?? null,
+          }}
         />
       )}
 

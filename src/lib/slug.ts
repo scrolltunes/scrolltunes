@@ -19,8 +19,8 @@ export function makeCanonicalPath(config: {
   readonly artist: string
 }): string {
   const normalized = normalizeTrackKey({ title: config.title, artist: config.artist })
-  const artistSlug = toSlug(normalized.artist)
-  const trackSlug = toSlug(normalized.title)
+  const artistSlug = toSlug(normalized.artist) || "artist"
+  const trackSlug = toSlug(normalized.title) || "track"
   return `/song/${artistSlug}/${trackSlug}-${config.id}`
 }
 

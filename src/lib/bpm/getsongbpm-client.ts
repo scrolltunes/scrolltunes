@@ -128,7 +128,7 @@ export const getSongBpmProvider: BPMProvider = {
       })
 
       // Find matching track by normalized title/artist
-      const results = data.search ?? []
+      const results = Array.isArray(data.search) ? data.search : []
       const match = results.find(track => {
         const trackNormalized = normalizeTrackKey({
           title: track.title,

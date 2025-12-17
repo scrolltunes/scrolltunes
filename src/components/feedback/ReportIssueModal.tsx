@@ -36,6 +36,9 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
   const [email, setEmail] = useState("")
   const [submitState, setSubmitState] = useState<SubmitState>("idle")
 
+  const hasMissingBpm = songContext && !songContext.bpm
+  const isDescriptionRequired = !hasMissingBpm
+
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target === e.currentTarget) {
@@ -48,12 +51,13 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault()
-      if (!description.trim()) return
+      if (isDescriptionRequired && !description.trim()) return
 
       setSubmitState("submitting")
 
       const pageUrl = typeof window !== "undefined" ? window.location.href : ""
 
+      const defaultDescription = hasMissingBpm ? "Missing BPM data" : ""
       const formData: Record<string, string> = {
         access_key: WEB3FORMS_ACCESS_KEY,
         subject: songContext
@@ -61,7 +65,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
           : "[ScrollTunes] Issue Report",
         from_name: "ScrollTunes Bug Reporter",
         url: pageUrl,
-        description: description.trim(),
+        description: description.trim() || defaultDescription,
       }
 
       if (email.trim()) {
@@ -102,7 +106,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
         setSubmitState("error")
       }
     },
-    [description, email, songContext, onClose],
+    [description, email, songContext, onClose, isDescriptionRequired, hasMissingBpm],
   )
 
   const handleClose = useCallback(() => {
@@ -161,15 +165,15 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
 
               <div>
                 <label htmlFor="description" className="block text-sm text-neutral-400 mb-1">
-                  Describe the issue *
+                  {isDescriptionRequired ? "Describe the issue *" : "Additional details (optional)"}
                 </label>
                 <textarea
                   id="description"
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  placeholder="What went wrong?"
+                  placeholder={hasMissingBpm ? "Any additional context..." : "What went wrong?"}
                   rows={4}
-                  required
+                  required={isDescriptionRequired}
                   disabled={submitState === "submitting"}
                   className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                 />
@@ -202,7 +206,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
 
               <button
                 type="submit"
-                disabled={submitState === "submitting" || !description.trim()}
+                disabled={submitState === "submitting" || (isDescriptionRequired && !description.trim())}
                 className="w-full flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-neutral-700 disabled:cursor-not-allowed px-4 py-2.5 text-white font-medium transition-colors"
               >
                 {submitState === "submitting" ? (
