@@ -82,7 +82,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-neutral-800 font-medium rounded-lg hover:bg-neutral-100 transition-colors"
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-neutral-800 font-medium rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
                 style={{ fontFamily: "Roboto, system-ui, sans-serif" }}
               >
                 <GoogleLogo />
