@@ -62,12 +62,8 @@ export function AuthProvider({ children, session }: AuthProviderProps) {
           fetchFavorites(),
         ])
 
-        if (serverHistory.length > 0) {
-          recentSongsStore.replaceFromServer(serverHistory)
-        }
-        if (serverFavorites.length > 0) {
-          favoritesStore.replaceFromServer(serverFavorites)
-        }
+        recentSongsStore.replaceFromServer(serverHistory)
+        favoritesStore.replaceFromServer(serverFavorites)
       } catch {
         // Failed to fetch server data
       } finally {

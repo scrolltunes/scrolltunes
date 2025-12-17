@@ -22,7 +22,6 @@ export async function DELETE(
   }
 
   const provider = compositeId.slice(0, colonIndex)
-  const songId = compositeId.slice(colonIndex + 1)
   const userId = session.user.id
 
   await db
@@ -35,7 +34,7 @@ export async function DELETE(
       and(
         eq(userSongItems.userId, userId),
         eq(userSongItems.songProvider, provider),
-        eq(userSongItems.songId, songId),
+        eq(userSongItems.songId, compositeId),
       ),
     )
 
