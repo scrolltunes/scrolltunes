@@ -141,17 +141,20 @@ export default function AboutPage() {
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
                   <p className="text-neutral-300">
-                    No server-side data storage — everything stays in your browser
+                    No analytics or tracking cookies for anonymous users
                   </p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
-                  <p className="text-neutral-300">No cookies, no tracking, no analytics</p>
+                  <p className="text-neutral-300">
+                    No server-side storage - your preferences and recent songs stay in your browser
+                  </p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
                   <p className="text-neutral-300">
-                    Microphone used for voice detection only — never recorded
+                    Audio processed entirely on your device - never recorded, stored, or sent to our
+                    servers
                   </p>
                 </div>
               </div>
@@ -168,7 +171,7 @@ export default function AboutPage() {
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />
                   <p className="text-neutral-300">
-                    We use analytics to improve ScrollTunes (you consent when signing up)
+                    We enable analytics to improve ScrollTunes (you consent when signing up)
                   </p>
                 </div>
                 <div className="flex items-start gap-3">
@@ -178,7 +181,7 @@ export default function AboutPage() {
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />
                   <p className="text-neutral-300">
-                    Microphone is still never recorded — voice detection runs locally
+                    Microphone is still never recorded - voice detection runs locally
                   </p>
                 </div>
               </div>
@@ -197,7 +200,7 @@ export default function AboutPage() {
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-green-500 mt-2 shrink-0" />
                   <p className="text-neutral-300">
-                    You control your data — export or delete anytime
+                    You control your data - export or delete anytime
                   </p>
                 </div>
               </div>

@@ -189,10 +189,24 @@ See [docs/architecture.md](docs/architecture.md) for details.
 
 ## Privacy
 
-- **No server-side storage** — Lyrics are fetched on-demand, not stored on our servers
-- **Local caching only** — Browser localStorage with 7-day TTL for performance
-- **No tracking** — No analytics or user tracking
-- **Microphone access** — Used only for voice detection, audio is not recorded or transmitted
+ScrollTunes is designed with privacy in mind:
+
+### Without an account
+- **No analytics or tracking cookies** — We do not use analytics or tracking for anonymous users
+- **No server-side storage** — Your preferences and recent songs stay in your browser
+- **Local caching only** — Browser localStorage with 7-day TTL for offline access
+
+### With an account
+- **Cloud sync** — We store your songs, favorites, and setlists to sync across devices
+- **Analytics enabled** — We use analytics to improve ScrollTunes (you consent when signing up)
+- **Session cookie** — We use a session cookie to keep you logged in
+
+### Always
+- **Microphone processed locally** — Audio is processed entirely on your device and is never recorded, stored, or sent to our servers
+- **No advertising trackers** — No marketing or advertising trackers
+- **You control your data** — Export or delete anytime
+
+See our [Privacy Policy](https://scrolltunes.com/privacy) for full details.
 
 ## Roadmap
 

@@ -4,8 +4,96 @@ import { UserMenu } from "@/components/auth"
 import { LogoMenu } from "@/components/layout"
 import { RecentSongs, SongSearch } from "@/components/search"
 import { Attribution } from "@/components/ui"
-import { GearSix } from "@phosphor-icons/react"
+import { CaretDown, GearSix } from "@phosphor-icons/react"
+import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
+import { useState } from "react"
+
+const linkClass = "text-indigo-400 hover:text-indigo-300"
+
+const faqItems: { question: string; answer: React.ReactNode }[] = [
+  {
+    question: "What is this?",
+    answer:
+      "ScrollTunes is a live lyrics teleprompter for musicians. It grew out of playing guitar with friends and getting tired of scrolling through lyrics on a phone balanced on your knee. Now you can just sing, and the lyrics follow along.",
+  },
+  {
+    question: "Is it free?",
+    answer:
+      "Yes, ScrollTunes is free to use. We use third-party services to fetch lyrics, tempo, and other song data. Due to rate limiting and content availability from these sources, not every song may be available, but we are always looking to expand coverage.",
+  },
+  {
+    question: "Is there a mobile app for iPhone or Android?",
+    answer:
+      "No, ScrollTunes runs entirely in your browser on desktop, tablet, or phone. The app may request microphone permission so it can listen to your singing, but audio is processed entirely on your device and is never recorded, stored, or sent to our servers.",
+  },
+  {
+    question: "How is this different from karaoke apps?",
+    answer:
+      "Unlike karaoke apps, ScrollTunes does not require playing the original track - it syncs to your live performance. You can use ScrollTunes without creating an account, and when you do, we do not use analytics, tracking cookies, or server-side storage for your activity. Your preferences and recent songs stay in your browser. Just open the site and start playing.",
+  },
+  {
+    question: "Why am I being asked to sign in with Google/Spotify?",
+    answer: (
+      <>
+        Some features require an account, including voice search, favorites, setlists, and syncing
+        your data across devices. To create an account, you will be asked to accept our{" "}
+        <Link href="/terms" className={linkClass}>
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className={linkClass}>
+          Privacy Policy
+        </Link>
+        , because we store your account data and enable analytics for signed-in users. You can use
+        all core features without signing in.
+      </>
+    ),
+  },
+  {
+    question: "Can I support you?",
+    answer: (
+      <>
+        Thank you for asking! The best way to support us right now is to use ScrollTunes and let us
+        know what you think. You can report issues or request features on X (Twitter){" "}
+        <a
+          href="https://x.com/ScrollTunes"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+        >
+          @ScrollTunes
+        </a>{" "}
+        or via the Report an issue link in the app.
+      </>
+    ),
+  },
+  {
+    question: "How can I contact you?",
+    answer: (
+      <>
+        Head over to the{" "}
+        <Link href="/about" className={linkClass}>
+          About page
+        </Link>{" "}
+        for contact details. You can reach us on X (Twitter){" "}
+        <a
+          href="https://x.com/ScrollTunes"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+        >
+          @ScrollTunes
+        </a>{" "}
+        or by email at{" "}
+        <a href="mailto:hello@scrolltunes.com" className={linkClass}>
+          hello@scrolltunes.com
+        </a>
+        .
+      </>
+    ),
+  },
+]
 
 export default function Home() {
   return (
@@ -37,8 +125,59 @@ export default function Home() {
             className="mt-3"
           />
           <RecentSongs className="w-full max-w-md mt-8" />
+
+          <FAQSection />
         </div>
       </main>
     </div>
+  )
+}
+
+function FAQSection() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
+
+  const toggle = (index: number) => {
+    setOpenIndex(openIndex === index ? null : index)
+  }
+
+  return (
+    <section className="w-full max-w-md mt-12">
+      <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-4 px-1">
+        FAQ
+      </h2>
+      <div className="space-y-3">
+        {faqItems.map((item, index) => (
+          <div key={item.question} className="bg-neutral-900 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggle(index)}
+              className="w-full p-4 flex items-center justify-between text-left"
+            >
+              <h3 className="font-medium text-white">{item.question}</h3>
+              <motion.span
+                animate={{ rotate: openIndex === index ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <CaretDown size={18} className="text-neutral-500" />
+              </motion.span>
+            </button>
+            <AnimatePresence initial={false}>
+              {openIndex === index && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <p className="text-neutral-300 text-sm leading-relaxed px-4 pb-4">
+                    {item.answer}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
