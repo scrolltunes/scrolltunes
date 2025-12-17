@@ -38,7 +38,7 @@ function getBpmAttribution(source: string): { name: string; url: string } {
       return { name: "ReccoBeats", url: "https://reccobeats.com" }
     case "Deezer":
       return { name: "Deezer", url: "https://www.deezer.com" }
-    case "RapidAPI-Spotify":
+    case "RapidAPI":
       return { name: "Spotify", url: "https://www.spotify.com" }
     default:
       return { name: "GetSongBPM", url: "https://getsongbpm.com" }

@@ -12,7 +12,7 @@
 import { Redis } from "@upstash/redis"
 import { Effect } from "effect"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
-import { rapidApiSpotifyProvider } from "../rapidapi-spotify-client"
+import { rapidApiSpotifyProvider } from "../rapidapi-client"
 import type { ReccoBeatsQuery } from "../reccobeats-client"
 
 const createQuery = (spotifyId: string): ReccoBeatsQuery => ({
@@ -123,7 +123,7 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     const result = await Effect.runPromise(effect)
 
     expect(result.bpm).toBe(121)
-    expect(result.source).toBe("RapidAPI-Spotify")
+    expect(result.source).toBe("RapidAPI")
     expect(result.key).toBe("C major")
   })
 

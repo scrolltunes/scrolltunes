@@ -1,9 +1,9 @@
 "use client"
 
 import { springs } from "@/animations"
-import { Bug, PaperPlaneTilt, X } from "@phosphor-icons/react"
+import { Bug, CheckCircle, PaperPlaneTilt, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 export interface SongContext {
   readonly title: string
@@ -13,6 +13,7 @@ export interface SongContext {
   readonly key: string | null
   readonly spotifyId: string | null
   readonly bpmSource: string | null
+  readonly lrclibId?: number | null
 }
 
 export interface ReportIssueModalProps {
@@ -31,13 +32,35 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`
 }
 
+const CLOSE_DELAY_SECONDS = 2
+
 export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueModalProps) {
   const [description, setDescription] = useState("")
   const [email, setEmail] = useState("")
   const [submitState, setSubmitState] = useState<SubmitState>("idle")
+  const [closeCountdown, setCloseCountdown] = useState(CLOSE_DELAY_SECONDS)
 
   const hasMissingBpm = songContext && !songContext.bpm
   const isDescriptionRequired = !hasMissingBpm
+
+  useEffect(() => {
+    if (submitState !== "success") {
+      setCloseCountdown(CLOSE_DELAY_SECONDS)
+      return
+    }
+
+    if (closeCountdown <= 0) {
+      onClose()
+      setSubmitState("idle")
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setCloseCountdown(c => c - 1)
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [submitState, closeCountdown, onClose])
 
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -80,6 +103,12 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
         formData.bpm = songContext.bpm?.toString() ?? "Missing"
         formData.key = songContext.key ?? "Missing"
         formData.bpm_source = songContext.bpmSource ?? "N/A"
+        formData.lrclib_id = songContext.lrclibId?.toString() ?? "N/A"
+        formData.bpm_search_raw = `title: "${songContext.title}", artist: "${songContext.artist}"${songContext.spotifyId ? `, spotifyId: "${songContext.spotifyId}"` : ""}`
+        const normalizedTitle = songContext.title.toLowerCase().trim().replace(/\s*[\(\[][^\)\]]*[\)\]]\s*$/g, "").replace(/\s*-\s*(remaster(ed)?(\s+\d{4})?|radio edit|single version|live|acoustic|remix).*$/gi, "").trim()
+        const normalizedArtist = songContext.artist.toLowerCase().trim().replace(/\s+(feat\.?|ft\.?|featuring|&)\s+.*$/gi, "")
+        formData.bpm_search_artist = normalizedArtist
+        formData.bpm_search_track = normalizedTitle
       }
 
       try {
@@ -95,10 +124,6 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
           setSubmitState("success")
           setDescription("")
           setEmail("")
-          setTimeout(() => {
-            onClose()
-            setSubmitState("idle")
-          }, 2000)
         } else {
           setSubmitState("error")
         }
@@ -199,8 +224,14 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
               )}
 
               {submitState === "success" && (
-                <div className="text-green-400 text-sm">
-                  Thank you! Your report has been submitted.
+                <div className="flex items-center gap-2 text-green-400 text-sm">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, ease: "linear" }}
+                  >
+                    <CheckCircle size={18} weight="bold" />
+                  </motion.div>
+                  <span>Thank you! Your report has been submitted.</span>
                 </div>
               )}
 

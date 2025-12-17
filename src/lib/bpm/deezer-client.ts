@@ -74,7 +74,7 @@ export const deezerBpmProvider: BPMProvider = {
 
       const normalizedArtist = normalizeForSearch(query.artist)
       const normalizedTrack = normalizeForSearch(query.title)
-      const searchQuery = encodeURIComponent(`${normalizedArtist} ${normalizedTrack}`)
+      const searchQuery = encodeURIComponent(`artist:"${normalizedArtist}" track:"${normalizedTrack}"`)
       const searchUrl = `${DEEZER_BASE_URL}/search?q=${searchQuery}&limit=5`
 
       const searchResponse = yield* Effect.tryPromise({

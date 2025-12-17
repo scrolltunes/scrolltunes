@@ -175,7 +175,7 @@ const enforceRateLimit = (): Effect.Effect<void> =>
  * Silently returns BPMNotFoundError on quota exceeded (429) to allow fallback.
  */
 export const rapidApiSpotifyProvider: BPMProvider = {
-  name: "RapidAPI-Spotify",
+  name: "RapidAPI",
 
   getBpm(query: BPMTrackQuery): Effect.Effect<BPMResult, BPMNotFoundError | BPMAPIError> {
     return Effect.gen(function* () {
@@ -263,7 +263,7 @@ export const rapidApiSpotifyProvider: BPMProvider = {
 
       return {
         bpm,
-        source: "RapidAPI-Spotify",
+        source: "RapidAPI",
         key: formatKey(data.audio_features.key, data.audio_features.mode),
       }
     })

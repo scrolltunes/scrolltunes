@@ -554,6 +554,7 @@ export default function SongPage() {
             key: loadState.key,
             spotifyId: loadState.spotifyId,
             bpmSource: loadState.bpmSource?.name ?? null,
+            lrclibId,
           }}
         />
       )}

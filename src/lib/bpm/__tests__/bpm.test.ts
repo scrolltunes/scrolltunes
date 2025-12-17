@@ -5,7 +5,7 @@ import { BPMAPIError, BPMNotFoundError, BPMRateLimitError } from "../bpm-errors"
 import { type BPMProvider, getBpmRace, getBpmWithFallback } from "../bpm-provider"
 import type { BPMTrackQuery } from "../bpm-types"
 import { makeCacheKey, normalizeTrackKey } from "../bpm-types"
-import { deezerBpmProvider } from "../deezer-bpm-client"
+import { deezerBpmProvider } from "../deezer-client"
 import { getSongBpmProvider } from "../getsongbpm-client"
 import { getMockBpm, hasMockBpm, mockBpmProvider } from "../mock-bpm"
 
