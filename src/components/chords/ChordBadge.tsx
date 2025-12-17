@@ -21,26 +21,26 @@ function getChordType(chord: string): ChordType {
 }
 
 const sizeConfig = {
-  sm: "px-1.5 py-0.5 text-xs",
+  sm: "px-1 text-sm",
   md: "px-2.5 py-1 text-sm min-w-[44px] min-h-[44px] flex items-center justify-center",
 } as const
 
 const colorConfig: Record<ChordType, { base: string; active: string }> = {
   major: {
-    base: "bg-blue-900/40 text-blue-300",
-    active: "bg-blue-700/60 text-blue-100",
+    base: "text-amber-400",
+    active: "text-amber-300",
   },
   minor: {
-    base: "bg-violet-900/40 text-violet-300",
-    active: "bg-violet-700/60 text-violet-100",
+    base: "text-amber-400",
+    active: "text-amber-300",
   },
   seventh: {
-    base: "bg-amber-900/40 text-amber-300",
-    active: "bg-amber-700/60 text-amber-100",
+    base: "text-amber-400",
+    active: "text-amber-300",
   },
   other: {
-    base: "bg-neutral-800/40 text-neutral-300",
-    active: "bg-neutral-700/60 text-neutral-100",
+    base: "text-amber-400",
+    active: "text-amber-300",
   },
 }
 
@@ -55,7 +55,7 @@ export const ChordBadge = memo(function ChordBadge({
   const sizeClasses = sizeConfig[size]
   const colorClasses = isActive ? colors.active : colors.base
 
-  const baseClassName = `inline-flex items-center justify-center rounded-md font-medium transition-colors ${sizeClasses} ${colorClasses}`
+  const baseClassName = `inline-flex items-center justify-center font-black transition-colors ${sizeClasses} ${colorClasses}`
   const animateProps = {
     animate: isActive ? { scale: 1.05 } : { scale: 1 },
     transition: { type: "spring" as const, stiffness: 400, damping: 20 },

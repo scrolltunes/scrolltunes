@@ -1,6 +1,5 @@
 "use client"
 
-import { springs } from "@/animations"
 import { ChordBadge, InlineChord } from "@/components/chords"
 import type { LyricChordPosition } from "@/lib/chords"
 import { AnimatePresence, motion } from "motion/react"
@@ -10,6 +9,7 @@ export interface LyricLineProps {
   readonly text: string
   readonly isActive: boolean
   readonly isPast: boolean
+  readonly isNext?: boolean
   readonly onClick?: () => void
   readonly index: number
   readonly fontSize?: number
@@ -19,6 +19,7 @@ export interface LyricLineProps {
   readonly isPlaying?: boolean
   readonly chords?: readonly string[] | undefined
   readonly chordPositions?: readonly LyricChordPosition[] | undefined
+  readonly variableSpeed?: boolean
 }
 
 interface WordTimingWithPosition {
@@ -33,14 +34,53 @@ interface ChordInWord extends LyricChordPosition {
   readonly offsetInWord: number
 }
 
-function calculateWordTimings(text: string, totalDuration: number): WordTimingWithPosition[] {
-  const words = text.split(/(\s+)/)
-  const nonSpaceWords = words.filter(w => w.trim() !== "")
-  const totalChars = nonSpaceWords.reduce((sum, w) => sum + w.length, 0)
+function estimateSyllables(word: string): number {
+  const cleaned = word.toLowerCase().replace(/[^a-z]/g, "")
+  if (cleaned.length <= 2) return 1
 
-  let charsSoFar = 0
+  const vowelGroups = cleaned.match(/[aeiouy]+/g)
+  if (!vowelGroups) return 1
+
+  let count = vowelGroups.length
+
+  if (cleaned.endsWith("e") && count > 1) count--
+  if (cleaned.endsWith("le") && cleaned.length > 2 && !/[aeiouy]/.test(cleaned[cleaned.length - 3] ?? "")) {
+    count++
+  }
+
+  return Math.max(1, count)
+}
+
+function calculateWordWeight(word: string, hasChord: boolean): number {
+  const syllables = estimateSyllables(word)
+  const baseWeight = syllables
+
+  const chordEmphasis = hasChord ? 1.3 : 1.0
+
+  const vowelCount = (word.match(/[aeiouyAEIOUY]/g) ?? []).length
+  const vowelRatio = vowelCount / Math.max(1, word.length)
+  const vowelBonus = 1 + vowelRatio * 0.2
+
+  return baseWeight * chordEmphasis * vowelBonus
+}
+
+function calculateWordTimings(
+  text: string,
+  totalDuration: number,
+  chordPositions: readonly LyricChordPosition[] | undefined,
+  variableSpeed: boolean,
+): WordTimingWithPosition[] {
+  const words = text.split(/(\s+)/)
+
+  const chordSet = new Set<number>()
+  if (chordPositions) {
+    for (const ch of chordPositions) {
+      chordSet.add(ch.charIndex)
+    }
+  }
+
   let position = 0
-  const result: WordTimingWithPosition[] = []
+  const wordData: { word: string; startIndex: number; endIndex: number; weight: number }[] = []
 
   for (const word of words) {
     const startIndex = position
@@ -48,12 +88,40 @@ function calculateWordTimings(text: string, totalDuration: number): WordTimingWi
     position = endIndex
 
     if (word.trim() === "") {
-      result.push({ word, delay: 0, wordDuration: 0, startIndex, endIndex })
+      wordData.push({ word, startIndex, endIndex, weight: 0 })
+    } else if (variableSpeed) {
+      let hasChord = false
+      for (let i = startIndex; i < endIndex; i++) {
+        if (chordSet.has(i)) {
+          hasChord = true
+          break
+        }
+      }
+      const weight = calculateWordWeight(word, hasChord)
+      wordData.push({ word, startIndex, endIndex, weight })
     } else {
-      const delay = totalChars > 0 ? (charsSoFar / totalChars) * totalDuration : 0
-      const wordDuration = totalChars > 0 ? (word.length / totalChars) * totalDuration : 0
-      result.push({ word, delay, wordDuration, startIndex, endIndex })
-      charsSoFar += word.length
+      wordData.push({ word, startIndex, endIndex, weight: word.length })
+    }
+  }
+
+  const totalWeight = wordData.reduce((sum, w) => sum + w.weight, 0)
+
+  let elapsed = 0
+  const result: WordTimingWithPosition[] = []
+
+  for (const wd of wordData) {
+    if (wd.weight === 0) {
+      result.push({ word: wd.word, delay: 0, wordDuration: 0, startIndex: wd.startIndex, endIndex: wd.endIndex })
+    } else {
+      const wordDuration = totalWeight > 0 ? (wd.weight / totalWeight) * totalDuration : 0
+      result.push({
+        word: wd.word,
+        delay: elapsed,
+        wordDuration,
+        startIndex: wd.startIndex,
+        endIndex: wd.endIndex,
+      })
+      elapsed += wordDuration
     }
   }
 
@@ -85,6 +153,7 @@ function renderWordWithChordAnchors(
   word: string,
   chords: readonly ChordInWord[],
   isActive: boolean,
+  isNext: boolean,
 ): React.ReactNode {
   if (chords.length === 0) {
     return word
@@ -118,7 +187,7 @@ function renderWordWithChordAnchors(
         {chordsAtOffset && chordsAtOffset.length > 0 && (
           <span className="absolute bottom-full mb-[-0.3em] left-0 flex gap-0.5 whitespace-nowrap">
             {chordsAtOffset.map((ch, i) => (
-              <ChordBadge key={`${ch.name}-${i}`} chord={ch.name} size="sm" isActive={isActive} />
+              <ChordBadge key={`${ch.name}-${i}`} chord={ch.name} size="sm" isActive={isActive || isNext} />
             ))}
           </span>
         )}
@@ -145,6 +214,7 @@ export const LyricLine = memo(function LyricLine({
   text,
   isActive,
   isPast,
+  isNext = false,
   onClick,
   index,
   fontSize,
@@ -154,8 +224,12 @@ export const LyricLine = memo(function LyricLine({
   isPlaying = true,
   chords,
   chordPositions,
+  variableSpeed = true,
 }: LyricLineProps) {
-  const wordTimings = useMemo(() => calculateWordTimings(text, duration ?? 0), [text, duration])
+  const wordTimings = useMemo(
+    () => calculateWordTimings(text, duration ?? 0, chordPositions, variableSpeed),
+    [text, duration, chordPositions, variableSpeed],
+  )
 
   const chordsPerWord = useMemo(
     () => chordsByWord(wordTimings, chordPositions),
@@ -170,11 +244,17 @@ export const LyricLine = memo(function LyricLine({
     )
   }
 
-  const opacityClass = isPast ? "opacity-40" : isActive ? "opacity-100" : "opacity-70"
-  const baseTextColor = isPast ? "text-neutral-600" : "text-neutral-400"
-  const textSizeClass = fontSize === undefined ? "text-2xl md:text-3xl lg:text-4xl" : ""
   const hasPositionedChords = chordPositions && chordPositions.length > 0
-  const shouldAnimate = isActive && isPlaying && duration !== undefined
+  // When chords are shown, keep lyrics visible but neutral so chords stand out
+  const opacityClass = isPast ? "opacity-40" : "opacity-100"
+  const baseTextColor = isPast
+    ? "text-neutral-600"
+    : isActive
+      ? "text-neutral-400"
+      : "text-neutral-500"
+  const textSizeClass = fontSize === undefined ? "text-2xl md:text-3xl lg:text-4xl" : ""
+  // Disable animation when chords are shown - musicians focus on chords, not lyrics
+  const shouldAnimate = isActive && isPlaying && duration !== undefined && !hasPositionedChords
 
   return (
     <button
@@ -209,7 +289,7 @@ export const LyricLine = memo(function LyricLine({
             <span key={i} className="relative inline-block">
               {/* Base layer: text with chord anchors (always rendered, stable structure) */}
               <span className={isActive ? "text-neutral-500" : baseTextColor}>
-                {renderWordWithChordAnchors(word, wordChords, isActive)}
+                {renderWordWithChordAnchors(word, wordChords, isActive, isNext)}
               </span>
 
               {/* Overlay layer: white text (animated or static based on state) */}
@@ -237,11 +317,11 @@ export const LyricLine = memo(function LyricLine({
       <AnimatePresence>
         {isActive && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={springs.lyricHighlight}
-            className="absolute inset-0 z-0 rounded-lg bg-indigo-500/30"
+            transition={{ type: "tween", duration: 0.4, ease: "easeOut" }}
+            className="absolute inset-0 z-0 rounded-lg bg-indigo-500/20"
           />
         )}
       </AnimatePresence>

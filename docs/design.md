@@ -247,10 +247,16 @@ Help performers keep time with configurable tempo cues:
 Display chord progressions alongside lyrics for guitarists:
 
 **Inline Chord Display**:
-- Chord names positioned above corresponding lyrics (e.g., `[Am]` `[G]` `[C]`)
-- Color-coded by chord type (major, minor, 7th, etc.)
-- Highlight upcoming chord change
+- Chord names positioned above corresponding lyrics at character-level positions
+- Amber/gold color (`text-amber-400`) with heavy font weight for visibility
+- Both current and next line chords highlighted so musicians can look ahead
 - Transpose support (+/- semitones) for capo or alternate tunings
+
+**Chord Mode UX** (optimized for musicians):
+- Word-by-word painting animation disabled when chords are shown (static highlight)
+- Lyrics use neutral colors so chords remain the visual focus
+- Upcoming lines stay visible (no aggressive dimming) for easy scanning
+- Variable-speed word painting (syllable-based timing) available for non-chord mode
 
 **Chord Shape Legend** (sidebar):
 - Visual chord diagrams showing finger positions
@@ -259,7 +265,7 @@ Display chord progressions alongside lyrics for guitarists:
 - Alternative voicings toggle (beginner vs. advanced shapes)
 
 **Data Sources**:
-- Ultimate Guitar API or similar chord database
+- Songsterr API for chord data with character-level positioning
 - User-submitted chord charts
 - Auto-detection from audio (future — ML-based chord recognition)
 

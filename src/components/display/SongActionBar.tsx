@@ -16,9 +16,9 @@ import {
 } from "@/core"
 import {
   CaretUp,
+  Guitar,
   Minus,
   MusicNote,
-  MusicNotes,
   Plus,
   SlidersHorizontal,
   TextAa,
@@ -84,7 +84,7 @@ export const SongActionBar = memo(function SongActionBar({
   }, [fontSize])
 
   return (
-    <div className="flex items-center justify-center gap-3 py-4">
+    <div className="flex items-center justify-center gap-3 py-4 px-4">
       {/* Font size controls */}
       <div className="flex items-center gap-1 bg-neutral-800/50 rounded-full px-2 py-1.5">
         <TextAa size={18} weight="fill" className="text-neutral-400 mr-1" />
@@ -162,8 +162,8 @@ export const SongActionBar = memo(function SongActionBar({
       {/* Chords button - show different states based on availability */}
       {chordsNotFound ? (
         <div className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800/50 rounded-full text-sm text-neutral-500">
-          <MusicNotes size={20} />
-          <span>No chords available</span>
+          <Guitar size={20} />
+          <span className="hidden sm:inline">No chords available</span>
         </div>
       ) : (
         <div
@@ -176,7 +176,7 @@ export const SongActionBar = memo(function SongActionBar({
             type="button"
             onClick={() => chordsStore.toggleShowChords()}
             disabled={chordsLoading}
-            className={`flex items-center gap-1.5 px-3 py-2 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`flex items-center gap-1.5 px-4 py-2 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
               showChords && chordsReady
                 ? "text-indigo-400 hover:bg-indigo-600/30"
                 : "text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
@@ -184,8 +184,8 @@ export const SongActionBar = memo(function SongActionBar({
             aria-label={showChords ? "Hide chords" : "Show chords"}
             aria-pressed={showChords && chordsReady}
           >
-            <MusicNotes size={20} weight={showChords && chordsReady ? "fill" : "regular"} />
-            <span>Chords</span>
+            <Guitar size={20} weight={showChords && chordsReady ? "fill" : "regular"} />
+            <span className="hidden sm:inline">Chords</span>
             <span className="text-[10px] font-semibold bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded-full">
               Beta
             </span>
@@ -201,7 +201,7 @@ export const SongActionBar = memo(function SongActionBar({
             type="button"
             onClick={onChordSettingsClick}
             disabled={!showChords || !chordsReady}
-            className={`flex items-center justify-center w-8 h-9 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+            className={`flex items-center justify-center w-10 h-9 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               showChords && chordsReady
                 ? isChordPanelOpen
                   ? "text-indigo-300 bg-indigo-600/30"

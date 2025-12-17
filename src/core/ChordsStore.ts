@@ -9,6 +9,7 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const CACHE_KEY_PREFIX = "scrolltunes:chords:"
 const SHOW_CHORDS_KEY = "scrolltunes:showChords"
 const TRANSPOSE_KEY = "scrolltunes:transpose"
+const VARIABLE_SPEED_KEY = "scrolltunes:variableSpeedPainting"
 const CACHE_VERSION = 2 // Increment when data format changes
 
 interface CachedChords {
@@ -25,6 +26,7 @@ interface ChordsState {
   errorUrl: string | null
   transposeSemitones: number
   showChords: boolean
+  variableSpeedPainting: boolean
 }
 
 const EMPTY_STATE: ChordsState = {
@@ -35,6 +37,7 @@ const EMPTY_STATE: ChordsState = {
   errorUrl: null,
   transposeSemitones: 0,
   showChords: true,
+  variableSpeedPainting: true,
 }
 
 function getCacheKey(songId: number): string {
@@ -96,6 +99,25 @@ function saveShowChordsPreference(show: boolean): void {
   }
 }
 
+function loadVariableSpeedPreference(): boolean {
+  if (typeof window === "undefined") return true
+  try {
+    const stored = localStorage.getItem(VARIABLE_SPEED_KEY)
+    return stored === null ? true : stored === "true"
+  } catch {
+    return true
+  }
+}
+
+function saveVariableSpeedPreference(enabled: boolean): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(VARIABLE_SPEED_KEY, String(enabled))
+  } catch {
+    // Failed to save
+  }
+}
+
 interface TransposePreferences {
   [songId: string]: number
 }
@@ -133,7 +155,11 @@ function saveTransposeForSong(songId: number, semitones: number): void {
 
 class ChordsStore {
   private listeners = new Set<() => void>()
-  private state: ChordsState = { ...EMPTY_STATE, showChords: loadShowChordsPreference() }
+  private state: ChordsState = {
+    ...EMPTY_STATE,
+    showChords: loadShowChordsPreference(),
+    variableSpeedPainting: loadVariableSpeedPreference(),
+  }
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
@@ -289,6 +315,17 @@ class ChordsStore {
     this.updateState({ showChords: show })
   }
 
+  toggleVariableSpeedPainting(): void {
+    const newValue = !this.state.variableSpeedPainting
+    saveVariableSpeedPreference(newValue)
+    this.updateState({ variableSpeedPainting: newValue })
+  }
+
+  setVariableSpeedPainting(enabled: boolean): void {
+    saveVariableSpeedPreference(enabled)
+    this.updateState({ variableSpeedPainting: enabled })
+  }
+
   clear(): void {
     this.state = { ...EMPTY_STATE, showChords: this.state.showChords }
     this.notify()
@@ -311,6 +348,10 @@ export function useTranspose(): number {
 
 export function useShowChords(): boolean {
   return useChordsState().showChords
+}
+
+export function useVariableSpeedPainting(): boolean {
+  return useChordsState().variableSpeedPainting
 }
 
 export function useUniqueChords(): string[] {

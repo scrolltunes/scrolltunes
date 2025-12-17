@@ -50,11 +50,12 @@ Live musicians need lyrics on stage, but traditional karaoke apps require playin
 - **Lyrics caching** — 7-day local cache for offline access
 - **Resume playback** — Return to where you left off
 
-### Chords (Experimental)
-- **Guitar chords** — Display chord progressions above lyrics (via Songsterr)
+### Chords (Beta)
+- **Guitar chords** — Display chord progressions positioned above lyrics (via Songsterr)
+- **Musician-friendly** — Chords on current and next line highlighted for look-ahead
+- **Clean display** — Static lyrics in chord mode so chords remain the visual focus
 - **Transpose** — Shift chords up/down by semitones
 - **Chord toggle** — Show/hide chords with one tap
-- **Enable in Settings** — Settings → Experimental → Enable chords
 
 ### Settings
 - **Font size** — Adjustable lyrics text size (16–64px)
@@ -205,9 +206,10 @@ See [docs/architecture.md](docs/architecture.md) for details.
 - ✅ User accounts & cloud sync
 - ✅ Favorites & setlists
 
-### V1.1 (Experimental)
+### V1.1 (Beta)
 - ✅ Guitar chord integration (Songsterr)
 - ✅ Transpose controls
+- ✅ Chord mode UX (static lyrics, look-ahead highlighting)
 - 🔲 Chord diagrams (tap to view fingering)
 - 🔲 Capo indicator
 

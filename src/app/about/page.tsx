@@ -116,6 +116,16 @@ export default function AboutPage() {
                   Voice search to find songs hands-free (sign in required)
                 </p>
               </div>
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-amber-500 mt-2 shrink-0" />
+                <p className="text-neutral-300">
+                  Guitar chords positioned above lyrics with look-ahead highlighting
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-amber-500 mt-2 shrink-0" />
+                <p className="text-neutral-300">Transpose chords up or down by semitones</p>
+              </div>
             </div>
           </section>
 
@@ -223,6 +233,17 @@ export default function AboutPage() {
                 <div className="font-medium text-white">GetSongBPM</div>
                 <div className="text-sm text-neutral-400 mt-1">
                   Tempo and BPM data — getsongbpm.com
+                </div>
+              </a>
+              <a
+                href="https://songsterr.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block p-4 bg-neutral-900 rounded-xl hover:bg-neutral-800 transition-colors"
+              >
+                <div className="font-medium text-white">Songsterr</div>
+                <div className="text-sm text-neutral-400 mt-1">
+                  Guitar chords and tabs — songsterr.com
                 </div>
               </a>
             </div>

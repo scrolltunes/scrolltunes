@@ -8,6 +8,7 @@ import {
   usePreferences,
   useShowChords,
   useTranspose,
+  useVariableSpeedPainting,
 } from "@/core"
 import { detectLyricsDirection } from "@/lib"
 import { type LyricChordPosition, matchChordsToLyrics, transposeChordLine } from "@/lib/chords"
@@ -35,6 +36,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const chordsData = useChordsData()
   const showChords = useShowChords()
   const transposeSemitones = useTranspose()
+  const variableSpeed = useVariableSpeedPainting()
 
   // Manual scroll override state
   const [isManualScrolling, setIsManualScrolling] = useState(false)
@@ -266,10 +268,11 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       <motion.div
         className="py-[50vh] max-w-4xl mx-auto"
         animate={{ y: -scrollY }}
-        transition={{ type: "tween", duration: 0.5, ease: "easeOut" }}
+        transition={{ type: "spring", stiffness: 80, damping: 20, mass: 0.8 }}
       >
         {lyrics.lines.map((line, index) => {
           const isActive = index === activeLineIndex
+          const isNext = index === activeLineIndex + 1
           const duration = isActive
             ? (lyrics.lines[index + 1]?.startTime ?? lyrics.duration) - line.startTime
             : undefined
@@ -281,6 +284,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
               text={line.text}
               isActive={isActive}
               isPast={index < activeLineIndex}
+              isNext={isNext}
               onClick={() => handleLineClick(index)}
               index={index}
               fontSize={fontSize}
@@ -291,6 +295,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
               isPlaying={isPlaying}
               chords={chordData?.chords}
               chordPositions={chordData?.chordPositions}
+              variableSpeed={variableSpeed}
               {...(duration !== undefined && { duration })}
             />
           )
