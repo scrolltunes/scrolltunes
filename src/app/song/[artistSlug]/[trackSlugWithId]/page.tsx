@@ -1,8 +1,8 @@
 "use client"
 
 import { springs } from "@/animations"
-import { FloatingMetronome, FontSizeControl, VoiceIndicator } from "@/components/audio"
-import { ChordInfoPanel, TransposeControl } from "@/components/chords"
+import { FloatingMetronome, VoiceIndicator } from "@/components/audio"
+import { ChordInfoPanel } from "@/components/chords"
 import {
   FloatingInfoButton,
   LyricsDisplay,
@@ -16,7 +16,6 @@ import { AddToSetlistModal } from "@/components/setlists"
 import {
   type Lyrics,
   chordsStore,
-  preferencesStore,
   recentSongsStore,
   useChordsState,
   usePlayerControls,
@@ -43,9 +42,7 @@ import { soundSystem } from "@/sounds"
 import {
   ArrowCounterClockwise,
   ArrowLeft,
-  Gear,
   MusicNote,
-  MusicNotes,
   Pause,
   Play,
   SpinnerGap,
@@ -96,11 +93,11 @@ export default function SongPage() {
   const searchParams = useSearchParams()
   const spotifyId = searchParams.get("spotifyId")
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
-  const [showSettings, setShowSettings] = useState(false)
   const [showInfo, setShowInfo] = useState(false)
   const [showAddToSetlist, setShowAddToSetlist] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
-  const [showChordPanel, setShowChordPanel] = useState(() => preferencesStore.getEnableChords())
+  const [showChordPanel, setShowChordPanel] = useState(false)
+  const chordPanelWasOpen = useRef(showChordPanel)
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
@@ -214,8 +211,6 @@ export default function SongPage() {
     const controller = new AbortController()
 
     async function fetchChordsForSong(artist: string, title: string) {
-      if (!preferencesStore.getEnableChords()) return
-
       const normalizedArtist = normalizeArtistName(artist)
       const normalizedTitle = normalizeTrackName(title)
       try {
@@ -371,6 +366,15 @@ export default function SongPage() {
     handleMicPermission()
   }, [loadState._tag, startListening])
 
+  useEffect(() => {
+    if (!showChords) {
+      chordPanelWasOpen.current = showChordPanel
+      setShowChordPanel(false)
+    } else {
+      setShowChordPanel(chordPanelWasOpen.current)
+    }
+  }, [showChords])
+
   const handleToggleListening = useCallback(async () => {
     if (isListening) {
       stopListening()
@@ -503,16 +507,6 @@ export default function SongPage() {
                     >
                       <ArrowCounterClockwise size={20} />
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowSettings(prev => !prev)}
-                      className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-                      aria-label={showSettings ? "Hide settings" : "Show settings"}
-                      aria-expanded={showSettings}
-                    >
-                      <Gear size={20} />
-                    </button>
                   </div>
                 )}
               </div>
@@ -547,72 +541,12 @@ export default function SongPage() {
         <LyricsDisplay className="flex-1 pb-12" />
 
         <FloatingInfoButton
-          hasBpm={loadState.bpm !== null}
+          hasIssue={loadState.bpm === null || chordsState.status === "error"}
           onPress={() => setShowInfo(true)}
           onWarningPress={() => setShowReportModal(true)}
           position="bottom-left"
         />
         <FloatingMetronome bpm={currentBpm} position="bottom-right" />
-
-        <AnimatePresence>
-          {showSettings && (
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={springs.default}
-              className="fixed bottom-7 left-0 right-0 z-20 bg-neutral-900/95 backdrop-blur-lg border-t border-neutral-800"
-            >
-              <div className="max-w-4xl mx-auto p-4 space-y-4">
-                <FontSizeControl />
-
-                {/* Chord controls - only show when experimental chords feature is enabled */}
-                {preferences.enableChords && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <MusicNotes size={20} className="text-neutral-400" />
-                        <span className="text-sm text-neutral-400">Chords</span>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {/* Toggle */}
-                        <button
-                          type="button"
-                          onClick={() => chordsStore.toggleShowChords()}
-                          className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                            showChords
-                              ? "bg-indigo-600 text-white"
-                              : "bg-neutral-800 text-neutral-400"
-                          }`}
-                          disabled={chordsState.status !== "ready"}
-                        >
-                          {showChords ? "On" : "Off"}
-                        </button>
-
-                        {/* Transpose - only show when chords are visible */}
-                        {showChords && chordsState.status === "ready" && (
-                          <TransposeControl
-                            value={transpose}
-                            onChange={v => chordsStore.setTranspose(v)}
-                          />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Status indicator */}
-                    {chordsState.status === "loading" && (
-                      <p className="text-xs text-neutral-500">Loading chords...</p>
-                    )}
-                    {chordsState.status === "not-found" && (
-                      <p className="text-xs text-neutral-500">No chords available for this song</p>
-                    )}
-                  </>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </main>
 
       {loadState._tag === "Loaded" && (
@@ -644,6 +578,8 @@ export default function SongPage() {
             spotifyId: loadState.spotifyId,
             bpmSource: loadState.bpmSource?.name ?? null,
             lrclibId,
+            chordsError: chordsState.status === "error" ? chordsState.error : null,
+            chordsErrorUrl: chordsState.status === "error" ? chordsState.errorUrl : null,
           }}
         />
       )}

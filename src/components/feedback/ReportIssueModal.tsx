@@ -15,6 +15,8 @@ export interface SongContext {
   readonly spotifyId: string | null
   readonly bpmSource: string | null
   readonly lrclibId?: number | null
+  readonly chordsError?: string | null
+  readonly chordsErrorUrl?: string | null
 }
 
 export interface ReportIssueModalProps {
@@ -42,7 +44,9 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
   const [closeCountdown, setCloseCountdown] = useState(CLOSE_DELAY_SECONDS)
 
   const hasMissingBpm = songContext && !songContext.bpm
-  const isDescriptionRequired = !hasMissingBpm
+  const hasChordsError = songContext?.chordsError
+  const hasKnownIssue = hasMissingBpm || hasChordsError
+  const isDescriptionRequired = !hasKnownIssue
 
   const displayTitle = useMemo(
     () => (songContext ? normalizeTrackName(songContext.title) : ""),
@@ -90,7 +94,11 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
 
       const pageUrl = typeof window !== "undefined" ? window.location.href : ""
 
-      const defaultDescription = hasMissingBpm ? "Missing BPM data" : ""
+      const defaultDescription = hasMissingBpm
+        ? "Missing BPM data"
+        : hasChordsError
+          ? `Chords error: ${songContext?.chordsError}`
+          : ""
       const formData: Record<string, string> = {
         access_key: WEB3FORMS_ACCESS_KEY,
         subject: songContext
@@ -116,6 +124,10 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
         formData.key = songContext.key ?? "Missing"
         formData.bpm_source = songContext.bpmSource ?? "N/A"
         formData.lrclib_id = songContext.lrclibId?.toString() ?? "N/A"
+        formData.chords_error = songContext.chordsError ?? "N/A"
+        if (songContext.chordsErrorUrl) {
+          formData.chords_error_url = songContext.chordsErrorUrl
+        }
       }
 
       try {
@@ -144,6 +156,8 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
       songContext,
       isDescriptionRequired,
       hasMissingBpm,
+      hasChordsError,
+      hasKnownIssue,
       displayTitle,
       displayArtist,
     ],
@@ -200,6 +214,11 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   {!songContext.bpm && (
                     <div className="mt-2 text-amber-500 text-xs">⚠ BPM data is missing</div>
                   )}
+                  {songContext.chordsError && (
+                    <div className="mt-2 text-amber-500 text-xs">
+                      ⚠ Chords error: {songContext.chordsError}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -211,7 +230,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   id="description"
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  placeholder={hasMissingBpm ? "Any additional context..." : "What went wrong?"}
+                  placeholder={hasKnownIssue ? "Any additional context..." : "What went wrong?"}
                   rows={4}
                   required={isDescriptionRequired}
                   disabled={submitState === "submitting"}

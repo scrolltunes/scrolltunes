@@ -5,62 +5,35 @@ import {
   FONT_SIZE_STEP,
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
-  type Setlist,
-  chordsStore,
   preferencesStore,
-  useChordsState,
-  useIsAuthenticated,
   usePreference,
-  useSetlistsContainingSong,
-  useShowChords,
 } from "@/core"
-import { CaretUp, Minus, MusicNote, MusicNotes, Plus, SlidersHorizontal, TextAa } from "@phosphor-icons/react"
-import { memo, useCallback } from "react"
+import type { ChordsState } from "@/core/ChordsStore"
+import { CaretUp, Minus, MusicNotes, Plus, SlidersHorizontal, TextAa } from "@phosphor-icons/react"
+import { memo, useCallback, useState } from "react"
 
-export interface SongActionBarProps {
-  readonly songId: number
-  readonly title: string
-  readonly artist: string
-  readonly albumArt?: string
-  readonly onAddToSetlist: () => void
-  readonly onChordSettingsClick: () => void
+type MockChordsStatus = ChordsState["status"]
+
+interface MockSongActionBarProps {
+  readonly status: MockChordsStatus
+  readonly showChords: boolean
   readonly isChordPanelOpen: boolean
+  readonly onToggleChords: () => void
+  readonly onChordSettingsClick: () => void
 }
 
-function SetlistIcon({ setlist }: { readonly setlist: Setlist }) {
-  return (
-    <div
-      className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-      style={{ backgroundColor: setlist.color ?? "#6366f1" }}
-      title={setlist.name}
-    >
-      {setlist.icon ? (
-        <span className="text-[10px]">{setlist.icon}</span>
-      ) : (
-        <MusicNote size={10} weight="fill" className="text-white" />
-      )}
-    </div>
-  )
-}
-
-export const SongActionBar = memo(function SongActionBar({
-  songId,
-  title,
-  artist,
-  albumArt,
-  onAddToSetlist,
-  onChordSettingsClick,
+const MockSongActionBar = memo(function MockSongActionBar({
+  status,
+  showChords,
   isChordPanelOpen,
-}: SongActionBarProps) {
-  const isAuthenticated = useIsAuthenticated()
-  const containingSetlists = useSetlistsContainingSong(songId)
-  const isInSetlist = containingSetlists.length > 0
+  onToggleChords,
+  onChordSettingsClick,
+}: MockSongActionBarProps) {
   const fontSize = usePreference("fontSize")
-  const chordsState = useChordsState()
-  const showChords = useShowChords()
-  const chordsReady = chordsState.status === "ready"
-  const chordsNotFound = chordsState.status === "not-found"
-  const chordsLoading = chordsState.status === "loading" || chordsState.status === "idle"
+
+  const chordsReady = status === "ready"
+  const chordsNotFound = status === "not-found"
+  const chordsLoading = status === "loading" || status === "idle"
 
   const isAtMin = fontSize <= MIN_FONT_SIZE
   const isAtMax = fontSize >= MAX_FONT_SIZE
@@ -102,52 +75,7 @@ export const SongActionBar = memo(function SongActionBar({
 
       <div className="w-px h-6 bg-neutral-700" />
 
-      <FavoriteButton
-        songId={songId}
-        title={title}
-        artist={artist}
-        {...(albumArt !== undefined && { albumArt })}
-        size="md"
-      />
-
-      {isAuthenticated && (
-        <button
-          type="button"
-          onClick={onAddToSetlist}
-          className={`flex items-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
-            isInSetlist
-              ? "bg-neutral-800/50 hover:bg-neutral-700/50"
-              : "bg-neutral-800/50 hover:bg-neutral-700/50 text-neutral-400 hover:text-neutral-300"
-          }`}
-          aria-label={isInSetlist ? "Manage setlists" : "Add to setlist"}
-        >
-          {isInSetlist ? (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-neutral-500 leading-none">
-                {containingSetlists.length}
-              </span>
-              <div className="flex items-center gap-0.5">
-                {containingSetlists.slice(0, 3).map(setlist => (
-                  <SetlistIcon key={setlist.id} setlist={setlist} />
-                ))}
-                {containingSetlists.length > 3 && (
-                  <div
-                    className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 bg-neutral-700 text-neutral-400 text-[10px] font-medium"
-                    title={`${containingSetlists.length - 3} more`}
-                  >
-                    +{containingSetlists.length - 3}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              <Plus size={20} />
-              <span>Add to setlist</span>
-            </>
-          )}
-        </button>
-      )}
+      <FavoriteButton songId={12345} title="Test Song" artist="Test Artist" size="md" />
 
       <div className="w-px h-6 bg-neutral-700" />
 
@@ -166,7 +94,7 @@ export const SongActionBar = memo(function SongActionBar({
           {/* Main button - toggle chords on/off */}
           <button
             type="button"
-            onClick={() => chordsStore.toggleShowChords()}
+            onClick={onToggleChords}
             disabled={chordsLoading}
             className={`flex items-center gap-1.5 px-3 py-2 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
               showChords && chordsReady
@@ -212,3 +140,102 @@ export const SongActionBar = memo(function SongActionBar({
     </div>
   )
 })
+
+interface StateCardProps {
+  readonly title: string
+  readonly description: string
+  readonly status: MockChordsStatus
+  readonly showChords?: boolean
+  readonly isChordPanelOpen?: boolean
+}
+
+function StateCard({
+  title,
+  description,
+  status,
+  showChords: initialShowChords = false,
+  isChordPanelOpen: initialPanelOpen = false,
+}: StateCardProps) {
+  const [showChords, setShowChords] = useState(initialShowChords)
+  const [isChordPanelOpen, setIsChordPanelOpen] = useState(initialPanelOpen)
+
+  return (
+    <div className="bg-neutral-900 rounded-xl p-6 space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-white">{title}</h2>
+        <p className="text-sm text-neutral-400">{description}</p>
+        <code className="text-xs text-indigo-400 mt-1 block">status: "{status}"</code>
+      </div>
+      <div className="bg-neutral-950 rounded-lg">
+        <MockSongActionBar
+          status={status}
+          showChords={showChords}
+          isChordPanelOpen={isChordPanelOpen}
+          onToggleChords={() => setShowChords(prev => !prev)}
+          onChordSettingsClick={() => setIsChordPanelOpen(prev => !prev)}
+        />
+      </div>
+    </div>
+  )
+}
+
+export default function ChordsStatesTestPage() {
+  return (
+    <div className="min-h-screen bg-black p-8">
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-2">Chords Button States</h1>
+          <p className="text-neutral-400">Test page showing all possible states of the chords button in SongActionBar</p>
+        </div>
+
+        <div className="grid gap-6">
+          <StateCard
+            title="Idle"
+            description="Initial state before any fetch has started"
+            status="idle"
+          />
+
+          <StateCard
+            title="Loading"
+            description="Chords are being fetched from the API"
+            status="loading"
+          />
+
+          <StateCard
+            title="Ready (Chords Off)"
+            description="Chords loaded successfully, toggle is off"
+            status="ready"
+            showChords={false}
+          />
+
+          <StateCard
+            title="Ready (Chords On)"
+            description="Chords loaded successfully, toggle is on"
+            status="ready"
+            showChords={true}
+          />
+
+          <StateCard
+            title="Ready (Settings Open)"
+            description="Chords on with settings panel open"
+            status="ready"
+            showChords={true}
+            isChordPanelOpen={true}
+          />
+
+          <StateCard
+            title="Not Found"
+            description="No chords available for this song"
+            status="not-found"
+          />
+
+          <StateCard
+            title="Error"
+            description="Failed to fetch chords (shows same as loading/idle)"
+            status="error"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}

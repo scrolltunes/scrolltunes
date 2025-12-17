@@ -4,7 +4,7 @@ import { Info, Warning } from "@phosphor-icons/react"
 import { memo } from "react"
 
 export interface FloatingInfoButtonProps {
-  readonly hasBpm: boolean
+  readonly hasIssue: boolean
   readonly onPress: () => void
   readonly onWarningPress?: () => void
   readonly position?: "bottom-left" | "bottom-right"
@@ -17,14 +17,14 @@ const positionClasses = {
 }
 
 export const FloatingInfoButton = memo(function FloatingInfoButton({
-  hasBpm,
+  hasIssue,
   onPress,
   onWarningPress,
   position = "bottom-left",
   className = "",
 }: FloatingInfoButtonProps) {
   const handleClick = () => {
-    if (!hasBpm && onWarningPress) {
+    if (hasIssue && onWarningPress) {
       onWarningPress()
     } else {
       onPress()
@@ -40,13 +40,13 @@ export const FloatingInfoButton = memo(function FloatingInfoButton({
         type="button"
         onClick={handleClick}
         className={`flex items-center gap-2 transition-colors backdrop-blur-sm border border-neutral-700/50 ${
-          hasBpm
+          !hasIssue
             ? "w-11 h-11 rounded-full justify-center bg-neutral-900/80 hover:bg-neutral-800"
             : "h-11 px-3 rounded-full bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/30"
         }`}
-        aria-label={hasBpm ? "Song info" : "Report issue"}
+        aria-label={!hasIssue ? "Song info" : "Report issue"}
       >
-        {hasBpm ? (
+        {!hasIssue ? (
           <Info size={20} className="text-neutral-300" />
         ) : (
           <>

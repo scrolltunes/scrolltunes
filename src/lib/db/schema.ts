@@ -78,6 +78,7 @@ export const appUserProfiles = pgTable("app_user_profiles", {
   consentVersion: text("consent_version").notNull(),
   consentGivenAt: timestamp("consent_given_at", { mode: "date", withTimezone: true }).notNull(),
   gdprExportEmail: text("gdpr_export_email"),
+  preferencesJson: jsonb("preferences_json").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
 })

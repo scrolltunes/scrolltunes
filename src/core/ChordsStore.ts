@@ -3,9 +3,12 @@
 import { type SongsterrChordData, transposeChord } from "@/lib/chords"
 import { useMemo, useSyncExternalStore } from "react"
 
+import { accountStore } from "./AccountStore"
+
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const CACHE_KEY_PREFIX = "scrolltunes:chords:"
 const SHOW_CHORDS_KEY = "scrolltunes:showChords"
+const TRANSPOSE_KEY = "scrolltunes:transpose"
 
 interface CachedChords {
   data: SongsterrChordData
@@ -17,6 +20,7 @@ interface ChordsState {
   songId: number | null
   data: SongsterrChordData | null
   error: string | null
+  errorUrl: string | null
   transposeSemitones: number
   showChords: boolean
 }
@@ -26,6 +30,7 @@ const EMPTY_STATE: ChordsState = {
   songId: null,
   data: null,
   error: null,
+  errorUrl: null,
   transposeSemitones: 0,
   showChords: true,
 }
@@ -86,6 +91,41 @@ function saveShowChordsPreference(show: boolean): void {
   }
 }
 
+interface TransposePreferences {
+  [songId: string]: number
+}
+
+function getTransposePreferences(): TransposePreferences {
+  if (typeof window === "undefined") return {}
+  try {
+    const stored = localStorage.getItem(TRANSPOSE_KEY)
+    return stored ? (JSON.parse(stored) as TransposePreferences) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveTransposePreferences(prefs: TransposePreferences): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(TRANSPOSE_KEY, JSON.stringify(prefs))
+  } catch {
+    // Storage full or unavailable
+  }
+}
+
+function loadTransposeForSong(songId: number): number | null {
+  const prefs = getTransposePreferences()
+  const key = String(songId)
+  return key in prefs ? (prefs[key] ?? 0) : null
+}
+
+function saveTransposeForSong(songId: number, semitones: number): void {
+  const prefs = getTransposePreferences()
+  prefs[String(songId)] = semitones
+  saveTransposePreferences(prefs)
+}
+
 class ChordsStore {
   private listeners = new Set<() => void>()
   private state: ChordsState = { ...EMPTY_STATE, showChords: loadShowChordsPreference() }
@@ -113,6 +153,8 @@ class ChordsStore {
       return
     }
 
+    const savedTranspose = await this.loadTranspose(songsterrSongId)
+
     const cached = loadFromCache(songsterrSongId)
     if (cached) {
       this.updateState({
@@ -120,7 +162,7 @@ class ChordsStore {
         songId: songsterrSongId,
         data: cached,
         error: null,
-        transposeSemitones: 0,
+        transposeSemitones: savedTranspose,
       })
       return
     }
@@ -130,17 +172,21 @@ class ChordsStore {
       songId: songsterrSongId,
       data: null,
       error: null,
-      transposeSemitones: 0,
+      transposeSemitones: savedTranspose,
     })
 
+    const params = new URLSearchParams({ artist, title })
+    const requestUrl = `/api/chords/${songsterrSongId}?${params.toString()}`
+    const fullUrl = typeof window !== "undefined" ? `${window.location.origin}${requestUrl}` : requestUrl
+
     try {
-      const params = new URLSearchParams({ artist, title })
-      const response = await fetch(`/api/chords/${songsterrSongId}?${params.toString()}`)
+      const response = await fetch(requestUrl)
 
       if (response.status === 404) {
         this.updateState({
           status: "not-found",
           error: "Chords not found",
+          errorUrl: null,
         })
         return
       }
@@ -156,18 +202,62 @@ class ChordsStore {
         status: "ready",
         data,
         error: null,
+        errorUrl: null,
       })
     } catch (err) {
       this.updateState({
         status: "error",
         error: err instanceof Error ? err.message : "Unknown error",
+        errorUrl: fullUrl,
       })
+    }
+  }
+
+  private async loadTranspose(songId: number): Promise<number> {
+    const localTranspose = loadTransposeForSong(songId)
+    if (localTranspose !== null) {
+      return localTranspose
+    }
+
+    if (accountStore.isAuthenticated()) {
+      try {
+        const response = await fetch(`/api/user/transpose/${songId}`)
+        if (response.ok) {
+          const data = (await response.json()) as { transpose: number }
+          saveTransposeForSong(songId, data.transpose)
+          return data.transpose
+        }
+      } catch {
+        // Failed to fetch from server, use default
+      }
+    }
+
+    return 0
+  }
+
+  private async saveTranspose(songId: number, semitones: number): Promise<void> {
+    saveTransposeForSong(songId, semitones)
+
+    if (accountStore.isAuthenticated()) {
+      try {
+        await fetch(`/api/user/transpose/${songId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transpose: semitones }),
+        })
+      } catch {
+        // Failed to sync to server, local storage is still updated
+      }
     }
   }
 
   setTranspose(semitones: number): void {
     const clamped = Math.max(-12, Math.min(12, semitones))
     this.updateState({ transposeSemitones: clamped })
+
+    if (this.state.songId !== null) {
+      this.saveTranspose(this.state.songId, clamped)
+    }
   }
 
   transposeUp(): void {

@@ -5,7 +5,6 @@ import {
   useCurrentLineIndex,
   usePlayerControls,
   usePlayerState,
-  usePreference,
   usePreferences,
   useShowChords,
   useTranspose,
@@ -33,7 +32,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const currentLineIndex = useCurrentLineIndex()
   const { jumpToLine } = usePlayerControls()
   const { fontSize } = usePreferences()
-  const enableChords = usePreference("enableChords")
   const chordsData = useChordsData()
   const showChords = useShowChords()
   const transposeSemitones = useTranspose()
@@ -58,7 +56,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   // Build map of line index → chords (transposed if needed)
   const lineChords = useMemo(() => {
-    if (!enableChords || !showChords || !chordsData || !lyrics) return new Map<number, string[]>()
+    if (!showChords || !chordsData || !lyrics) return new Map<number, string[]>()
 
     // Match Songsterr chord lines to LRCLIB lyrics
     const matched = matchChordsToLyrics(chordsData.lines, lyrics.lines)
@@ -76,7 +74,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       }
     }
     return map
-  }, [enableChords, showChords, chordsData, lyrics, transposeSemitones])
+  }, [showChords, chordsData, lyrics, transposeSemitones])
 
   // Scroll to position a line at target position
   const scrollToLine = useCallback((lineIndex: number): boolean => {

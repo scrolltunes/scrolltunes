@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from "react"
 
+import { accountStore } from "./AccountStore"
+
 const STORAGE_KEY = "scrolltunes-preferences"
 
 export const MIN_FONT_SIZE = 16
@@ -20,7 +22,6 @@ export interface Preferences {
   readonly themeMode: ThemeMode
   readonly metronomeEnabled: boolean
   readonly fontSize: number
-  readonly enableChords: boolean
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -32,12 +33,13 @@ const DEFAULT_PREFERENCES: Preferences = {
   themeMode: "dark",
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,
-  enableChords: false,
 }
 
 export class PreferencesStore {
   private listeners = new Set<() => void>()
   private state: Preferences = DEFAULT_PREFERENCES
+  private hasLocalData = false
+  private initialized = false
 
   constructor() {
     this.loadFromStorage()
@@ -64,9 +66,10 @@ export class PreferencesStore {
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<Preferences>
         this.state = { ...DEFAULT_PREFERENCES, ...parsed }
+        this.hasLocalData = true
       }
     } catch {
-      console.warn("Failed to load preferences from localStorage")
+      // Failed to load from localStorage
     }
   }
 
@@ -75,15 +78,52 @@ export class PreferencesStore {
 
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state))
+      this.hasLocalData = true
     } catch {
-      console.warn("Failed to save preferences to localStorage")
+      // Failed to save to localStorage
+    }
+  }
+
+  private async syncToServer(): Promise<void> {
+    if (!accountStore.isAuthenticated()) return
+
+    try {
+      await fetch("/api/user/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: this.state }),
+      })
+    } catch {
+      // Failed to sync to server
     }
   }
 
   private setState(partial: Partial<Preferences>): void {
     this.state = { ...this.state, ...partial }
     this.saveToStorage()
+    this.syncToServer()
     this.notify()
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return
+    this.initialized = true
+
+    if (this.hasLocalData) return
+
+    try {
+      const response = await fetch("/api/user/preferences")
+      if (response.ok) {
+        const data = (await response.json()) as { preferences: Partial<Preferences> | null }
+        if (data.preferences) {
+          this.state = { ...DEFAULT_PREFERENCES, ...data.preferences }
+          this.saveToStorage()
+          this.notify()
+        }
+      }
+    } catch {
+      // Failed to fetch from server
+    }
   }
 
   get<K extends keyof Preferences>(key: K): Preferences[K] {
@@ -156,14 +196,6 @@ export class PreferencesStore {
 
   setFontSize(value: number): void {
     this.setState({ fontSize: value })
-  }
-
-  getEnableChords(): boolean {
-    return this.state.enableChords
-  }
-
-  setEnableChords(value: boolean): void {
-    this.setState({ enableChords: value })
   }
 
   reset(): void {
