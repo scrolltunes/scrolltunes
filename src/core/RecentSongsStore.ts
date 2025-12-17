@@ -304,7 +304,13 @@ class RecentSongsStore {
       })
       .filter((s): s is RecentSong => s !== null)
 
-    this.updateState({ recents: recentSongs.slice(0, MAX_RECENT_SONGS) })
+    // Set loading state for songs needing album art BEFORE updating recents
+    // This ensures the skeleton shows immediately, not after a flash of MusicNote icon
+    const loadingIds = new Set(songsNeedingAlbumArt)
+    this.updateState({
+      recents: recentSongs.slice(0, MAX_RECENT_SONGS),
+      loadingAlbumArtIds: loadingIds,
+    })
     this.saveToStorage()
 
     if (songsNeedingAlbumArt.length > 0) {
@@ -313,9 +319,6 @@ class RecentSongsStore {
   }
 
   private async fetchAlbumArtInBackground(songIds: number[]): Promise<void> {
-    for (const id of songIds) {
-      this.setLoadingAlbumArt(id, true)
-    }
 
     const fetchPromises = songIds.map(async id => {
       try {
