@@ -50,6 +50,12 @@ Live musicians need lyrics on stage, but traditional karaoke apps require playin
 - **Lyrics caching** — 7-day local cache for offline access
 - **Resume playback** — Return to where you left off
 
+### Chords (Experimental)
+- **Guitar chords** — Display chord progressions above lyrics (via Songsterr)
+- **Transpose** — Shift chords up/down by semitones
+- **Chord toggle** — Show/hide chords with one tap
+- **Enable in Settings** — Settings → Experimental → Enable chords
+
 ### Settings
 - **Font size** — Adjustable lyrics text size (16–64px)
 - **Auto-hide timeout** — Configure when controls disappear
@@ -81,7 +87,7 @@ Live musicians need lyrics on stage, but traditional karaoke apps require playin
 
 ```bash
 # Clone the repository
-git clone https://github.com/hmemcpy/scrolltunes.git
+git clone https://github.com/scrolltunes/scrolltunes.git
 cd scrolltunes
 
 # Install dependencies
@@ -137,6 +143,7 @@ scrolltunes/
 │   │   ├── audio/         # Voice, metronome, controls
 │   │   ├── display/       # Lyrics display
 │   │   ├── search/        # Search, recent songs
+│   │   ├── chords/        # Chord display components
 │   │   └── ui/            # Reusable primitives
 │   ├── core/              # State management (Effect.ts)
 │   │   ├── LyricsPlayer.ts
@@ -177,6 +184,7 @@ See [docs/architecture.md](docs/architecture.md) for details.
 |---------|---------|-------------|
 | [LRCLIB](https://lrclib.net) | Synced lyrics | Displayed in footer |
 | [GetSongBPM](https://getsongbpm.com) | Tempo/BPM data | Displayed in footer |
+| [Songsterr](https://songsterr.com) | Guitar chords | Experimental feature |
 
 ## Privacy
 
@@ -194,11 +202,17 @@ See [docs/architecture.md](docs/architecture.md) for details.
 - ✅ Hands-free gestures
 - ✅ Recent songs & caching
 - ✅ Voice search (Google Speech-to-Text)
+- ✅ User accounts & cloud sync
+- ✅ Favorites & setlists
+
+### V1.1 (Experimental)
+- ✅ Guitar chord integration (Songsterr)
+- ✅ Transpose controls
+- 🔲 Chord diagrams (tap to view fingering)
+- 🔲 Capo indicator
 
 ### V2 (Planned)
 - Karaoke mode (large text, word highlighting)
-- Chord diagrams integration
-- User accounts & cloud sync
 - Jam session mode (multiplayer)
 
 ### V3 (Future)

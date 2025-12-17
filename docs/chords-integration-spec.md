@@ -1,12 +1,34 @@
 # Guitar Chords Integration Spec
 
-> **Status**: Draft  
+> **Status**: Partially Implemented (Experimental)  
 > **Priority**: High (v1.0 feature per design.md)  
 > **Data Source**: Songsterr API + Scales-Chords API
 
 ## Overview
 
 Display guitar chord progressions alongside scrolling lyrics, synchronized to the song timeline. Chords appear above corresponding lyric lines with optional fingering diagrams.
+
+## Implementation Status
+
+### ✅ Completed
+- **Phase 1: Songsterr API Client** — `src/lib/chords/songsterr-client.ts` with Effect.ts patterns
+- **Phase 2: Chord Data Parsing** — Extracts chord data from Songsterr's HTML state JSON
+- **Phase 3: Chord/Lyrics Sync** — `matchChordsToLyrics` function for fuzzy text matching
+- **Phase 4: UI Components (partial)**
+  - `InlineChord.tsx` — Chord badges displayed above lyrics
+  - `ChordBadge.tsx` — Individual chord name display
+  - `TransposeControl.tsx` — +/- semitone controls
+- **Phase 5: Transpose** — Full transposition with localStorage persistence
+- **ChordsStore** — State management with useSyncExternalStore pattern
+- **API Routes** — `/api/chords/search` and `/api/chords/[songId]`
+- **Experimental Feature Flag** — Chords gated behind Settings → Experimental → Enable chords
+- **Caching** — 7-day localStorage cache for chord data
+
+### 🔲 Pending
+- **ChordDiagram component** — Tap chord to see fingering (bottom sheet on mobile)
+- **Capo indicator** — Display capo position when specified in Songsterr data
+- **ChordLegend sidebar** — Show all chords used in song (tablet/desktop only)
+- **Scales-Chords API integration** — For chord diagram images
 
 ## Integration Architecture
 

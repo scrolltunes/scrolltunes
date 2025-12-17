@@ -232,13 +232,20 @@
 - [x] Keep original names for storage, caching, and API lookups
 - [ ] LRCLIB's `/api/get` can match by exact signature (title, artist, album, duration ±2s)
 
-### Chords Integration
-- [ ] Define `ChordChart` type
-- [ ] Research chord API options (Ultimate Guitar, Chordify)
-- [ ] Create `src/lib/chords-client.ts`
-- [ ] Create chord overlay components
-- [ ] Add transpose controls (+/- semitones)
+### Chords Integration (Experimental)
+- [x] Research chord API options → Chose Songsterr API
+- [x] Create `src/lib/chords/songsterr-client.ts` with Effect.ts patterns
+- [x] Create `src/lib/chords/chord-parser.ts` for data extraction
+- [x] Create `src/lib/chords/chord-matching.ts` for lyrics sync
+- [x] Create chord overlay components (`InlineChord`, `ChordBadge`)
+- [x] Add transpose controls (+/- semitones) with persistence
+- [x] Create `ChordsStore` with useSyncExternalStore pattern
+- [x] Add API routes `/api/chords/search` and `/api/chords/[songId]`
+- [x] Gate feature behind experimental setting
+- [x] Add chords toggle button to song action bar
+- [ ] Implement ChordDiagram component (tap to see fingering)
 - [ ] Implement capo indicator
+- [ ] Add ChordLegend sidebar (tablet/desktop)
 
 ### User Accounts
 - [ ] Set up database (Vercel Postgres or alternative)

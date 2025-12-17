@@ -62,23 +62,6 @@ export const SongActionBar = memo(function SongActionBar({
         size="md"
       />
 
-      {hasChordsAvailable && (
-        <button
-          type="button"
-          onClick={() => chordsStore.toggleShowChords()}
-          className={`flex items-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
-            showChords
-              ? "bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30"
-              : "bg-neutral-800/50 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
-          }`}
-          aria-label={showChords ? "Hide chords" : "Show chords"}
-          aria-pressed={showChords}
-        >
-          <MusicNotes size={20} weight={showChords ? "fill" : "regular"} />
-          <span>Chords</span>
-        </button>
-      )}
-
       {isAuthenticated && (
         <button
           type="button"
@@ -116,6 +99,26 @@ export const SongActionBar = memo(function SongActionBar({
             </>
           )}
         </button>
+      )}
+
+      {hasChordsAvailable && (
+        <>
+          <div className="w-px h-6 bg-neutral-700" />
+          <button
+            type="button"
+            onClick={() => chordsStore.toggleShowChords()}
+            className={`flex items-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
+              showChords
+                ? "bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30"
+                : "bg-neutral-800/50 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
+            }`}
+            aria-label={showChords ? "Hide chords" : "Show chords"}
+            aria-pressed={showChords}
+          >
+            <MusicNotes size={20} weight={showChords ? "fill" : "regular"} />
+            <span>Chords</span>
+          </button>
+        </>
       )}
     </div>
   )
