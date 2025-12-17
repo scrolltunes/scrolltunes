@@ -69,7 +69,7 @@ function findSpotifyMatch(
       if (!match) return null
       return {
         spotifyId: match.id,
-        albumArt: getAlbumImageUrl(match.album, "small"),
+        albumArt: getAlbumImageUrl(match.album, "medium"),
         albumName: match.album.name || null,
       }
     }),
@@ -87,7 +87,7 @@ function getAlbumArtRace(
   }
 
   return Effect.tryPromise({
-    try: () => getAlbumArt(artist, track, "small"),
+    try: () => getAlbumArt(artist, track, "medium"),
     catch: () => null,
   }).pipe(
     Effect.map(art => art ?? null),

@@ -11,7 +11,12 @@ import {
 import { getAlbumArt } from "@/lib/deezer-client"
 import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
 import { LyricsAPIError, LyricsNotFoundError, getLyricsById } from "@/lib/lyrics-client"
-import { formatArtists, getAlbumImageUrl, searchTracksEffect } from "@/lib/spotify-client"
+import {
+  formatArtists,
+  getAlbumImageUrl,
+  getTrackEffect,
+  searchTracksEffect,
+} from "@/lib/spotify-client"
 import { Effect } from "effect"
 import { NextResponse } from "next/server"
 
@@ -54,7 +59,17 @@ interface SpotifyLookupResult {
   readonly albumArt: string | null
 }
 
-function lookupSpotifyId(
+function lookupSpotifyById(spotifyId: string): Effect.Effect<SpotifyLookupResult | null, never> {
+  return getTrackEffect(spotifyId).pipe(
+    Effect.map(track => ({
+      spotifyId: track.id,
+      albumArt: getAlbumImageUrl(track.album, "medium"),
+    })),
+    Effect.catchAll(() => Effect.succeed(null)),
+  )
+}
+
+function lookupSpotifyBySearch(
   title: string,
   artist: string,
 ): Effect.Effect<SpotifyLookupResult | null, never> {
@@ -98,8 +113,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const combinedEffect = lyricsEffect.pipe(
     Effect.flatMap(lyrics => {
       const spotifyLookupEffect: Effect.Effect<SpotifyLookupResult | null, never> = spotifyId
-        ? Effect.succeed({ spotifyId, albumArt: null })
-        : lookupSpotifyId(lyrics.title, lyrics.artist)
+        ? lookupSpotifyById(spotifyId)
+        : lookupSpotifyBySearch(lyrics.title, lyrics.artist)
 
       return Effect.flatMap(spotifyLookupEffect, spotifyResult => {
         const resolvedSpotifyId = spotifyResult?.spotifyId
