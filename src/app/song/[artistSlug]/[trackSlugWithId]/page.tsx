@@ -211,6 +211,27 @@ export default function SongPage() {
     const id = lrclibId
     const controller = new AbortController()
 
+    async function fetchChordsForSong(artist: string, title: string) {
+      const normalizedArtist = normalizeArtistName(artist)
+      const normalizedTitle = normalizeTrackName(title)
+      try {
+        const searchRes = await fetch(
+          `/api/chords/search?artist=${encodeURIComponent(normalizedArtist)}&title=${encodeURIComponent(normalizedTitle)}`,
+          { signal: controller.signal },
+        )
+        const searchData = await searchRes.json()
+
+        if (searchData.results && searchData.results.length > 0) {
+          const match = searchData.results[0]
+          await chordsStore.fetchChords(match.songId, match.artist, match.title)
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Failed to fetch chords:", error)
+        }
+      }
+    }
+
     async function fetchLyrics() {
       // Try cache first
       const cached = loadCachedLyrics(id)
@@ -237,6 +258,8 @@ export default function SongPage() {
           durationSeconds: cached.lyrics.duration,
           albumArt: cached.albumArt,
         })
+
+        fetchChordsForSong(cached.lyrics.artist, cached.lyrics.title)
         return
       }
 
@@ -292,6 +315,8 @@ export default function SongPage() {
           durationSeconds: data.lyrics.duration,
           albumArt: data.albumArt ?? undefined,
         })
+
+        fetchChordsForSong(data.lyrics.artist, data.lyrics.title)
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           return
@@ -341,31 +366,6 @@ export default function SongPage() {
 
     handleMicPermission()
   }, [loadState._tag, startListening])
-
-  // Fetch chords when lyrics are loaded
-  useEffect(() => {
-    if (loadState._tag !== "Loaded") return
-
-    const { lyrics } = loadState
-
-    async function fetchChords() {
-      try {
-        const searchRes = await fetch(
-          `/api/chords/search?artist=${encodeURIComponent(lyrics.artist)}&title=${encodeURIComponent(lyrics.title)}`,
-        )
-        const searchData = await searchRes.json()
-
-        if (searchData.results && searchData.results.length > 0) {
-          const match = searchData.results[0]
-          await chordsStore.fetchChords(match.songId, match.artist, match.title)
-        }
-      } catch (error) {
-        console.error("Failed to fetch chords:", error)
-      }
-    }
-
-    fetchChords()
-  }, [loadState])
 
   const handleToggleListening = useCallback(async () => {
     if (isListening) {

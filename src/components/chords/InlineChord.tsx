@@ -11,7 +11,7 @@ export function InlineChord({ chords, isCurrentLine = false }: InlineChordProps)
 
   return (
     <motion.div
-      className="flex flex-wrap gap-1.5 mb-1"
+      className="flex flex-wrap justify-center gap-1.5 mb-1"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >

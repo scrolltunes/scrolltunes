@@ -114,12 +114,8 @@ class ChordsStore {
     })
 
     try {
-      const params = new URLSearchParams({
-        songId: songsterrSongId.toString(),
-        artist,
-        title,
-      })
-      const response = await fetch(`/api/chords?${params.toString()}`)
+      const params = new URLSearchParams({ artist, title })
+      const response = await fetch(`/api/chords/${songsterrSongId}?${params.toString()}`)
 
       if (response.status === 404) {
         this.updateState({
