@@ -51,3 +51,23 @@ export async function fetchHistory(): Promise<HistoryItem[]> {
   const data = (await response.json()) as { history: HistoryItem[] }
   return data.history
 }
+
+export interface ServerFavorite {
+  readonly songId: string
+  readonly songProvider: string
+  readonly title: string
+  readonly artist: string
+  readonly album?: string
+  readonly addedAt: string
+}
+
+export async function fetchFavorites(): Promise<ServerFavorite[]> {
+  const response = await fetch("/api/user/favorites/sync")
+
+  if (!response.ok) {
+    throw new Error(`Fetch favorites failed: ${response.status}`)
+  }
+
+  const data = (await response.json()) as { favorites: ServerFavorite[] }
+  return data.favorites
+}

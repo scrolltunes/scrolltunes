@@ -38,9 +38,14 @@ function normalizeForMatch(text: string): string {
     .trim()
 }
 
+function normalizeDisplayText(text: string): string {
+  return text.replace(/_/g, " ").trim()
+}
+
 interface SpotifyMatch {
   readonly spotifyId: string
   readonly albumArt: string | null
+  readonly albumName: string | null
 }
 
 function findSpotifyMatch(
@@ -65,6 +70,7 @@ function findSpotifyMatch(
       return {
         spotifyId: match.id,
         albumArt: getAlbumImageUrl(match.album, "small"),
+        albumName: match.album.name || null,
       }
     }),
     Effect.catchAll(() => Effect.succeed(null)),
@@ -144,13 +150,15 @@ function searchLRCLib(
             spotifyMatch?.albumArt ?? null,
           )
 
+          const lrclibAlbum = r.albumName ? normalizeDisplayText(r.albumName) : ""
+          const album = spotifyMatch?.albumName ?? (lrclibAlbum === "-" ? "" : lrclibAlbum)
           return {
             id: `lrclib-${r.id}`,
             lrclibId: r.id,
             spotifyId: spotifyMatch?.spotifyId,
-            name: r.trackName,
-            artist: r.artistName,
-            album: r.albumName ?? "",
+            name: normalizeDisplayText(r.trackName),
+            artist: normalizeDisplayText(r.artistName),
+            album,
             albumArt: albumArt ?? undefined,
             duration: r.duration * 1000,
             hasLyrics: true,

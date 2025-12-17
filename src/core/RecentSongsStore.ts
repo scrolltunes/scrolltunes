@@ -1,6 +1,6 @@
 "use client"
 
-import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
+import { loadCachedLyrics, removeCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { MAX_RECENT_SONGS, type RecentSong } from "@/lib/recent-songs-types"
 import { recentSongToHistorySyncItem, syncHistory } from "@/lib/sync-service"
 import { useSyncExternalStore } from "react"
@@ -155,9 +155,11 @@ class RecentSongsStore {
   /**
    * Update song metadata without changing position in list.
    * Use this when loading a song page without actually playing it.
-   * If the song doesn't exist yet, adds it to the front.
+   * Adds new songs to the front if not already in list, and syncs to server.
    */
   updateMetadata(song: Omit<RecentSong, "lastPlayedAt">): void {
+    const isNew = !this.state.recents.some(s => s.id === song.id)
+
     this.setRecents(prev => {
       const existingIndex = prev.findIndex(s => s.id === song.id)
 
@@ -178,6 +180,13 @@ class RecentSongsStore {
       }
       return [newSong, ...prev].slice(0, MAX_RECENT_SONGS)
     })
+
+    if (isNew) {
+      const fullSong = this.state.recents.find(s => s.id === song.id)
+      if (fullSong) {
+        this.syncToServer(fullSong)
+      }
+    }
   }
 
   /**
@@ -224,10 +233,23 @@ class RecentSongsStore {
   }
 
   /**
-   * Remove a specific song from recents
+   * Remove a specific song from recents (local and server-side if authenticated)
    */
-  remove(id: number): void {
+  async remove(id: number): Promise<void> {
     this.setRecents(prev => prev.filter(s => s.id !== id))
+    removeCachedLyrics(id)
+
+    if (accountStore.isAuthenticated()) {
+      try {
+        await fetch("/api/user/history", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ songId: `lrclib:${id}` }),
+        })
+      } catch {
+        // Server delete failed, already removed from localStorage
+      }
+    }
   }
 
   async syncAllToServer(): Promise<void> {

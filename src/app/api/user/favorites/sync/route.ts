@@ -1,8 +1,48 @@
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
 import { userSongItems } from "@/lib/db/schema"
-import { and, eq } from "drizzle-orm"
+import { and, desc, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+
+export async function GET() {
+  const session = await auth()
+
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const userId = session.user.id
+
+  const serverFavorites = await db
+    .select({
+      songId: userSongItems.songId,
+      songProvider: userSongItems.songProvider,
+      title: userSongItems.songTitle,
+      artist: userSongItems.songArtist,
+      album: userSongItems.songAlbum,
+      addedAt: userSongItems.createdAt,
+    })
+    .from(userSongItems)
+    .where(
+      and(
+        eq(userSongItems.userId, userId),
+        eq(userSongItems.isFavorite, true),
+        eq(userSongItems.deleted, false),
+      ),
+    )
+    .orderBy(desc(userSongItems.createdAt))
+
+  return NextResponse.json({
+    favorites: serverFavorites.map(f => ({
+      songId: f.songId,
+      songProvider: f.songProvider,
+      title: f.title,
+      artist: f.artist,
+      album: f.album,
+      addedAt: f.addedAt?.toISOString() ?? new Date().toISOString(),
+    })),
+  })
+}
 
 interface FavoriteInput {
   songId: string

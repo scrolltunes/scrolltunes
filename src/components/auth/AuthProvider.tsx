@@ -1,7 +1,7 @@
 "use client"
 
-import { accountStore, recentSongsStore } from "@/core"
-import { fetchHistory } from "@/lib/sync-service"
+import { accountStore, favoritesStore, recentSongsStore } from "@/core"
+import { fetchFavorites, fetchHistory } from "@/lib/sync-service"
 import { SessionProvider } from "next-auth/react"
 import { type ReactNode, useEffect } from "react"
 
@@ -51,14 +51,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       await recentSongsStore.syncAllToServer()
+      await favoritesStore.syncAllToServer()
 
       try {
-        const serverHistory = await fetchHistory()
+        const [serverHistory, serverFavorites] = await Promise.all([
+          fetchHistory(),
+          fetchFavorites(),
+        ])
+
         if (serverHistory.length > 0) {
           recentSongsStore.replaceFromServer(serverHistory)
         }
+        if (serverFavorites.length > 0) {
+          favoritesStore.replaceFromServer(serverFavorites)
+        }
       } catch {
-        // Failed to fetch server history
+        // Failed to fetch server data
       } finally {
         recentSongsStore.setSyncing(false)
       }

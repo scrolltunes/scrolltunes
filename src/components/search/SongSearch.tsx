@@ -432,7 +432,7 @@ export const SongSearch = memo(function SongSearch({
                 <div className="flex-1 min-w-0 text-left">
                   <p className="text-white font-medium truncate">{track.name}</p>
                   <p className="text-sm text-neutral-500 truncate">
-                    {track.artist} • {track.album}
+                    {track.artist}{track.album && track.album !== "-" ? ` • ${track.album}` : ""}
                   </p>
                 </div>
 
