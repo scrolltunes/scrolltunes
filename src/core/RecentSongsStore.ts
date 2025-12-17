@@ -95,10 +95,12 @@ class RecentSongsStore {
             .slice(0, MAX_RECENT_SONGS)
           this.hadLocalCache = true
           this.state = { ...this.state, recents, isInitialized: true }
+          return
         }
       }
+      this.state = { ...this.state, isInitialized: true }
     } catch {
-      // Failed to load from localStorage
+      this.state = { ...this.state, isInitialized: true }
     }
   }
 

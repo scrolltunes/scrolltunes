@@ -9,7 +9,7 @@ import { makeCanonicalPath } from "@/lib/slug"
 import { ClockCounterClockwise, MusicNote, Trash, X } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { useRouter } from "next/navigation"
-import { memo, useCallback, useEffect, useState } from "react"
+import { memo, useCallback } from "react"
 
 export interface RecentSongsProps {
   readonly className?: string
@@ -18,11 +18,6 @@ export interface RecentSongsProps {
 export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentSongsProps) {
   const { recents, loadingAlbumArtIds, isLoading, isInitialized, expectedCount } = useRecentSongsState()
   const router = useRouter()
-  const [isMounted, setIsMounted] = useState(false)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
 
   const skeletonCount = expectedCount !== null && expectedCount > 0 ? Math.min(expectedCount, MAX_RECENT_SONGS) : 0
 
@@ -43,10 +38,7 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
     recentSongsStore.remove(songId)
   }, [])
 
-  // Show skeleton during hydration or loading when we have no items yet
-  const isHydrating = recents.length === 0 && !isInitialized && !isLoading
-  const showSkeleton = recents.length === 0 && (isHydrating || isLoading || !isMounted)
-  const skeletonItems = skeletonCount > 0 ? skeletonCount : 1
+  const showSkeleton = recents.length === 0 && isLoading
 
   return (
     <div className={className}>
@@ -80,7 +72,7 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
 
       {showSkeleton ? (
         <ul className="space-y-2" aria-label="Loading recently played songs">
-          {Array.from({ length: skeletonItems }, (_, i) => (
+          {Array.from({ length: skeletonCount || 1 }, (_, i) => (
             <li key={i}>
               <div className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-900 animate-pulse">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
