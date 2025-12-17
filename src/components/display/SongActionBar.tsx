@@ -1,8 +1,15 @@
 "use client"
 
 import { FavoriteButton } from "@/components/ui"
-import { type Setlist, useIsAuthenticated, useSetlistsContainingSong } from "@/core"
-import { MusicNote, Plus } from "@phosphor-icons/react"
+import {
+  type Setlist,
+  chordsStore,
+  useChordsState,
+  useIsAuthenticated,
+  useSetlistsContainingSong,
+  useShowChords,
+} from "@/core"
+import { MusicNote, MusicNotes, Plus } from "@phosphor-icons/react"
 import { memo } from "react"
 
 export interface SongActionBarProps {
@@ -39,6 +46,9 @@ export const SongActionBar = memo(function SongActionBar({
   const isAuthenticated = useIsAuthenticated()
   const containingSetlists = useSetlistsContainingSong(songId)
   const isInSetlist = containingSetlists.length > 0
+  const chordsState = useChordsState()
+  const showChords = useShowChords()
+  const hasChordsAvailable = chordsState.status === "ready"
 
   return (
     <div className="flex items-center justify-center gap-3 py-4">
@@ -49,6 +59,23 @@ export const SongActionBar = memo(function SongActionBar({
         {...(albumArt !== undefined && { albumArt })}
         size="md"
       />
+
+      {hasChordsAvailable && (
+        <button
+          type="button"
+          onClick={() => chordsStore.toggleShowChords()}
+          className={`flex items-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
+            showChords
+              ? "bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30"
+              : "bg-neutral-800/50 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
+          }`}
+          aria-label={showChords ? "Hide chords" : "Show chords"}
+          aria-pressed={showChords}
+        >
+          <MusicNotes size={20} weight={showChords ? "fill" : "regular"} />
+          <span>Chords</span>
+        </button>
+      )}
 
       {isAuthenticated && (
         <button

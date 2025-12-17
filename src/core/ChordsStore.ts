@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react"
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const CACHE_KEY_PREFIX = "scrolltunes:chords:"
+const SHOW_CHORDS_KEY = "scrolltunes:showChords"
 
 interface CachedChords {
   data: SongsterrChordData
@@ -66,9 +67,28 @@ function saveToCache(songId: number, data: SongsterrChordData): void {
   }
 }
 
+function loadShowChordsPreference(): boolean {
+  if (typeof window === "undefined") return true
+  try {
+    const stored = localStorage.getItem(SHOW_CHORDS_KEY)
+    return stored === null ? true : stored === "true"
+  } catch {
+    return true
+  }
+}
+
+function saveShowChordsPreference(show: boolean): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(SHOW_CHORDS_KEY, String(show))
+  } catch {
+    // Failed to save
+  }
+}
+
 class ChordsStore {
   private listeners = new Set<() => void>()
-  private state: ChordsState = { ...EMPTY_STATE }
+  private state: ChordsState = { ...EMPTY_STATE, showChords: loadShowChordsPreference() }
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
@@ -163,15 +183,18 @@ class ChordsStore {
   }
 
   toggleShowChords(): void {
-    this.updateState({ showChords: !this.state.showChords })
+    const newValue = !this.state.showChords
+    saveShowChordsPreference(newValue)
+    this.updateState({ showChords: newValue })
   }
 
   setShowChords(show: boolean): void {
+    saveShowChordsPreference(show)
     this.updateState({ showChords: show })
   }
 
   clear(): void {
-    this.state = { ...EMPTY_STATE }
+    this.state = { ...EMPTY_STATE, showChords: this.state.showChords }
     this.notify()
   }
 }
