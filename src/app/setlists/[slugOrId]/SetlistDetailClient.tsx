@@ -1,6 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
+import { EditSetlistModal } from "@/components/setlists"
 import { BackButton, Logo, SongListItem } from "@/components/ui"
 import { setlistsStore } from "@/core"
 import { uuidToBase64Url } from "@/lib/slug"
@@ -9,11 +10,13 @@ import {
   Check,
   Copy,
   MusicNotesSimple,
+  PencilSimple,
   Queue,
   Share,
   X,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
+import { useRouter } from "next/navigation"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 
 interface SetlistSong {
@@ -30,7 +33,6 @@ interface Setlist {
   readonly name: string
   readonly description: string | null
   readonly color: string | null
-  readonly icon: string | null
 }
 
 interface SetlistDetailClientProps {
@@ -45,13 +47,49 @@ interface RemovedItem {
 }
 
 export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDetailClientProps) {
+  const router = useRouter()
   const shortCode = uuidToBase64Url(setlist.id)
   const shortUrl =
     typeof window !== "undefined" ? `${window.location.origin}/sl/${shortCode}` : `/sl/${shortCode}`
 
   const [songs, setSongs] = useState<readonly SetlistSong[]>(initialSongs)
   const [removedItem, setRemovedItem] = useState<RemovedItem | null>(null)
+  const [currentSetlist, setCurrentSetlist] = useState(setlist)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleEditClick = useCallback(() => {
+    setShowEditModal(true)
+  }, [])
+
+  const handleEditSave = useCallback(() => {
+    const updated = setlistsStore.getSetlist(setlist.id)
+    if (updated) {
+      setCurrentSetlist({
+        id: updated.id,
+        name: updated.name,
+        description: updated.description ?? null,
+        color: updated.color ?? null,
+      })
+    }
+  }, [setlist.id])
+
+  const handleDeleteRequest = useCallback(() => {
+    setShowEditModal(false)
+    setShowDeleteConfirm(true)
+  }, [])
+
+  const handleDeleteConfirm = useCallback(async () => {
+    const success = await setlistsStore.delete(setlist.id)
+    if (success) {
+      router.push("/setlists")
+    }
+  }, [setlist.id, router])
+
+  const handleDeleteCancel = useCallback(() => {
+    setShowDeleteConfirm(false)
+  }, [])
 
   const handleRemove = useCallback(
     (songId: string, index: number, albumArt: string | undefined) => {
@@ -123,7 +161,7 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
-      <Header setlistName={setlist.name} shortUrl={shortUrl} />
+      <Header setlistName={currentSetlist.name} shortUrl={shortUrl} onEdit={handleEditClick} />
 
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-2xl mx-auto">
@@ -135,14 +173,14 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
             <div className="flex items-start gap-4 mb-6">
               <div
                 className="flex-shrink-0 w-16 h-16 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: setlist.color ?? "#262626" }}
+                style={{ backgroundColor: currentSetlist.color ?? "#262626" }}
               >
                 <Queue size={32} weight="fill" className="text-white/80" />
               </div>
               <div className="flex-1 min-w-0">
-                <h1 className="text-2xl font-semibold truncate">{setlist.name}</h1>
-                {setlist.description && (
-                  <p className="text-neutral-400 mt-1">{setlist.description}</p>
+                <h1 className="text-2xl font-semibold truncate">{currentSetlist.name}</h1>
+                {currentSetlist.description && (
+                  <p className="text-neutral-400 mt-1">{currentSetlist.description}</p>
                 )}
                 <p className="text-sm text-neutral-500 mt-2">
                   {songs.length} {songs.length === 1 ? "song" : "songs"}
@@ -195,6 +233,62 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
                 Undo
               </button>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <EditSetlistModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        setlist={{
+          id: currentSetlist.id,
+          name: currentSetlist.name,
+          ...(currentSetlist.description ? { description: currentSetlist.description } : {}),
+          ...(currentSetlist.color ? { color: currentSetlist.color } : {}),
+        }}
+        onSave={handleEditSave}
+        onDelete={handleDeleteRequest}
+      />
+
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={handleDeleteCancel}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={springs.default}
+              className="mx-4 w-full max-w-sm rounded-2xl bg-neutral-900 p-6 shadow-xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <h2 className="text-xl font-semibold text-white mb-2">Delete setlist?</h2>
+              <p className="text-neutral-400 mb-6">
+                This will permanently delete "{currentSetlist.name}" and remove all songs from it.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleDeleteCancel}
+                  className="flex-1 px-4 py-2.5 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteConfirm}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -272,7 +366,13 @@ const SetlistSongItem = memo(function SetlistSongItem({
   )
 })
 
-function Header({ setlistName, shortUrl }: { setlistName: string; shortUrl: string }) {
+interface HeaderProps {
+  readonly setlistName: string
+  readonly shortUrl: string
+  readonly onEdit: () => void
+}
+
+function Header({ setlistName, shortUrl, onEdit }: HeaderProps) {
   const [showShareMenu, setShowShareMenu] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -298,6 +398,15 @@ function Header({ setlistName, shortUrl }: { setlistName: string; shortUrl: stri
           <Logo size={24} className="text-indigo-500 flex-shrink-0" />
           <span className="truncate">{setlistName}</span>
         </span>
+
+        <button
+          type="button"
+          onClick={onEdit}
+          className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+          aria-label="Edit setlist"
+        >
+          <PencilSimple size={20} />
+        </button>
 
         <div className="relative">
           <button

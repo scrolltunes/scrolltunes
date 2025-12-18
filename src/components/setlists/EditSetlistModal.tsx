@@ -1,15 +1,22 @@
 "use client"
 
 import { springs } from "@/animations"
-import { type Setlist, setlistsStore } from "@/core"
+import { setlistsStore } from "@/core"
 import { X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
-export interface CreateSetlistModalProps {
+export interface EditSetlistModalProps {
   readonly isOpen: boolean
   readonly onClose: () => void
-  readonly onCreate?: (setlist: Setlist) => void
+  readonly setlist: {
+    readonly id: string
+    readonly name: string
+    readonly description?: string
+    readonly color?: string
+  }
+  readonly onSave?: () => void
+  readonly onDelete?: () => void
 }
 
 const PRESET_COLORS = [
@@ -20,11 +27,25 @@ const PRESET_COLORS = [
   { name: "Sky", value: "#0ea5e9" },
 ]
 
-export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistModalProps) {
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [selectedColor, setSelectedColor] = useState<string | undefined>(undefined)
+export function EditSetlistModal({
+  isOpen,
+  onClose,
+  setlist,
+  onSave,
+  onDelete,
+}: EditSetlistModalProps) {
+  const [name, setName] = useState(setlist.name)
+  const [description, setDescription] = useState(setlist.description ?? "")
+  const [selectedColor, setSelectedColor] = useState<string | undefined>(setlist.color)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(setlist.name)
+      setDescription(setlist.description ?? "")
+      setSelectedColor(setlist.color)
+    }
+  }, [isOpen, setlist])
 
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -43,32 +64,36 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
 
       setIsSubmitting(true)
 
-      const options: { description?: string; color?: string } = {
-        ...(description.trim() ? { description: description.trim() } : {}),
-        ...(selectedColor ? { color: selectedColor } : {}),
+      const trimmedName = name.trim()
+      const trimmedDescription = description.trim()
+
+      const updates = {
+        ...(trimmedName !== setlist.name ? { name: trimmedName } : {}),
+        ...(trimmedDescription !== (setlist.description ?? "")
+          ? { description: trimmedDescription }
+          : {}),
+        ...(selectedColor !== setlist.color && selectedColor ? { color: selectedColor } : {}),
       }
 
-      const setlist = await setlistsStore.create(name.trim(), options)
+      const success = await setlistsStore.update(setlist.id, updates)
 
       setIsSubmitting(false)
 
-      if (setlist) {
-        onCreate?.(setlist)
-        setName("")
-        setDescription("")
-        setSelectedColor(undefined)
+      if (success) {
+        onSave?.()
         onClose()
       }
     },
-    [name, description, selectedColor, isSubmitting, onCreate, onClose],
+    [name, description, selectedColor, isSubmitting, setlist, onSave, onClose],
   )
 
   const handleClose = useCallback(() => {
-    setName("")
-    setDescription("")
-    setSelectedColor(undefined)
     onClose()
   }, [onClose])
+
+  const handleDelete = useCallback(() => {
+    onDelete?.()
+  }, [onDelete])
 
   return (
     <AnimatePresence>
@@ -97,7 +122,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
               <X size={20} weight="bold" />
             </button>
 
-            <h2 className="text-xl font-semibold text-white mb-6 pr-8">Create setlist</h2>
+            <h2 className="text-xl font-semibold text-white mb-6 pr-8">Edit setlist</h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -173,9 +198,17 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
                   disabled={!name.trim() || isSubmitting}
                   className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? "Creating..." : "Create"}
+                  {isSubmitting ? "Saving..." : "Save"}
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="w-full px-4 py-2.5 bg-red-900/30 text-red-400 rounded-lg hover:bg-red-900/50 hover:text-red-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+              >
+                Delete setlist
+              </button>
             </form>
           </motion.div>
         </motion.div>
