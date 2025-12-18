@@ -64,6 +64,11 @@ export const FloatingMetronome = memo(function FloatingMetronome({
   const controls = useMetronomeControls()
   const playerState = usePlayerState()
 
+  // Initialize metronome settings from localStorage on mount
+  useEffect(() => {
+    metronomeStore.initialize()
+  }, [])
+
   const hasApiBpm = bpm !== null && bpm > 0
   const effectiveBpm = hasApiBpm ? bpm : manualBpm
 

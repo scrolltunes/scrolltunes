@@ -1,6 +1,7 @@
 "use client"
 
 import { useSyncExternalStore } from "react"
+import { accountStore } from "./AccountStore"
 
 export type MetronomeMode = "click" | "visual" | "both"
 
@@ -12,12 +13,45 @@ export interface MetronomeState {
   readonly isRunning: boolean
 }
 
+const STORAGE_KEY = "scrolltunes:metronome"
+
+interface PersistedMetronomeSettings {
+  mode: MetronomeMode
+  isMuted: boolean
+  volume: number
+}
+
 const DEFAULT_STATE: MetronomeState = {
   mode: "both",
   isMuted: false,
   volume: 0.5,
   bpm: null,
   isRunning: false,
+}
+
+function loadPersistedSettings(): Partial<MetronomeState> {
+  if (typeof window === "undefined") return {}
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (!stored) return {}
+    const parsed = JSON.parse(stored) as PersistedMetronomeSettings
+    return {
+      mode: parsed.mode,
+      isMuted: parsed.isMuted,
+      volume: parsed.volume,
+    }
+  } catch {
+    return {}
+  }
+}
+
+function savePersistedSettings(settings: PersistedMetronomeSettings): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+  } catch {
+    // Storage full or unavailable
+  }
 }
 
 export interface MetronomeControls {
@@ -32,6 +66,7 @@ export interface MetronomeControls {
 export class MetronomeStore {
   private listeners = new Set<() => void>()
   private state: MetronomeState = DEFAULT_STATE
+  private initialized = false
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
@@ -51,6 +86,62 @@ export class MetronomeStore {
     this.notify()
   }
 
+  private persistSettings(): void {
+    const settings = {
+      mode: this.state.mode,
+      isMuted: this.state.isMuted,
+      volume: this.state.volume,
+    }
+    savePersistedSettings(settings)
+    this.syncToServer(settings)
+  }
+
+  private async syncToServer(settings: PersistedMetronomeSettings): Promise<void> {
+    if (!accountStore.isAuthenticated()) return
+
+    try {
+      await fetch("/api/user/metronome", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metronome: settings }),
+      })
+    } catch {
+      // Failed to sync to server
+    }
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return
+    this.initialized = true
+
+    const localSettings = loadPersistedSettings()
+    const hasLocalData = Object.keys(localSettings).length > 0
+
+    if (hasLocalData) {
+      this.setState(localSettings)
+      return
+    }
+
+    if (!accountStore.isAuthenticated()) return
+
+    try {
+      const response = await fetch("/api/user/metronome")
+      if (response.ok) {
+        const data = (await response.json()) as { metronome: PersistedMetronomeSettings | null }
+        if (data.metronome) {
+          this.setState({
+            mode: data.metronome.mode,
+            isMuted: data.metronome.isMuted,
+            volume: data.metronome.volume,
+          })
+          savePersistedSettings(data.metronome)
+        }
+      }
+    } catch {
+      // Failed to fetch from server
+    }
+  }
+
   start(): void {
     this.setState({ isRunning: true })
   }
@@ -61,15 +152,18 @@ export class MetronomeStore {
 
   setMode(mode: MetronomeMode): void {
     this.setState({ mode })
+    this.persistSettings()
   }
 
   setMuted(isMuted: boolean): void {
     this.setState({ isMuted })
+    this.persistSettings()
   }
 
   setVolume(volume: number): void {
     const clampedVolume = Math.max(0, Math.min(1, volume))
     this.setState({ volume: clampedVolume })
+    this.persistSettings()
   }
 
   setBpm(bpm: number | null): void {
