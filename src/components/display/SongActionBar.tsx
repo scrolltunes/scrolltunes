@@ -142,15 +142,15 @@ export const SongActionBar = memo(function SongActionBar({
                   {containingSetlists.length}
                 </span>
                 <div className="flex items-center gap-0.5">
-                  {containingSetlists.slice(0, 3).map(setlist => (
+                  {containingSetlists.slice(0, 2).map(setlist => (
                     <SetlistIcon key={setlist.id} setlist={setlist} />
                   ))}
-                  {containingSetlists.length > 3 && (
+                  {containingSetlists.length > 2 && (
                     <div
                       className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 bg-neutral-700 text-neutral-400 text-[10px] font-medium"
-                      title={`${containingSetlists.length - 3} more`}
+                      title={`${containingSetlists.length - 2} more`}
                     >
-                      +{containingSetlists.length - 3}
+                      +{containingSetlists.length - 2}
                     </div>
                   )}
                 </div>
