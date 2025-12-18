@@ -375,6 +375,27 @@ if (updates.length > 0) {
 5. **Follow the pattern** — Consistency makes the codebase maintainable
 6. **Use proper accessibility** — ARIA labels, focus states, keyboard controls
 7. **Use `@/` imports** — Path alias for src/
+8. **Enforce input limits** — All text inputs need `maxLength`; validate server-side too
+
+### Input Limits
+
+When adding new text inputs (name fields, descriptions, search boxes, etc.):
+
+1. Add the limit to `src/constants/limits.ts`
+2. Add `maxLength={INPUT_LIMITS.YOUR_FIELD}` to the input element
+3. Add server-side validation in the API route handler
+
+```typescript
+import { INPUT_LIMITS } from "@/constants/limits"
+
+// In component
+<input maxLength={INPUT_LIMITS.SETLIST_NAME} />
+
+// In API route
+if (name.length > INPUT_LIMITS.SETLIST_NAME) {
+  return NextResponse.json({ error: "Name too long" }, { status: 400 })
+}
+```
 
 ## Copy Style Guide
 

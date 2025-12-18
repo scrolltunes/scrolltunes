@@ -664,6 +664,35 @@ bun run check        # lint + typecheck + test (pre-commit)
 6. **Use proper accessibility** — ARIA labels, focus states, keyboard controls
 7. **Optimize bundle size** — Lazy load routes, code split heavy components
 8. **Path aliases** — Use `@/` for src imports
+9. **Enforce input limits** — All text inputs must have `maxLength`; validate on server too
+
+### Input Length Limits
+
+All user-editable text inputs must enforce length limits both in UI and API:
+
+```typescript
+import { INPUT_LIMITS } from "@/constants/limits"
+
+// UI: Add maxLength to inputs
+<input maxLength={INPUT_LIMITS.SETLIST_NAME} />
+<textarea maxLength={INPUT_LIMITS.SETLIST_DESCRIPTION} />
+
+// API: Validate in route handlers
+if (name.length > INPUT_LIMITS.SETLIST_NAME) {
+  return NextResponse.json({ error: "Name too long" }, { status: 400 })
+}
+```
+
+Current limits defined in `src/constants/limits.ts`:
+| Field | Limit |
+|-------|-------|
+| Setlist name | 100 |
+| Setlist description | 500 |
+| Search query | 200 |
+| Bug report description | 1000 |
+| Email | 254 |
+
+When adding new inputs, add limits to `INPUT_LIMITS` and enforce in both UI and API.
 
 ## Copy Style Guide
 
