@@ -3,7 +3,14 @@
 import { springs } from "@/animations"
 import { CreateSetlistModal, SetlistCard } from "@/components/setlists"
 import { Logo } from "@/components/ui"
-import { setlistsStore, useIsAuthenticated, useSetlists, useSetlistsLoading } from "@/core"
+import {
+  type Setlist,
+  setlistsStore,
+  useIsAuthenticated,
+  useSetlists,
+  useSetlistsLoading,
+} from "@/core"
+import { makeSetlistPath } from "@/lib/slug"
 import { ArrowLeft, Plus, Queue, SignIn } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import Link from "next/link"
@@ -24,8 +31,8 @@ export default function SetlistsPage() {
   }, [isAuthenticated])
 
   const handleSetlistClick = useCallback(
-    (id: string) => {
-      router.push(`/setlists/${id}`)
+    (setlist: Setlist) => {
+      router.push(makeSetlistPath({ id: setlist.id, name: setlist.name }))
     },
     [router],
   )
@@ -131,7 +138,7 @@ export default function SetlistsPage() {
                     songCount={setlist.songCount}
                     {...(setlist.color ? { color: setlist.color } : {})}
                     {...(setlist.icon ? { icon: setlist.icon } : {})}
-                    onClick={() => handleSetlistClick(setlist.id)}
+                    onClick={() => handleSetlistClick(setlist)}
                   />
                 </li>
               ))}
