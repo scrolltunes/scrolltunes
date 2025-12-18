@@ -185,7 +185,7 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
           >
             <div className="flex items-center gap-3 px-4 py-3 bg-neutral-800 rounded-xl shadow-lg border border-neutral-700">
-              <span className="text-sm text-neutral-300">Removed from setlist</span>
+              <span className="text-sm text-neutral-300">Removed</span>
               <button
                 type="button"
                 onClick={handleUndo}
