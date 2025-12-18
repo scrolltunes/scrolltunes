@@ -17,9 +17,12 @@ import { motion } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
 
-const SCROLL_OVERRIDE_TIMEOUT = 3000 // Resume auto-scroll after 3 seconds
+const SCROLL_INDICATOR_TIMEOUT = 3000 // Hide manual scroll badge after 3 seconds
 const RUBBERBAND_RESISTANCE = 0.3 // How much resistance when overscrolling (0-1)
 const MAX_OVERSCROLL = 100 // Maximum pixels of overscroll before full resistance
+const MOMENTUM_FRICTION = 0.003 // Velocity decay rate (higher = faster stop)
+const MIN_VELOCITY = 0.015 // Minimum velocity to continue momentum (pixels/ms)
+const MAX_VELOCITY = 3.5 // Maximum velocity clamp (pixels/ms)
 
 const isEmptyLine = (text: string): boolean => {
   const trimmed = text.trim()
@@ -48,8 +51,10 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   // Manual scroll override state
   const [isManualScrolling, setIsManualScrolling] = useState(false)
+  const [showManualScrollIndicator, setShowManualScrollIndicator] = useState(false)
   const [scrollY, setScrollY] = useState(0)
-  const manualScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const manualIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const momentumRafIdRef = useRef<number | null>(null)
 
   // Refs for geometry-based scroll calculation
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -156,20 +161,13 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   // Track if initial scroll has happened
   const hasInitialScroll = useRef(false)
 
-  // Initial scroll when lyrics first render - only needed if first line is empty
+  // Initial scroll when lyrics first render - always scroll to first non-empty line
   useEffect(() => {
     if (!lyrics || hasInitialScroll.current) return
 
-    // Only scroll initially if the first line is empty (to show first non-empty line)
-    const firstLine = lyrics.lines[0]
-    if (firstLine?.text.trim() !== "") {
-      hasInitialScroll.current = true
-      return
-    }
-
-    // Find first non-empty line index
-    const firstLineIndex = lyrics.lines.findIndex(line => line.text.trim() !== "")
-    if (firstLineIndex === -1) return
+    // Find first non-empty line index (default to 0 if all empty)
+    let firstLineIndex = lyrics.lines.findIndex(line => line.text.trim() !== "")
+    if (firstLineIndex === -1) firstLineIndex = 0
 
     // Retry with increasing delays to handle font loading and layout shifts
     const delays = [50, 100, 200]
@@ -191,15 +189,31 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     }
   }, [lyrics, scrollToLine])
 
-  // Reset initial scroll flag when lyrics change
+  // Reset state when lyrics change
   useEffect(() => {
     hasInitialScroll.current = false
     setScrollY(0)
+    setIsManualScrolling(false)
+    setShowManualScrollIndicator(false)
   }, [lyrics])
 
-  // Update scroll position when current line changes (if not manually scrolling)
+  // Only auto-scroll when playing AND not manually overridden
+  const isPlaying = state._tag === "Playing"
+  const isAutoScrollEnabled = isPlaying && !isManualScrolling
+
+  // Reset manual scroll when play is pressed (transition to Playing)
+  const prevStateTag = useRef(state._tag)
   useEffect(() => {
-    if (isManualScrolling || !lyrics) return
+    if (prevStateTag.current !== "Playing" && state._tag === "Playing") {
+      setIsManualScrolling(false)
+      setShowManualScrollIndicator(false)
+    }
+    prevStateTag.current = state._tag
+  }, [state._tag])
+
+  // Update scroll position when current line changes (only during active playback)
+  useEffect(() => {
+    if (!lyrics || !isAutoScrollEnabled) return
 
     let lineIndex = Math.max(0, currentLineIndex)
 
@@ -228,22 +242,44 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       cancelAnimationFrame(rafId1)
       if (rafId2 !== undefined) cancelAnimationFrame(rafId2)
     }
-  }, [currentLineIndex, isManualScrolling, lyrics, scrollToLine])
+  }, [currentLineIndex, isAutoScrollEnabled, lyrics, scrollToLine])
 
-  // Handle manual scroll detection
+  // Check if active line is visible in viewport
+  const isActiveLineVisible = useCallback(() => {
+    if (currentLineIndex < 0) return true
+    const container = containerRef.current
+    const activeLine = lineRefs.current[currentLineIndex]
+    if (!container || !activeLine) return true
+
+    const containerRect = container.getBoundingClientRect()
+    const lineRect = activeLine.getBoundingClientRect()
+
+    // Line is visible if any part of it is within the container
+    return lineRect.bottom > containerRect.top && lineRect.top < containerRect.bottom
+  }, [currentLineIndex])
+
+  // Handle manual scroll detection - sticky override until highlight leaves view
+  // When playing and highlight goes out of view, resume auto-follow
   const handleUserScroll = useCallback(() => {
     setIsManualScrolling(true)
+    setShowManualScrollIndicator(true)
 
     // Clear existing timeout
-    if (manualScrollTimeoutRef.current) {
-      clearTimeout(manualScrollTimeoutRef.current)
+    if (manualIndicatorTimeoutRef.current) {
+      clearTimeout(manualIndicatorTimeoutRef.current)
     }
 
-    // Resume auto-scroll after timeout
-    manualScrollTimeoutRef.current = setTimeout(() => {
+    // Only hide the badge after timeout - do NOT reset isManualScrolling
+    manualIndicatorTimeoutRef.current = setTimeout(() => {
+      setShowManualScrollIndicator(false)
+    }, SCROLL_INDICATOR_TIMEOUT)
+
+    // If playing and active line goes out of view, reset manual scroll to resume following
+    if (isPlaying && !isActiveLineVisible()) {
       setIsManualScrolling(false)
-    }, SCROLL_OVERRIDE_TIMEOUT)
-  }, [])
+      setShowManualScrollIndicator(false)
+    }
+  }, [isPlaying, isActiveLineVisible])
 
   // Handle wheel events
   const handleWheel = useCallback(
@@ -254,12 +290,82 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     [handleUserScroll, applyRubberband],
   )
 
-  // Handle touch events for mobile
+  // Handle touch events for mobile with velocity-based momentum
   const touchStartY = useRef<number | null>(null)
+  const touchLastY = useRef<number | null>(null)
+  const touchLastTime = useRef<number | null>(null)
+  const touchVelocity = useRef<number>(0)
+
+  // Helper to get max scroll bounds
+  const getMaxScroll = useCallback(() => {
+    const container = containerRef.current
+    const content = contentRef.current
+    if (!container || !content) return 0
+    return Math.max(0, content.scrollHeight - container.clientHeight)
+  }, [])
+
+  // Start momentum animation after touch ends
+  const startMomentumScroll = useCallback(() => {
+    const initialV = touchVelocity.current
+
+    if (Math.abs(initialV) < MIN_VELOCITY) {
+      // Just snap back to bounds
+      const maxScroll = getMaxScroll()
+      setScrollY(prev => Math.min(Math.max(prev, 0), maxScroll))
+      return
+    }
+
+    let v = initialV
+    let lastTime = performance.now()
+
+    const step = () => {
+      const now = performance.now()
+      const dt = now - lastTime
+      lastTime = now
+
+      // Velocity decays exponentially with friction
+      v *= Math.exp(-MOMENTUM_FRICTION * dt)
+
+      let stop = false
+      setScrollY(prev => {
+        const next = applyRubberband(prev + v * dt)
+        const maxScroll = getMaxScroll()
+
+        // Stop if past bounds and velocity pointing further out
+        if ((next < 0 && v < 0) || (next > maxScroll && v > 0)) {
+          stop = true
+        }
+        return next
+      })
+
+      if (stop || Math.abs(v) < MIN_VELOCITY) {
+        // Final clamp to bounds
+        const maxScroll = getMaxScroll()
+        setScrollY(prev => Math.min(Math.max(prev, 0), maxScroll))
+        momentumRafIdRef.current = null
+        return
+      }
+
+      momentumRafIdRef.current = requestAnimationFrame(step)
+    }
+
+    momentumRafIdRef.current = requestAnimationFrame(step)
+  }, [applyRubberband, getMaxScroll])
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
-      touchStartY.current = e.touches[0]?.clientY ?? null
+      const y = e.touches[0]?.clientY ?? null
+      touchStartY.current = y
+      touchLastY.current = y
+      touchLastTime.current = performance.now()
+      touchVelocity.current = 0
+
+      // Cancel any running momentum when user touches again
+      if (momentumRafIdRef.current !== null) {
+        cancelAnimationFrame(momentumRafIdRef.current)
+        momentumRafIdRef.current = null
+      }
+
       handleUserScroll()
     },
     [handleUserScroll],
@@ -267,40 +373,44 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   const handleTouchMove = useCallback(
     (e: React.TouchEvent) => {
-      if (touchStartY.current === null) return
       const currentY = e.touches[0]?.clientY ?? 0
-      const deltaY = touchStartY.current - currentY
+      if (touchStartY.current === null || touchLastY.current === null || touchLastTime.current === null) return
+
+      const now = performance.now()
+      const dy = touchLastY.current - currentY // positive dy = scroll down
+      const dt = now - touchLastTime.current
+
       touchStartY.current = currentY
-      setScrollY(prev => applyRubberband(prev + deltaY))
+      touchLastY.current = currentY
+      touchLastTime.current = now
+
+      if (dt > 0) {
+        // Calculate velocity (pixels per ms), clamped to avoid crazy spikes
+        const v = dy / dt
+        touchVelocity.current = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, v))
+      }
+
+      setScrollY(prev => applyRubberband(prev + dy))
     },
     [applyRubberband],
   )
 
-  // Snap back to bounds when touch ends
+  // Start momentum scroll when touch ends
   const handleTouchEnd = useCallback(() => {
     touchStartY.current = null
-    const container = containerRef.current
-    const content = contentRef.current
+    touchLastY.current = null
+    touchLastTime.current = null
+    startMomentumScroll()
+  }, [startMomentumScroll])
 
-    // Calculate max scroll
-    let maxScroll = 0
-    if (container && content) {
-      maxScroll = Math.max(0, content.scrollHeight - container.clientHeight)
-    }
-
-    // Snap back to bounds
-    setScrollY(prev => {
-      if (prev < 0) return 0
-      if (prev > maxScroll) return maxScroll
-      return prev
-    })
-  }, [])
-
-  // Cleanup timeout on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (manualScrollTimeoutRef.current) {
-        clearTimeout(manualScrollTimeoutRef.current)
+      if (manualIndicatorTimeoutRef.current) {
+        clearTimeout(manualIndicatorTimeoutRef.current)
+      }
+      if (momentumRafIdRef.current !== null) {
+        cancelAnimationFrame(momentumRafIdRef.current)
       }
     }
   }, [])
@@ -324,7 +434,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   // Only show highlight when playing/paused, not in Ready state
   // Empty lines render as spacers without highlight, so no special handling needed
-  const isPlaying = state._tag === "Playing"
   const isPlayingOrPaused = isPlaying || state._tag === "Paused"
   const activeLineIndex = isPlayingOrPaused ? Math.max(0, currentLineIndex) : -1
 
@@ -339,7 +448,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       aria-label="Lyrics display"
     >
       {/* Manual scroll indicator */}
-      {isManualScrolling && (
+      {showManualScrollIndicator && (
         <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-neutral-800/80 rounded-full text-sm text-neutral-400">
           Manual scroll
         </div>
