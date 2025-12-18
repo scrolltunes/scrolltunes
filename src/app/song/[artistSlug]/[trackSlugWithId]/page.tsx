@@ -4,7 +4,7 @@ import { springs } from "@/animations"
 import { FloatingMetronome, VoiceIndicator } from "@/components/audio"
 import { ChordInfoPanel } from "@/components/chords"
 import {
-  FloatingInfoButton,
+  FloatingActions,
   LyricsDisplay,
   SongActionBar,
   SongInfoModal,
@@ -540,9 +540,13 @@ export default function SongPage() {
         )}
         <LyricsDisplay className="flex-1 pb-12" />
 
-        <FloatingInfoButton
+        <FloatingActions
+          songId={lrclibId ?? 0}
+          title={loadState._tag === "Loaded" ? loadState.lyrics.title : ""}
+          artist={loadState._tag === "Loaded" ? loadState.lyrics.artist : ""}
+          {...(loadState._tag === "Loaded" && loadState.albumArt !== null && { albumArt: loadState.albumArt })}
           hasIssue={loadState.bpm === null || chordsState.status === "error"}
-          onPress={() => setShowInfo(true)}
+          onInfoPress={() => setShowInfo(true)}
           onWarningPress={() => setShowReportModal(true)}
           position="bottom-left"
         />

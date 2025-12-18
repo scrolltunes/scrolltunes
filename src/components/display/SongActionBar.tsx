@@ -17,6 +17,7 @@ import {
 import {
   CaretUp,
   Guitar,
+  ListPlus,
   Minus,
   MusicNote,
   Plus,
@@ -108,56 +109,61 @@ export const SongActionBar = memo(function SongActionBar({
         </button>
       </div>
 
-      <div className="w-px h-6 bg-neutral-700" />
+      {/* Favorite button - hidden on mobile (shown in FloatingSongDrawer) */}
+      <div className="hidden sm:flex sm:items-center sm:gap-3">
+        <div className="w-px h-6 bg-neutral-700" />
 
-      <FavoriteButton
-        songId={songId}
-        title={title}
-        artist={artist}
-        {...(albumArt !== undefined && { albumArt })}
-        size="md"
-      />
+        <FavoriteButton
+          songId={songId}
+          title={title}
+          artist={artist}
+          {...(albumArt !== undefined && { albumArt })}
+          size="md"
+        />
+      </div>
 
+      {/* Setlist button - icon only on mobile, full on desktop */}
       {isAuthenticated && (
-        <button
-          type="button"
-          onClick={onAddToSetlist}
-          className={`flex items-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
-            isInSetlist
-              ? "bg-neutral-800/50 hover:bg-neutral-700/50"
-              : "bg-neutral-800/50 hover:bg-neutral-700/50 text-neutral-400 hover:text-neutral-300"
-          }`}
-          aria-label={isInSetlist ? "Manage setlists" : "Add to setlist"}
-        >
-          {isInSetlist ? (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-neutral-500 leading-none">
-                {containingSetlists.length}
-              </span>
-              <div className="flex items-center gap-0.5">
-                {containingSetlists.slice(0, 3).map(setlist => (
-                  <SetlistIcon key={setlist.id} setlist={setlist} />
-                ))}
-                {containingSetlists.length > 3 && (
-                  <div
-                    className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 bg-neutral-700 text-neutral-400 text-[10px] font-medium"
-                    title={`${containingSetlists.length - 3} more`}
-                  >
-                    +{containingSetlists.length - 3}
-                  </div>
-                )}
+        <>
+          <div className="w-px h-6 bg-neutral-700" />
+          <button
+            type="button"
+            onClick={onAddToSetlist}
+            className={`relative flex items-center gap-2 rounded-full transition-colors text-sm font-medium ${
+              isInSetlist
+                ? "bg-neutral-800/50 hover:bg-neutral-700/50"
+                : "bg-neutral-800/50 hover:bg-neutral-700/50 text-neutral-400 hover:text-neutral-300"
+            } ${isInSetlist ? "px-2 py-2 sm:px-3" : "p-2 sm:px-3 sm:py-2"}`}
+            aria-label={isInSetlist ? "Manage setlists" : "Add to setlist"}
+          >
+            {isInSetlist ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-neutral-500 leading-none">
+                  {containingSetlists.length}
+                </span>
+                <div className="flex items-center gap-0.5">
+                  {containingSetlists.slice(0, 3).map(setlist => (
+                    <SetlistIcon key={setlist.id} setlist={setlist} />
+                  ))}
+                  {containingSetlists.length > 3 && (
+                    <div
+                      className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 bg-neutral-700 text-neutral-400 text-[10px] font-medium"
+                      title={`${containingSetlists.length - 3} more`}
+                    >
+                      +{containingSetlists.length - 3}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ) : (
-            <>
-              <Plus size={20} />
-              <span>Add to setlist</span>
-            </>
-          )}
-        </button>
+            ) : (
+              <>
+                <ListPlus size={20} />
+                <span className="hidden sm:inline">Add to setlist</span>
+              </>
+            )}
+          </button>
+        </>
       )}
-
-      <div className="w-px h-6 bg-neutral-700" />
 
       {/* Chords button - show different states based on availability */}
       {chordsNotFound ? (
