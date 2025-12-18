@@ -43,16 +43,23 @@ export const accounts = pgTable(
     id_token: text("id_token"),
     session_state: text("session_state"),
   },
-  account => [primaryKey({ columns: [account.provider, account.providerAccountId] })],
+  account => [
+    primaryKey({ columns: [account.provider, account.providerAccountId] }),
+    index("account_user_id_idx").on(account.userId),
+  ],
 )
 
-export const sessions = pgTable("session", {
-  sessionToken: text("sessionToken").primaryKey(),
-  userId: uuid("userId")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  expires: timestamp("expires", { mode: "date", withTimezone: true }).notNull(),
-})
+export const sessions = pgTable(
+  "session",
+  {
+    sessionToken: text("sessionToken").primaryKey(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expires: timestamp("expires", { mode: "date", withTimezone: true }).notNull(),
+  },
+  session => [index("session_user_id_idx").on(session.userId)],
+)
 
 export const verificationTokens = pgTable(
   "verificationToken",
@@ -145,6 +152,7 @@ export const userSongSettings = pgTable(
       table.songProvider,
       table.songId,
     ),
+    index("user_song_settings_user_id_idx").on(table.userId),
   ],
 )
 

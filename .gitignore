@@ -34,3 +34,6 @@ next-env.d.ts
 
 # Local HTTPS certs
 localhost*.pem
+
+# Drizzle migrations (using push workflow)
+drizzle/
