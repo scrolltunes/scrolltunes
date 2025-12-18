@@ -21,6 +21,11 @@ const SCROLL_OVERRIDE_TIMEOUT = 3000 // Resume auto-scroll after 3 seconds
 const RUBBERBAND_RESISTANCE = 0.3 // How much resistance when overscrolling (0-1)
 const MAX_OVERSCROLL = 100 // Maximum pixels of overscroll before full resistance
 
+const isEmptyLine = (text: string): boolean => {
+  const trimmed = text.trim()
+  return trimmed === "" || trimmed === "♪"
+}
+
 export interface LyricsDisplayProps {
   readonly className?: string
 }
@@ -196,7 +201,20 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   useEffect(() => {
     if (isManualScrolling || !lyrics) return
 
-    const lineIndex = Math.max(0, currentLineIndex)
+    let lineIndex = Math.max(0, currentLineIndex)
+
+    // If current line is empty (or just a musical note), scroll to the next non-empty line
+    // This keeps the next lyric visible while waiting
+    const currentLine = lyrics.lines[lineIndex]
+    if (currentLine && isEmptyLine(currentLine.text)) {
+      for (let i = lineIndex + 1; i < lyrics.lines.length; i++) {
+        const line = lyrics.lines[i]
+        if (line && !isEmptyLine(line.text)) {
+          lineIndex = i
+          break
+        }
+      }
+    }
 
     // Double RAF to ensure layout is fully settled (fonts loaded, text reflowed)
     let rafId2: number | undefined
