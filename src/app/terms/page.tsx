@@ -1,19 +1,16 @@
 "use client"
 
-import { ArrowLeft } from "@phosphor-icons/react"
 import Link from "next/link"
+
+import { BackButton } from "@/components/ui"
 
 export default function TermsOfService() {
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
       <div className="mx-auto max-w-3xl px-6 py-12">
-        <Link
-          href="/"
-          className="mb-8 inline-flex items-center gap-2 text-neutral-400 transition-colors hover:text-white"
-        >
-          <ArrowLeft size={20} />
-          Back to ScrollTunes
-        </Link>
+        <div className="mb-8">
+          <BackButton fallbackHref="/" ariaLabel="Back to ScrollTunes" />
+        </div>
 
         <h1 className="mb-2 text-4xl font-bold">Terms of Service</h1>
         <p className="mb-12 text-neutral-400">Last updated: December 2025</p>

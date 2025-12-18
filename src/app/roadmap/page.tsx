@@ -1,8 +1,9 @@
 "use client"
 
-import { ArrowLeft, Check, EnvelopeSimple, XLogo } from "@phosphor-icons/react"
+import { Check, EnvelopeSimple, XLogo } from "@phosphor-icons/react"
 import { motion } from "motion/react"
-import Link from "next/link"
+
+import { BackButton } from "@/components/ui"
 
 const nowFeatures = [
   "Voice-activated scrolling",
@@ -37,13 +38,7 @@ export default function RoadmapPage() {
     <div className="min-h-screen bg-neutral-950 text-white">
       <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
-          <Link
-            href="/"
-            className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-            aria-label="Back"
-          >
-            <ArrowLeft size={20} />
-          </Link>
+          <BackButton fallbackHref="/about" ariaLabel="Back" />
           <h1 className="text-lg font-semibold">Roadmap</h1>
         </div>
       </header>

@@ -1,18 +1,10 @@
 "use client"
 
 import { springs } from "@/animations"
-import { AlbumArtSkeleton, Logo } from "@/components/ui"
+import { AlbumArtSkeleton, BackButton, Logo } from "@/components/ui"
 import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { makeCanonicalPath, uuidToBase64Url } from "@/lib/slug"
-import {
-  ArrowLeft,
-  Check,
-  Copy,
-  MusicNote,
-  MusicNotesSimple,
-  Queue,
-  Share,
-} from "@phosphor-icons/react"
+import { Check, Copy, MusicNote, MusicNotesSimple, Queue, Share } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import Link from "next/link"
 import { memo, useCallback, useEffect, useState } from "react"
@@ -233,13 +225,7 @@ function Header({ setlistName, shortUrl }: { setlistName: string; shortUrl: stri
   return (
     <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
-        <Link
-          href="/setlists"
-          className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-          aria-label="Back to setlists"
-        >
-          <ArrowLeft size={20} />
-        </Link>
+        <BackButton fallbackHref="/setlists" ariaLabel="Back to setlists" />
 
         <span className="flex-1 text-lg font-semibold flex items-center gap-2 truncate">
           <Logo size={24} className="text-indigo-500 flex-shrink-0" />
