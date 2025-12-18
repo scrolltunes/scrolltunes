@@ -88,7 +88,10 @@ export class SetlistsStore {
   }
 
   async fetchAll(): Promise<void> {
-    this.setState({ isLoading: true })
+    const hasCachedData = this.state.setlists.length > 0
+    if (!hasCachedData) {
+      this.setState({ isLoading: true })
+    }
 
     try {
       const response = await fetch("/api/user/setlists")
