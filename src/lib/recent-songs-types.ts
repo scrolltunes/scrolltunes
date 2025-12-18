@@ -31,6 +31,7 @@ export interface AttributionSource {
  * Cached lyrics data with expiry tracking
  */
 export interface CachedLyrics {
+  readonly version?: number | undefined
   readonly lyrics: Lyrics
   readonly bpm: number | null
   readonly key: string | null

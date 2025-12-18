@@ -8,6 +8,7 @@ import type { CachedLyrics } from "./recent-songs-types"
 import { LYRICS_CACHE_TTL_MS } from "./recent-songs-types"
 
 const LYRICS_KEY_PREFIX = "scrolltunes:lyrics:"
+const CACHE_VERSION = 2
 
 function lyricsKey(id: number): string {
   return `${LYRICS_KEY_PREFIX}${id}`
@@ -26,6 +27,12 @@ export function loadCachedLyrics(id: number): CachedLyrics | null {
 
     const parsed = JSON.parse(raw) as CachedLyrics
     const now = Date.now()
+
+    // Invalidate old cache versions (metadata format changed)
+    if (parsed.version !== CACHE_VERSION) {
+      localStorage.removeItem(lyricsKey(id))
+      return null
+    }
 
     if (now - parsed.cachedAt > LYRICS_CACHE_TTL_MS) {
       localStorage.removeItem(lyricsKey(id))
@@ -53,6 +60,7 @@ export function saveCachedLyrics(id: number, data: Omit<CachedLyrics, "cachedAt"
   try {
     const cached: CachedLyrics = {
       ...data,
+      version: CACHE_VERSION,
       cachedAt: Date.now(),
     }
     localStorage.setItem(lyricsKey(id), JSON.stringify(cached))

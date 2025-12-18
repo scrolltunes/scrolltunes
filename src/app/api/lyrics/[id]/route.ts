@@ -17,6 +17,7 @@ import {
   findBestAlternativeLyrics,
   getLyricsById,
 } from "@/lib/lyrics-client"
+import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import {
   formatArtists,
   getAlbumImageUrl,
@@ -62,6 +63,8 @@ function normalizeForMatch(text: string): string {
 
 interface SpotifyLookupResult {
   readonly spotifyId: string
+  readonly trackName: string
+  readonly artistName: string
   readonly albumArt: string | null
 }
 
@@ -69,6 +72,8 @@ function lookupSpotifyById(spotifyId: string): Effect.Effect<SpotifyLookupResult
   return getTrackEffect(spotifyId).pipe(
     Effect.map(track => ({
       spotifyId: track.id,
+      trackName: normalizeTrackName(track.name),
+      artistName: normalizeArtistName(formatArtists(track.artists)),
       albumArt: getAlbumImageUrl(track.album, "medium"),
     })),
     Effect.catchAll(() => Effect.succeed(null)),
@@ -97,6 +102,8 @@ function lookupSpotifyBySearch(
       if (!match) return null
       return {
         spotifyId: match.id,
+        trackName: normalizeTrackName(match.name),
+        artistName: normalizeArtistName(formatArtists(match.artists)),
         albumArt: getAlbumImageUrl(match.album, "medium"),
       }
     }),
@@ -133,6 +140,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
       return Effect.flatMap(spotifyLookupEffect, spotifyResult => {
         const resolvedSpotifyId = spotifyResult?.spotifyId
+        const spotifyTrackName = spotifyResult?.trackName ?? null
+        const spotifyArtistName = spotifyResult?.artistName ?? null
         const spotifyAlbumArt = spotifyResult?.albumArt ?? null
 
         const bpmQuery = {
@@ -171,6 +180,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         return Effect.map(bpmEffect, bpm => ({
           lyrics,
           bpm,
+          spotifyTrackName,
+          spotifyArtistName,
           spotifyAlbumArt,
           resolvedSpotifyId,
         }))
@@ -207,12 +218,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Failed to fetch lyrics" }, { status: 502 })
   }
 
-  const { lyrics, bpm: bpmResult, spotifyAlbumArt, resolvedSpotifyId } = result.value
+  const {
+    lyrics,
+    bpm: bpmResult,
+    spotifyTrackName,
+    spotifyArtistName,
+    spotifyAlbumArt,
+    resolvedSpotifyId,
+  } = result.value
 
   const albumArt = spotifyAlbumArt ?? (await getAlbumArt(lyrics.artist, lyrics.title, "medium"))
 
+  const normalizedLyrics = {
+    ...lyrics,
+    title: spotifyTrackName ?? normalizeTrackName(lyrics.title),
+    artist: spotifyArtistName ?? normalizeArtistName(lyrics.artist),
+  }
+
   const body: LyricsApiSuccessResponse = {
-    lyrics,
+    lyrics: normalizedLyrics,
     bpm: bpmResult?.bpm ?? null,
     key: bpmResult?.key ?? null,
     albumArt: albumArt ?? null,
