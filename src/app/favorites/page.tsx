@@ -151,6 +151,8 @@ const FavoriteSongItem = memo(function FavoriteSongItem({
 }: FavoriteSongItemProps) {
   const [albumArt, setAlbumArt] = useState<string | null | undefined>(song.albumArt ?? undefined)
   const [isLoading, setIsLoading] = useState(!song.albumArt)
+  const [displayTitle, setDisplayTitle] = useState(song.title)
+  const [displayArtist, setDisplayArtist] = useState(song.artist)
 
   useEffect(() => {
     if (song.albumArt) {
@@ -160,10 +162,14 @@ const FavoriteSongItem = memo(function FavoriteSongItem({
     }
 
     const cached = loadCachedLyrics(song.id)
-    if (cached?.albumArt) {
-      setAlbumArt(cached.albumArt)
-      setIsLoading(false)
-      return
+    if (cached) {
+      if (cached.albumArt) setAlbumArt(cached.albumArt)
+      if (cached.lyrics.title) setDisplayTitle(cached.lyrics.title)
+      if (cached.lyrics.artist) setDisplayArtist(cached.lyrics.artist)
+      if (cached.albumArt) {
+        setIsLoading(false)
+        return
+      }
     }
 
     let cancelled = false
@@ -190,6 +196,8 @@ const FavoriteSongItem = memo(function FavoriteSongItem({
             bpmSource: data.attribution?.bpm ?? undefined,
             lyricsSource: data.attribution?.lyrics ?? undefined,
           })
+          if (data.lyrics.title) setDisplayTitle(data.lyrics.title)
+          if (data.lyrics.artist) setDisplayArtist(data.lyrics.artist)
         }
 
         setAlbumArt(art ?? null)
@@ -240,8 +248,8 @@ const FavoriteSongItem = memo(function FavoriteSongItem({
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium truncate">{song.title}</p>
-            <p className="text-sm text-neutral-400 truncate">{song.artist}</p>
+            <p className="font-medium truncate">{displayTitle}</p>
+            <p className="text-sm text-neutral-400 truncate">{displayArtist}</p>
           </div>
         </Link>
         <motion.button
