@@ -25,11 +25,11 @@ export const springs = {
     bounce: 0.3,
     visualDuration: 0.5,
   },
-  // Smooth scroll animation
+  // Smooth scroll animation - responsive feel for mobile touch scrolling
   scroll: {
     type: "spring" as const,
-    stiffness: 100,
-    damping: 20,
+    stiffness: 200,
+    damping: 28,
     mass: 0.5,
   },
   // Lyric highlight animation

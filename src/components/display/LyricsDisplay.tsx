@@ -1,5 +1,6 @@
 "use client"
 
+import { springs } from "@/animations"
 import {
   useChordsData,
   useCurrentLineIndex,
@@ -17,6 +18,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
 
 const SCROLL_OVERRIDE_TIMEOUT = 3000 // Resume auto-scroll after 3 seconds
+const RUBBERBAND_RESISTANCE = 0.3 // How much resistance when overscrolling (0-1)
+const MAX_OVERSCROLL = 100 // Maximum pixels of overscroll before full resistance
 
 export interface LyricsDisplayProps {
   readonly className?: string
@@ -45,7 +48,42 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   // Refs for geometry-based scroll calculation
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
   const lineRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  // Calculate scroll bounds with rubberband effect
+  const applyRubberband = useCallback((newScrollY: number): number => {
+    const container = containerRef.current
+    const content = contentRef.current
+    const minScroll = 0
+
+    // Calculate max scroll (content height - container height, accounting for 50vh padding on both sides)
+    let maxScroll = 0
+    if (container && content) {
+      const containerHeight = container.clientHeight
+      const contentHeight = content.scrollHeight
+      // Content has py-[50vh] so actual scrollable area is contentHeight - containerHeight
+      maxScroll = Math.max(0, contentHeight - containerHeight)
+    }
+
+    // Apply rubberband resistance when scrolling above top
+    if (newScrollY < minScroll) {
+      const overscroll = minScroll - newScrollY
+      const resistance = Math.min(overscroll / MAX_OVERSCROLL, 1)
+      const dampedOverscroll = overscroll * RUBBERBAND_RESISTANCE * (1 - resistance * 0.5)
+      return minScroll - dampedOverscroll
+    }
+
+    // Apply rubberband resistance when scrolling past bottom
+    if (newScrollY > maxScroll) {
+      const overscroll = newScrollY - maxScroll
+      const resistance = Math.min(overscroll / MAX_OVERSCROLL, 1)
+      const dampedOverscroll = overscroll * RUBBERBAND_RESISTANCE * (1 - resistance * 0.5)
+      return maxScroll + dampedOverscroll
+    }
+
+    return newScrollY
+  }, [])
 
   // Get lyrics from state
   const lyrics = state._tag !== "Idle" ? state.lyrics : null
@@ -193,9 +231,9 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       handleUserScroll()
-      setScrollY(prev => prev + e.deltaY)
+      setScrollY(prev => applyRubberband(prev + e.deltaY))
     },
-    [handleUserScroll],
+    [handleUserScroll, applyRubberband],
   )
 
   // Handle touch events for mobile
@@ -209,12 +247,35 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     [handleUserScroll],
   )
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (touchStartY.current === null) return
-    const currentY = e.touches[0]?.clientY ?? 0
-    const deltaY = touchStartY.current - currentY
-    touchStartY.current = currentY
-    setScrollY(prev => prev + deltaY)
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (touchStartY.current === null) return
+      const currentY = e.touches[0]?.clientY ?? 0
+      const deltaY = touchStartY.current - currentY
+      touchStartY.current = currentY
+      setScrollY(prev => applyRubberband(prev + deltaY))
+    },
+    [applyRubberband],
+  )
+
+  // Snap back to bounds when touch ends
+  const handleTouchEnd = useCallback(() => {
+    touchStartY.current = null
+    const container = containerRef.current
+    const content = contentRef.current
+
+    // Calculate max scroll
+    let maxScroll = 0
+    if (container && content) {
+      maxScroll = Math.max(0, content.scrollHeight - container.clientHeight)
+    }
+
+    // Snap back to bounds
+    setScrollY(prev => {
+      if (prev < 0) return 0
+      if (prev > maxScroll) return maxScroll
+      return prev
+    })
   }, [])
 
   // Cleanup timeout on unmount
@@ -256,6 +317,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       aria-label="Lyrics display"
     >
       {/* Manual scroll indicator */}
@@ -266,9 +328,10 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       )}
 
       <motion.div
+        ref={contentRef}
         className="py-[50vh] max-w-4xl mx-auto"
         animate={{ y: -scrollY }}
-        transition={{ type: "spring", stiffness: 80, damping: 20, mass: 0.8 }}
+        transition={springs.scroll}
       >
         {lyrics.lines.map((line, index) => {
           const isActive = index === activeLineIndex
