@@ -358,7 +358,12 @@
 - [x] Create SongActionBar with favorite + setlist icons in content body
 - [x] Show setlist membership as colored icons (toggle add/remove from modal)
 - [x] Cache setlists in localStorage for instant display
-- [ ] Create setlist detail view with drag-to-reorder (/setlists/[id])
+- [x] Create setlist detail view (/setlists/[id]) with song list and remove
+- [x] Add EditSetlistModal for editing name, description, color
+- [x] Add edit button to SetlistCard with pencil icon on hover
+- [x] Add delete confirmation modal for setlists
+- [x] Show 2x2 album art collage on SetlistCard from song album covers
+- [ ] Add drag-to-reorder songs in setlist detail view
 
 ### Legal Updates
 - [x] Update Privacy Policy with "Accounts and Synced Data" section
@@ -395,12 +400,12 @@
 
 **Active:** Phase 9 remaining items:
 - API: `/api/user/song-settings` GET/POST
-- UI: Setlist detail page with drag-to-reorder (/setlists/[id]), feature comparison screen, login page redesign
+- UI: Drag-to-reorder songs in setlist detail, feature comparison screen, login page redesign
 - Infra: Rate limiting, Spotify OAuth (needs production HTTPS), offline mode
 
 **Blocked:** Spotify OAuth requires production HTTPS
 
-**Next:** Setlist detail page (/setlists/[id]) with song list, reordering, and delete
+**Next:** Drag-to-reorder songs in setlist detail view
 
 ---
 

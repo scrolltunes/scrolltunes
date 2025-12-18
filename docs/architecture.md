@@ -72,6 +72,12 @@ scrolltunes/
 │   │   │   ├── QRCode.tsx
 │   │   │   ├── SongQueue.tsx
 │   │   │   └── GuestList.tsx
+│   │   ├── setlists/             # Setlist management
+│   │   │   ├── SetlistCard.tsx   # Card with 2x2 album art collage, edit button
+│   │   │   ├── CreateSetlistModal.tsx
+│   │   │   ├── EditSetlistModal.tsx  # Edit name, description, color + delete
+│   │   │   ├── AddToSetlistModal.tsx
+│   │   │   └── index.ts
 │   │   ├── ui/                   # Reusable UI primitives
 │   │   │   ├── Button.tsx
 │   │   │   ├── Slider.tsx
