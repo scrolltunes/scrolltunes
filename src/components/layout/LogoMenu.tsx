@@ -2,7 +2,7 @@
 
 import { Logo } from "@/components/ui"
 import { useAccount } from "@/core"
-import { CaretDown, GearSix, House, Info, MusicNotes } from "@phosphor-icons/react"
+import { CaretDown, GearSix, Heart, House, Info, MusicNotes } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
@@ -76,8 +76,16 @@ export const LogoMenu = memo(function LogoMenu() {
               </Link>
             </div>
 
-            {isAuthenticated && (
-              <div className="border-t border-neutral-800 py-2">
+            <div className="border-t border-neutral-800 py-2">
+              <Link
+                href="/favorites"
+                onClick={handleClose}
+                className="flex items-center gap-3 px-4 py-2 text-neutral-300 hover:bg-neutral-800 transition-colors"
+              >
+                <Heart size={20} />
+                <span>Favorites</span>
+              </Link>
+              {isAuthenticated && (
                 <Link
                   href="/setlists"
                   onClick={handleClose}
@@ -86,8 +94,8 @@ export const LogoMenu = memo(function LogoMenu() {
                   <MusicNotes size={20} />
                   <span>Your Setlists</span>
                 </Link>
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="border-t border-neutral-800 py-2">
               <Link

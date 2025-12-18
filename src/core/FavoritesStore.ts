@@ -123,15 +123,15 @@ class FavoritesStore {
     }
   }
 
-  add(song: Omit<FavoriteItem, "addedAt">): void {
+  add(song: Omit<FavoriteItem, "addedAt">, addedAt?: number): void {
     if (this.isFavorite(song.id)) return
 
     const item: FavoriteItem = {
       ...song,
-      addedAt: Date.now(),
+      addedAt: addedAt ?? Date.now(),
     }
 
-    this.setState(prev => [item, ...prev])
+    this.setState(prev => [...prev, item].sort((a, b) => b.addedAt - a.addedAt))
     this.syncAddToServer(item)
   }
 
