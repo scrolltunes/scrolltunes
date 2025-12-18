@@ -3,8 +3,9 @@
 import { springs } from "@/animations"
 import { VoiceSearchButton } from "@/components/audio"
 import { useIsAuthenticated, useVoiceActivity } from "@/core"
-import { useVoiceSearch } from "@/hooks"
+import { useLocalSongCache, useVoiceSearch } from "@/hooks"
 import { normalizeTrackKey } from "@/lib/bpm"
+import { fuzzyMatchSongs } from "@/lib/fuzzy-search"
 import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import type { SearchApiResponse, SearchResultTrack } from "@/lib/search-api-types"
 import { makeCanonicalPath } from "@/lib/slug"
@@ -13,13 +14,12 @@ import {
   MagnifyingGlass,
   MusicNote,
   MusicNoteSimple,
-  TextAa,
   WarningCircle,
   X,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { useRouter } from "next/navigation"
-import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 interface VerifyResponse {
   readonly found: boolean
@@ -94,8 +94,9 @@ export const SongSearch = memo(function SongSearch({
   const isAuthenticated = useIsAuthenticated()
   const voiceSearch = useVoiceSearch()
   const voiceActivity = useVoiceActivity()
+  const localSongCache = useLocalSongCache()
   const [query, setQuery] = useState("")
-  const [results, setResults] = useState<NormalizedSearchResult[]>([])
+  const [apiResults, setApiResults] = useState<NormalizedSearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isPending, setIsPending] = useState(false) // True immediately on typing
   const [error, setError] = useState<string | null>(null)
@@ -108,11 +109,41 @@ export const SongSearch = memo(function SongSearch({
   const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastFinalTranscriptRef = useRef<string | null>(null)
 
+  const localMatches = useMemo((): NormalizedSearchResult[] => {
+    const trimmed = query.trim()
+    if (!trimmed || trimmed.length < 2) return []
+
+    const matches = fuzzyMatchSongs(trimmed, localSongCache, 0.3)
+
+    return matches.slice(0, 5).map(match => ({
+      id: `lrclib-${match.item.id}`,
+      name: match.item.title,
+      artist: match.item.artist,
+      album: match.item.album ?? "",
+      albumArt: match.item.albumArt,
+      duration: match.item.durationMs,
+      hasLyrics: true,
+      lrclibId: match.item.id,
+      displayName: normalizeTrackName(match.item.title),
+      displayArtist: normalizeArtistName(match.item.artist),
+      displayAlbum: match.item.album ? normalizeAlbumName(match.item.album) : "",
+    }))
+  }, [query, localSongCache])
+
+  const results = useMemo((): NormalizedSearchResult[] => {
+    if (localMatches.length === 0) return apiResults
+
+    const localIds = new Set(localMatches.map(m => m.id))
+    const filteredApiResults = apiResults.filter(r => !localIds.has(r.id))
+
+    return [...localMatches, ...filteredApiResults]
+  }, [localMatches, apiResults])
+
   const searchTracks = useCallback(async (searchQuery: string) => {
     const trimmed = searchQuery.trim()
 
     if (!trimmed) {
-      setResults([])
+      setApiResults([])
       setHasSearched(false)
       setError(null)
       setIsPending(false)
@@ -120,7 +151,7 @@ export const SongSearch = memo(function SongSearch({
     }
 
     if (trimmed.length < 2) {
-      setResults([])
+      setApiResults([])
       setHasSearched(false)
       setIsPending(false)
       return
@@ -129,7 +160,7 @@ export const SongSearch = memo(function SongSearch({
     const cacheKey = trimmed.toLowerCase()
     const cached = cacheRef.current.get(cacheKey)
     if (cached) {
-      setResults(cached)
+      setApiResults(cached)
       setHasSearched(true)
       setIsPending(false)
       setIsLoading(false)
@@ -154,7 +185,7 @@ export const SongSearch = memo(function SongSearch({
       const data: SearchApiResponse = await response.json()
       const tracks = deduplicateTracks(data.tracks ?? [])
       cacheRef.current.set(cacheKey, tracks)
-      setResults(tracks)
+      setApiResults(tracks)
       setHasSearched(true)
       setIsPending(false)
       setIsLoading(false)
@@ -163,7 +194,7 @@ export const SongSearch = memo(function SongSearch({
         return
       }
       setError("Unable to search. Please try again")
-      setResults([])
+      setApiResults([])
       setIsPending(false)
       setIsLoading(false)
     }
@@ -178,7 +209,7 @@ export const SongSearch = memo(function SongSearch({
         clearTimeout(debounceRef.current)
       }
 
-      // Show skeleton immediately on typing
+      // Show skeleton immediately on typing (only if no local matches)
       if (value.trim()) {
         setIsPending(true)
         setHasSearched(false)
@@ -187,7 +218,8 @@ export const SongSearch = memo(function SongSearch({
         // Cancel any in-flight request when text is cleared
         abortControllerRef.current?.abort()
         setIsPending(false)
-        setResults([])
+        setIsLoading(false)
+        setApiResults([])
         setHasSearched(false)
       }
 
@@ -200,10 +232,11 @@ export const SongSearch = memo(function SongSearch({
 
   const handleClear = useCallback(() => {
     setQuery("")
-    setResults([])
+    setApiResults([])
     setHasSearched(false)
     setError(null)
     setIsPending(false)
+    setIsLoading(false)
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
     }
@@ -467,16 +500,9 @@ export const SongSearch = memo(function SongSearch({
                     </p>
                   </div>
 
-                  <span className="flex-shrink-0 text-sm text-neutral-600 tabular-nums">
-                    {formatDuration(track.duration)}
-                  </span>
-
-                  {track.hasLyrics && (
-                    <span
-                      className="flex-shrink-0 ml-2 px-1.5 py-0.5 text-xs font-medium text-green-400 bg-green-400/10 rounded"
-                      title="Synced lyrics available"
-                    >
-                      <TextAa size={14} weight="bold" className="inline" />
+                  {track.duration > 0 && (
+                    <span className="flex-shrink-0 text-sm text-neutral-600 tabular-nums">
+                      {formatDuration(track.duration)}
                     </span>
                   )}
                 </button>
