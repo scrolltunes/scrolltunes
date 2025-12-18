@@ -77,6 +77,7 @@ scrolltunes/
 │   │   │   ├── Slider.tsx
 │   │   │   ├── Modal.tsx
 │   │   │   ├── SegmentedControl.tsx
+│   │   │   ├── SongListItem.tsx  # Song item with cached titles (use in all song lists)
 │   │   │   ├── VolumeToggle.tsx
 │   │   │   └── index.ts          # Barrel export
 │   │   ├── CodeBlock.tsx         # Top-level shared components

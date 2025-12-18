@@ -1,18 +1,16 @@
 "use client"
 
 import { springs } from "@/animations"
-import { AlbumArtSkeleton, Logo } from "@/components/ui"
+import { Logo, SongListItem } from "@/components/ui"
 import { type FavoriteItem, favoritesStore, useFavorites } from "@/core"
-import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
-import { makeCanonicalPath } from "@/lib/slug"
-import { ArrowLeft, ArrowCounterClockwise, Heart, MusicNote } from "@phosphor-icons/react"
+import { ArrowCounterClockwise, ArrowLeft, Heart } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 
 interface RemovedItem {
   readonly song: FavoriteItem
-  readonly albumArt: string | null | undefined
+  readonly albumArt: string | undefined
 }
 
 export default function FavoritesPage() {
@@ -20,18 +18,24 @@ export default function FavoritesPage() {
   const [removedItem, setRemovedItem] = useState<RemovedItem | null>(null)
   const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handleRemove = useCallback((song: FavoriteItem, albumArt: string | null | undefined) => {
-    if (undoTimeoutRef.current) {
-      clearTimeout(undoTimeoutRef.current)
-    }
+  const handleRemove = useCallback(
+    (id: number, albumArt: string | undefined) => {
+      const song = favorites.find(f => f.id === id)
+      if (!song) return
 
-    setRemovedItem({ song, albumArt })
-    favoritesStore.remove(song.id)
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current)
+      }
 
-    undoTimeoutRef.current = setTimeout(() => {
-      setRemovedItem(null)
-    }, 5000)
-  }, [])
+      setRemovedItem({ song, albumArt })
+      favoritesStore.remove(id)
+
+      undoTimeoutRef.current = setTimeout(() => {
+        setRemovedItem(null)
+      }, 5000)
+    },
+    [favorites],
+  )
 
   const handleUndo = useCallback(() => {
     if (!removedItem) return
@@ -141,7 +145,7 @@ export default function FavoritesPage() {
 interface FavoriteSongItemProps {
   readonly song: FavoriteItem
   readonly index: number
-  readonly onRemove: (song: FavoriteItem, albumArt: string | null | undefined) => void
+  readonly onRemove: (id: number, albumArt: string | undefined) => void
 }
 
 const FavoriteSongItem = memo(function FavoriteSongItem({
@@ -149,120 +153,38 @@ const FavoriteSongItem = memo(function FavoriteSongItem({
   index,
   onRemove,
 }: FavoriteSongItemProps) {
-  const [albumArt, setAlbumArt] = useState<string | null | undefined>(song.albumArt ?? undefined)
-  const [isLoading, setIsLoading] = useState(!song.albumArt)
-  const [displayTitle, setDisplayTitle] = useState(song.title)
-  const [displayArtist, setDisplayArtist] = useState(song.artist)
-
-  useEffect(() => {
-    if (song.albumArt) {
-      setAlbumArt(song.albumArt)
-      setIsLoading(false)
-      return
-    }
-
-    const cached = loadCachedLyrics(song.id)
-    if (cached) {
-      if (cached.albumArt) setAlbumArt(cached.albumArt)
-      if (cached.lyrics.title) setDisplayTitle(cached.lyrics.title)
-      if (cached.lyrics.artist) setDisplayArtist(cached.lyrics.artist)
-      if (cached.albumArt) {
-        setIsLoading(false)
-        return
-      }
-    }
-
-    let cancelled = false
-
-    fetch(`/api/lyrics/${song.id}`)
-      .then(async response => {
-        if (!response.ok || cancelled) {
-          if (!cancelled) setIsLoading(false)
-          return
-        }
-
-        const data = await response.json()
-        if (cancelled) return
-
-        const art = data.albumArt as string | null | undefined
-
-        if (data.lyrics) {
-          saveCachedLyrics(song.id, {
-            lyrics: data.lyrics,
-            bpm: data.bpm ?? null,
-            key: data.key ?? null,
-            albumArt: art ?? undefined,
-            spotifyId: data.spotifyId ?? undefined,
-            bpmSource: data.attribution?.bpm ?? undefined,
-            lyricsSource: data.attribution?.lyrics ?? undefined,
-          })
-          if (data.lyrics.title) setDisplayTitle(data.lyrics.title)
-          if (data.lyrics.artist) setDisplayArtist(data.lyrics.artist)
-        }
-
-        setAlbumArt(art ?? null)
-        setIsLoading(false)
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAlbumArt(null)
-          setIsLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [song.id, song.albumArt])
-
-  const songPath = makeCanonicalPath({
-    id: song.id,
-    title: song.title,
-    artist: song.artist,
-  })
-
-  const handleToggle = useCallback(() => {
-    onRemove(song, albumArt)
-  }, [song, albumArt, onRemove])
+  const renderAction = useCallback(
+    ({ albumArt }: { albumArt: string | undefined }) => (
+      <motion.button
+        type="button"
+        onClick={e => {
+          e.preventDefault()
+          e.stopPropagation()
+          onRemove(song.id, albumArt)
+        }}
+        className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 transition-colors"
+        aria-label="Remove from favorites"
+        whileTap={{ scale: 0.9 }}
+      >
+        <Heart size={24} weight="fill" className="text-red-500" />
+      </motion.button>
+    ),
+    [song.id, onRemove],
+  )
 
   return (
-    <motion.li
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: -100, transition: { duration: 0.2 } }}
-      transition={{ ...springs.default, delay: index * 0.03 }}
-    >
-      <div className="flex items-center gap-3 p-4 rounded-xl bg-neutral-900">
-        <Link
-          href={songPath}
-          className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
-        >
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
-            {isLoading ? (
-              <AlbumArtSkeleton />
-            ) : albumArt ? (
-              <img src={albumArt} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <MusicNote size={20} weight="fill" className="text-neutral-600" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-medium truncate">{displayTitle}</p>
-            <p className="text-sm text-neutral-400 truncate">{displayArtist}</p>
-          </div>
-        </Link>
-        <motion.button
-          type="button"
-          onClick={handleToggle}
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 transition-colors"
-          aria-label="Remove from favorites"
-          whileTap={{ scale: 0.9 }}
-        >
-          <Heart size={24} weight="fill" className="text-red-500" />
-        </motion.button>
-      </div>
-    </motion.li>
+    <li key={song.id}>
+      <SongListItem
+        id={song.id}
+        title={song.title}
+        artist={song.artist}
+        album={song.album}
+        albumArt={song.albumArt}
+        renderAction={renderAction}
+        animationIndex={index}
+        animateExit
+      />
+    </li>
   )
 })
 

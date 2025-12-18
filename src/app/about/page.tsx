@@ -1,9 +1,9 @@
 "use client"
 
+import { BackButton } from "@/components/ui"
 import { ArrowRight, EnvelopeSimple, XLogo } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import Link from "next/link"
-import { BackButton } from "@/components/ui"
 
 export default function AboutPage() {
   return (

@@ -153,6 +153,61 @@ await setlistsStore.create("My Setlist") // Create new setlist
 await setlistsStore.addSong(setlistId, song) // Add song to setlist
 ```
 
+### 8. SongListItem Component
+
+**Always use `SongListItem` when displaying a song in a list.** This component handles:
+- Loading and displaying cached normalized titles from Spotify
+- Album art loading with skeleton states
+- Optional favorite button and remove button
+- Optional entry/exit animations
+
+```typescript
+import { SongListItem } from "@/components/ui"
+
+// Basic usage
+<SongListItem
+  id={song.id}
+  title={song.title}
+  artist={song.artist}
+/>
+
+// With favorite and remove buttons
+<SongListItem
+  id={song.id}
+  title={song.title}
+  artist={song.artist}
+  albumArt={song.albumArt}
+  showFavorite
+  showRemove
+  onRemove={(id, albumArt) => handleRemove(id)}
+/>
+
+// With animations (for lists with AnimatePresence)
+<SongListItem
+  id={song.id}
+  title={song.title}
+  artist={song.artist}
+  animationIndex={index}
+  animateExit
+/>
+
+// With custom action button
+<SongListItem
+  id={song.id}
+  title={song.title}
+  artist={song.artist}
+  renderAction={({ albumArt }) => (
+    <button onClick={() => doSomething(albumArt)}>Action</button>
+  )}
+/>
+```
+
+Key features:
+- **Normalized titles**: Loads cached Spotify metadata for proper casing/formatting
+- **Album art loading**: Fetches from cache or API, shows skeleton during load
+- **Flexible actions**: `showFavorite`, `showRemove`, or custom `renderAction`
+- **Animation support**: `animationIndex` for staggered entry, `animateExit` for exit animations
+
 ## Key Patterns
 
 ### 1. State Management with useSyncExternalStore

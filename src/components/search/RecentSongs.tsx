@@ -1,14 +1,10 @@
 "use client"
 
-import { AlbumArtSkeleton, FavoriteButton } from "@/components/ui"
+import { SongListItem } from "@/components/ui"
 import { recentSongsStore, useRecentSongsState } from "@/core"
-import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { MAX_RECENT_SONGS } from "@/lib/recent-songs-types"
-import { makeCanonicalPath } from "@/lib/slug"
-
-import { ClockCounterClockwise, MusicNote, Trash, X } from "@phosphor-icons/react"
+import { ClockCounterClockwise, Trash } from "@phosphor-icons/react"
 import { motion } from "motion/react"
-import { useRouter } from "next/navigation"
 import { memo, useCallback } from "react"
 
 export interface RecentSongsProps {
@@ -18,25 +14,15 @@ export interface RecentSongsProps {
 export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentSongsProps) {
   const { recents, loadingAlbumArtIds, isLoading, isInitialized, expectedCount } =
     useRecentSongsState()
-  const router = useRouter()
 
   const skeletonCount =
     expectedCount !== null && expectedCount > 0 ? Math.min(expectedCount, MAX_RECENT_SONGS) : 0
-
-  const handleClick = useCallback(
-    (song: { id: number; title: string; artist: string }) => {
-      const path = makeCanonicalPath({ id: song.id, title: song.title, artist: song.artist })
-      router.push(path)
-    },
-    [router],
-  )
 
   const handleClear = useCallback(() => {
     recentSongsStore.clear()
   }, [])
 
-  const handleRemove = useCallback((e: React.MouseEvent, songId: number) => {
-    e.stopPropagation()
+  const handleRemove = useCallback((songId: number, _albumArt: string | undefined) => {
     recentSongsStore.remove(songId)
   }, [])
 
@@ -94,56 +80,21 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
         </ul>
       ) : recents.length > 0 ? (
         <ul className="space-y-2" aria-label="Recently played songs">
-          {recents.map(song => {
-            const isLoadingAlbumArt = loadingAlbumArtIds.has(song.id)
-            const displayTitle = normalizeTrackName(song.title)
-            const displayArtist = normalizeArtistName(song.artist)
-            return (
-              <li key={song.id}>
-                <div className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition-colors">
-                  <button
-                    type="button"
-                    onClick={() => handleClick(song)}
-                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                    aria-label={`${displayTitle} by ${displayArtist}`}
-                  >
-                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
-                      {isLoadingAlbumArt ? (
-                        <AlbumArtSkeleton />
-                      ) : song.albumArt ? (
-                        <img src={song.albumArt} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <MusicNote size={20} weight="fill" className="text-neutral-600" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium truncate">{displayTitle}</p>
-                      <p className="text-sm text-neutral-500 truncate">{displayArtist}</p>
-                    </div>
-                  </button>
-
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <FavoriteButton
-                      songId={song.id}
-                      title={song.title}
-                      artist={song.artist}
-                      {...(song.albumArt !== undefined && { albumArt: song.albumArt })}
-                      size="sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={e => handleRemove(e, song.id)}
-                      className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-800/50 hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
-                      aria-label="Remove from history"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                </div>
-              </li>
-            )
-          })}
+          {recents.map(song => (
+            <li key={song.id}>
+              <SongListItem
+                id={song.id}
+                title={song.title}
+                artist={song.artist}
+                album={song.album}
+                albumArt={song.albumArt}
+                isLoadingAlbumArt={loadingAlbumArtIds.has(song.id)}
+                showFavorite
+                showRemove
+                onRemove={handleRemove}
+              />
+            </li>
+          ))}
         </ul>
       ) : isInitialized ? (
         <p className="text-sm text-neutral-500">No recently played songs</p>

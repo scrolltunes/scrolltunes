@@ -12,3 +12,4 @@ export {
   type SongCardSkeletonProps,
   type AlbumArtSkeletonProps,
 } from "./Skeleton"
+export { SongListItem, type SongListItemProps } from "./SongListItem"

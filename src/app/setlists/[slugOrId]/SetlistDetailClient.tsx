@@ -1,13 +1,11 @@
 "use client"
 
 import { springs } from "@/animations"
-import { AlbumArtSkeleton, BackButton, Logo } from "@/components/ui"
-import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
-import { makeCanonicalPath, uuidToBase64Url } from "@/lib/slug"
-import { Check, Copy, MusicNote, MusicNotesSimple, Queue, Share } from "@phosphor-icons/react"
+import { BackButton, Logo, SongListItem } from "@/components/ui"
+import { uuidToBase64Url } from "@/lib/slug"
+import { Check, Copy, MusicNotesSimple, Queue, Share } from "@phosphor-icons/react"
 import { motion } from "motion/react"
-import Link from "next/link"
-import { memo, useCallback, useEffect, useState } from "react"
+import { memo, useCallback, useState } from "react"
 
 interface SetlistSong {
   readonly songId: string
@@ -95,113 +93,37 @@ interface SetlistSongItemProps {
 }
 
 const SetlistSongItem = memo(function SetlistSongItem({ song, index }: SetlistSongItemProps) {
-  const [albumArt, setAlbumArt] = useState<string | null | undefined>(undefined)
-  const [isLoading, setIsLoading] = useState(true)
+  if (song.songProvider !== "lrclib") {
+    return (
+      <li>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...springs.default, delay: index * 0.03 }}
+          className="flex items-center gap-3 p-4 rounded-xl bg-neutral-900 opacity-50"
+        >
+          <p className="font-medium truncate">{song.songTitle}</p>
+          <p className="text-sm text-neutral-400 truncate">{song.songArtist}</p>
+        </motion.div>
+      </li>
+    )
+  }
 
-  useEffect(() => {
-    if (song.songProvider !== "lrclib") {
-      setIsLoading(false)
-      return
-    }
-
-    const songId = Number(song.songId)
-    if (Number.isNaN(songId)) {
-      setIsLoading(false)
-      return
-    }
-
-    const cached = loadCachedLyrics(songId)
-    if (cached?.albumArt) {
-      setAlbumArt(cached.albumArt)
-      setIsLoading(false)
-      return
-    }
-
-    let cancelled = false
-
-    fetch(`/api/lyrics/${songId}`)
-      .then(async response => {
-        if (!response.ok || cancelled) {
-          if (!cancelled) setIsLoading(false)
-          return
-        }
-
-        const data = await response.json()
-        if (cancelled) return
-
-        const art = data.albumArt as string | null | undefined
-
-        if (data.lyrics) {
-          saveCachedLyrics(songId, {
-            lyrics: data.lyrics,
-            bpm: data.bpm ?? null,
-            key: data.key ?? null,
-            albumArt: art ?? undefined,
-            spotifyId: data.spotifyId ?? undefined,
-            bpmSource: data.attribution?.bpm ?? undefined,
-            lyricsSource: data.attribution?.lyrics ?? undefined,
-          })
-        }
-
-        setAlbumArt(art ?? null)
-        setIsLoading(false)
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAlbumArt(null)
-          setIsLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [song.songId, song.songProvider])
-
-  const songPath =
-    song.songProvider === "lrclib"
-      ? makeCanonicalPath({
-          id: Number(song.songId),
-          title: song.songTitle,
-          artist: song.songArtist,
-        })
-      : null
-
-  const content = (
-    <>
-      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
-        {isLoading ? (
-          <AlbumArtSkeleton />
-        ) : albumArt ? (
-          <img src={albumArt} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <MusicNote size={20} weight="fill" className="text-neutral-600" />
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium truncate">{song.songTitle}</p>
-        <p className="text-sm text-neutral-400 truncate">{song.songArtist}</p>
-      </div>
-    </>
-  )
+  const songId = Number(song.songId)
+  if (Number.isNaN(songId)) {
+    return null
+  }
 
   return (
-    <motion.li
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ ...springs.default, delay: index * 0.03 }}
-    >
-      {songPath ? (
-        <Link
-          href={songPath}
-          className="flex items-center gap-3 p-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition-colors"
-        >
-          {content}
-        </Link>
-      ) : (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-neutral-900">{content}</div>
-      )}
-    </motion.li>
+    <li>
+      <SongListItem
+        id={songId}
+        title={song.songTitle}
+        artist={song.songArtist}
+        showFavorite
+        animationIndex={index}
+      />
+    </li>
   )
 })
 
