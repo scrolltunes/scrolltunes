@@ -349,6 +349,23 @@ Strict TypeScript configuration:
 - `isolatedModules` for Next.js compatibility
 - Effect language service for enhanced checking
 
+### 6. Neon Database
+Using Neon with the HTTP driver (neon-http). Key constraints:
+- **No transactions** — The HTTP driver doesn't support `db.transaction()`
+- **Use `db.batch()` for multiple updates** — Sends all queries in one HTTP request
+
+```typescript
+// DON'T: Individual updates (N requests)
+await Promise.all(items.map(item => db.update(table).set(...).where(...)))
+
+// DO: Batch updates (1 request)
+const updates = items.map(item => db.update(table).set(...).where(...))
+if (updates.length > 0) {
+  const [first, ...rest] = updates
+  await db.batch([first, ...rest])
+}
+```
+
 ## Best Practices
 
 1. **Always memoize effects** — Prevents recreation on every render

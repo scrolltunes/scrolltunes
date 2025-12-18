@@ -1,7 +1,7 @@
 "use client"
 
 import { useAccount } from "@/core"
-import { MusicNotes, SignOut, UserCircle } from "@phosphor-icons/react"
+import { SignOut, UserCircle } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { signOut } from "next-auth/react"
 import Image from "next/image"
@@ -117,17 +117,6 @@ export const UserMenu = memo(function UserMenu() {
             </div>
 
             <div className="py-2">
-              <Link
-                href="#"
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-3 px-4 py-2 text-neutral-300 hover:bg-neutral-800 transition-colors"
-              >
-                <MusicNotes size={20} />
-                <span>Your setlists</span>
-              </Link>
-            </div>
-
-            <div className="border-t border-neutral-800 py-2">
               <button
                 type="button"
                 onClick={handleSignOut}

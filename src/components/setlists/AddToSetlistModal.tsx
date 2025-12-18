@@ -75,12 +75,13 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
       if (isInSetlist) {
         success = await setlistsStore.removeSong(setlistId, `lrclib:${song.songId}`)
       } else {
-        success = await setlistsStore.addSong(setlistId, {
+        const addedSong = await setlistsStore.addSong(setlistId, {
           songId: String(song.songId),
           songProvider: "lrclib",
           title: song.title,
           artist: song.artist,
         })
+        success = addedSong !== null
       }
 
       setAddingToSetlistId(null)

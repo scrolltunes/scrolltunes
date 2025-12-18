@@ -3,10 +3,11 @@
 import { useSyncExternalStore } from "react"
 
 export interface SetlistSong {
+  readonly id: string
   readonly songId: string
   readonly songProvider: string
-  readonly title: string
-  readonly artist: string
+  readonly songTitle: string
+  readonly songArtist: string
   readonly sortOrder: number
 }
 
@@ -221,7 +222,7 @@ export class SetlistsStore {
   async addSong(
     setlistId: string,
     song: { songId: string; songProvider: string; title: string; artist: string },
-  ): Promise<boolean> {
+  ): Promise<SetlistSong | null> {
     try {
       const response = await fetch(`/api/user/setlists/${setlistId}/songs`, {
         method: "POST",
@@ -230,7 +231,7 @@ export class SetlistsStore {
       })
 
       if (!response.ok) {
-        return false
+        return null
       }
 
       const data = (await response.json()) as { song: SetlistSong }
@@ -248,9 +249,9 @@ export class SetlistsStore {
       })
       this.saveToStorage()
 
-      return true
+      return data.song
     } catch {
-      return false
+      return null
     }
   }
 
@@ -305,8 +306,8 @@ export class SetlistsStore {
         setlists: this.state.setlists.map(s => {
           if (s.id !== setlistId || !s.songs) return s
           const reorderedSongs = songIds
-            .map((id, index) => {
-              const song = s.songs?.find(song => song.songId === id)
+            .map((recordId, index) => {
+              const song = s.songs?.find(song => song.id === recordId)
               return song ? { ...song, sortOrder: index } : null
             })
             .filter((song): song is SetlistSong => song !== null)

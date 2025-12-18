@@ -2,12 +2,22 @@
 
 import { springs } from "@/animations"
 import { BackButton, Logo, SongListItem } from "@/components/ui"
+import { setlistsStore } from "@/core"
 import { uuidToBase64Url } from "@/lib/slug"
-import { Check, Copy, MusicNotesSimple, Queue, Share } from "@phosphor-icons/react"
-import { motion } from "motion/react"
-import { memo, useCallback, useState } from "react"
+import {
+  ArrowCounterClockwise,
+  Check,
+  Copy,
+  MusicNotesSimple,
+  Queue,
+  Share,
+  X,
+} from "@phosphor-icons/react"
+import { AnimatePresence, motion } from "motion/react"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
 
 interface SetlistSong {
+  readonly id: string
   readonly songId: string
   readonly songProvider: string
   readonly songTitle: string
@@ -28,10 +38,88 @@ interface SetlistDetailClientProps {
   readonly songs: readonly SetlistSong[]
 }
 
-export function SetlistDetailClient({ setlist, songs }: SetlistDetailClientProps) {
+interface RemovedItem {
+  readonly song: SetlistSong
+  readonly index: number
+  readonly albumArt: string | undefined
+}
+
+export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDetailClientProps) {
   const shortCode = uuidToBase64Url(setlist.id)
   const shortUrl =
     typeof window !== "undefined" ? `${window.location.origin}/sl/${shortCode}` : `/sl/${shortCode}`
+
+  const [songs, setSongs] = useState<readonly SetlistSong[]>(initialSongs)
+  const [removedItem, setRemovedItem] = useState<RemovedItem | null>(null)
+  const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleRemove = useCallback(
+    (songId: string, index: number, albumArt: string | undefined) => {
+      const song = songs[index]
+      if (!song) return
+
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current)
+      }
+
+      setRemovedItem({ song, index, albumArt })
+      setSongs(prev => prev.filter((_, i) => i !== index))
+
+      const compositeId = `${song.songProvider}:${song.songId}`
+      setlistsStore.removeSong(setlist.id, compositeId)
+
+      undoTimeoutRef.current = setTimeout(() => {
+        setRemovedItem(null)
+      }, 5000)
+    },
+    [songs, setlist.id],
+  )
+
+  const handleUndo = useCallback(() => {
+    if (!removedItem) return
+
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current)
+    }
+
+    const { song, index } = removedItem
+
+    // Optimistically restore the song in the UI immediately
+    const restoredSongs = [...songs]
+    restoredSongs.splice(index, 0, song)
+    setSongs(restoredSongs)
+    setRemovedItem(null)
+
+    // Sync to server in background: add song then reorder to correct position
+    const syncToServer = async () => {
+      const addedSong = await setlistsStore.addSong(setlist.id, {
+        songId: song.songId,
+        songProvider: song.songProvider,
+        title: song.songTitle,
+        artist: song.songArtist,
+      })
+
+      if (addedSong) {
+        // Reorder to put the song back in its original position
+        // Build the record IDs array with the new song's ID at the correct position
+        const recordIds = restoredSongs.map((s, i) => (i === index ? addedSong.id : s.id))
+        await setlistsStore.reorderSongs(setlist.id, recordIds)
+
+        // Update local state with the new ID so subsequent operations use it
+        setSongs(prev => prev.map((s, i) => (i === index ? { ...s, id: addedSong.id } : s)))
+      }
+    }
+
+    syncToServer()
+  }, [removedItem, setlist.id, songs])
+
+  useEffect(() => {
+    return () => {
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
@@ -62,7 +150,7 @@ export function SetlistDetailClient({ setlist, songs }: SetlistDetailClientProps
               </div>
             </div>
 
-            {songs.length === 0 ? (
+            {songs.length === 0 && !removedItem ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-neutral-900 flex items-center justify-center">
                   <MusicNotesSimple size={32} className="text-neutral-500" />
@@ -71,18 +159,45 @@ export function SetlistDetailClient({ setlist, songs }: SetlistDetailClientProps
               </div>
             ) : (
               <ul className="space-y-2" aria-label="Songs in setlist">
-                {songs.map((song, index) => (
-                  <SetlistSongItem
-                    key={`${song.songProvider}:${song.songId}`}
-                    song={song}
-                    index={index}
-                  />
-                ))}
+                <AnimatePresence mode="popLayout">
+                  {songs.map((song, index) => (
+                    <SetlistSongItem
+                      key={`${song.songProvider}:${song.songId}`}
+                      song={song}
+                      index={index}
+                      onRemove={handleRemove}
+                    />
+                  ))}
+                </AnimatePresence>
               </ul>
             )}
           </motion.div>
         </div>
       </main>
+
+      <AnimatePresence>
+        {removedItem && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            transition={springs.default}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+          >
+            <div className="flex items-center gap-3 px-4 py-3 bg-neutral-800 rounded-xl shadow-lg border border-neutral-700">
+              <span className="text-sm text-neutral-300">Removed from setlist</span>
+              <button
+                type="button"
+                onClick={handleUndo}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
+              >
+                <ArrowCounterClockwise size={16} />
+                Undo
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -90,22 +205,35 @@ export function SetlistDetailClient({ setlist, songs }: SetlistDetailClientProps
 interface SetlistSongItemProps {
   readonly song: SetlistSong
   readonly index: number
+  readonly onRemove: (songId: string, index: number, albumArt: string | undefined) => void
 }
 
-const SetlistSongItem = memo(function SetlistSongItem({ song, index }: SetlistSongItemProps) {
+const SetlistSongItem = memo(function SetlistSongItem({
+  song,
+  index,
+  onRemove,
+}: SetlistSongItemProps) {
+  const handleRemove = useCallback(
+    (albumArt: string | undefined) => {
+      onRemove(song.songId, index, albumArt)
+    },
+    [song.songId, index, onRemove],
+  )
+
   if (song.songProvider !== "lrclib") {
     return (
-      <li>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ ...springs.default, delay: index * 0.03 }}
-          className="flex items-center gap-3 p-4 rounded-xl bg-neutral-900 opacity-50"
-        >
+      <motion.li
+        layout
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, x: -100, transition: { duration: 0.2 } }}
+        transition={{ ...springs.default, delay: index * 0.03 }}
+      >
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-neutral-900 opacity-50">
           <p className="font-medium truncate">{song.songTitle}</p>
           <p className="text-sm text-neutral-400 truncate">{song.songArtist}</p>
-        </motion.div>
-      </li>
+        </div>
+      </motion.li>
     )
   }
 
@@ -114,6 +242,21 @@ const SetlistSongItem = memo(function SetlistSongItem({ song, index }: SetlistSo
     return null
   }
 
+  const renderAction = ({ albumArt }: { albumArt: string | undefined }) => (
+    <button
+      type="button"
+      onClick={e => {
+        e.preventDefault()
+        e.stopPropagation()
+        handleRemove(albumArt)
+      }}
+      className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-800/50 hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
+      aria-label="Remove from setlist"
+    >
+      <X size={16} />
+    </button>
+  )
+
   return (
     <li>
       <SongListItem
@@ -121,7 +264,9 @@ const SetlistSongItem = memo(function SetlistSongItem({ song, index }: SetlistSo
         title={song.songTitle}
         artist={song.songArtist}
         showFavorite
+        renderAction={renderAction}
         animationIndex={index}
+        animateExit
       />
     </li>
   )

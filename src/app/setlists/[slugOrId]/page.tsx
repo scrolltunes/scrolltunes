@@ -34,6 +34,7 @@ export default async function SetlistDetailPage({ params }: PageProps) {
 
   const songs = await db
     .select({
+      id: userSetlistSongs.id,
       songId: userSetlistSongs.songId,
       songProvider: userSetlistSongs.songProvider,
       songTitle: userSetlistSongs.songTitle,

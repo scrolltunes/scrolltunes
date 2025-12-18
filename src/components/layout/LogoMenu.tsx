@@ -92,7 +92,7 @@ export const LogoMenu = memo(function LogoMenu() {
                   className="flex items-center gap-3 px-4 py-2 text-neutral-300 hover:bg-neutral-800 transition-colors"
                 >
                   <MusicNotes size={20} />
-                  <span>Your Setlists</span>
+                  <span>Setlists</span>
                 </Link>
               )}
             </div>
