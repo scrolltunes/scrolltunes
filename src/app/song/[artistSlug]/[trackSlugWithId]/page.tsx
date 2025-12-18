@@ -3,12 +3,7 @@
 import { springs } from "@/animations"
 import { FloatingMetronome, VoiceIndicator } from "@/components/audio"
 import { ChordInfoPanel } from "@/components/chords"
-import {
-  FloatingActions,
-  LyricsDisplay,
-  SongActionBar,
-  SongInfoModal,
-} from "@/components/display"
+import { FloatingActions, LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
@@ -42,6 +37,7 @@ import { soundSystem } from "@/sounds"
 import {
   ArrowCounterClockwise,
   ArrowLeft,
+  Bug,
   MusicNote,
   Pause,
   Play,
@@ -52,7 +48,7 @@ import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-type ErrorType = "invalid-url" | "not-found" | "network"
+type ErrorType = "invalid-url" | "not-found" | "network" | "invalid-lyrics"
 
 interface AttributionSource {
   readonly name: string
@@ -85,6 +81,10 @@ const errorMessages: Record<ErrorType, { title: string; description: string }> =
   network: {
     title: "Could not load lyrics",
     description: "Check your internet connection and try again",
+  },
+  "invalid-lyrics": {
+    title: "Lyrics data is invalid",
+    description: "The synced lyrics for this song are not available",
   },
 }
 
@@ -277,7 +277,12 @@ export default function SongPage() {
         const data: LyricsApiResponse = await response.json()
 
         if (!response.ok || !isLyricsApiSuccess(data)) {
-          const errorType: ErrorType = response.status === 404 ? "not-found" : "network"
+          const errorType: ErrorType =
+            response.status === 404
+              ? "not-found"
+              : response.status === 422
+                ? "invalid-lyrics"
+                : "network"
           setLoadState({ _tag: "Error", errorType })
           return
         }
@@ -409,6 +414,8 @@ export default function SongPage() {
   if (loadState._tag === "Error") {
     const { title, description } = errorMessages[loadState.errorType]
     const canRetry = loadState.errorType === "network" || loadState.errorType === "not-found"
+    const canReport =
+      loadState.errorType === "not-found" || loadState.errorType === "invalid-lyrics"
 
     return (
       <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center gap-6 p-6">
@@ -436,6 +443,36 @@ export default function SongPage() {
             Back to search
           </Link>
         </div>
+        {canReport && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowReportModal(true)}
+              className="px-6 py-3 bg-amber-600/20 hover:bg-amber-600/30 text-amber-500 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <Bug size={20} />
+              Report this issue
+            </button>
+            <ReportIssueModal
+              isOpen={showReportModal}
+              onClose={() => setShowReportModal(false)}
+              songContext={{
+                title: params.trackSlugWithId?.split("-").slice(0, -1).join(" ") ?? "Unknown",
+                artist: params.artistSlug?.replace(/-/g, " ") ?? "Unknown",
+                duration: 0,
+                bpm: null,
+                key: null,
+                spotifyId: spotifyId,
+                bpmSource: null,
+                lrclibId: lrclibId,
+                lyricsError:
+                  loadState.errorType === "invalid-lyrics"
+                    ? `Invalid lyrics data (ID: ${lrclibId})`
+                    : `Lyrics not found (ID: ${lrclibId})`,
+              }}
+            />
+          </>
+        )}
       </div>
     )
   }
@@ -544,7 +581,8 @@ export default function SongPage() {
           songId={lrclibId ?? 0}
           title={loadState._tag === "Loaded" ? loadState.lyrics.title : ""}
           artist={loadState._tag === "Loaded" ? loadState.lyrics.artist : ""}
-          {...(loadState._tag === "Loaded" && loadState.albumArt !== null && { albumArt: loadState.albumArt })}
+          {...(loadState._tag === "Loaded" &&
+            loadState.albumArt !== null && { albumArt: loadState.albumArt })}
           hasIssue={loadState.bpm === null || chordsState.status === "error"}
           onInfoPress={() => setShowInfo(true)}
           onWarningPress={() => setShowReportModal(true)}

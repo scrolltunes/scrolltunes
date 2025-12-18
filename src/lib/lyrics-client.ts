@@ -47,7 +47,18 @@ export class LyricsAPIError extends Data.TaggedClass("LyricsAPIError")<{
   readonly message: string
 }> {}
 
-export type LyricsError = LyricsNotFoundError | LyricsAPIError
+/**
+ * Lyrics data is invalid or malformed (e.g., no valid synced lines).
+ * Uses Data.TaggedClass for discriminated union pattern matching.
+ */
+export class LyricsInvalidError extends Data.TaggedClass("LyricsInvalidError")<{
+  readonly id: number
+  readonly trackName: string
+  readonly artistName: string
+  readonly reason: string
+}> {}
+
+export type LyricsError = LyricsNotFoundError | LyricsAPIError | LyricsInvalidError
 
 // --- API Response Types ---
 
@@ -335,7 +346,20 @@ export const getLyricsById = (id: number): Effect.Effect<Lyrics, LyricsError> =>
     }
 
     const songId = `lrclib-${data.id}`
-    return parseLRC(data.syncedLyrics, songId, data.trackName, data.artistName)
+    const lyrics = parseLRC(data.syncedLyrics, songId, data.trackName, data.artistName)
+
+    if (lyrics.lines.length === 0) {
+      return yield* Effect.fail(
+        new LyricsInvalidError({
+          id: data.id,
+          trackName: data.trackName,
+          artistName: data.artistName,
+          reason: "No valid synced lyrics lines found",
+        }),
+      )
+    }
+
+    return lyrics
   })
 }
 
@@ -471,4 +495,178 @@ export const searchLRCLibBySpotifyMetadata = (
 
     return deduped
   })
+}
+
+// --- Fallback Search with Ranking ---
+
+/**
+ * Album names that indicate low-quality or placeholder entries
+ */
+const LOW_QUALITY_ALBUMS = new Set([
+  "-",
+  ".",
+  "null",
+  "unknown",
+  "title",
+  "e",
+  "vari",
+  "valirock",
+  "drumless",
+])
+
+/**
+ * Check if syncedLyrics contains valid LRC timestamps
+ */
+function hasValidLrcTimestamps(syncedLyrics: string | null): boolean {
+  if (!syncedLyrics) return false
+  // Must have at least 5 timestamp lines to be valid
+  const timestampMatches = syncedLyrics.match(/\[\d{2}:\d{2}\.\d{2}\]/g)
+  return timestampMatches !== null && timestampMatches.length >= 5
+}
+
+/**
+ * Score a lyrics result for ranking (higher is better)
+ */
+function scoreLyricsResult(result: LRCLibResponse, targetDuration: number | null): number {
+  let score = 0
+
+  // Has valid synced lyrics with timestamps (+100 base)
+  if (hasValidLrcTimestamps(result.syncedLyrics)) {
+    score += 100
+  } else {
+    return 0 // No valid lyrics = not usable
+  }
+
+  // Duration match (within ±2s = +50, within ±5s = +30, within ±10s = +10)
+  if (targetDuration !== null) {
+    const durationDiff = Math.abs(result.duration - targetDuration)
+    if (durationDiff <= 2) {
+      score += 50
+    } else if (durationDiff <= 5) {
+      score += 30
+    } else if (durationDiff <= 10) {
+      score += 10
+    }
+  }
+
+  // Album name quality (+20 for good album names)
+  const albumLower = (result.albumName ?? "").toLowerCase().trim()
+  if (albumLower && !LOW_QUALITY_ALBUMS.has(albumLower)) {
+    score += 20
+  }
+
+  // Prefer official album names
+  if (
+    albumLower.includes("hybrid theory") ||
+    albumLower.includes("meteora") ||
+    albumLower.includes("papercuts")
+  ) {
+    score += 15
+  }
+
+  return score
+}
+
+/**
+ * Search for alternative lyrics when primary ID fails.
+ * Returns the best matching lyrics based on ranking criteria.
+ *
+ * @param trackName - Track title to search for
+ * @param artistName - Artist name to search for
+ * @param targetDuration - Expected duration in seconds (for matching)
+ * @param excludeId - ID to exclude from results (the failed one)
+ */
+export const findBestAlternativeLyrics = (
+  trackName: string,
+  artistName: string,
+  targetDuration: number | null,
+  excludeId?: number,
+): Effect.Effect<Lyrics, LyricsError> => {
+  return Effect.gen(function* () {
+    const params = new URLSearchParams({
+      track_name: trackName,
+      artist_name: artistName,
+    })
+
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        fetch(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
+          headers,
+          cache: "force-cache",
+          next: { revalidate: 600 },
+        }),
+      catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
+    })
+
+    if (!response.ok) {
+      return yield* Effect.fail(
+        new LyricsAPIError({ status: response.status, message: response.statusText }),
+      )
+    }
+
+    const results = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<LRCLibResponse[]>,
+      catch: () => new LyricsAPIError({ status: 0, message: "Failed to parse response" }),
+    })
+
+    // Score and rank results
+    const scored = results
+      .filter(r => r.id !== excludeId)
+      .map(r => ({ result: r, score: scoreLyricsResult(r, targetDuration) }))
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+
+    if (scored.length === 0) {
+      return yield* Effect.fail(new LyricsNotFoundError({ trackName, artistName }))
+    }
+
+    // Use the best match
+    const best = scored[0]
+    if (!best) {
+      return yield* Effect.fail(new LyricsNotFoundError({ trackName, artistName }))
+    }
+
+    const data = best.result
+    if (!data.syncedLyrics) {
+      return yield* Effect.fail(new LyricsNotFoundError({ trackName, artistName }))
+    }
+
+    const songId = `lrclib-${data.id}`
+    const lyrics = parseLRC(data.syncedLyrics, songId, data.trackName, data.artistName)
+
+    if (lyrics.lines.length === 0) {
+      return yield* Effect.fail(
+        new LyricsInvalidError({
+          id: data.id,
+          trackName: data.trackName,
+          artistName: data.artistName,
+          reason: "No valid synced lyrics lines found",
+        }),
+      )
+    }
+
+    return lyrics
+  })
+}
+
+/**
+ * Get lyrics by ID with automatic fallback to search if the ID has invalid data.
+ *
+ * @param id - Primary LRCLIB ID to try
+ * @param trackName - Track name for fallback search
+ * @param artistName - Artist name for fallback search
+ * @param targetDuration - Expected duration for ranking alternatives
+ */
+export const getLyricsByIdWithFallback = (
+  id: number,
+  trackName: string,
+  artistName: string,
+  targetDuration: number | null,
+): Effect.Effect<Lyrics, LyricsError> => {
+  return getLyricsById(id).pipe(
+    Effect.catchTag("LyricsInvalidError", error => {
+      console.log(`[Lyrics] ID ${error.id} has invalid data, searching for alternative...`)
+      return findBestAlternativeLyrics(trackName, artistName, targetDuration, error.id)
+    }),
+  )
 }

@@ -17,6 +17,7 @@ export interface SongContext {
   readonly lrclibId?: number | null
   readonly chordsError?: string | null
   readonly chordsErrorUrl?: string | null
+  readonly lyricsError?: string | null
 }
 
 export interface ReportIssueModalProps {
@@ -45,7 +46,8 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
 
   const hasMissingBpm = songContext && !songContext.bpm
   const hasChordsError = songContext?.chordsError
-  const hasKnownIssue = hasMissingBpm || hasChordsError
+  const hasLyricsError = songContext?.lyricsError
+  const hasKnownIssue = hasMissingBpm || hasChordsError || hasLyricsError
   const isDescriptionRequired = !hasKnownIssue
 
   const displayTitle = useMemo(
@@ -98,7 +100,9 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
         ? "Missing BPM data"
         : hasChordsError
           ? `Chords error: ${songContext?.chordsError}`
-          : ""
+          : hasLyricsError
+            ? `Lyrics error: ${songContext?.lyricsError}`
+            : ""
       const formData: Record<string, string> = {
         access_key: WEB3FORMS_ACCESS_KEY,
         subject: songContext
@@ -157,6 +161,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
       isDescriptionRequired,
       hasMissingBpm,
       hasChordsError,
+      hasLyricsError,
       hasKnownIssue,
       displayTitle,
       displayArtist,
@@ -217,6 +222,11 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   {songContext.chordsError && (
                     <div className="mt-2 text-amber-500 text-xs">
                       ⚠ Chords error: {songContext.chordsError}
+                    </div>
+                  )}
+                  {songContext.lyricsError && (
+                    <div className="mt-2 text-amber-500 text-xs">
+                      ⚠ Lyrics error: {songContext.lyricsError}
                     </div>
                   )}
                 </div>

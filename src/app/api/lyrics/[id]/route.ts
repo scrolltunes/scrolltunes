@@ -10,7 +10,13 @@ import {
 } from "@/lib/bpm"
 import { getAlbumArt } from "@/lib/deezer-client"
 import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
-import { LyricsAPIError, LyricsNotFoundError, getLyricsById } from "@/lib/lyrics-client"
+import {
+  LyricsAPIError,
+  LyricsInvalidError,
+  LyricsNotFoundError,
+  findBestAlternativeLyrics,
+  getLyricsById,
+} from "@/lib/lyrics-client"
 import {
   formatArtists,
   getAlbumImageUrl,
@@ -108,7 +114,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Invalid ID: must be a positive integer" }, { status: 400 })
   }
 
-  const lyricsEffect = getLyricsById(id)
+  // Fetch lyrics with automatic fallback if primary ID has invalid data
+  const lyricsEffect = getLyricsById(id).pipe(
+    Effect.catchTag("LyricsInvalidError", error => {
+      console.log(
+        `[Lyrics] ID ${id} has invalid data ("${error.trackName}" by ${error.artistName}), searching for alternative...`,
+      )
+      // Use track info from the failed request to search for alternatives
+      return findBestAlternativeLyrics(error.trackName, error.artistName, null, error.id)
+    }),
+  )
 
   const combinedEffect = lyricsEffect.pipe(
     Effect.flatMap(lyrics => {
@@ -177,6 +192,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         return NextResponse.json(
           { error: "Lyrics service temporarily unavailable" },
           { status: failure.status >= 500 ? 502 : 500 },
+        )
+      }
+      if (failure instanceof LyricsInvalidError) {
+        return NextResponse.json(
+          {
+            error: `Invalid lyrics data for "${failure.trackName}" by ${failure.artistName}: ${failure.reason}`,
+          },
+          { status: 422 },
         )
       }
     }

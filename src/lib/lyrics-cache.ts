@@ -32,6 +32,12 @@ export function loadCachedLyrics(id: number): CachedLyrics | null {
       return null
     }
 
+    // Invalidate cached lyrics with no lines (garbage data)
+    if (!parsed.lyrics?.lines || parsed.lyrics.lines.length === 0) {
+      localStorage.removeItem(lyricsKey(id))
+      return null
+    }
+
     return parsed
   } catch {
     return null
