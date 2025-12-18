@@ -5,7 +5,7 @@ import { VoiceSearchButton } from "@/components/audio"
 import { useIsAuthenticated, useVoiceActivity } from "@/core"
 import { useVoiceSearch } from "@/hooks"
 import { normalizeTrackKey } from "@/lib/bpm"
-import { normalizeAlbumName } from "@/lib/normalize-track"
+import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import type { SearchApiResponse, SearchResultTrack } from "@/lib/search-api-types"
 import { makeCanonicalPath } from "@/lib/slug"
 import {
@@ -42,15 +42,11 @@ function deduplicateTracks(tracks: SearchResultTrack[]): NormalizedSearchResult[
     const key = `${normalized.artist}:${normalized.title}`
 
     if (!seen.has(key)) {
-      const displayName = normalized.title.charAt(0).toUpperCase() + normalized.title.slice(1)
-      const displayArtist = normalized.artist.charAt(0).toUpperCase() + normalized.artist.slice(1)
-      const displayAlbum = track.album ? normalizeAlbumName(track.album) : ""
-
       seen.set(key, {
         ...track,
-        displayName,
-        displayArtist,
-        displayAlbum,
+        displayName: normalizeTrackName(track.name),
+        displayArtist: normalizeArtistName(track.artist),
+        displayAlbum: track.album ? normalizeAlbumName(track.album) : "",
       })
     }
   }

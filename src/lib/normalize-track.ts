@@ -12,7 +12,7 @@ export function normalizeTrackName(name: string): string {
   // Second pass: remove common parenthetical suffixes the library misses
   title = title
     .replace(
-      /\s*[\(\[](?:radio edit|single version|acoustic|deluxe(?: edition)?|explicit|clean|instrumental|extended|original mix)[\)\]]\s*$/gi,
+      /\s*[\(\[](?:radio edit|single version|deluxe(?: edition)?|explicit|clean|instrumental|extended|original mix)[\)\]]\s*$/gi,
       "",
     )
     .trim()

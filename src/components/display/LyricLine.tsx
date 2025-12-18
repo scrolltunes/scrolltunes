@@ -44,7 +44,11 @@ function estimateSyllables(word: string): number {
   let count = vowelGroups.length
 
   if (cleaned.endsWith("e") && count > 1) count--
-  if (cleaned.endsWith("le") && cleaned.length > 2 && !/[aeiouy]/.test(cleaned[cleaned.length - 3] ?? "")) {
+  if (
+    cleaned.endsWith("le") &&
+    cleaned.length > 2 &&
+    !/[aeiouy]/.test(cleaned[cleaned.length - 3] ?? "")
+  ) {
     count++
   }
 
@@ -111,7 +115,13 @@ function calculateWordTimings(
 
   for (const wd of wordData) {
     if (wd.weight === 0) {
-      result.push({ word: wd.word, delay: 0, wordDuration: 0, startIndex: wd.startIndex, endIndex: wd.endIndex })
+      result.push({
+        word: wd.word,
+        delay: 0,
+        wordDuration: 0,
+        startIndex: wd.startIndex,
+        endIndex: wd.endIndex,
+      })
     } else {
       const wordDuration = totalWeight > 0 ? (wd.weight / totalWeight) * totalDuration : 0
       result.push({
@@ -187,7 +197,12 @@ function renderWordWithChordAnchors(
         {chordsAtOffset && chordsAtOffset.length > 0 && (
           <span className="absolute bottom-full mb-[-0.3em] left-0 flex gap-0.5 whitespace-nowrap">
             {chordsAtOffset.map((ch, i) => (
-              <ChordBadge key={`${ch.name}-${i}`} chord={ch.name} size="sm" isActive={isActive || isNext} />
+              <ChordBadge
+                key={`${ch.name}-${i}`}
+                chord={ch.name}
+                size="sm"
+                isActive={isActive || isNext}
+              />
             ))}
           </span>
         )}

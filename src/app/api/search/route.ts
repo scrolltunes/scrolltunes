@@ -4,6 +4,7 @@ import {
   type LyricsError,
   searchLRCLibBySpotifyMetadata,
 } from "@/lib/lyrics-client"
+import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import type { SearchResultTrack } from "@/lib/search-api-types"
 import { formatArtists, getAlbumImageUrl, searchTracksEffect } from "@/lib/spotify-client"
 import { Effect } from "effect"
@@ -44,6 +45,8 @@ function normalizeDisplayText(text: string): string {
 
 interface SpotifyMatch {
   readonly spotifyId: string
+  readonly trackName: string
+  readonly artistName: string
   readonly albumArt: string | null
   readonly albumName: string | null
 }
@@ -69,6 +72,8 @@ function findSpotifyMatch(
       if (!match) return null
       return {
         spotifyId: match.id,
+        trackName: normalizeTrackName(match.name),
+        artistName: normalizeArtistName(formatArtists(match.artists)),
         albumArt: getAlbumImageUrl(match.album, "medium"),
         albumName: match.album.name || null,
       }
@@ -156,8 +161,8 @@ function searchLRCLib(
             id: `lrclib-${r.id}`,
             lrclibId: r.id,
             spotifyId: spotifyMatch?.spotifyId,
-            name: normalizeDisplayText(r.trackName),
-            artist: normalizeDisplayText(r.artistName),
+            name: spotifyMatch?.trackName ?? normalizeDisplayText(r.trackName),
+            artist: spotifyMatch?.artistName ?? normalizeDisplayText(r.artistName),
             album,
             albumArt: albumArt ?? undefined,
             duration: r.duration * 1000,
