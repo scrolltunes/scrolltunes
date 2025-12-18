@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
+import { normalizeSongInput } from "@/lib/db/normalize"
 import { userSongItems } from "@/lib/db/schema"
 import { and, desc, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
@@ -70,15 +71,17 @@ export async function POST(request: Request) {
   for (const fav of favorites) {
     await db
       .insert(userSongItems)
-      .values({
-        userId,
-        songId: fav.songId,
-        songProvider: fav.songProvider,
-        songTitle: fav.title,
-        songArtist: fav.artist,
-        songAlbum: fav.album,
-        isFavorite: true,
-      })
+      .values(
+        normalizeSongInput({
+          userId,
+          songId: fav.songId,
+          songProvider: fav.songProvider,
+          songTitle: fav.title,
+          songArtist: fav.artist,
+          songAlbum: fav.album,
+          isFavorite: true,
+        }),
+      )
       .onConflictDoUpdate({
         target: [userSongItems.userId, userSongItems.songProvider, userSongItems.songId],
         set: {

@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
+import { normalizeSongInput } from "@/lib/db/normalize"
 import { userSetlistSongs, userSetlists } from "@/lib/db/schema"
 import { and, asc, eq, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
@@ -83,14 +84,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const [song] = await db
     .insert(userSetlistSongs)
-    .values({
-      setlistId: id,
-      songId,
-      songProvider,
-      songTitle: title,
-      songArtist: artist,
-      sortOrder: maxSortOrder + 1,
-    })
+    .values(
+      normalizeSongInput({
+        setlistId: id,
+        songId,
+        songProvider,
+        songTitle: title,
+        songArtist: artist,
+        sortOrder: maxSortOrder + 1,
+      }),
+    )
     .returning()
 
   return NextResponse.json({ song }, { status: 201 })

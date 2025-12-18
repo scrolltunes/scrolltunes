@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
+import { normalizeSongInput } from "@/lib/db/normalize"
 import { userSongItems } from "@/lib/db/schema"
 import { and, desc, eq, sql } from "drizzle-orm"
 import { NextResponse } from "next/server"
@@ -40,21 +41,23 @@ export async function POST(request: Request) {
 
     await db
       .insert(userSongItems)
-      .values({
-        userId,
-        songId: song.songId,
-        songProvider: song.songProvider,
-        songTitle: song.title,
-        songArtist: song.artist,
-        songAlbum: song.album,
-        songDurationMs: song.durationMs,
-        inHistory: true,
-        firstPlayedAt: lastPlayedAt,
-        lastPlayedAt,
-        playCount,
-        createdAt: now,
-        updatedAt: now,
-      })
+      .values(
+        normalizeSongInput({
+          userId,
+          songId: song.songId,
+          songProvider: song.songProvider,
+          songTitle: song.title,
+          songArtist: song.artist,
+          songAlbum: song.album,
+          songDurationMs: song.durationMs,
+          inHistory: true,
+          firstPlayedAt: lastPlayedAt,
+          lastPlayedAt,
+          playCount,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      )
       .onConflictDoUpdate({
         target: [userSongItems.userId, userSongItems.songProvider, userSongItems.songId],
         set: {
