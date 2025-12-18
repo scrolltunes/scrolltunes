@@ -1,4 +1,5 @@
 import { auth } from "@/auth"
+import { INPUT_LIMITS } from "@/constants/limits"
 import { db } from "@/lib/db"
 import { userSetlistSongs, userSetlists } from "@/lib/db/schema"
 import { and, asc, eq } from "drizzle-orm"
@@ -49,6 +50,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (!existing) {
     return NextResponse.json({ error: "Setlist not found" }, { status: 404 })
+  }
+
+  if (name !== undefined && typeof name === "string" && name.length > INPUT_LIMITS.SETLIST_NAME) {
+    return NextResponse.json(
+      { error: `Name must be ${INPUT_LIMITS.SETLIST_NAME} characters or less` },
+      { status: 400 },
+    )
+  }
+
+  if (
+    description !== undefined &&
+    typeof description === "string" &&
+    description.length > INPUT_LIMITS.SETLIST_DESCRIPTION
+  ) {
+    return NextResponse.json(
+      { error: `Description must be ${INPUT_LIMITS.SETLIST_DESCRIPTION} characters or less` },
+      { status: 400 },
+    )
   }
 
   const updates: Record<string, unknown> = { updatedAt: new Date() }

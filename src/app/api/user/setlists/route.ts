@@ -1,4 +1,5 @@
 import { auth } from "@/auth"
+import { INPUT_LIMITS } from "@/constants/limits"
 import { db } from "@/lib/db"
 import { userSetlistSongs, userSetlists } from "@/lib/db/schema"
 import { asc, eq, inArray } from "drizzle-orm"
@@ -78,6 +79,24 @@ export async function POST(request: Request) {
 
   if (!name || typeof name !== "string") {
     return NextResponse.json({ error: "Name is required" }, { status: 400 })
+  }
+
+  if (name.length > INPUT_LIMITS.SETLIST_NAME) {
+    return NextResponse.json(
+      { error: `Name must be ${INPUT_LIMITS.SETLIST_NAME} characters or less` },
+      { status: 400 },
+    )
+  }
+
+  if (
+    description &&
+    typeof description === "string" &&
+    description.length > INPUT_LIMITS.SETLIST_DESCRIPTION
+  ) {
+    return NextResponse.json(
+      { error: `Description must be ${INPUT_LIMITS.SETLIST_DESCRIPTION} characters or less` },
+      { status: 400 },
+    )
   }
 
   const maxSortOrder = await db

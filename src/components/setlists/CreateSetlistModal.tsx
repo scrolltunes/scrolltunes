@@ -1,6 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
+import { INPUT_LIMITS } from "@/constants/limits"
 import { type Setlist, setlistsStore } from "@/core"
 import { X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
@@ -114,6 +115,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
                   onChange={e => setName(e.target.value)}
                   placeholder="My setlist"
                   required
+                  maxLength={INPUT_LIMITS.SETLIST_NAME}
                   className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
@@ -131,6 +133,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
                   onChange={e => setDescription(e.target.value)}
                   placeholder="Add a description"
                   rows={2}
+                  maxLength={INPUT_LIMITS.SETLIST_DESCRIPTION}
                   className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 />
               </div>

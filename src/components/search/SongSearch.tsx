@@ -1,6 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
+import { INPUT_LIMITS } from "@/constants/limits"
 import { VoiceSearchButton } from "@/components/audio"
 import { useIsAuthenticated, useVoiceActivity } from "@/core"
 import { useLocalSongCache, useVoiceSearch } from "@/hooks"
@@ -370,6 +371,7 @@ export const SongSearch = memo(function SongSearch({
             value={query}
             onChange={handleInputChange}
             placeholder="Search by song title or artist name"
+            maxLength={INPUT_LIMITS.SEARCH_QUERY}
             className={`w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 border border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
               isAuthenticated ? (query ? "pr-20" : "pr-12") : "pr-10"
             }`}

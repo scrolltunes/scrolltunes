@@ -1,6 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
+import { INPUT_LIMITS } from "@/constants/limits"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { Bug, CheckCircle, PaperPlaneTilt, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
@@ -244,6 +245,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   rows={4}
                   required={isDescriptionRequired}
                   disabled={submitState === "submitting"}
+                  maxLength={INPUT_LIMITS.REPORT_DESCRIPTION}
                   className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                 />
               </div>
@@ -259,6 +261,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   onChange={e => setEmail(e.target.value)}
                   placeholder="your@email.com"
                   disabled={submitState === "submitting"}
+                  maxLength={INPUT_LIMITS.EMAIL}
                   className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                 />
               </div>
