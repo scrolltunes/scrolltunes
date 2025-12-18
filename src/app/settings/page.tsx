@@ -121,7 +121,11 @@ function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
 
     setIsDeleting(true)
     try {
-      const response = await fetch("/api/user/delete", { method: "POST" })
+      const response = await fetch("/api/user/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "DELETE" }),
+      })
       if (response.ok) {
         await signOut({ callbackUrl: "/" })
       }
