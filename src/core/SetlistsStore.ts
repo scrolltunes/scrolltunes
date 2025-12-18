@@ -150,7 +150,7 @@ export class SetlistsStore {
 
   async update(
     id: string,
-    updates: { name?: string; description?: string; color?: string; icon?: string },
+    updates: { name?: string; description?: string; color?: string | null; icon?: string },
   ): Promise<boolean> {
     try {
       const response = await fetch(`/api/user/setlists/${id}`, {

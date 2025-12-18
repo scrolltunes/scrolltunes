@@ -67,12 +67,18 @@ export function EditSetlistModal({
       const trimmedName = name.trim()
       const trimmedDescription = description.trim()
 
-      const updates = {
-        ...(trimmedName !== setlist.name ? { name: trimmedName } : {}),
-        ...(trimmedDescription !== (setlist.description ?? "")
-          ? { description: trimmedDescription }
-          : {}),
-        ...(selectedColor !== setlist.color && selectedColor ? { color: selectedColor } : {}),
+      const updates: { name?: string; description?: string; color?: string | null } = {}
+
+      if (trimmedName !== setlist.name) {
+        updates.name = trimmedName
+      }
+
+      if (trimmedDescription !== (setlist.description ?? "")) {
+        updates.description = trimmedDescription
+      }
+
+      if (selectedColor !== setlist.color) {
+        updates.color = selectedColor ?? null
       }
 
       const success = await setlistsStore.update(setlist.id, updates)
