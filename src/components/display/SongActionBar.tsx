@@ -1,6 +1,5 @@
 "use client"
 
-import { FavoriteButton } from "@/components/ui"
 import {
   FONT_SIZE_STEP,
   MAX_FONT_SIZE,
@@ -109,19 +108,6 @@ export const SongActionBar = memo(function SongActionBar({
         </button>
       </div>
 
-      {/* Favorite button - hidden on mobile (shown in FloatingSongDrawer) */}
-      <div className="hidden sm:flex sm:items-center sm:gap-3">
-        <div className="w-px h-6 bg-neutral-700" />
-
-        <FavoriteButton
-          songId={songId}
-          title={title}
-          artist={artist}
-          {...(albumArt !== undefined && { albumArt })}
-          size="md"
-        />
-      </div>
-
       {/* Setlist button - icon only on mobile, full on desktop */}
       {isAuthenticated && (
         <>
@@ -164,6 +150,9 @@ export const SongActionBar = memo(function SongActionBar({
           </button>
         </>
       )}
+
+      {/* Separator */}
+      <div className="w-px h-6 bg-neutral-700" />
 
       {/* Chords button - show different states based on availability */}
       {chordsNotFound ? (

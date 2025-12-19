@@ -17,6 +17,7 @@ const nowFeatures = [
   "Song search",
   "Shareable links",
   "Metronome",
+  "User accounts",
 ]
 
 const nextFeatures = [{ title: "Auto tempo", description: "Scroll speed based on song BPM" }]
@@ -29,7 +30,6 @@ const laterFeatures = [
 
 const futureFeatures = [
   { title: "Spotify integration", description: "Search your library" },
-  { title: "User accounts", description: "Sync across devices" },
   { title: "Jam sessions", description: "Play together in real-time" },
 ]
 
