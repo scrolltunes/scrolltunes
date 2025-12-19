@@ -14,9 +14,7 @@ interface MetadataPreview {
 }
 
 const DEMO_SONGS = [
-  { id: 1, name: "Bohemian Rhapsody" },
-  { id: 5, name: "Blinding Lights" },
-  { id: 10, name: "Shape of You" },
+  { id: 1, name: "Everlong" },
 ]
 
 export default function MetadataPreviewPage() {
