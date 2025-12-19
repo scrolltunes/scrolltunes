@@ -1,85 +1,86 @@
-import type { LyricsApiResponse } from "@/lib/lyrics-api-types"
-import { isLyricsApiSuccess } from "@/lib/lyrics-api-types"
-import { parseTrackSlugWithId } from "@/lib/slug"
 import type { Metadata, ResolvingMetadata } from "next"
+import { type LyricsApiResponse, isLyricsApiSuccess } from "@/lib"
+import { parseTrackSlugWithId } from "@/lib/slug"
+import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 
-interface LayoutProps {
-  children: React.ReactNode
-  params: Promise<{
-    artistSlug: string
-    trackSlugWithId: string
-  }>
+interface GenerateMetadataProps {
+  params: Promise<{ artistSlug: string; trackSlugWithId: string }>
+  searchParams: Promise<{ spotifyId?: string }>
 }
 
 export async function generateMetadata(
-  { params }: Omit<LayoutProps, "children">,
+  { params, searchParams }: GenerateMetadataProps,
   parent: ResolvingMetadata,
 ): Promise<Metadata> {
+  const { trackSlugWithId } = await params
+  const searchParamsObj = await searchParams
+  const spotifyId = searchParamsObj?.spotifyId
+
+  const lrclibId = parseTrackSlugWithId(trackSlugWithId)
+
+  if (lrclibId === null) {
+    return {
+      title: "Song | ScrollTunes",
+    }
+  }
+
   try {
-    const { artistSlug, trackSlugWithId } = await params
-    const lrclibId = parseTrackSlugWithId(trackSlugWithId)
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000"
 
-    if (!lrclibId) {
-      return {
-        title: "Song | ScrollTunes",
-      }
-    }
+    const url = spotifyId
+      ? `${baseUrl}/api/lyrics/${lrclibId}?spotifyId=${spotifyId}`
+      : `${baseUrl}/api/lyrics/${lrclibId}`
 
-    // Fetch song metadata from the API
-    const response = await fetch(`https://scrolltunes.com/api/lyrics/${lrclibId}`, {
-      next: { revalidate: 3600 }, // Cache for 1 hour
-    })
-
-    if (!response.ok) {
-      return {
-        title: `${trackSlugWithId.split("-").slice(0, -1).join(" ")} | ScrollTunes`,
-      }
-    }
-
+    const response = await fetch(url, { next: { revalidate: 3600 } })
     const data: LyricsApiResponse = await response.json()
 
-    if (!isLyricsApiSuccess(data)) {
+    if (!response.ok || !isLyricsApiSuccess(data)) {
       return {
         title: "Song | ScrollTunes",
       }
     }
 
-    const { title, artist } = data.lyrics
-    const albumArt = data.albumArt
+    const title = normalizeTrackName(data.lyrics.title)
+    const artist = normalizeArtistName(data.lyrics.artist)
+    const pageTitle = `Sing along to ${title} by ${artist} | ScrollTunes`
+    const albumArt = data.albumArt ?? undefined
 
-    const ogTitle = `Sing ${title} by ${artist} on ScrollTunes`
-
-    const metadata: Metadata = {
-      title: ogTitle,
+    return {
+      title: {
+        absolute: pageTitle,
+      },
+      description: `Sing along to ${title} by ${artist} on ScrollTunes — Live lyrics teleprompter with voice-activated scrolling`,
       openGraph: {
-        title: ogTitle,
+        title: pageTitle,
+        description: `Sing along to ${title} by ${artist} on ScrollTunes`,
         type: "website",
-        url: `https://scrolltunes.com/song/${artistSlug}/${trackSlugWithId}`,
-        images: albumArt
-          ? [
-              {
-                url: albumArt,
-                width: 300,
-                height: 300,
-                alt: `${title} album art`,
-              },
-            ]
-          : (await parent).openGraph?.images,
+        ...(albumArt && {
+          images: [
+            {
+              url: albumArt,
+              width: 300,
+              height: 300,
+              alt: `${title} by ${artist}`,
+            },
+          ],
+        }),
       },
       twitter: {
-        card: "summary",
-        title: ogTitle,
-        images: albumArt ? [albumArt] : undefined,
+        card: "summary_large_image",
+        title: pageTitle,
+        description: `Sing along to ${title} by ${artist} on ScrollTunes`,
+        ...(albumArt && { images: [albumArt] }),
       },
     }
-
-    return metadata
-  } catch {
-    // If metadata fetch fails, return default metadata
-    return {}
+  } catch (error) {
+    return {
+      title: "Song | ScrollTunes",
+    }
   }
 }
 
-export default function SongLayout({ children }: LayoutProps) {
+export default function SongLayout({ children }: { children: React.ReactNode }) {
   return children
 }
