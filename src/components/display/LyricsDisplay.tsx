@@ -18,8 +18,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
 
 const SCROLL_INDICATOR_TIMEOUT = 3000 // Hide manual scroll badge after 3 seconds
-const RUBBERBAND_RESISTANCE = 0.3 // How much resistance when overscrolling (0-1)
-const MAX_OVERSCROLL = 100 // Maximum pixels of overscroll before full resistance
 const MOMENTUM_FRICTION = 0.0015 // Velocity decay rate (higher = faster stop)
 const MIN_VELOCITY = 0.005 // Minimum velocity to continue momentum (pixels/ms)
 const MAX_VELOCITY = 5 // Maximum velocity clamp (pixels/ms)
@@ -61,11 +59,11 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
   const lineRefs = useRef<(HTMLButtonElement | null)[]>([])
 
-  // Calculate scroll bounds with rubberband effect
+  // Calculate scroll bounds with snap-back effect
   const applyRubberband = useCallback((newScrollY: number): number => {
     const container = containerRef.current
     const content = contentRef.current
-    const minScroll = 0
+    const minScroll = initialScrollValue.current
 
     // Calculate max scroll (content height - container height, accounting for 50vh padding on both sides)
     let maxScroll = 0
@@ -76,20 +74,14 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       maxScroll = Math.max(0, contentHeight - containerHeight)
     }
 
-    // Apply rubberband resistance when scrolling above top
+    // Snap back when scrolling above top
     if (newScrollY < minScroll) {
-      const overscroll = minScroll - newScrollY
-      const resistance = Math.min(overscroll / MAX_OVERSCROLL, 1)
-      const dampedOverscroll = overscroll * RUBBERBAND_RESISTANCE * (1 - resistance * 0.5)
-      return minScroll - dampedOverscroll
+      return minScroll
     }
 
-    // Apply rubberband resistance when scrolling past bottom
+    // Snap back when scrolling past bottom
     if (newScrollY > maxScroll) {
-      const overscroll = newScrollY - maxScroll
-      const resistance = Math.min(overscroll / MAX_OVERSCROLL, 1)
-      const dampedOverscroll = overscroll * RUBBERBAND_RESISTANCE * (1 - resistance * 0.5)
-      return maxScroll + dampedOverscroll
+      return maxScroll
     }
 
     return newScrollY
@@ -158,10 +150,11 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     return true
   }, [])
 
-  // Track if initial scroll has happened
+  // Track if initial scroll has happened and what the initial scroll value was
   const hasInitialScroll = useRef(false)
+  const initialScrollValue = useRef(0)
 
-  // Initial scroll when lyrics first render - always scroll to first non-empty line
+  // Initial scroll when lyrics first render or when reset - always scroll to first non-empty line
   useEffect(() => {
     if (!lyrics || hasInitialScroll.current) return
 
@@ -177,6 +170,11 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       const timeoutId = setTimeout(() => {
         if (!hasInitialScroll.current && scrollToLine(firstLineIndex)) {
           hasInitialScroll.current = true
+          // Capture the scroll value after initial scroll completes
+          setScrollY(current => {
+            initialScrollValue.current = current
+            return current
+          })
         }
       }, delay)
       timeoutIds.push(timeoutId)
@@ -187,7 +185,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
         clearTimeout(id)
       }
     }
-  }, [lyrics, scrollToLine])
+  }, [lyrics, scrollToLine, state._tag])
 
   // Reset state when lyrics change
   useEffect(() => {
@@ -201,10 +199,18 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const isPlaying = state._tag === "Playing"
   const isAutoScrollEnabled = isPlaying && !isManualScrolling
 
-  // Reset manual scroll when play is pressed (transition to Playing)
+  // Reset scroll and state when player is reset to Ready, or manual scroll when play is pressed
   const prevStateTag = useRef(state._tag)
   useEffect(() => {
-    if (prevStateTag.current !== "Playing" && state._tag === "Playing") {
+    // Reset scroll position when transitioning to Ready (reset button pressed)
+    if (prevStateTag.current !== "Ready" && state._tag === "Ready") {
+      hasInitialScroll.current = false
+      setScrollY(initialScrollValue.current)
+      setIsManualScrolling(false)
+      setShowManualScrollIndicator(false)
+    }
+    // Clear manual scroll when transitioning to Playing
+    else if (prevStateTag.current !== "Playing" && state._tag === "Playing") {
       setIsManualScrolling(false)
       setShowManualScrollIndicator(false)
     }
@@ -311,7 +317,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     if (Math.abs(initialV) < MIN_VELOCITY) {
       // Just snap back to bounds
       const maxScroll = getMaxScroll()
-      setScrollY(prev => Math.min(Math.max(prev, 0), maxScroll))
+      setScrollY(prev => Math.min(Math.max(prev, initialScrollValue.current), maxScroll))
       return
     }
 
@@ -341,7 +347,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       if (stop || Math.abs(v) < MIN_VELOCITY) {
         // Final clamp to bounds
         const maxScroll = getMaxScroll()
-        setScrollY(prev => Math.min(Math.max(prev, 0), maxScroll))
+        setScrollY(prev => Math.min(Math.max(prev, initialScrollValue.current), maxScroll))
         momentumRafIdRef.current = null
         return
       }
