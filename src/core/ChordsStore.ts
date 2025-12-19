@@ -36,7 +36,7 @@ const EMPTY_STATE: ChordsState = {
   error: null,
   errorUrl: null,
   transposeSemitones: 0,
-  showChords: true,
+  showChords: false,
   variableSpeedPainting: true,
 }
 
@@ -81,12 +81,12 @@ function saveToCache(songId: number, data: SongsterrChordData): void {
 }
 
 function loadShowChordsPreference(): boolean {
-  if (typeof window === "undefined") return true
+  if (typeof window === "undefined") return false
   try {
     const stored = localStorage.getItem(SHOW_CHORDS_KEY)
-    return stored === null ? true : stored === "true"
+    return stored === null ? false : stored === "true"
   } catch {
-    return true
+    return false
   }
 }
 

@@ -5,7 +5,7 @@ import { type MetronomeMode, useMetronome, useMetronomeControls } from "@/core"
 import { soundSystem } from "@/sounds"
 import { Eye, SpeakerHigh, SpeakerSlash, Waveform } from "@phosphor-icons/react"
 import { motion } from "motion/react"
-import { memo, useCallback, useRef } from "react"
+import { memo, useCallback, useEffect, useRef } from "react"
 import { MetronomeOrb } from "./MetronomeOrb"
 
 export interface MetronomeProps {
@@ -35,6 +35,11 @@ export const Metronome = memo(function Metronome({
   const { setMode, setMuted, setVolume, start, stop } = useMetronomeControls()
   const beatCountRef = useRef(0)
 
+  // Sync soundSystem volume with metronome store on mount and when volume changes
+  useEffect(() => {
+    soundSystem.setVolume(volume)
+  }, [volume])
+
   const handlePulse = useCallback(() => {
     if (mode === "visual" || isMuted) return
 
@@ -53,7 +58,9 @@ export const Metronome = memo(function Metronome({
 
   const handleVolumeChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      setVolume(Number.parseFloat(e.target.value))
+      const newVolume = Number.parseFloat(e.target.value)
+      setVolume(newVolume)
+      soundSystem.setVolume(newVolume)
     },
     [setVolume],
   )

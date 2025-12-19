@@ -1,7 +1,8 @@
 "use client"
 
 import { Data, Effect } from "effect"
-import * as Tone from "tone"
+
+type ToneModule = typeof import("tone")
 
 export class MicPermissionDenied extends Data.TaggedClass("MicPermissionDenied")<{
   readonly cause: unknown
@@ -22,12 +23,15 @@ export type AudioError = MicPermissionDenied | AudioNotInitialized
  * Reference: kitlangton/visual-effect TaskSounds.ts
  */
 class SoundSystem {
-  private synthClick: Tone.PolySynth | null = null
-  private synthNotification: Tone.PolySynth | null = null
-  private synthMetronome: Tone.PolySynth | null = null
+  private Tone = null as ToneModule | null
 
-  private reverb: Tone.Reverb | null = null
-  private volume: Tone.Volume | null = null
+  private synthClick = null
+  private synthNotification = null
+  private synthMetronome = null
+
+  private reverb = null
+  private volume = null
+  private desiredVolume = 0.5 // Store the desired volume before initialization
 
   private initialized = false
   private initializing: Effect.Effect<void, AudioNotInitialized> | null = null
@@ -36,6 +40,12 @@ class SoundSystem {
   private micStream: MediaStream | null = null
   private micSource: MediaStreamAudioSourceNode | null = null
   private analyser: AnalyserNode | null = null
+
+  private async getTone(): Promise<ToneModule> {
+    if (this.Tone) return this.Tone
+    this.Tone = await import("tone")
+    return this.Tone
+  }
 
   readonly initializeEffect: Effect.Effect<void, AudioNotInitialized> = Effect.gen(
     this,
@@ -48,6 +58,11 @@ class SoundSystem {
       }
 
       const doInit: Effect.Effect<void, AudioNotInitialized> = Effect.gen(this, function* () {
+        const Tone = yield* Effect.tryPromise({
+          try: () => this.getTone(),
+          catch: () => new AudioNotInitialized({}),
+        })
+
         yield* Effect.tryPromise({
           try: () => Tone.start(),
           catch: () => new AudioNotInitialized({}),
@@ -59,17 +74,20 @@ class SoundSystem {
         this.synthClick = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: "sine" },
           envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
-        } as Tone.SynthOptions).connect(this.reverb)
+        }).connect(this.reverb)
 
         this.synthNotification = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: "triangle" },
           envelope: { attack: 0.005, decay: 0.15, sustain: 0.05, release: 0.3 },
-        } as Tone.SynthOptions).connect(this.reverb)
+        }).connect(this.reverb)
 
         this.synthMetronome = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: "triangle" },
           envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
-        } as Tone.SynthOptions).connect(this.volume)
+        }).connect(this.volume)
+
+        // Apply desired volume after initialization
+        this.applyVolume()
 
         this.initialized = true
       })
@@ -96,8 +114,8 @@ class SoundSystem {
   })
 
   getAudioContext(): AudioContext | null {
-    if (!this.initialized) return null
-    return Tone.getContext().rawContext as AudioContext
+    if (!this.initialized || !this.Tone) return null
+    return this.Tone.getContext().rawContext as AudioContext
   }
 
   readonly getMicrophoneAnalyserEffect: Effect.Effect<AnalyserNode, AudioError> = Effect.gen(
@@ -164,7 +182,7 @@ class SoundSystem {
     this,
     function* () {
       const ready = yield* this.readyEffect
-      if (!ready) return
+      if (!ready || !this.Tone) return
       this.synthClick?.triggerAttackRelease("G5", "32n", undefined, 0.3)
     },
   )
@@ -177,8 +195,8 @@ class SoundSystem {
     this,
     function* () {
       const ready = yield* this.readyEffect
-      if (!ready) return
-      const now = Tone.now()
+      if (!ready || !this.Tone) return
+      const now = this.Tone.now()
       this.synthNotification?.triggerAttackRelease("C5", "16n", now, 0.4)
       this.synthNotification?.triggerAttackRelease("E5", "16n", now + 0.1, 0.4)
     },
@@ -192,8 +210,8 @@ class SoundSystem {
     this,
     function* () {
       const ready = yield* this.readyEffect
-      if (!ready) return
-      const now = Tone.now()
+      if (!ready || !this.Tone) return
+      const now = this.Tone.now()
       this.synthNotification?.triggerAttackRelease("C5", "16n", now, 0.4)
       this.synthNotification?.triggerAttackRelease("E5", "16n", now + 0.08, 0.4)
       this.synthNotification?.triggerAttackRelease("G5", "16n", now + 0.16, 0.4)
@@ -208,7 +226,7 @@ class SoundSystem {
     (accent = false) =>
       Effect.gen(this, function* () {
         const ready = yield* this.readyEffect
-        if (!ready) return
+        if (!ready || !this.Tone) return
         const note = accent ? "C5" : "G4"
         const velocity = accent ? 0.6 : 0.3
         this.synthMetronome?.triggerAttackRelease(note, "32n", undefined, velocity)
@@ -224,7 +242,7 @@ class SoundSystem {
     this,
     function* () {
       const ready = yield* this.readyEffect
-      if (!ready) return
+      if (!ready || !this.Tone) return
       this.synthClick?.triggerAttackRelease("E6", "64n", undefined, 0.2)
     },
   )
@@ -242,8 +260,13 @@ class SoundSystem {
   }
 
   setVolume(volume: number): void {
+    this.desiredVolume = Math.max(0, Math.min(1, volume))
+    this.applyVolume()
+  }
+
+  private applyVolume(): void {
     if (!this.volume) return
-    const db = volume === 0 ? Number.NEGATIVE_INFINITY : -40 + volume * 40
+    const db = this.desiredVolume === 0 ? Number.NEGATIVE_INFINITY : -40 + this.desiredVolume * 40
     this.volume.volume.value = db
   }
 

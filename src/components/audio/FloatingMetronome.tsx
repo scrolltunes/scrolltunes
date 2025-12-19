@@ -69,6 +69,11 @@ export const FloatingMetronome = memo(function FloatingMetronome({
     metronomeStore.initialize()
   }, [])
 
+  // Sync soundSystem volume with metronome store on mount and when volume changes
+  useEffect(() => {
+    soundSystem.setVolume(metronomeState.volume)
+  }, [metronomeState.volume])
+
   const hasApiBpm = bpm !== null && bpm > 0
   const effectiveBpm = hasApiBpm ? bpm : manualBpm
 
@@ -98,7 +103,9 @@ export const FloatingMetronome = memo(function FloatingMetronome({
 
   const handleVolumeChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      controls.setVolume(Number.parseFloat(e.target.value))
+      const newVolume = Number.parseFloat(e.target.value)
+      controls.setVolume(newVolume)
+      soundSystem.setVolume(newVolume)
     },
     [controls],
   )
