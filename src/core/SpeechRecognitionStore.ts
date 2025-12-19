@@ -1,7 +1,9 @@
 "use client"
 
-import { voiceActivityStore } from "@/core"
+import { VoiceActivityStore, type VoiceState } from "./VoiceActivityStore"
 import { soundSystem } from "@/sounds"
+import type { VADConfig } from "@/lib"
+import type { SileroVADConfig } from "@/lib/silero-vad-config"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
 
@@ -75,6 +77,29 @@ function speechLog(category: string, message: string, data?: Record<string, unkn
 
 const MAX_RECORDING_DURATION_MS = 10000
 const SAMPLE_RATE = 16000
+const VAD_END_SILENCE_FALLBACK_MS = 900
+const VAD_POST_END_PAD_MS = 150
+
+// Speech-specific VAD tuning (no guitar): more sensitive energy gate, no burst suppression
+const VOICE_SEARCH_VAD_CONFIG: VADConfig = {
+  thresholdOn: 0.065,
+  thresholdOff: 0.04,
+  holdTimeMs: 160,
+  smoothingFactor: 0.12,
+  burstPeakThreshold: 1,
+  burstDecayThreshold: 1,
+  burstWindowMs: 150,
+}
+
+const VOICE_SEARCH_SILERO_CONFIG: Partial<SileroVADConfig> = {
+  positiveSpeechThreshold: 0.5, // easier to trigger on whispers
+  negativeSpeechThreshold: 0.3,
+  minSpeechMs: 150,
+  redemptionMs: 900,
+}
+
+// Dedicated VAD instance for voice search (keeps singing VAD isolated)
+export const voiceSearchVADStore = new VoiceActivityStore()
 
 // --- SpeechRecognitionStore Class ---
 
@@ -105,7 +130,11 @@ export class SpeechRecognitionStore {
 
   // VAD integration
   private hasDetectedSpeech = false
+  private lastSpeechAt: number | null = null
+  private utteranceSilenceMs = VAD_END_SILENCE_FALLBACK_MS
+  private utteranceStopTimeoutId: ReturnType<typeof setTimeout> | null = null
   private vadUnsubscribe: (() => void) | null = null
+  private vadStateUnsubscribe: (() => void) | null = null
 
   // --- Observable pattern ---
 
@@ -424,56 +453,139 @@ export class SpeechRecognitionStore {
     }
   }
 
+  private clearUtteranceStopTimer(): void {
+    if (this.utteranceStopTimeoutId !== null) {
+      clearTimeout(this.utteranceStopTimeoutId)
+      this.utteranceStopTimeoutId = null
+    }
+  }
+
+  private scheduleUtteranceStop(
+    reason: "vad_stop" | "silence_timeout",
+    delayMs = VAD_POST_END_PAD_MS,
+  ): void {
+    if (!this.state.isRecording) return
+    if (this.utteranceStopTimeoutId !== null) return
+    this.utteranceStopTimeoutId = setTimeout(() => {
+      this.utteranceStopTimeoutId = null
+      this.setState({ isAutoStopping: true })
+      speechLog("VAD", "Auto-stopping recording after VAD silence", {
+        reason,
+        delayMs,
+      })
+      this.handleStopRecognition()
+    }, delayMs)
+  }
+
   // --- VAD integration ---
 
   private async setupVADIntegration(): Promise<void> {
     speechLog("VAD", "Setting up voice activity detection for auto-stop")
 
     this.hasDetectedSpeech = false
-
-    voiceActivityStore.setSileroPreset("voice-search")
-    voiceActivityStore.setAndGateEnabled(false) // Disable AND-gate for voice search (no guitar)
+    this.lastSpeechAt = null
+    this.clearUtteranceStopTimer()
+    voiceSearchVADStore.setSileroPreset("voice-search")
+    voiceSearchVADStore.setSileroConfig(VOICE_SEARCH_SILERO_CONFIG)
+    voiceSearchVADStore.setConfig(VOICE_SEARCH_VAD_CONFIG)
+    voiceSearchVADStore.setAndGateEnabled(false) // Disable AND-gate for voice search (no guitar)
+    this.utteranceSilenceMs = Math.max(
+      voiceSearchVADStore.getSileroConfig().redemptionMs,
+      VAD_END_SILENCE_FALLBACK_MS,
+    )
 
     // Subscribe BEFORE starting listening to catch all events
     let wasSpeaking = false
-    this.vadUnsubscribe = voiceActivityStore.subscribeToVoiceEvents(() => {
-      const state = voiceActivityStore.getSnapshot()
+    const levelStartThreshold = Math.max(VOICE_SEARCH_VAD_CONFIG.thresholdOn * 0.8, 0.03)
+    this.vadUnsubscribe = voiceSearchVADStore.subscribeToVoiceEvents(() => {
+      const state = voiceSearchVADStore.getSnapshot()
       speechLog("VAD", "Voice event received", {
         isSpeaking: state.isSpeaking,
         wasSpeaking,
         hasDetectedSpeech: this.hasDetectedSpeech,
         isRecording: this.state.isRecording,
+        lastSpeechAt: this.lastSpeechAt,
       })
 
       if (state.isSpeaking && !wasSpeaking) {
         speechLog("VAD", "Voice activity detected - speech started")
         this.hasDetectedSpeech = true
+        this.lastSpeechAt = Date.now()
         this.clearMaxDurationTimeout()
       } else if (!state.isSpeaking && wasSpeaking && this.hasDetectedSpeech) {
-        speechLog("VAD", "Voice activity stopped after speech - auto-stopping recording")
-        this.setState({ isAutoStopping: true })
-        this.handleStopRecognition()
+        speechLog("VAD", "Voice activity stopped after speech - scheduling auto-stop", {
+          silenceMs: this.utteranceSilenceMs,
+        })
+        this.scheduleUtteranceStop("vad_stop")
       }
 
       wasSpeaking = state.isSpeaking
     })
 
+    this.vadStateUnsubscribe = voiceSearchVADStore.subscribe(() => {
+      if (!this.state.isRecording) return
+      const state = voiceSearchVADStore.getSnapshot()
+      const now = Date.now()
+
+      const hasPendingStop = this.utteranceStopTimeoutId !== null
+      const effectiveLevelThreshold = hasPendingStop
+        ? Math.max(levelStartThreshold * 2, 0.06) // avoid canceling pending stop on tiny blips
+        : levelStartThreshold
+      const levelTriggered = state.level >= effectiveLevelThreshold
+
+      if (state.isSpeaking || levelTriggered) {
+        if (!this.hasDetectedSpeech && levelTriggered) {
+          speechLog("VAD", "Level-based speech start (fallback)", {
+            level: state.level.toFixed(3),
+            threshold: effectiveLevelThreshold,
+          })
+          this.hasDetectedSpeech = true
+          this.clearMaxDurationTimeout()
+        }
+        this.lastSpeechAt = now
+        this.clearUtteranceStopTimer()
+        return
+      }
+
+      if (!this.hasDetectedSpeech || this.lastSpeechAt === null) return
+
+      const silenceMs = now - this.lastSpeechAt
+      if (silenceMs >= this.utteranceSilenceMs) {
+        speechLog("VAD", "Silence window exceeded - auto-stopping recording", {
+          silenceMs,
+          target: this.utteranceSilenceMs,
+        })
+        this.scheduleUtteranceStop("silence_timeout")
+      } else if (!this.utteranceStopTimeoutId) {
+        const remaining = Math.max(this.utteranceSilenceMs - silenceMs, VAD_POST_END_PAD_MS)
+        this.scheduleUtteranceStop("silence_timeout", remaining)
+      }
+    })
+
     // Start listening after subscription is set up
-    await voiceActivityStore.startListening()
+    await voiceSearchVADStore.startListening()
     speechLog("VAD", "VAD listening started", {
-      isListening: voiceActivityStore.getSnapshot().isListening,
+      isListening: voiceSearchVADStore.getSnapshot().isListening,
+      silenceWindowMs: this.utteranceSilenceMs,
     })
   }
 
   private cleanupVADIntegration(): void {
+    this.clearUtteranceStopTimer()
+    this.lastSpeechAt = null
     if (this.vadUnsubscribe) {
       this.vadUnsubscribe()
       this.vadUnsubscribe = null
     }
+    if (this.vadStateUnsubscribe) {
+      this.vadStateUnsubscribe()
+      this.vadStateUnsubscribe = null
+    }
 
-    voiceActivityStore.stopListening()
-    voiceActivityStore.setAndGateEnabled(true) // Re-enable AND-gate for normal use
+    voiceSearchVADStore.stopListening()
+    voiceSearchVADStore.setAndGateEnabled(false)
     this.hasDetectedSpeech = false
+    this.utteranceSilenceMs = VAD_END_SILENCE_FALLBACK_MS
   }
 
   // --- Stop recognition ---
@@ -483,6 +595,7 @@ export class SpeechRecognitionStore {
 
     // Clear max duration timeout
     this.clearMaxDurationTimeout()
+    this.clearUtteranceStopTimer()
 
     // Cleanup VAD
     this.cleanupVADIntegration()
@@ -634,6 +747,16 @@ export function useSpeechState(): SpeechState {
     speechRecognitionStore.subscribe,
     speechRecognitionStore.getSnapshot,
     () => DEFAULT_STATE,
+  )
+}
+
+const DEFAULT_VOICE_SEARCH_VAD_STATE: VoiceState = voiceSearchVADStore.getSnapshot()
+
+export function useVoiceSearchVADState(): VoiceState {
+  return useSyncExternalStore(
+    voiceSearchVADStore.subscribe,
+    voiceSearchVADStore.getSnapshot,
+    () => DEFAULT_VOICE_SEARCH_VAD_STATE,
   )
 }
 

@@ -78,7 +78,7 @@ function isDevMode(): boolean {
 const DEV_VAD_LOGS_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DEV_VAD_LOGS === "true"
 
 function vadLog(category: string, message: string, data?: Record<string, unknown>): void {
-  if (!isDevMode()) return
+  if (!isDevMode() || !DEV_VAD_LOGS_ENABLED) return
   const timestamp = new Date().toISOString().substring(11, 23)
   const dataStr = data ? ` ${JSON.stringify(data)}` : ""
   console.log(`[VAD ${timestamp}] [${category}] ${message}${dataStr}`)

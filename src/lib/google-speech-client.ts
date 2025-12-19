@@ -21,20 +21,35 @@ export interface RecognitionResult {
   readonly languageCode: string | null
 }
 
+function normalizePrivateKey(raw: string): string {
+  const unescaped = raw.replace(/\\n/g, "\n").trim()
+  const hasNewlines = unescaped.includes("\n")
+  if (hasNewlines) return unescaped
+
+  // Add PEM line breaks if the key was pasted as a single line
+  const withHeader = unescaped.replace(
+    /^-----BEGIN PRIVATE KEY-----/,
+    "-----BEGIN PRIVATE KEY-----\n",
+  )
+  const withFooter = withHeader.replace(/-----END PRIVATE KEY-----$/, "\n-----END PRIVATE KEY-----")
+  return `${withFooter}\n`
+}
+
 // Create a configured speech client
 export function createSpeechClient(): Effect.Effect<SpeechClient, Error> {
   return Effect.try({
     try: () => {
       const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID
       const clientEmail = process.env.GOOGLE_CLOUD_CLIENT_EMAIL
-      const privateKey = process.env.GOOGLE_CLOUD_PRIVATE_KEY
+      const privateKeyRaw = process.env.GOOGLE_CLOUD_PRIVATE_KEY
+      const privateKey = privateKeyRaw ? normalizePrivateKey(privateKeyRaw) : null
 
       if (projectId && clientEmail && privateKey) {
         return new SpeechClient({
           projectId,
           credentials: {
             client_email: clientEmail,
-            private_key: privateKey.replace(/\\n/g, "\n"),
+            private_key: privateKey,
           },
         })
       }

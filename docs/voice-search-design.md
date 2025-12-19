@@ -269,6 +269,16 @@ useEffect(() => {
 }, [finalTranscript, searchTracks])
 ```
 
+**End-of-utterance detection**
+- Voice search uses the Silero `voice-search` preset with whisper-friendly tuning (start ~0.5 / stop 0.3, 150 ms min speech, ~0.9 s redemption) and the AND-gate disabled.
+- Energy fallback is re-tuned for spoken queries (0.065 on / 0.04 off, faster smoothing) and does not apply burst suppression.
+- We stop recording when VAD reports `VoiceStop` or when silence exceeds the current Silero `redemptionMs` (~0.9 s, min 0.9 s fallback), then send the buffered audio to Google STT and push the transcript into the search box.
+- Singing/guitar VAD stays untouched because voice search runs on its own store instance with separate tuning and gating.
+
+**Quota handling**
+- Client calls `/api/voice-search/quota` and caches the result for 30s; a prefetch runs once when the voice search hook mounts to avoid first-tap latency.
+- Server enforces quota in `/api/voice-search/transcribe`; on success it increments usage for the user (duration-based). On exhaustion the client shows the quota error and disables the mic.
+
 ## Error Handling
 
 ### Error Messages (imperative, no period)

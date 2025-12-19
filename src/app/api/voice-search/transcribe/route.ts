@@ -46,8 +46,17 @@ function transcribeAudio(
       decodingConfig: "auto",
     })
 
-    const recognizeConfig = createRecognizeConfig({
-      languageHints: languageHints ?? ["en-US"],
+    const recognizeConfig = yield* Effect.try({
+      try: () =>
+        createRecognizeConfig({
+          languageHints: languageHints ?? ["en-US"],
+        }),
+      catch: err =>
+        new SpeechAPIError({
+          code: "CONFIG",
+          message:
+            err instanceof Error ? err.message : "Failed to build recognition config (missing env?)",
+        }),
     })
 
     // V2 API expects content as Uint8Array for gRPC clients (binary format, not base64)
@@ -177,7 +186,7 @@ export async function POST(
       if (error instanceof SpeechAPIError) {
         console.error("Speech API error:", error.code, error.message)
         return NextResponse.json(
-          { error: "Speech recognition failed", code: error.code },
+          { error: error.message ?? "Speech recognition failed", code: error.code },
           { status: 502 },
         )
       }
