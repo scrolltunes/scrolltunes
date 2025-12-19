@@ -10,6 +10,7 @@ interface MetadataPreview {
   title: string
   artist: string
   albumArt: string | null
+  description: string
   url: string
 }
 
@@ -44,11 +45,13 @@ export default function MetadataPreviewPage() {
 
         const { title, artist } = data.lyrics
         const albumArt = data.albumArt
+        const description = `Perform ${title} hands-free with synced scrolling lyrics on ScrollTunes`
 
         setPreview({
           title,
           artist,
           albumArt,
+          description,
           url: `https://scrolltunes.com/song/demo/${title.toLowerCase().replace(/\s+/g, "-")}-${selectedId}`,
         })
       } catch (err) {
@@ -182,6 +185,7 @@ export default function MetadataPreviewPage() {
               </summary>
               <pre className="mt-4 text-xs text-neutral-400 overflow-x-auto bg-neutral-950 p-3 rounded border border-neutral-800">
 {`<meta property="og:title" content="${preview.title} — ${preview.artist}" />
+<meta property="og:description" content="${preview.description}" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="${preview.url}" />
 ${preview.albumArt ? `<meta property="og:image" content="${preview.albumArt}" />
@@ -189,6 +193,7 @@ ${preview.albumArt ? `<meta property="og:image" content="${preview.albumArt}" />
 <meta property="og:image:height" content="300" />` : ""}
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="${preview.title} — ${preview.artist}" />
+<meta name="twitter:description" content="${preview.description}" />
 ${preview.albumArt ? `<meta name="twitter:image" content="${preview.albumArt}" />` : ""}`}
               </pre>
             </details>
