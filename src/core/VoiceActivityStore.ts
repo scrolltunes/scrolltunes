@@ -69,7 +69,9 @@ export class VADError extends Data.TaggedClass("VADError")<{
 
 function isDevMode(): boolean {
   if (typeof window === "undefined") return false
-  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  const isNotProduction = process.env.NEXT_PUBLIC_VERCEL_ENV !== "production"
+  return isDev || isNotProduction
 }
 
 function vadLog(category: string, message: string, data?: Record<string, unknown>): void {
