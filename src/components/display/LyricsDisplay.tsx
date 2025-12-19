@@ -435,6 +435,14 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     [jumpToLine],
   )
 
+  // Blur the focused line when player state changes to avoid persistent focus ring
+  useEffect(() => {
+    const focused = document.activeElement as HTMLElement
+    if (focused && focused.tagName === "BUTTON" && lineRefs.current.includes(focused as HTMLButtonElement)) {
+      focused.blur()
+    }
+  }, [state._tag])
+
   if (!lyrics) {
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>

@@ -1,6 +1,7 @@
 "use client"
 
 import { usePlayerControls, usePlayerState } from "@/core"
+import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 export interface UseKeyboardShortcutsOptions {
@@ -20,6 +21,7 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
   const { enabled = true, seekAmount = 5, tempoStep = 0.1 } = options ?? {}
   const state = usePlayerState()
   const { play, pause, reset, seek, setScrollSpeed, getScrollSpeed } = usePlayerControls()
+  const router = useRouter()
 
   useEffect(() => {
     if (!enabled) return
@@ -93,6 +95,11 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
           }
           break
         }
+        case "Backspace": {
+          event.preventDefault()
+          router.back()
+          break
+        }
       }
     }
 
@@ -109,5 +116,6 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
     seek,
     setScrollSpeed,
     getScrollSpeed,
+    router,
   ])
 }
