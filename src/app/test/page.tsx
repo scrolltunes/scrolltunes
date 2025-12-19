@@ -21,6 +21,11 @@ const testPages: TestPageLink[] = [
     title: "Report Issue Dialog",
     description: "Test error reporting scenarios: missing BPM and chords fetch errors",
   },
+  {
+    href: "/test/metadata-preview",
+    title: "Song Metadata Preview",
+    description: "Preview Open Graph and Twitter Card unfurls for shared song links with album art",
+  },
 ]
 
 export default function TestLandingPage() {
