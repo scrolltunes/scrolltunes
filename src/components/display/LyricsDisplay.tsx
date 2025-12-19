@@ -20,9 +20,9 @@ import { LyricLine } from "./LyricLine"
 const SCROLL_INDICATOR_TIMEOUT = 3000 // Hide manual scroll badge after 3 seconds
 const RUBBERBAND_RESISTANCE = 0.3 // How much resistance when overscrolling (0-1)
 const MAX_OVERSCROLL = 100 // Maximum pixels of overscroll before full resistance
-const MOMENTUM_FRICTION = 0.003 // Velocity decay rate (higher = faster stop)
-const MIN_VELOCITY = 0.015 // Minimum velocity to continue momentum (pixels/ms)
-const MAX_VELOCITY = 3.5 // Maximum velocity clamp (pixels/ms)
+const MOMENTUM_FRICTION = 0.0015 // Velocity decay rate (higher = faster stop)
+const MIN_VELOCITY = 0.005 // Minimum velocity to continue momentum (pixels/ms)
+const MAX_VELOCITY = 5 // Maximum velocity clamp (pixels/ms)
 
 const isEmptyLine = (text: string): boolean => {
   const trimmed = text.trim()
@@ -224,8 +224,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     }
     prevStateTag.current = state._tag
   }, [state._tag])
-
-
 
   // Update scroll position when current line changes (only during active playback)
   useEffect(() => {
@@ -468,7 +466,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
         ref={contentRef}
         className="py-[50vh] max-w-4xl mx-auto"
         animate={{ y: -scrollY }}
-        transition={isAutoScrollEnabled ? { type: "tween", duration: 0 } : springs.scroll}
+        transition={springs.scroll}
       >
         {lyrics.lines.map((line, index) => {
           const isActive = index === activeLineIndex
