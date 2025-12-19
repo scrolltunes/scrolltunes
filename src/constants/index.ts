@@ -11,10 +11,10 @@ export const MIN_SCROLL_SPEED = 0.5
 export const MAX_SCROLL_SPEED = 2.0
 
 // Voice detection defaults
-export const VAD_THRESHOLD_ON = 0.15
-export const VAD_THRESHOLD_OFF = 0.08
+export const VAD_THRESHOLD_ON = 0.16
+export const VAD_THRESHOLD_OFF = 0.09
 export const VAD_HOLD_TIME_MS = 150
-export const VAD_SMOOTHING_FACTOR = 0.3
+export const VAD_SMOOTHING_FACTOR = 0.2
 
 // UI constants
 export const LYRICS_LINE_HEIGHT = 1.8

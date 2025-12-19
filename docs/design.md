@@ -47,6 +47,13 @@ Live musicians and karaoke performers need a lyrics teleprompter that syncs to t
 - **False positives** — Guitar strums or audience noise triggering early? Need robust voice-vs-instrument discrimination
 - **Manual override** — Tap to re-sync if detection fails?
 
+## Recent VAD tuning (dev)
+
+- Silero guitar preset: threshold 0.88, minSpeechMs 250, negative 0.7, redemption 500; starts require smoothed >= threshold, defer releases after energy gate opens, plus preroll release when raw >= 0.95 and smoothed >= 0.75 (max 600ms defer)
+- Energy gate: on 0.16, off 0.09, hold 150ms, smoothing 0.2; burst suppression: peak 0.35, decay 0.18, window 500ms
+- Dev-only VAD server logs are gated by `NEXT_PUBLIC_ENABLE_DEV_VAD_LOGS=true` (in addition to NODE_ENV guard); keep disabled in production/staging
+- Goal: allow soft vocal onsets (e.g., “another turning”) while blocking guitar-only strums; if false starts return, raise energy on-threshold slightly; if missed soft onsets return, drop Silero threshold marginally
+
 ---
 
 ## Backlog / Future Features

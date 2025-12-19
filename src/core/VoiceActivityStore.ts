@@ -69,16 +69,86 @@ export class VADError extends Data.TaggedClass("VADError")<{
 
 function isDevMode(): boolean {
   if (typeof window === "undefined") return false
+  if (process.env.NODE_ENV !== "production") return true
   const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   const isNotProduction = process.env.NEXT_PUBLIC_VERCEL_ENV !== "production"
   return isDev || isNotProduction
 }
+
+const DEV_VAD_LOGS_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DEV_VAD_LOGS === "true"
 
 function vadLog(category: string, message: string, data?: Record<string, unknown>): void {
   if (!isDevMode()) return
   const timestamp = new Date().toISOString().substring(11, 23)
   const dataStr = data ? ` ${JSON.stringify(data)}` : ""
   console.log(`[VAD ${timestamp}] [${category}] ${message}${dataStr}`)
+
+  queueServerVADLog({
+    category,
+    message,
+    isoTime: new Date().toISOString(),
+    ...(data ? { data } : {}),
+  })
+}
+
+type ServerVADLogEntry = {
+  readonly category: string
+  readonly message: string
+  readonly data?: Record<string, unknown>
+  readonly isoTime: string
+}
+
+let serverLogQueue: ServerVADLogEntry[] = []
+let serverLogFlushTimer: number | null = null
+
+function queueServerVADLog(entry: ServerVADLogEntry): void {
+  if (typeof window === "undefined") return
+  if (process.env.NODE_ENV === "production") return
+  if (!DEV_VAD_LOGS_ENABLED) return
+
+  if (serverLogQueue.length >= 200) {
+    serverLogQueue = serverLogQueue.slice(-100)
+  }
+  serverLogQueue.push(entry)
+
+  if (serverLogFlushTimer !== null) return
+  serverLogFlushTimer = window.setTimeout(() => {
+    serverLogFlushTimer = null
+    flushServerVADLogs()
+  }, 250)
+}
+
+function flushServerVADLogs(): void {
+  if (typeof window === "undefined") return
+  if (serverLogQueue.length === 0) return
+
+  const entries = serverLogQueue
+  serverLogQueue = []
+
+  const body = JSON.stringify({ entries })
+
+  if (navigator.sendBeacon) {
+    const ok = navigator.sendBeacon("/api/dev/vad-log", new Blob([body], { type: "application/json" }))
+    if (ok) return
+  }
+
+  void fetch("/api/dev/vad-log", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body,
+    keepalive: true,
+  }).catch(() => {
+    serverLogQueue = entries.slice(-100).concat(serverLogQueue).slice(-200)
+  })
+}
+
+function formatErrorForLog(error: unknown): string {
+  if (error instanceof Error) return `${error.name}: ${error.message}`
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
 }
 
 // --- VoiceActivityStore Class ---
@@ -110,6 +180,7 @@ export class VoiceActivityStore {
   private sileroEngine: SileroVADEngine | null = null
   private lastSileroLevelUpdateAt = 0
   private smoothedSileroLevel = 0
+  private pendingSileroStartAt: number | null = null
 
   // Energy-based fallback / parallel monitoring
   private analyser: AnalyserNode | null = null
@@ -225,82 +296,147 @@ export class VoiceActivityStore {
         return false
       }
 
-      vadLog("SILERO", "Initializing Silero VAD engine...", {
-        threshold: this.sileroConfig.positiveSpeechThreshold,
-        minSpeechMs: this.sileroConfig.minSpeechMs,
-      })
+            vadLog("SILERO", "Initializing Silero VAD engine...", {
+              threshold: this.sileroConfig.positiveSpeechThreshold,
+              minSpeechMs: this.sileroConfig.minSpeechMs,
+            })
 
       this.sileroEngine = new SileroVADEngine()
 
-      yield* _(
-        Effect.mapError(
-          this.sileroEngine.initialize(this.sileroConfig, {
-            onSpeechStart: () => {
-              if (!this.state.isListening) return // Guard against ghost events
+      const initEffect = Effect.mapError(
+        this.sileroEngine.initialize(this.sileroConfig, {
+          onSpeechStart: () => {
+            if (!this.state.isListening) return // Guard against ghost events
 
-              const now = Date.now()
+            const now = Date.now()
+            const smoothedNow = this.smoothedSileroLevel
 
-              // Check burst window (guitar transient detected)
-              if (isInBurstWindow(this.runtime, now)) {
-                vadLog("SILERO", "Speech start ignored - in burst window (likely guitar)", {
-                  burstUntil: this.runtime.burstDetectedUntil,
-                })
-                return
-              }
+            // Check burst window (guitar transient detected)
+            if (isInBurstWindow(this.runtime, now)) {
+              vadLog("SILERO", "Speech start ignored - in burst window (likely guitar)", {
+                burstUntil: this.runtime.burstDetectedUntil,
+              })
+              return
+            }
 
-              // AND-gate: require energy VAD to also detect speech (can be disabled for voice search)
-              if (this.andGateEnabled && !this.isEnergySpeaking) {
-                vadLog("SILERO", "Speech start ignored - energy gate not speaking", {
-                  threshold: this.sileroConfig.positiveSpeechThreshold,
-                  level: this.smoothedSileroLevel.toFixed(3),
-                })
-                return
-              }
-
-              vadLog("SILERO", "🎤 SPEECH START detected (all gates passed)", {
+            // Require smoothed probability to clear threshold; otherwise defer and wait
+            if (smoothedNow < this.sileroConfig.positiveSpeechThreshold) {
+              this.pendingSileroStartAt = this.pendingSileroStartAt ?? now
+              vadLog("SILERO", "Speech start deferred - smoothed below threshold", {
+                level: smoothedNow.toFixed(3),
                 threshold: this.sileroConfig.positiveSpeechThreshold,
-                level: this.smoothedSileroLevel.toFixed(3),
-                energySpeaking: this.isEnergySpeaking,
               })
-              Effect.runPromise(
-                Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void),
-              )
-            },
-            onSpeechEnd: () => {
-              if (!this.state.isListening) return
-              vadLog("SILERO", "🔇 SPEECH END detected", {
-                threshold: this.sileroConfig.negativeSpeechThreshold,
-              })
-              Effect.runSync(this.dispatch(new VoiceStop({})))
-            },
-            onFrameProcessed: ({ isSpeech }) => {
-              if (!this.state.isListening) return
+              return
+            }
 
-              // Throttle level updates to 50ms
+            // AND-gate: require energy VAD to also detect speech (can be disabled for voice search)
+            if (this.andGateEnabled && !this.isEnergySpeaking) {
+              const overrideThreshold = this.sileroConfig.positiveSpeechThreshold
               const now = Date.now()
-              if (now - this.lastSileroLevelUpdateAt < 50) return
-              this.lastSileroLevelUpdateAt = now
+              this.pendingSileroStartAt = this.pendingSileroStartAt ?? now
+              const smoothedOverride = this.smoothedSileroLevel >= overrideThreshold
+              if (this.pendingSileroStartAt === null) {
+                this.pendingSileroStartAt = now
+              }
+              // If smoothed already exceeds threshold, note the high-confidence defer
+              if (smoothedOverride) {
+                vadLog("SILERO", "Speech start deferred (smoothed above threshold, waiting energy)", {
+                  level: this.smoothedSileroLevel.toFixed(3),
+                  overrideThreshold: overrideThreshold.toFixed(3),
+                })
+              } else {
+                vadLog("SILERO", "Speech start deferred (smoothed below threshold, waiting energy)", {
+                  level: this.smoothedSileroLevel.toFixed(3),
+                  overrideThreshold: overrideThreshold.toFixed(3),
+                })
+              }
+              return
+            }
 
-              // Exponential smoothing
-              this.smoothedSileroLevel = smoothLevel(this.smoothedSileroLevel, isSpeech, 0.3)
+            vadLog("SILERO", "🎤 SPEECH START detected (all gates passed)", {
+              threshold: this.sileroConfig.positiveSpeechThreshold,
+              level: this.smoothedSileroLevel.toFixed(3),
+              energySpeaking: this.isEnergySpeaking,
+            })
+            Effect.runPromise(Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void))
+          },
+          onSpeechEnd: () => {
+            if (!this.state.isListening) return
+            vadLog("SILERO", "🔇 SPEECH END detected", {
+              threshold: this.sileroConfig.negativeSpeechThreshold,
+            })
+            this.pendingSileroStartAt = null
+            Effect.runSync(this.dispatch(new VoiceStop({})))
+          },
+          onFrameProcessed: ({ isSpeech }) => {
+            if (!this.state.isListening) return
 
-              // Log significant probability values for tuning
-              if (isSpeech > 0.3) {
-                vadLog("FRAME", `Speech probability: ${isSpeech.toFixed(3)}`, {
+            this.smoothedSileroLevel = smoothLevel(this.smoothedSileroLevel, isSpeech, 0.3)
+
+            // Throttle level/log updates to ~20 FPS to avoid noisy spam
+            const now = Date.now()
+            if (now - this.lastSileroLevelUpdateAt < 50) return
+            this.lastSileroLevelUpdateAt = now
+
+            // Log significant probability values for tuning
+            if (isSpeech > 0.3) {
+              vadLog("FRAME", `Speech probability: ${isSpeech.toFixed(3)}`, {
+                smoothed: this.smoothedSileroLevel.toFixed(3),
+                threshold: this.sileroConfig.positiveSpeechThreshold,
+                wouldTrigger: isSpeech >= this.sileroConfig.positiveSpeechThreshold,
+              })
+            }
+
+            // Release deferred start once energy gate catches up and probability stays high
+            if (this.pendingSileroStartAt !== null) {
+              const age = now - this.pendingSileroStartAt
+              const shouldRelease =
+                this.isEnergySpeaking &&
+                !isInBurstWindow(this.runtime, now) &&
+                this.smoothedSileroLevel >= this.sileroConfig.positiveSpeechThreshold &&
+                age <= 600
+
+              // Preroll release: allow high raw probability with moderate smoothed to start immediately
+              const prerelease =
+                this.isEnergySpeaking &&
+                !isInBurstWindow(this.runtime, now) &&
+                isSpeech >= 0.95 &&
+                this.smoothedSileroLevel >= 0.75
+
+              if (shouldRelease) {
+                this.pendingSileroStartAt = null
+                vadLog("SILERO", "Speech start released after energy gate opened", {
+                  level: this.smoothedSileroLevel.toFixed(3),
+                  threshold: this.sileroConfig.positiveSpeechThreshold,
+                })
+                Effect.runPromise(Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void))
+              } else if (prerelease) {
+                this.pendingSileroStartAt = null
+                vadLog("SILERO", "Speech start preroll release (high raw prob)", {
+                  raw: isSpeech.toFixed(3),
                   smoothed: this.smoothedSileroLevel.toFixed(3),
                   threshold: this.sileroConfig.positiveSpeechThreshold,
-                  wouldTrigger: isSpeech >= this.sileroConfig.positiveSpeechThreshold,
                 })
+                Effect.runPromise(Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void))
+              } else if (age > 600) {
+                this.pendingSileroStartAt = null
               }
+            }
 
-              Effect.runSync(this.dispatch(new UpdateLevel({ level: this.smoothedSileroLevel })))
-            },
-          }),
-          e => new VADError({ cause: e }),
-        ),
+            Effect.runSync(this.dispatch(new UpdateLevel({ level: this.smoothedSileroLevel })))
+          },
+        }),
+        e => new VADError({ cause: e }),
       )
 
-      yield* _(Effect.mapError(this.sileroEngine.start(), e => new VADError({ cause: e })))
+      yield* _(initEffect)
+
+      const startEffect = Effect.mapError(
+        this.sileroEngine.start(),
+        e => new VADError({ cause: e }),
+      )
+
+      yield* _(startEffect)
 
       vadLog("SILERO", "✅ Silero VAD started successfully")
 
@@ -370,6 +506,9 @@ export class VoiceActivityStore {
       // Update isEnergySpeaking for AND-gate, but do NOT dispatch VoiceStart/VoiceStop
       if (prevSpeaking !== nextRuntime.isSpeaking) {
         this.isEnergySpeaking = nextRuntime.isSpeaking
+        if (!this.isEnergySpeaking) {
+          this.pendingSileroStartAt = null
+        }
         vadLog("ENERGY-GATE", `Energy speaking state: ${this.isEnergySpeaking}`, {
           level: smoothed.toFixed(3),
           threshold: this.config.thresholdOn,
@@ -408,13 +547,20 @@ export class VoiceActivityStore {
     function* (_) {
       if (this.state.isListening) return
 
-      vadLog("START", "Starting voice detection...")
+      vadLog("START", "Starting voice detection...", {
+        permissionStatus: this.state.permissionStatus,
+      })
 
       // Try Silero first
       const sileroStarted = yield* _(
         Effect.catchAll(this.tryStartSilero(), e => {
           vadLog("SILERO", "⚠️ Silero VAD failed to start, falling back to energy-based", {
-            error: String(e),
+            error: formatErrorForLog(e),
+            cause: formatErrorForLog(e.cause),
+            causeTag:
+              e.cause && typeof e.cause === "object" && "_tag" in e.cause
+                ? String((e.cause as { _tag?: unknown })._tag)
+                : null,
           })
           return Effect.succeed(false)
         }),
@@ -557,6 +703,7 @@ export class VoiceActivityStore {
         return Effect.void
       }),
     )
+    vadLog("CLIENT", "startListening() called (promise resolved)")
   }
 
   stopListening(): void {

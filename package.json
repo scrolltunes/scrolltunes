@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -H 0.0.0.0",
+    "dev:https": "node scripts/dev-https.js",
     "build": "next build",
     "start": "next start",
     "lint": "biome lint .",
@@ -46,6 +47,7 @@
     "@vitejs/plugin-react": "^4",
     "@vitest/ui": "^3",
     "drizzle-kit": "^0.31.8",
+    "http-proxy": "^1.18.1",
     "jsdom": "^26",
     "tailwindcss": "^4",
     "typescript": "^5",

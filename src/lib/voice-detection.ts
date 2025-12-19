@@ -44,9 +44,9 @@ export const DEFAULT_VAD_CONFIG: VADConfig = {
   thresholdOff: VAD_THRESHOLD_OFF,
   holdTimeMs: VAD_HOLD_TIME_MS,
   smoothingFactor: VAD_SMOOTHING_FACTOR,
-  burstPeakThreshold: 0.4,
-  burstDecayThreshold: 0.2,
-  burstWindowMs: 300,
+  burstPeakThreshold: 0.35,
+  burstDecayThreshold: 0.18,
+  burstWindowMs: 500,
 }
 
 /**
@@ -112,8 +112,8 @@ export function detectBurst(
     }
   }
 
-  // Track new peaks
-  if (level > lastPeakLevel) {
+  // Track new peaks with a small grace margin to allow rising singing to supersede a guitar transient
+  if (level > lastPeakLevel * 0.9) {
     return {
       ...runtime,
       lastPeakLevel: level,
@@ -121,9 +121,9 @@ export function detectBurst(
     }
   }
 
-  // Detect burst: 150-350ms since peak, peak was significant, and rapid decay occurred
+  // Detect burst: 120-500ms since peak, peak was significant, and rapid decay occurred
   const decay = lastPeakLevel - level
-  const isInBurstDetectionWindow = timeSincePeak >= 150 && timeSincePeak <= 350
+  const isInBurstDetectionWindow = timeSincePeak >= 120 && timeSincePeak <= 500
   const peakWasSignificant = lastPeakLevel > config.burstPeakThreshold
   const hasRapidDecay = decay > config.burstDecayThreshold
 
