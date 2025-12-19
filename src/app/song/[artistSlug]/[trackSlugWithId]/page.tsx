@@ -11,6 +11,7 @@ import { AddToSetlistModal } from "@/components/setlists"
 import {
   type Lyrics,
   chordsStore,
+  metronomeStore,
   recentSongsStore,
   useChordsState,
   usePlayerControls,
@@ -124,7 +125,7 @@ export default function SongPage() {
 
   const isLoaded = loadState._tag === "Loaded"
 
-  // Stop playback and voice detection when navigating away (unmount only)
+  // Stop playback, voice detection, and metronome when navigating away (unmount only)
   const resetRef = useRef(reset)
   const stopListeningRef = useRef(stopListening)
   resetRef.current = reset
@@ -133,6 +134,7 @@ export default function SongPage() {
     return () => {
       resetRef.current()
       stopListeningRef.current()
+      metronomeStore.stop()
       chordsStore.clear()
     }
   }, [])
