@@ -1,7 +1,7 @@
-import type { Metadata, ResolvingMetadata } from "next"
 import type { LyricsApiResponse } from "@/lib/lyrics-api-types"
 import { isLyricsApiSuccess } from "@/lib/lyrics-api-types"
 import { parseTrackSlugWithId } from "@/lib/slug"
+import type { Metadata, ResolvingMetadata } from "next"
 
 interface LayoutProps {
   children: React.ReactNode

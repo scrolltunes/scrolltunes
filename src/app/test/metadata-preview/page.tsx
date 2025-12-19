@@ -13,9 +13,7 @@ interface MetadataPreview {
   url: string
 }
 
-const DEMO_SONGS = [
-  { id: 1040196, name: "Everlong - Foo Fighters" },
-]
+const DEMO_SONGS = [{ id: 1040196, name: "Everlong - Foo Fighters" }]
 
 export default function MetadataPreviewPage() {
   const [preview, setPreview] = useState<MetadataPreview | null>(null)
@@ -127,7 +125,9 @@ export default function MetadataPreviewPage() {
               </div>
               <div>
                 <span className="text-neutral-400">Album Art:</span>
-                <span className="ml-2 text-white">{preview.albumArt ? "✓ Available" : "✗ None"}</span>
+                <span className="ml-2 text-white">
+                  {preview.albumArt ? "✓ Available" : "✗ None"}
+                </span>
               </div>
               <div>
                 <span className="text-neutral-400">URL:</span>
@@ -148,7 +148,9 @@ export default function MetadataPreviewPage() {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-semibold text-white truncate">{preview.title} — {preview.artist}</h2>
+                  <h2 className="text-sm font-semibold text-white truncate">
+                    {preview.title} — {preview.artist}
+                  </h2>
                   <p className="text-xs text-neutral-500 mt-1">scrolltunes.com</p>
                 </div>
               </div>
@@ -167,7 +169,9 @@ export default function MetadataPreviewPage() {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-bold text-white truncate">{preview.title} — {preview.artist}</h3>
+                  <h3 className="text-sm font-bold text-white truncate">
+                    {preview.title} — {preview.artist}
+                  </h3>
                   <p className="text-xs text-neutral-500 mt-1">scrolltunes.com</p>
                 </div>
               </div>
@@ -179,12 +183,16 @@ export default function MetadataPreviewPage() {
                 View meta tags
               </summary>
               <pre className="mt-4 text-xs text-neutral-400 overflow-x-auto bg-neutral-950 p-3 rounded border border-neutral-800">
-{`<meta property="og:title" content="Sing along to ${preview.title} by ${preview.artist}" />
+                {`<meta property="og:title" content="Sing along to ${preview.title} by ${preview.artist}" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="${preview.url}" />
-${preview.albumArt ? `<meta property="og:image" content="${preview.albumArt}" />
+${
+  preview.albumArt
+    ? `<meta property="og:image" content="${preview.albumArt}" />
 <meta property="og:image:width" content="300" />
-<meta property="og:image:height" content="300" />` : ""}
+<meta property="og:image:height" content="300" />`
+    : ""
+}
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="Sing along to ${preview.title} by ${preview.artist}" />
 ${preview.albumArt ? `<meta name="twitter:image" content="${preview.albumArt}" />` : ""}`}

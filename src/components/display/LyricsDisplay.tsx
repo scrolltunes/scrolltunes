@@ -201,20 +201,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const isPlaying = state._tag === "Playing"
   const isAutoScrollEnabled = isPlaying && !isManualScrolling
 
-  // Check if active line is visible in viewport
-  const isActiveLineVisible = useCallback(() => {
-    if (currentLineIndex < 0) return true
-    const container = containerRef.current
-    const activeLine = lineRefs.current[currentLineIndex]
-    if (!container || !activeLine) return true
-
-    const containerRect = container.getBoundingClientRect()
-    const lineRect = activeLine.getBoundingClientRect()
-
-    // Line is visible if any part of it is within the container
-    return lineRect.bottom > containerRect.top && lineRect.top < containerRect.bottom
-  }, [currentLineIndex])
-
   // Reset manual scroll when play is pressed (transition to Playing)
   const prevStateTag = useRef(state._tag)
   useEffect(() => {
@@ -257,6 +243,20 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       if (rafId2 !== undefined) cancelAnimationFrame(rafId2)
     }
   }, [currentLineIndex, isAutoScrollEnabled, lyrics, scrollToLine])
+
+  // Check if active line is visible in viewport
+  const isActiveLineVisible = useCallback(() => {
+    if (currentLineIndex < 0) return true
+    const container = containerRef.current
+    const activeLine = lineRefs.current[currentLineIndex]
+    if (!container || !activeLine) return true
+
+    const containerRect = container.getBoundingClientRect()
+    const lineRect = activeLine.getBoundingClientRect()
+
+    // Line is visible if any part of it is within the container
+    return lineRect.bottom > containerRect.top && lineRect.top < containerRect.bottom
+  }, [currentLineIndex])
 
   // Handle manual scroll detection - sticky override until highlight leaves view
   // When playing and highlight goes out of view, resume auto-follow
@@ -354,7 +354,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
-      e.preventDefault()
       const y = e.touches[0]?.clientY ?? null
       touchStartY.current = y
       touchLastY.current = y
@@ -374,7 +373,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
   const handleTouchMove = useCallback(
     (e: React.TouchEvent) => {
-      e.preventDefault()
       const currentY = e.touches[0]?.clientY ?? 0
       if (
         touchStartY.current === null ||
@@ -448,7 +446,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     <div
       ref={containerRef}
       className={`relative overflow-hidden h-full ${className}`}
-      style={{ touchAction: "none", overscrollBehavior: "none" }}
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
