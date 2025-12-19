@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "ScrollTunes — Live Lyrics Teleprompter for Musicians",
+    default: "ScrollTunes | Live Lyrics Teleprompter for Musicians",
     template: "%s | ScrollTunes",
   },
   description:
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "ScrollTunes — Live Lyrics Teleprompter",
+    title: "ScrollTunes | Live Lyrics Teleprompter",
     description:
       "Voice-activated scrolling syncs lyrics to your performance. Hands-free, distraction-free.",
     siteName: "ScrollTunes",
@@ -51,13 +51,13 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "ScrollTunes — Live Lyrics Teleprompter for Musicians",
+        alt: "ScrollTunes | Live Lyrics Teleprompter for Musicians",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ScrollTunes — Live Lyrics Teleprompter",
+    title: "ScrollTunes | Live Lyrics Teleprompter",
     description:
       "Voice-activated scrolling syncs lyrics to your performance. Hands-free, distraction-free.",
     site: "@ScrollTunes",

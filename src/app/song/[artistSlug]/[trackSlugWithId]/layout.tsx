@@ -51,7 +51,7 @@ export async function generateMetadata(
       title: {
         absolute: pageTitle,
       },
-      description: `Sing along to ${title} by ${artist} on ScrollTunes — Live lyrics teleprompter with voice-activated scrolling`,
+      description: `Sing along to ${title} by ${artist} on ScrollTunes | Live lyrics teleprompter with voice-activated scrolling`,
       openGraph: {
         title: pageTitle,
         description: `Sing along to ${title} by ${artist} on ScrollTunes`,
