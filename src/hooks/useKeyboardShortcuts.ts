@@ -46,8 +46,11 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
         }
         case "r":
         case "R": {
-          event.preventDefault()
-          reset()
+          // Only reset on plain "r" key, not with modifiers (cmd+r, cmd+shift+r for browser reload)
+          if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
+            event.preventDefault()
+            reset()
+          }
           break
         }
         case "ArrowLeft": {
