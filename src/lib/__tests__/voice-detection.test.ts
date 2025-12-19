@@ -57,9 +57,9 @@ describe("detectVoiceActivity", () => {
 
   test("transitions to speaking when level exceeds threshold after hold time", () => {
     const runtime = { ...INITIAL_VAD_RUNTIME, lastStateChangeTime: 0 }
-    const result = detectVoiceActivity(0.2, runtime, config, 200)
+    const result = detectVoiceActivity(0.3, runtime, config, config.holdTimeMs + 50)
     expect(result.isSpeaking).toBe(true)
-    expect(result.lastStateChangeTime).toBe(200)
+    expect(result.lastStateChangeTime).toBe(config.holdTimeMs + 50)
   })
 
   test("does not transition to speaking within hold time", () => {
@@ -75,9 +75,9 @@ describe("detectVoiceActivity", () => {
       lastStateChangeTime: 0,
       isSpeaking: true,
     }
-    const result = detectVoiceActivity(0.05, runtime, config, 200)
+    const result = detectVoiceActivity(0.05, runtime, config, config.holdTimeMs + 50)
     expect(result.isSpeaking).toBe(false)
-    expect(result.lastStateChangeTime).toBe(200)
+    expect(result.lastStateChangeTime).toBe(config.holdTimeMs + 50)
   })
 
   test("hysteresis: stays speaking when level is between thresholds", () => {
