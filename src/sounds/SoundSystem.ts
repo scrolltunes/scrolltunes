@@ -1,6 +1,7 @@
 "use client"
 
 import { Data, Effect } from "effect"
+import type * as Tone from "tone"
 
 type ToneModule = typeof import("tone")
 
@@ -23,14 +24,14 @@ export type AudioError = MicPermissionDenied | AudioNotInitialized
  * Reference: kitlangton/visual-effect TaskSounds.ts
  */
 class SoundSystem {
-  private Tone = null as ToneModule | null
+  private Tone: ToneModule | null = null
 
-  private synthClick = null
-  private synthNotification = null
-  private synthMetronome = null
+  private synthClick: Tone.PolySynth<Tone.Synth> | null = null
+  private synthNotification: Tone.PolySynth<Tone.Synth> | null = null
+  private synthMetronome: Tone.PolySynth<Tone.Synth> | null = null
 
-  private reverb = null
-  private volume = null
+  private reverb: Tone.Reverb | null = null
+  private volume: Tone.Volume | null = null
   private desiredVolume = 0.5 // Store the desired volume before initialization
 
   private initialized = false

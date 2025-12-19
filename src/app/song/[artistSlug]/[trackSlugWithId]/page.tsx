@@ -171,7 +171,7 @@ export default function SongPage() {
 
   const { isVisible: isHeaderVisible } = useAutoHide({
     timeoutMs: preferences.autoHideControlsMs,
-    enabled: isLoaded && preferences.autoHideControlsMs > 0,
+    enabled: isLoaded && preferences.autoHideControlsMs > 0 && playerState._tag === "Playing",
   })
 
   const handleTogglePlayPause = useCallback(async () => {
@@ -556,26 +556,37 @@ export default function SongPage() {
 
       <main className="pt-16 h-screen flex flex-col">
         {lrclibId !== null && (
-          <div className="relative">
-            <SongActionBar
-              songId={lrclibId}
-              title={loadState.lyrics.title}
-              artist={loadState.lyrics.artist}
-              {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
-              onAddToSetlist={() => setShowAddToSetlist(true)}
-              onChordSettingsClick={() => setShowChordPanel(prev => !prev)}
-              isChordPanelOpen={showChordPanel}
-            />
-            <ChordInfoPanel
-              isOpen={showChordPanel}
-              {...(chordsState.data?.tuning !== undefined && { tuning: chordsState.data.tuning })}
-              {...(loadState._tag === "Loaded" &&
-                loadState.key !== null && { musicalKey: loadState.key })}
-              {...(chordsState.data?.capo !== undefined && { capo: chordsState.data.capo })}
-              transpose={transpose}
-              onTransposeChange={v => chordsStore.setTranspose(v)}
-            />
-          </div>
+          <AnimatePresence initial={false}>
+            {(!isLoaded || isHeaderVisible) && (
+              <motion.div
+                className="relative"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={springs.default}
+                layout
+              >
+                <SongActionBar
+                  songId={lrclibId}
+                  title={loadState.lyrics.title}
+                  artist={loadState.lyrics.artist}
+                  {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
+                  onAddToSetlist={() => setShowAddToSetlist(true)}
+                  onChordSettingsClick={() => setShowChordPanel(prev => !prev)}
+                  isChordPanelOpen={showChordPanel}
+                />
+                <ChordInfoPanel
+                  isOpen={showChordPanel}
+                  {...(chordsState.data?.tuning !== undefined && { tuning: chordsState.data.tuning })}
+                  {...(loadState._tag === "Loaded" &&
+                    loadState.key !== null && { musicalKey: loadState.key })}
+                  {...(chordsState.data?.capo !== undefined && { capo: chordsState.data.capo })}
+                  transpose={transpose}
+                  onTransposeChange={v => chordsStore.setTranspose(v)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         )}
         <LyricsDisplay className="flex-1 pb-12" />
 

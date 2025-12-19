@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   DeviceMobile,
   DownloadSimple,
-  Eye,
   Hand,
   Moon,
   SignOut,
@@ -344,9 +343,7 @@ export default function SettingsPage() {
     preferencesStore.setShakeToRestartEnabled(!preferences.shakeToRestartEnabled)
   }, [preferences.shakeToRestartEnabled])
 
-  const handleToggleDistractionFree = useCallback(() => {
-    preferencesStore.setDistractionFreeMode(!preferences.distractionFreeMode)
-  }, [preferences.distractionFreeMode])
+
 
   const handleAutoHideChange = useCallback((value: number) => {
     preferencesStore.setAutoHideControlsMs(value)
@@ -412,18 +409,11 @@ export default function SettingsPage() {
               Display
             </h2>
             <div className="space-y-3">
-              <Toggle
-                enabled={preferences.distractionFreeMode}
-                onToggle={handleToggleDistractionFree}
-                label="Distraction-Free Mode"
-                description="Hide all controls during playback"
-                icon={<Eye size={20} weight="duotone" />}
-              />
               <SliderSetting
                 value={preferences.autoHideControlsMs}
                 onChange={handleAutoHideChange}
-                label="Auto-hide controls"
-                description="Hide header after inactivity"
+                label="Auto-hide during playback"
+                description="Hide header after inactivity while playing"
                 icon={<Timer size={20} weight="duotone" />}
                 min={0}
                 max={30000}

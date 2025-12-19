@@ -18,7 +18,6 @@ export interface Preferences {
   readonly doubleTapEnabled: boolean
   readonly shakeToRestartEnabled: boolean
   readonly autoHideControlsMs: number
-  readonly distractionFreeMode: boolean
   readonly themeMode: ThemeMode
   readonly metronomeEnabled: boolean
   readonly fontSize: number
@@ -29,7 +28,6 @@ const DEFAULT_PREFERENCES: Preferences = {
   doubleTapEnabled: true,
   shakeToRestartEnabled: false,
   autoHideControlsMs: 0,
-  distractionFreeMode: false,
   themeMode: "dark",
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,
@@ -164,14 +162,6 @@ export class PreferencesStore {
 
   setAutoHideControlsMs(value: number): void {
     this.setState({ autoHideControlsMs: value })
-  }
-
-  getDistractionFreeMode(): boolean {
-    return this.state.distractionFreeMode
-  }
-
-  setDistractionFreeMode(value: boolean): void {
-    this.setState({ distractionFreeMode: value })
   }
 
   getThemeMode(): ThemeMode {
