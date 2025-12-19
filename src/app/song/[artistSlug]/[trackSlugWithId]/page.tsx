@@ -7,6 +7,7 @@ import { FloatingActions, LyricsDisplay, SongActionBar, SongInfoModal } from "@/
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
+import { FavoriteButton } from "@/components/ui"
 
 import {
   type Lyrics,
@@ -509,9 +510,22 @@ export default function SongPage() {
                   <MusicNote size={20} weight="fill" className="text-neutral-600" />
                 </div>
               )}
-              <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-sm font-medium truncate">{songTitle}</span>
-                <span className="text-xs text-neutral-500 truncate">{songArtist}</span>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-sm font-medium truncate">{songTitle}</span>
+                  <span className="text-xs text-neutral-500 truncate">{songArtist}</span>
+                </div>
+                {lrclibId !== null && (
+                  <FavoriteButton
+                    songId={lrclibId}
+                    title={loadState._tag === "Loaded" ? loadState.lyrics.title : ""}
+                    artist={loadState._tag === "Loaded" ? loadState.lyrics.artist : ""}
+                    {...(loadState._tag === "Loaded" &&
+                      loadState.albumArt !== null && { albumArt: loadState.albumArt })}
+                    size="sm"
+                    className="shrink-0"
+                  />
+                )}
               </div>
 
               <div className="flex items-center gap-2 shrink-0">

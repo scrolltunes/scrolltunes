@@ -1,7 +1,6 @@
 "use client"
 
-import { favoritesStore, useIsFavorite } from "@/core"
-import { Heart, Info, Warning } from "@phosphor-icons/react"
+import { Info, Warning } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { memo, useCallback } from "react"
 
@@ -33,17 +32,6 @@ export const FloatingActions = memo(function FloatingActions({
   position = "bottom-left",
   className = "",
 }: FloatingActionsProps) {
-  const isFavorite = useIsFavorite(songId)
-
-  const handleToggleFavorite = useCallback(() => {
-    favoritesStore.toggle({
-      id: songId,
-      title,
-      artist,
-      ...(albumArt !== undefined && { albumArt }),
-    })
-  }, [songId, title, artist, albumArt])
-
   const handleWarningClick = useCallback(() => {
     if (onWarningPress) {
       onWarningPress()
@@ -56,25 +44,6 @@ export const FloatingActions = memo(function FloatingActions({
       aria-label="Song actions"
     >
       <div className="flex flex-col gap-2 items-center">
-        <motion.button
-          type="button"
-          onClick={handleToggleFavorite}
-          className={`relative w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-sm border transition-colors ${
-            isFavorite
-              ? "bg-red-500/20 border-red-500/30 hover:bg-red-500/30"
-              : "bg-neutral-900/80 border-neutral-700/50 hover:bg-neutral-800"
-          }`}
-          aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-          aria-pressed={isFavorite}
-          whileTap={{ scale: 0.9 }}
-        >
-          <Heart
-            size={20}
-            weight={isFavorite ? "fill" : "regular"}
-            className={isFavorite ? "text-red-500" : "text-neutral-300"}
-          />
-        </motion.button>
-
         {hasIssue ? (
           <motion.button
             type="button"

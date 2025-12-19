@@ -124,6 +124,7 @@ export const SongActionBar = memo(function SongActionBar({
           >
             {isInSetlist ? (
               <div className="flex items-center gap-2">
+                <span className="hidden sm:inline">Setlists</span>
                 <span className="text-[10px] text-neutral-500 leading-none">
                   {containingSetlists.length}
                 </span>
