@@ -48,14 +48,11 @@ export async function generateMetadata(
     const albumArt = data.albumArt
 
     const ogTitle = `${title} — ${artist}`
-    const ogDescription = `Listen to lyrics for ${title} by ${artist} on ScrollTunes`
 
     const metadata: Metadata = {
       title: ogTitle,
-      description: ogDescription,
       openGraph: {
         title: ogTitle,
-        description: ogDescription,
         type: "website",
         url: `https://scrolltunes.com/song/${artistSlug}/${trackSlugWithId}`,
         images: albumArt
@@ -70,9 +67,8 @@ export async function generateMetadata(
           : (await parent).openGraph?.images,
       },
       twitter: {
-        card: "summary_large_image",
+        card: "summary",
         title: ogTitle,
-        description: ogDescription,
         images: albumArt ? [albumArt] : undefined,
       },
     }

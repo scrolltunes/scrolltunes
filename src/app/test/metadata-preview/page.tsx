@@ -138,33 +138,10 @@ export default function MetadataPreviewPage() {
             </div>
 
             {/* OpenGraph Preview Card */}
-            <div className="border-2 border-indigo-500/50 rounded-lg overflow-hidden bg-neutral-900">
-              {/* OG Image */}
-              {preview.albumArt && (
-                <div className="w-full h-48 bg-neutral-800 flex items-center justify-center overflow-hidden">
-                  <img
-                    src={preview.albumArt}
-                    alt={`${preview.title} album art`}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-
-              {/* OG Text Content */}
-              <div className="p-4 space-y-2">
-                <h2 className="text-lg font-semibold text-white">{preview.title} — {preview.artist}</h2>
-                <p className="text-sm text-neutral-400">
-                  Listen to lyrics for {preview.title} by {preview.artist} on ScrollTunes
-                </p>
-                <p className="text-xs text-neutral-500">scrolltunes.com</p>
-              </div>
-            </div>
-
-            {/* Twitter Card Preview */}
-            <div className="border-2 border-blue-400/50 rounded-lg overflow-hidden bg-neutral-900">
-              <div className="flex gap-3 p-3">
+            <div className="border-2 border-indigo-500/50 rounded-lg bg-neutral-900 p-4">
+              <div className="flex gap-3">
                 {preview.albumArt && (
-                  <div className="w-128 h-128 flex-shrink-0 bg-neutral-800 rounded overflow-hidden">
+                  <div className="w-20 h-20 flex-shrink-0 bg-neutral-800 rounded overflow-hidden">
                     <img
                       src={preview.albumArt}
                       alt={`${preview.title} album art`}
@@ -172,12 +149,28 @@ export default function MetadataPreviewPage() {
                     />
                   </div>
                 )}
-                <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-sm font-semibold text-white truncate">{preview.title} — {preview.artist}</h2>
+                  <p className="text-xs text-neutral-500 mt-1">scrolltunes.com</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Twitter Card Preview */}
+            <div className="border-2 border-blue-400/50 rounded-lg bg-neutral-900 p-4">
+              <div className="flex gap-3">
+                {preview.albumArt && (
+                  <div className="w-20 h-20 flex-shrink-0 bg-neutral-800 rounded overflow-hidden">
+                    <img
+                      src={preview.albumArt}
+                      alt={`${preview.title} album art`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-bold text-white truncate">{preview.title} — {preview.artist}</h3>
-                  <p className="text-xs text-neutral-400 line-clamp-2">
-                    Listen to lyrics for {preview.title} by {preview.artist} on ScrollTunes
-                  </p>
-                  <p className="text-xs text-neutral-500">scrolltunes.com</p>
+                  <p className="text-xs text-neutral-500 mt-1">scrolltunes.com</p>
                 </div>
               </div>
             </div>
@@ -189,15 +182,13 @@ export default function MetadataPreviewPage() {
               </summary>
               <pre className="mt-4 text-xs text-neutral-400 overflow-x-auto bg-neutral-950 p-3 rounded border border-neutral-800">
 {`<meta property="og:title" content="${preview.title} — ${preview.artist}" />
-<meta property="og:description" content="Listen to lyrics for ${preview.title} by ${preview.artist} on ScrollTunes" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="${preview.url}" />
 ${preview.albumArt ? `<meta property="og:image" content="${preview.albumArt}" />
 <meta property="og:image:width" content="300" />
 <meta property="og:image:height" content="300" />` : ""}
-<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="${preview.title} — ${preview.artist}" />
-<meta name="twitter:description" content="Listen to lyrics for ${preview.title} by ${preview.artist} on ScrollTunes" />
 ${preview.albumArt ? `<meta name="twitter:image" content="${preview.albumArt}" />` : ""}`}
               </pre>
             </details>
