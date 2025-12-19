@@ -9,12 +9,12 @@ import { useEffect, useState } from "react"
 interface MetadataPreview {
   title: string
   artist: string
-  albumArt: string | null
+  albumArt: string | null | undefined
   url: string
 }
 
 const DEMO_SONGS = [
-  { id: 1, name: "Everlong" },
+  { id: 1040196, name: "Everlong - Foo Fighters" },
 ]
 
 export default function MetadataPreviewPage() {
@@ -28,7 +28,7 @@ export default function MetadataPreviewPage() {
       setLoading(true)
       setError(null)
       try {
-        const response = await fetch(`/api/lyrics/${selectedId}`)
+        const response = await fetch(`/api/lyrics/${selectedId}?t=${Date.now()}`)
         if (!response.ok) {
           setError("Failed to fetch song data")
           return
