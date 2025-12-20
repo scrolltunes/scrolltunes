@@ -17,7 +17,8 @@ import { animate, motion, useMotionValue, useTransform } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
 
-const SCROLL_INDICATOR_TIMEOUT = 3000 // Hide manual scroll badge after 3 seconds
+const SCROLL_INDICATOR_TIMEOUT_TOUCH = 3000 // Hide manual scroll badge after touch scroll
+const SCROLL_INDICATOR_TIMEOUT_WHEEL = 6000 // Hide manual scroll badge after wheel scroll
 const MOMENTUM_FRICTION = 0.0022 // Velocity decay rate (higher = faster stop)
 const MIN_VELOCITY = 0.01 // Minimum velocity to continue momentum (pixels/ms)
 const MAX_VELOCITY = 4 // Maximum velocity clamp (pixels/ms)
@@ -312,17 +313,17 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     return lineRect.bottom > containerRect.top && lineRect.top < containerRect.bottom
   }, [currentLineIndex])
 
-  const scheduleManualIndicatorHide = useCallback(() => {
+  const scheduleManualIndicatorHide = useCallback((delayMs: number) => {
     if (manualIndicatorTimeoutRef.current) {
       clearTimeout(manualIndicatorTimeoutRef.current)
     }
     manualIndicatorTimeoutRef.current = setTimeout(() => {
       setShowManualScrollIndicator(false)
-      if (isPlaying) {
+      if (isPlaying && isActiveLineVisible()) {
         setIsManualScrolling(false)
       }
-    }, SCROLL_INDICATOR_TIMEOUT)
-  }, [isPlaying])
+    }, delayMs)
+  }, [isPlaying, isActiveLineVisible])
 
   // Handle manual scroll detection - sticky override until highlight leaves view
   // When playing and highlight goes out of view, resume auto-follow
@@ -345,7 +346,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       }
       stopScrollAnimation()
       handleUserScroll()
-      scheduleManualIndicatorHide()
+      scheduleManualIndicatorHide(SCROLL_INDICATOR_TIMEOUT_WHEEL)
       updateScrollY(prev => clampScroll(prev + e.deltaY))
     },
     [handleUserScroll, clampScroll, scheduleManualIndicatorHide, stopScrollAnimation, updateScrollY],
@@ -488,7 +489,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     touchStartY.current = null
     touchLastY.current = null
     touchLastTime.current = null
-    scheduleManualIndicatorHide()
+    scheduleManualIndicatorHide(SCROLL_INDICATOR_TIMEOUT_TOUCH)
     startMomentumScroll()
   }, [scheduleManualIndicatorHide, startMomentumScroll])
 
