@@ -133,6 +133,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     [scrollY],
   )
 
+
   // Get lyrics from state
   const lyrics = state._tag !== "Idle" ? state.lyrics : null
 
@@ -311,21 +312,23 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     return lineRect.bottom > containerRect.top && lineRect.top < containerRect.bottom
   }, [currentLineIndex])
 
+  const scheduleManualIndicatorHide = useCallback(() => {
+    if (manualIndicatorTimeoutRef.current) {
+      clearTimeout(manualIndicatorTimeoutRef.current)
+    }
+    manualIndicatorTimeoutRef.current = setTimeout(() => {
+      setShowManualScrollIndicator(false)
+      if (isPlaying) {
+        setIsManualScrolling(false)
+      }
+    }, SCROLL_INDICATOR_TIMEOUT)
+  }, [isPlaying])
+
   // Handle manual scroll detection - sticky override until highlight leaves view
   // When playing and highlight goes out of view, resume auto-follow
   const handleUserScroll = useCallback(() => {
     setIsManualScrolling(true)
     setShowManualScrollIndicator(true)
-
-    // Clear existing timeout
-    if (manualIndicatorTimeoutRef.current) {
-      clearTimeout(manualIndicatorTimeoutRef.current)
-    }
-
-    // Only hide the badge after timeout - do NOT reset isManualScrolling
-    manualIndicatorTimeoutRef.current = setTimeout(() => {
-      setShowManualScrollIndicator(false)
-    }, SCROLL_INDICATOR_TIMEOUT)
 
     // If playing and active line goes out of view, reset manual scroll to resume following
     if (isPlaying && !isActiveLineVisible()) {
@@ -342,9 +345,10 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       }
       stopScrollAnimation()
       handleUserScroll()
+      scheduleManualIndicatorHide()
       updateScrollY(prev => clampScroll(prev + e.deltaY))
     },
-    [handleUserScroll, clampScroll, stopScrollAnimation, updateScrollY],
+    [handleUserScroll, clampScroll, scheduleManualIndicatorHide, stopScrollAnimation, updateScrollY],
   )
 
   // Handle touch events for mobile with velocity-based momentum
@@ -484,8 +488,9 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     touchStartY.current = null
     touchLastY.current = null
     touchLastTime.current = null
+    scheduleManualIndicatorHide()
     startMomentumScroll()
-  }, [startMomentumScroll])
+  }, [scheduleManualIndicatorHide, startMomentumScroll])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -502,6 +507,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       }
     }
   }, [])
+
 
   // Handle line click
   const handleLineClick = useCallback(
@@ -549,6 +555,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
           Manual scroll
         </div>
       )}
+
 
       <motion.div
         ref={contentRef}
