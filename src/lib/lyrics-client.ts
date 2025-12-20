@@ -23,9 +23,10 @@
  */
 
 import type { Lyrics } from "@/core"
+import { FetchService } from "@/services/fetch"
 import { Data, Effect } from "effect"
 import { parseLRC } from "./lyrics-parser"
-import { formatArtists, searchTracksEffect } from "./spotify-client"
+import { formatArtists, searchTracksEffect, type SpotifyService } from "./spotify-client"
 
 // --- Error Classes ---
 
@@ -60,6 +61,9 @@ export class LyricsInvalidError extends Data.TaggedClass("LyricsInvalidError")<{
 
 export type LyricsError = LyricsNotFoundError | LyricsAPIError | LyricsInvalidError
 
+type LyricsClientEnv = FetchService
+type LyricsSpotifyEnv = FetchService | SpotifyService
+
 // --- API Response Types ---
 
 export interface LRCLibResponse {
@@ -80,6 +84,19 @@ const headers = {
   "User-Agent": "ScrollTunes/1.0 (https://scrolltunes.com)",
 }
 
+const fetchResponse = (
+  url: string,
+  init?: RequestInit,
+  message = "Network error",
+): Effect.Effect<Response, LyricsAPIError, FetchService> =>
+  FetchService.pipe(
+    Effect.flatMap(({ fetch }) =>
+      fetch(url, init).pipe(
+        Effect.mapError(() => new LyricsAPIError({ status: 0, message })),
+      ),
+    ),
+  )
+
 // --- Effect-based Functions ---
 
 /**
@@ -96,7 +113,7 @@ export const getLyrics = (
   artistName: string,
   albumName: string,
   durationSeconds: number,
-): Effect.Effect<Lyrics, LyricsError> => {
+): Effect.Effect<Lyrics, LyricsError, LyricsClientEnv> => {
   return Effect.gen(function* () {
     const params = new URLSearchParams({
       track_name: trackName,
@@ -105,14 +122,10 @@ export const getLyrics = (
       duration: durationSeconds.toString(),
     })
 
-    const response = yield* Effect.tryPromise({
-      try: () =>
-        fetch(`${LRCLIB_BASE_URL}/get?${params.toString()}`, {
-          headers,
-          cache: "force-cache",
-          next: { revalidate: 600 },
-        }),
-      catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
+    const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/get?${params.toString()}`, {
+      headers,
+      cache: "force-cache",
+      next: { revalidate: 600 },
     })
 
     if (response.status === 404) {
@@ -149,7 +162,7 @@ export const getLyricsCached = (
   artistName: string,
   albumName: string,
   durationSeconds: number,
-): Effect.Effect<Lyrics, LyricsError> => {
+): Effect.Effect<Lyrics, LyricsError, LyricsClientEnv> => {
   return Effect.gen(function* () {
     const params = new URLSearchParams({
       track_name: trackName,
@@ -158,14 +171,10 @@ export const getLyricsCached = (
       duration: durationSeconds.toString(),
     })
 
-    const response = yield* Effect.tryPromise({
-      try: () =>
-        fetch(`${LRCLIB_BASE_URL}/get-cached?${params.toString()}`, {
-          headers,
-          cache: "force-cache",
-          next: { revalidate: 600 },
-        }),
-      catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
+    const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/get-cached?${params.toString()}`, {
+      headers,
+      cache: "force-cache",
+      next: { revalidate: 600 },
     })
 
     if (response.status === 404) {
@@ -212,18 +221,14 @@ export interface LRCLibTrackResult {
  */
 export const searchLRCLibTracks = (
   query: string,
-): Effect.Effect<readonly LRCLibTrackResult[], LyricsError> => {
+): Effect.Effect<readonly LRCLibTrackResult[], LyricsError, LyricsClientEnv> => {
   return Effect.gen(function* () {
     const params = new URLSearchParams({ q: query })
 
-    const response = yield* Effect.tryPromise({
-      try: () =>
-        fetch(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
-          headers,
-          cache: "force-cache",
-          next: { revalidate: 600 },
-        }),
-      catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
+    const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
+      headers,
+      cache: "force-cache",
+      next: { revalidate: 600 },
     })
 
     if (!response.ok) {
@@ -258,7 +263,7 @@ export const searchLyrics = (
   trackName: string,
   artistName: string,
   albumName?: string,
-): Effect.Effect<Lyrics, LyricsError> => {
+): Effect.Effect<Lyrics, LyricsError, LyricsClientEnv> => {
   return Effect.gen(function* () {
     const params = new URLSearchParams({
       track_name: trackName,
@@ -268,14 +273,10 @@ export const searchLyrics = (
       params.set("album_name", albumName)
     }
 
-    const response = yield* Effect.tryPromise({
-      try: () =>
-        fetch(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
-          headers,
-          cache: "force-cache",
-          next: { revalidate: 600 },
-        }),
-      catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
+    const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
+      headers,
+      cache: "force-cache",
+      next: { revalidate: 600 },
     })
 
     if (!response.ok) {
@@ -310,16 +311,14 @@ export const searchLyrics = (
  * Uses the `/api/get/{id}` endpoint to fetch lyrics by database ID.
  * Useful when you already have a track ID from a previous search.
  */
-export const getLyricsById = (id: number): Effect.Effect<Lyrics, LyricsError> => {
+export const getLyricsById = (
+  id: number,
+): Effect.Effect<Lyrics, LyricsError, LyricsClientEnv> => {
   return Effect.gen(function* () {
-    const response = yield* Effect.tryPromise({
-      try: () =>
-        fetch(`${LRCLIB_BASE_URL}/get/${id}`, {
-          headers,
-          cache: "force-cache",
-          next: { revalidate: 600 },
-        }),
-      catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
+    const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/get/${id}`, {
+      headers,
+      cache: "force-cache",
+      next: { revalidate: 600 },
     })
 
     if (response.status === 404) {
@@ -371,7 +370,9 @@ export const getLyricsById = (id: number): Effect.Effect<Lyrics, LyricsError> =>
  *
  * Demonstrates Effect.fail for immediate typed failure construction.
  */
-export const getLyricsBySpotifyId = (trackId: string): Effect.Effect<Lyrics, LyricsError> => {
+export const getLyricsBySpotifyId = (
+  trackId: string,
+): Effect.Effect<Lyrics, LyricsError, LyricsClientEnv> => {
   return Effect.fail(
     new LyricsAPIError({
       status: 501,
@@ -387,22 +388,18 @@ export const getLyricsBySpotifyId = (trackId: string): Effect.Effect<Lyrics, Lyr
 const searchLRCLibByTrack = (
   trackName: string,
   artistName: string,
-): Effect.Effect<readonly LRCLibTrackResult[], never> => {
+): Effect.Effect<readonly LRCLibTrackResult[], never, LyricsClientEnv> => {
   return Effect.gen(function* () {
     const params = new URLSearchParams({
       track_name: trackName,
       artist_name: artistName,
     })
 
-    const response = yield* Effect.tryPromise({
-      try: () =>
-        fetch(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
-          headers,
-          cache: "force-cache",
-          next: { revalidate: 600 },
-        }),
-      catch: () => null,
-    })
+    const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
+      headers,
+      cache: "force-cache",
+      next: { revalidate: 600 },
+    }).pipe(Effect.orElseSucceed(() => null))
 
     if (!response || !response.ok) {
       return []
@@ -438,7 +435,7 @@ const searchLRCLibByTrack = (
  */
 export const searchLRCLibBySpotifyMetadata = (
   query: string,
-): Effect.Effect<readonly LRCLibTrackResult[], LyricsError> => {
+): Effect.Effect<readonly LRCLibTrackResult[], LyricsError, LyricsSpotifyEnv> => {
   // Try to get canonical metadata from Spotify (top 8 results)
   // Falls back to null if Spotify fails (config error, rate limit, network, etc.)
   const getSpotifyTracks = searchTracksEffect(query, 8).pipe(
@@ -581,21 +578,17 @@ export const findBestAlternativeLyrics = (
   artistName: string,
   targetDuration: number | null,
   excludeId?: number,
-): Effect.Effect<Lyrics, LyricsError> => {
+): Effect.Effect<Lyrics, LyricsError, LyricsClientEnv> => {
   return Effect.gen(function* () {
     const params = new URLSearchParams({
       track_name: trackName,
       artist_name: artistName,
     })
 
-    const response = yield* Effect.tryPromise({
-      try: () =>
-        fetch(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
-          headers,
-          cache: "force-cache",
-          next: { revalidate: 600 },
-        }),
-      catch: () => new LyricsAPIError({ status: 0, message: "Network error" }),
+    const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
+      headers,
+      cache: "force-cache",
+      next: { revalidate: 600 },
     })
 
     if (!response.ok) {
@@ -662,7 +655,7 @@ export const getLyricsByIdWithFallback = (
   trackName: string,
   artistName: string,
   targetDuration: number | null,
-): Effect.Effect<Lyrics, LyricsError> => {
+): Effect.Effect<Lyrics, LyricsError, LyricsClientEnv> => {
   return getLyricsById(id).pipe(
     Effect.catchTag("LyricsInvalidError", error => {
       console.log(`[Lyrics] ID ${error.id} has invalid data, searching for alternative...`)

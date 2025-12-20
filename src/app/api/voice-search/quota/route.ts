@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
 import { checkQuotaAvailable, getUsageStats } from "@/lib/speech-usage-tracker"
+import { ServerLayer } from "@/services/server-layer"
 import { Effect } from "effect"
 import { NextResponse } from "next/server"
 
@@ -20,8 +21,8 @@ export async function GET(): Promise<NextResponse<QuotaResponse | ErrorResponse>
   }
 
   const [availableResult, statsResult] = await Promise.all([
-    Effect.runPromiseExit(checkQuotaAvailable()),
-    Effect.runPromiseExit(getUsageStats()),
+    Effect.runPromiseExit(checkQuotaAvailable().pipe(Effect.provide(ServerLayer))),
+    Effect.runPromiseExit(getUsageStats().pipe(Effect.provide(ServerLayer))),
   ])
 
   if (availableResult._tag === "Failure" || statsResult._tag === "Failure") {

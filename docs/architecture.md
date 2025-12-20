@@ -239,6 +239,19 @@ export default defineConfig({
 })
 ```
 
+### Environment Configuration (Effect.Config)
+
+All runtime configuration MUST be loaded through Effect Config and a ConfigProvider.
+Do not access `process.env` directly in runtime code.
+External API access is always enabled; there is no runtime flag to disable external APIs.
+
+- Public config: `src/services/public-config.ts`
+- Server config: `src/services/server-config.ts`
+- Config provider: `src/services/config-provider.ts`
+- Startup validation: `src/services/validate-env.ts` (fail fast)
+
+Reference: https://effect.website/docs/configuration/#loading-configuration-from-environment-variables
+
 ## Design Patterns
 
 ### 1. Component Architecture
@@ -270,6 +283,37 @@ Top-level shared components (used across domains) live alongside folders.
 - Testable and mockable
 - Consistent patterns across the codebase
 
+#### Requirements Management (Layers and Services)
+
+All dependencies MUST be modeled as Effect services and provided at the composition root via `Layer`. Direct imports of singletons or global constructors are not allowed in domain logic.
+
+Reference: https://effect.website/docs/requirements-management/services/
+
+```typescript
+import { Context, Effect, Layer } from "effect"
+
+// Service definition
+class LyricsClient extends Context.Tag("LyricsClient")<
+  LyricsClient,
+  {
+    readonly getLyrics: (track: string, artist: string) => Effect.Effect<Lyrics, LyricsError>
+  }
+>() {}
+
+// Live layer
+const LyricsClientLive = Layer.succeed(LyricsClient, {
+  getLyrics: (track, artist) => getLyrics(track, artist),
+})
+
+// Composition root
+const program = Effect.gen(function* () {
+  const client = yield* LyricsClient
+  return yield* client.getLyrics("Song", "Artist")
+})
+
+Effect.runPromise(program.pipe(Effect.provide(LyricsClientLive)))
+```
+
 #### Tagged Error Classes
 
 All errors MUST be defined as `Data.TaggedClass`:
@@ -289,6 +333,26 @@ export class LyricsAPIError extends Data.TaggedClass("LyricsAPIError")<{
 }> {}
 
 export type LyricsError = LyricsNotFoundError | LyricsAPIError
+```
+
+#### Error Management (Typed Errors and Recovery)
+
+Use Effect error channels for all failures and recovery. Do not use `try/catch` except at the outermost boundary where you call `Effect.run*`.
+
+Reference: https://effect.website/docs/error-management/two-error-types/
+
+```typescript
+// ✅ Correct: typed errors + recovery
+const program = getLyrics(track, artist).pipe(
+  Effect.catchTag("LyricsNotFoundError", () => getLyricsCached(track, artist)),
+)
+
+// ❌ Wrong: try/catch inside domain logic
+try {
+  return await fetch(url)
+} catch {
+  // do not do this in domain code
+}
 ```
 
 #### Domain Functions Return Effects
@@ -336,6 +400,39 @@ export async function fetchLyrics(track: string, artist: string): Promise<Lyrics
   return Effect.runPromise(getLyrics(track, artist))
 }
 ```
+
+#### Async, Fanout, Parallelism, Timeouts, Retries
+
+All async work MUST be expressed in Effects. Use Effect primitives for fanout, parallelism, timeouts, and retries rather than ad-hoc Promise logic.
+
+References:
+- Parallelism: https://effect.website/docs/parallelism/
+- Retry: https://effect.website/docs/recursion-and-retrying/retrying/
+- Timeout: https://effect.website/docs/timeouts/
+
+```typescript
+// Fanout with concurrency
+const results = yield* Effect.all(tasks, { concurrency: 5 })
+
+// Race or first-success
+const fastest = yield* Effect.firstSuccessOf(effects)
+
+// Timeout + retry
+const safeCall = externalCall.pipe(
+  Effect.timeout("5 seconds"),
+  Effect.retry({ times: 2 }),
+)
+```
+
+#### External API Integration (Effect)
+
+All third-party APIs MUST be wrapped in Effect with typed errors, timeout/retry policies, and explicit fallback or racing strategies when multiple providers are available.
+
+References:
+- https://effect.website/docs/error-management/two-error-types/
+- https://effect.website/docs/parallelism/
+- https://effect.website/docs/timeouts/
+- https://effect.website/docs/recursion-and-retrying/retrying/
 
 #### API Routes Use Effect Properly
 

@@ -1,3 +1,4 @@
+import { loadPublicConfig } from "@/services/public-config"
 import { NextResponse, type NextRequest } from "next/server"
 
 type LogEntry = {
@@ -12,7 +13,7 @@ type Payload = {
 }
 
 export async function POST(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
+  if (loadPublicConfig().nodeEnv === "production") {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
@@ -40,4 +41,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true })
 }
-

@@ -10,6 +10,7 @@
  * - Attribution: MANDATORY backlink to getsongbpm.com
  */
 
+import { ServerConfig } from "@/services/server-config"
 import { Effect } from "effect"
 import { BPMAPIError, BPMNotFoundError } from "./bpm-errors"
 import type { BPMProvider } from "./bpm-provider"
@@ -67,19 +68,14 @@ const enforceRateLimit = (): Effect.Effect<void> =>
 /**
  * GetSongBPM provider implementation
  */
-export const getSongBpmProvider: BPMProvider = {
+export const getSongBpmProvider: BPMProvider<ServerConfig> = {
   name: "GetSongBPM",
 
-  getBpm(query: BPMTrackQuery): Effect.Effect<BPMResult, BPMNotFoundError | BPMAPIError> {
+  getBpm(
+    query: BPMTrackQuery,
+  ): Effect.Effect<BPMResult, BPMNotFoundError | BPMAPIError, ServerConfig> {
     return Effect.gen(function* () {
       const normalized = normalizeTrackKey(query)
-
-      // Skip external API if disabled (for tests/demo)
-      if (process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS === "true") {
-        return yield* Effect.fail(
-          new BPMNotFoundError({ title: query.title, artist: query.artist }),
-        )
-      }
 
       // Enforce rate limit
       yield* enforceRateLimit()
@@ -91,12 +87,8 @@ export const getSongBpmProvider: BPMProvider = {
       })
 
       // API key is required - unauthenticated requests are not allowed
-      const apiKey = process.env.GETSONGBPM_API_KEY
-      if (!apiKey) {
-        return yield* Effect.fail(
-          new BPMAPIError({ status: 401, message: "GETSONGBPM_API_KEY not configured" }),
-        )
-      }
+      const { getSongBpmApiKey } = yield* ServerConfig
+      const apiKey = getSongBpmApiKey
       params.set("api_key", apiKey)
 
       const url = `${GETSONGBPM_BASE_URL}/search/?${params.toString()}`

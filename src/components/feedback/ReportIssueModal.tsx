@@ -3,6 +3,7 @@
 import { springs } from "@/animations"
 import { INPUT_LIMITS } from "@/constants/limits"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
+import { loadPublicConfig } from "@/services/public-config"
 import { Bug, CheckCircle, PaperPlaneTilt, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -29,7 +30,7 @@ export interface ReportIssueModalProps {
 
 type SubmitState = "idle" | "submitting" | "success" | "error"
 
-const WEB3FORMS_ACCESS_KEY = process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY ?? ""
+const WEB3FORMS_ACCESS_KEY = loadPublicConfig().web3FormsAccessKey
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60)

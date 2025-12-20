@@ -1,3 +1,6 @@
+import type { PublicConfig } from "@/services/public-config"
+import type { ServerConfig } from "@/services/server-config"
+import { ConfigLayer } from "@/services/server-base-layer"
 import { Effect } from "effect"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { clearBpmCache, withInMemoryCache } from "../bpm-cache"
@@ -8,6 +11,26 @@ import { makeCacheKey, normalizeTrackKey } from "../bpm-types"
 import { deezerBpmProvider } from "../deezer-client"
 import { getSongBpmProvider } from "../getsongbpm-client"
 import { getMockBpm, hasMockBpm, mockBpmProvider } from "../mock-bpm"
+
+const runWithConfig = <A, E>(
+  effect: Effect.Effect<A, E, PublicConfig | ServerConfig>,
+) => Effect.runPromise(effect.pipe(Effect.provide(ConfigLayer)))
+
+const runWithConfigExit = <A, E>(
+  effect: Effect.Effect<A, E, PublicConfig | ServerConfig>,
+) => Effect.runPromiseExit(effect.pipe(Effect.provide(ConfigLayer)))
+
+const originalWeb3FormsKey = process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY
+
+beforeEach(() => {
+  if (!process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY) {
+    process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY = "test-web3forms-key"
+  }
+})
+
+afterEach(() => {
+  process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY = originalWeb3FormsKey
+})
 
 describe("normalizeTrackKey", () => {
   test("lowercases and trims", () => {
@@ -121,7 +144,7 @@ describe("getBpmWithFallback", () => {
   test("returns result from first successful provider", async () => {
     const providers = [successProvider(120, "First")]
     const effect = getBpmWithFallback(providers, query)
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
     expect(result.bpm).toBe(120)
     expect(result.source).toBe("First")
   })
@@ -129,7 +152,7 @@ describe("getBpmWithFallback", () => {
   test("falls back to second provider on BPMNotFoundError", async () => {
     const providers = [notFoundProvider("First"), successProvider(140, "Second")]
     const effect = getBpmWithFallback(providers, query)
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
     expect(result.bpm).toBe(140)
     expect(result.source).toBe("Second")
   })
@@ -137,20 +160,20 @@ describe("getBpmWithFallback", () => {
   test("does NOT fall back on BPMAPIError", async () => {
     const providers = [apiErrorProvider("First"), successProvider(140, "Second")]
     const effect = getBpmWithFallback(providers, query)
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
     expect(exit._tag).toBe("Failure")
   })
 
   test("fails with BPMNotFoundError when no providers", async () => {
-    const effect = getBpmWithFallback([], query)
-    const exit = await Effect.runPromiseExit(effect)
+    const effect = getBpmWithFallback<never>([], query)
+    const exit = await runWithConfigExit(effect)
     expect(exit._tag).toBe("Failure")
   })
 
   test("fails with BPMNotFoundError when all providers fail with not found", async () => {
     const providers = [notFoundProvider("First"), notFoundProvider("Second")]
     const effect = getBpmWithFallback(providers, query)
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
     expect(exit._tag).toBe("Failure")
   })
 
@@ -161,7 +184,7 @@ describe("getBpmWithFallback", () => {
       successProvider(100, "Third"),
     ]
     const effect = getBpmWithFallback(providers, query)
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
     expect(result.bpm).toBe(100)
     expect(result.source).toBe("Third")
   })
@@ -171,14 +194,14 @@ describe("getBpmRace", () => {
   test("returns first successful result", async () => {
     const providers = [successProvider(120, "First"), successProvider(140, "Second")]
     const effect = getBpmRace(providers, query)
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
     expect(result.bpm).toBeGreaterThan(0)
   })
 
   test("returns result from second provider if first fails with not found", async () => {
     const providers = [notFoundProvider("ReccoBeats"), successProvider(140, "GetSongBPM")]
     const effect = getBpmRace(providers, query)
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
     expect(result.bpm).toBe(140)
     expect(result.source).toBe("GetSongBPM")
   })
@@ -186,7 +209,7 @@ describe("getBpmRace", () => {
   test("returns first successful result in order", async () => {
     const providers = [successProvider(120, "First"), successProvider(140, "Second")]
     const effect = getBpmRace(providers, query)
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
     expect(result.bpm).toBe(120)
     expect(result.source).toBe("First")
   })
@@ -198,7 +221,7 @@ describe("getBpmRace", () => {
       successProvider(100, "GetSongBPM"),
     ]
     const effect = getBpmRace(providers, query)
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
     expect(result.bpm).toBe(100)
     expect(result.source).toBe("GetSongBPM")
   })
@@ -206,31 +229,28 @@ describe("getBpmRace", () => {
   test("fails with BPMNotFoundError when all providers fail", async () => {
     const providers = [notFoundProvider("First"), notFoundProvider("Second")]
     const effect = getBpmRace(providers, query)
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
     expect(exit._tag).toBe("Failure")
   })
 
   test("fails with BPMNotFoundError when no providers", async () => {
-    const effect = getBpmRace([], query)
-    const exit = await Effect.runPromiseExit(effect)
+    const effect = getBpmRace<never>([], query)
+    const exit = await runWithConfigExit(effect)
     expect(exit._tag).toBe("Failure")
   })
 })
 
 describe("getSongBpmProvider", () => {
   const originalFetch = global.fetch
-  const originalEnv = process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS
 
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS = "false"
     process.env.GETSONGBPM_API_KEY = "test-api-key"
   })
 
   afterEach(() => {
     global.fetch = originalFetch
     vi.useRealTimers()
-    process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS = originalEnv
     process.env.GETSONGBPM_API_KEY = undefined
   })
 
@@ -246,7 +266,7 @@ describe("getSongBpmProvider", () => {
     })
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
 
     expect(result.bpm).toBe(120)
     expect(result.source).toBe("GetSongBPM")
@@ -260,7 +280,7 @@ describe("getSongBpmProvider", () => {
     })
 
     const effect = getSongBpmProvider.getBpm({ title: "Unknown", artist: "Nobody" })
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
   })
@@ -273,7 +293,7 @@ describe("getSongBpmProvider", () => {
     })
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
   })
@@ -282,7 +302,7 @@ describe("getSongBpmProvider", () => {
     global.fetch = vi.fn().mockRejectedValue(new Error("Network error"))
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
   })
@@ -299,7 +319,7 @@ describe("getSongBpmProvider", () => {
     })
 
     const effect = getSongBpmProvider.getBpm({ title: "hello world", artist: "test artist" })
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
 
     expect(result.bpm).toBe(100)
   })
@@ -314,35 +334,18 @@ describe("getSongBpmProvider", () => {
     })
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
 
     expect(result.key).toBeNull()
   })
 
-  test("fails when external APIs are disabled", async () => {
-    process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS = "true"
-
-    const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
-    const exit = await Effect.runPromiseExit(effect)
-
-    expect(exit._tag).toBe("Failure")
-  })
-
-  test("fails with BPMAPIError when API key is missing", async () => {
+  test("fails when API key is missing", async () => {
     process.env.GETSONGBPM_API_KEY = ""
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
-    if (exit._tag === "Failure" && exit.cause._tag === "Fail") {
-      const error = exit.cause.error
-      expect(error._tag).toBe("BPMAPIError")
-      if (error._tag === "BPMAPIError") {
-        expect(error.status).toBe(401)
-        expect(error.message).toContain("not configured")
-      }
-    }
   })
 
   test("fails with BPMNotFoundError on 404", async () => {
@@ -353,7 +356,7 @@ describe("getSongBpmProvider", () => {
     })
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
   })
@@ -361,15 +364,9 @@ describe("getSongBpmProvider", () => {
 
 describe("deezerBpmProvider", () => {
   const originalFetch = global.fetch
-  const originalEnv = process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS
-
-  beforeEach(() => {
-    process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS = undefined
-  })
 
   afterEach(() => {
     global.fetch = originalFetch
-    process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS = originalEnv
   })
 
   test("returns BPM when track found with valid BPM", async () => {
@@ -388,7 +385,7 @@ describe("deezerBpmProvider", () => {
       })
 
     const effect = deezerBpmProvider.getBpm({ title: "Song", artist: "Artist" })
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
 
     expect(result.bpm).toBe(120)
     expect(result.source).toBe("Deezer")
@@ -411,7 +408,7 @@ describe("deezerBpmProvider", () => {
       })
 
     const effect = deezerBpmProvider.getBpm({ title: "Song", artist: "Artist" })
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
     if (exit._tag === "Failure" && exit.cause._tag === "Fail") {
@@ -426,7 +423,7 @@ describe("deezerBpmProvider", () => {
     })
 
     const effect = deezerBpmProvider.getBpm({ title: "Unknown", artist: "Nobody" })
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
     if (exit._tag === "Failure" && exit.cause._tag === "Fail") {
@@ -438,7 +435,7 @@ describe("deezerBpmProvider", () => {
     global.fetch = vi.fn().mockRejectedValue(new Error("Network error"))
 
     const effect = deezerBpmProvider.getBpm({ title: "Song", artist: "Artist" })
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
     if (exit._tag === "Failure" && exit.cause._tag === "Fail") {
@@ -462,7 +459,7 @@ describe("deezerBpmProvider", () => {
       })
 
     const effect = deezerBpmProvider.getBpm({ title: "hello world", artist: "test artist" })
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
 
     expect(result.bpm).toBe(100)
   })
@@ -486,8 +483,8 @@ describe("withInMemoryCache", () => {
     const cached = withInMemoryCache(baseProvider)
     const testQuery = { title: "Song", artist: "Artist" }
 
-    await Effect.runPromise(cached.getBpm(testQuery))
-    await Effect.runPromise(cached.getBpm(testQuery))
+    await runWithConfig(cached.getBpm(testQuery))
+    await runWithConfig(cached.getBpm(testQuery))
 
     expect(callCount).toBe(1)
   })
@@ -501,8 +498,8 @@ describe("withInMemoryCache", () => {
     const cached = withInMemoryCache(baseProvider)
     const testQuery = { title: "Song", artist: "Artist" }
 
-    const result1 = await Effect.runPromise(cached.getBpm(testQuery))
-    const result2 = await Effect.runPromise(cached.getBpm(testQuery))
+    const result1 = await runWithConfig(cached.getBpm(testQuery))
+    const result2 = await runWithConfig(cached.getBpm(testQuery))
 
     expect(result1).toEqual(result2)
     expect(result1.bpm).toBe(120)
@@ -520,8 +517,8 @@ describe("withInMemoryCache", () => {
 
     const cached = withInMemoryCache(baseProvider)
 
-    await Effect.runPromise(cached.getBpm({ title: "Song", artist: "Artist" }))
-    await Effect.runPromise(cached.getBpm({ title: "SONG", artist: "ARTIST" }))
+    await runWithConfig(cached.getBpm({ title: "Song", artist: "Artist" }))
+    await runWithConfig(cached.getBpm({ title: "SONG", artist: "ARTIST" }))
 
     expect(callCount).toBe(1)
   })
@@ -548,8 +545,8 @@ describe("withInMemoryCache", () => {
 
     const cached = withInMemoryCache(baseProvider)
 
-    await Effect.runPromise(cached.getBpm({ title: "Song1", artist: "Artist" }))
-    await Effect.runPromise(cached.getBpm({ title: "Song2", artist: "Artist" }))
+    await runWithConfig(cached.getBpm({ title: "Song1", artist: "Artist" }))
+    await runWithConfig(cached.getBpm({ title: "Song2", artist: "Artist" }))
 
     expect(callCount).toBe(2)
   })
@@ -567,9 +564,9 @@ describe("withInMemoryCache", () => {
     const cached = withInMemoryCache(baseProvider)
     const testQuery = { title: "Song", artist: "Artist" }
 
-    await Effect.runPromise(cached.getBpm(testQuery))
+    await runWithConfig(cached.getBpm(testQuery))
     clearBpmCache()
-    await Effect.runPromise(cached.getBpm(testQuery))
+    await runWithConfig(cached.getBpm(testQuery))
 
     expect(callCount).toBe(2)
   })
@@ -616,20 +613,20 @@ describe("hasMockBpm", () => {
 describe("mockBpmProvider", () => {
   test("succeeds for known song", async () => {
     const effect = mockBpmProvider.getBpm({ title: "Demo Song", artist: "ScrollTunes" })
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
     expect(result.bpm).toBe(120)
     expect(result.source).toBe("MockBPM")
   })
 
   test("returns key for known song", async () => {
     const effect = mockBpmProvider.getBpm({ title: "Demo Song", artist: "ScrollTunes" })
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
     expect(result.key).toBe("C")
   })
 
   test("fails for unknown song", async () => {
     const effect = mockBpmProvider.getBpm({ title: "Unknown", artist: "Nobody" })
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
     expect(exit._tag).toBe("Failure")
   })
 

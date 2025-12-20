@@ -157,12 +157,6 @@ export const reccoBeatsProvider: BPMProvider = {
         )
       }
 
-      if (process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS === "true") {
-        return yield* Effect.fail(
-          new BPMNotFoundError({ title: query.title, artist: query.artist }),
-        )
-      }
-
       const uuid = yield* lookupReccoBeatsUuid(spotifyId, query)
       const features = yield* fetchAudioFeatures(uuid, query)
 

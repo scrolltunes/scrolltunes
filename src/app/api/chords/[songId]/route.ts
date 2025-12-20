@@ -5,6 +5,7 @@ import {
   SongsterrNotFoundError,
   SongsterrParseError,
 } from "@/lib/chords/songsterr-types"
+import { ServerLayer } from "@/services/server-layer"
 import { Effect } from "effect"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
@@ -36,7 +37,7 @@ export async function GET(
     return parseChordProDocument(rawChordProDoc, songId, artist, title)
   })
 
-  const result = await Effect.runPromiseExit(effect)
+  const result = await Effect.runPromiseExit(effect.pipe(Effect.provide(ServerLayer)))
 
   if (result._tag === "Failure") {
     const error = result.cause

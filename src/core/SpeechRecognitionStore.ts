@@ -1,9 +1,11 @@
 "use client"
 
 import { VoiceActivityStore, type VoiceState } from "./VoiceActivityStore"
-import { soundSystem } from "@/sounds"
 import type { VADConfig } from "@/lib"
 import type { SileroVADConfig } from "@/lib/silero-vad-config"
+import { ClientLayer, type ClientLayerContext } from "@/services/client-layer"
+import { loadPublicConfig } from "@/services/public-config"
+import { SoundSystemService } from "@/services/sound-system"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
 
@@ -59,10 +61,12 @@ export class SpeechRecognitionError extends Data.TaggedClass("SpeechRecognitionE
 
 // --- Logging Configuration ---
 
+const publicConfig = loadPublicConfig()
+
 function isDevMode(): boolean {
   if (typeof window === "undefined") return false
   const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-  const isNotProduction = process.env.NEXT_PUBLIC_VERCEL_ENV !== "production"
+  const isNotProduction = publicConfig.vercelEnv !== "production"
   return isDev || isNotProduction
 }
 
@@ -136,6 +140,39 @@ export class SpeechRecognitionStore {
   private vadUnsubscribe: (() => void) | null = null
   private vadStateUnsubscribe: (() => void) | null = null
 
+  private runPromiseWithClientLayer<T, E, R extends ClientLayerContext>(
+    effect: Effect.Effect<T, E, R>,
+  ): Promise<T> {
+    return Effect.runPromise(
+      effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>,
+    )
+  }
+
+  private runSyncWithClientLayer<T, E, R extends ClientLayerContext>(
+    effect: Effect.Effect<T, E, R>,
+  ): T {
+    return Effect.runSync(effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>)
+  }
+
+  private getMicrophoneAnalyserEffect(): Effect.Effect<
+    AnalyserNode,
+    SpeechRecognitionError,
+    SoundSystemService
+  > {
+    return SoundSystemService.pipe(
+      Effect.flatMap(({ getMicrophoneAnalyser }) =>
+        Effect.mapError(
+          getMicrophoneAnalyser,
+          () =>
+            new SpeechRecognitionError({
+              code: "MIC_ERROR",
+              message: "Failed to access microphone",
+            }),
+        ),
+      ),
+    )
+  }
+
   // --- Observable pattern ---
 
   subscribe = (listener: () => void): (() => void) => {
@@ -188,6 +225,16 @@ export class SpeechRecognitionStore {
       const response = await fetch("/api/voice-search/quota")
       this.lastQuotaCheckAt = Date.now()
 
+      if (response.status === 401) {
+        speechLog("QUOTA", "Unauthorized for quota check")
+        this.setState({
+          isQuotaAvailable: false,
+          errorCode: "AUTH_REQUIRED",
+          errorMessage: "Sign in to use voice search",
+        })
+        return false
+      }
+
       if (!response.ok) {
         speechLog("QUOTA", "Failed to check quota", { status: response.status })
         this.setState({ isQuotaAvailable: false })
@@ -199,7 +246,11 @@ export class SpeechRecognitionStore {
       if (!isAvailable) {
         speechLog("QUOTA", "Quota exhausted")
       }
-      this.setState({ isQuotaAvailable: isAvailable })
+      this.setState({
+        isQuotaAvailable: isAvailable,
+        errorCode: null,
+        errorMessage: null,
+      })
       return isAvailable
     } catch (e) {
       speechLog("QUOTA", "Error checking quota", { error: String(e) })
@@ -214,7 +265,9 @@ export class SpeechRecognitionStore {
 
   // --- Event dispatch ---
 
-  readonly dispatch = (event: SpeechEvent): Effect.Effect<void, SpeechRecognitionError> => {
+  readonly dispatch = (
+    event: SpeechEvent,
+  ): Effect.Effect<void, SpeechRecognitionError, SoundSystemService> => {
     switch (event._tag) {
       case "StartRecognition":
         return this.startRecognitionEffect
@@ -244,7 +297,11 @@ export class SpeechRecognitionStore {
 
   // --- Start recognition ---
 
-  private readonly startRecognitionEffect: Effect.Effect<void, SpeechRecognitionError> = Effect.gen(
+  private readonly startRecognitionEffect: Effect.Effect<
+    void,
+    SpeechRecognitionError,
+    SoundSystemService
+  > = Effect.gen(
     this,
     function* (_) {
       if (this.state.isRecording || this.state.isConnecting) {
@@ -280,16 +337,7 @@ export class SpeechRecognitionStore {
       })
 
       // Get microphone access via SoundSystem
-      const analyser = yield* _(
-        Effect.mapError(
-          soundSystem.getMicrophoneAnalyserEffect,
-          () =>
-            new SpeechRecognitionError({
-              code: "MIC_ERROR",
-              message: "Failed to access microphone",
-            }),
-        ),
-      )
+      const analyser = yield* _(this.getMicrophoneAnalyserEffect())
 
       if (!analyser) {
         yield* _(
@@ -418,7 +466,7 @@ export class SpeechRecognitionStore {
 
       const data = (await response.json()) as { transcript?: string; languageCode?: string }
       if (data.transcript) {
-        Effect.runSync(
+        this.runSyncWithClientLayer(
           this.dispatch(
             new ReceiveFinal({
               text: data.transcript,
@@ -665,7 +713,7 @@ export class SpeechRecognitionStore {
   // --- Convenience methods ---
 
   async start(): Promise<void> {
-    await Effect.runPromise(
+    await this.runPromiseWithClientLayer(
       Effect.catchAll(this.dispatch(new StartRecognition({})), e => {
         this.setState({
           errorCode: e.code,
@@ -679,7 +727,7 @@ export class SpeechRecognitionStore {
   }
 
   stop(): void {
-    Effect.runSync(this.dispatch(new StopRecognition({})))
+    this.runSyncWithClientLayer(this.dispatch(new StopRecognition({})))
   }
 
   clearError(): void {

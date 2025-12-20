@@ -7,12 +7,15 @@
  * Flow: Spotify search → get track ID → ReccoBeats audio features
  */
 
-import { Effect } from "effect"
+import { ServerBaseLayer } from "@/services/server-base-layer"
+import { SpotifyServiceLive } from "../spotify-client"
+import { Effect, Layer } from "effect"
 import { describe, expect, it } from "vitest"
 import { type SpotifyTrack, searchTracksEffect } from "../spotify-client"
 
 const RECCOBEATS_API = "https://api.reccobeats.com/v1"
 const USER_AGENT = "ScrollTunes/1.0 (https://scrolltunes.com)"
+const spotifyRuntimeLayer = SpotifyServiceLive.pipe(Layer.provide(ServerBaseLayer))
 
 interface ReccoBeatsAudioFeatures {
   readonly id: string
@@ -82,7 +85,11 @@ async function lookupBpmViaReccoBeats(
   artist: string,
 ): Promise<{ bpm: number; key: string | null; spotifyId: string; track: SpotifyTrack } | null> {
   const query = `track:${title} artist:${artist}`
-  const exit = await Effect.runPromiseExit(searchTracksEffect(query, 5))
+  const exit = await Effect.runPromiseExit(
+    searchTracksEffect(query, 5).pipe(
+      Effect.provide(spotifyRuntimeLayer),
+    ),
+  )
 
   if (exit._tag === "Failure") return null
 
@@ -130,7 +137,10 @@ describe("ReccoBeats Direct API Test", () => {
 
 describe("ReccoBeats BPM Lookup (Spotify ID → ReccoBeats)", () => {
   const hasSpotifyCredentials = !!(
-    process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET
+    process.env.SPOTIFY_CLIENT_ID &&
+    process.env.SPOTIFY_CLIENT_SECRET &&
+    !process.env.SPOTIFY_CLIENT_ID.startsWith("test-") &&
+    !process.env.SPOTIFY_CLIENT_SECRET.startsWith("test-")
   )
 
   it.skipIf(!hasSpotifyCredentials)(

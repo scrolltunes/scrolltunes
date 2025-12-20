@@ -1,6 +1,13 @@
-import { Effect } from "effect"
+import { ServerBaseLayer } from "@/services/server-base-layer"
+import { Effect, Layer } from "effect"
 import { describe, expect, it } from "vitest"
 import { searchLRCLibBySpotifyMetadata } from "./lyrics-client"
+import { SpotifyServiceLive } from "./spotify-client"
+
+const spotifyRuntimeLayer = Layer.mergeAll(
+  ServerBaseLayer,
+  SpotifyServiceLive.pipe(Layer.provide(ServerBaseLayer)),
+)
 
 describe("Spotify-first search", () => {
   /**
@@ -12,7 +19,11 @@ describe("Spotify-first search", () => {
   it("should resolve 'my sacrifice' to 'My Sacrifice' by Creed", async () => {
     const query = "my sacrifice"
 
-    const results = await Effect.runPromise(searchLRCLibBySpotifyMetadata(query))
+    const results = await Effect.runPromise(
+      searchLRCLibBySpotifyMetadata(query).pipe(
+        Effect.provide(spotifyRuntimeLayer),
+      ),
+    )
 
     // Spotify should normalize to "My Sacrifice" by Creed
     // LRCLIB should return results matching that exact metadata

@@ -3,9 +3,11 @@ import {
   createRecognizeConfig,
   createSpeechClient,
   parseRecognitionResponse,
+  type SpeechClientService,
 } from "@/lib/google-speech-client"
 import { SpeechAPIError, SpeechQuotaError } from "@/lib/speech-errors"
 import { checkQuotaAvailable, incrementUsage } from "@/lib/speech-usage-tracker"
+import { ServerLayer } from "@/services/server-layer"
 import { Effect } from "effect"
 import { NextResponse } from "next/server"
 
@@ -29,7 +31,7 @@ interface ErrorResponse {
 function transcribeAudio(
   audioBase64: string,
   languageHints: string[] | undefined,
-): Effect.Effect<TranscribeResponse, SpeechAPIError | SpeechQuotaError> {
+): Effect.Effect<TranscribeResponse, SpeechAPIError | SpeechQuotaError, SpeechClientService> {
   return Effect.gen(function* () {
     const client = yield* createSpeechClient().pipe(
       Effect.mapError(
@@ -46,18 +48,20 @@ function transcribeAudio(
       decodingConfig: "auto",
     })
 
-    const recognizeConfig = yield* Effect.try({
-      try: () =>
-        createRecognizeConfig({
-          languageHints: languageHints ?? ["en-US"],
-        }),
-      catch: err =>
-        new SpeechAPIError({
-          code: "CONFIG",
-          message:
-            err instanceof Error ? err.message : "Failed to build recognition config (missing env?)",
-        }),
-    })
+    const recognizeConfig = yield* createRecognizeConfig({
+      languageHints: languageHints ?? ["en-US"],
+    }).pipe(
+      Effect.mapError(
+        err =>
+          new SpeechAPIError({
+            code: "CONFIG",
+            message:
+              err instanceof Error
+                ? err.message
+                : "Failed to build recognition config (missing env?)",
+          }),
+      ),
+    )
 
     // V2 API expects content as Uint8Array for gRPC clients (binary format, not base64)
     const request = {
@@ -142,7 +146,9 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, { status: 401 })
   }
 
-  const quotaResult = await Effect.runPromiseExit(checkQuotaAvailable())
+  const quotaResult = await Effect.runPromiseExit(
+    checkQuotaAvailable().pipe(Effect.provide(ServerLayer)),
+  )
   if (quotaResult._tag === "Failure") {
     console.error("Failed to check quota:", quotaResult.cause)
   } else if (!quotaResult.value) {
@@ -174,7 +180,9 @@ export async function POST(
   const audioBuffer = Buffer.from(audio, "base64")
   const durationSeconds = Math.ceil(audioBuffer.length / 32000)
 
-  const result = await Effect.runPromiseExit(transcribeAudio(audio, languageHints))
+  const result = await Effect.runPromiseExit(
+    transcribeAudio(audio, languageHints).pipe(Effect.provide(ServerLayer)),
+  )
 
   if (result._tag === "Failure") {
     const cause = result.cause
@@ -200,6 +208,7 @@ export async function POST(
 
   await Effect.runPromise(
     incrementUsage({ userId: session.user.id, durationSeconds }).pipe(
+      Effect.provide(ServerLayer),
       Effect.catchAll(err => {
         console.error("Failed to track usage:", err)
         return Effect.void
