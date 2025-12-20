@@ -13,18 +13,26 @@ import {
 } from "@/core"
 import { detectLyricsDirection } from "@/lib"
 import { type LyricChordPosition, matchChordsToLyrics, transposeChordLine } from "@/lib/chords"
-import { motion } from "motion/react"
+import { animate, motion, useMotionValue, useTransform } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
 
 const SCROLL_INDICATOR_TIMEOUT = 3000 // Hide manual scroll badge after 3 seconds
-const MOMENTUM_FRICTION = 0.0015 // Velocity decay rate (higher = faster stop)
-const MIN_VELOCITY = 0.005 // Minimum velocity to continue momentum (pixels/ms)
-const MAX_VELOCITY = 5 // Maximum velocity clamp (pixels/ms)
+const MOMENTUM_FRICTION = 0.0022 // Velocity decay rate (higher = faster stop)
+const MIN_VELOCITY = 0.01 // Minimum velocity to continue momentum (pixels/ms)
+const MAX_VELOCITY = 4 // Maximum velocity clamp (pixels/ms)
+const VELOCITY_SMOOTHING = 0.2 // Smooths touch velocity for natural fling
+const RUBBERBAND_COEFFICIENT = 0.55
+const OVERSCROLL_DAMPING = 0.6
 
 const isEmptyLine = (text: string): boolean => {
   const trimmed = text.trim()
   return trimmed === "" || trimmed === "♪"
+}
+
+const rubberbandDistance = (distance: number, dimension: number): number => {
+  if (distance <= 0 || dimension <= 0) return 0
+  return (distance * dimension * RUBBERBAND_COEFFICIENT) / (dimension + RUBBERBAND_COEFFICIENT * distance)
 }
 
 export interface LyricsDisplayProps {
@@ -50,42 +58,80 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   // Manual scroll override state
   const [isManualScrolling, setIsManualScrolling] = useState(false)
   const [showManualScrollIndicator, setShowManualScrollIndicator] = useState(false)
-  const [scrollY, setScrollY] = useState(0)
+  const scrollY = useMotionValue(0)
   const manualIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const momentumRafIdRef = useRef<number | null>(null)
+  const scrollAnimationRef = useRef<ReturnType<typeof animate> | null>(null)
+  const scrollYOffset = useTransform(scrollY, value => -value)
 
   // Refs for geometry-based scroll calculation
   const containerRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const lineRefs = useRef<(HTMLButtonElement | null)[]>([])
 
-  // Calculate scroll bounds with snap-back effect
-  const applyRubberband = useCallback((newScrollY: number): number => {
+  const getScrollBounds = useCallback(() => {
     const container = containerRef.current
     const content = contentRef.current
+    if (!container || !content) return null
+
+    const containerHeight = container.clientHeight
+    const contentHeight = content.scrollHeight
     const minScroll = initialScrollValue.current
+    const maxScroll = Math.max(minScroll, contentHeight - containerHeight)
 
-    // Calculate max scroll (content height - container height, accounting for 50vh padding on both sides)
-    let maxScroll = 0
-    if (container && content) {
-      const containerHeight = container.clientHeight
-      const contentHeight = content.scrollHeight
-      // Content has py-[50vh] so actual scrollable area is contentHeight - containerHeight
-      maxScroll = Math.max(0, contentHeight - containerHeight)
-    }
-
-    // Snap back when scrolling above top
-    if (newScrollY < minScroll) {
-      return minScroll
-    }
-
-    // Snap back when scrolling past bottom
-    if (newScrollY > maxScroll) {
-      return maxScroll
-    }
-
-    return newScrollY
+    return { minScroll, maxScroll, containerHeight }
   }, [])
+
+  const clampScroll = useCallback(
+    (value: number): number => {
+      const bounds = getScrollBounds()
+      if (!bounds) return value
+      return Math.min(Math.max(value, bounds.minScroll), bounds.maxScroll)
+    },
+    [getScrollBounds],
+  )
+
+  const applyRubberband = useCallback(
+    (value: number): number => {
+      const bounds = getScrollBounds()
+      if (!bounds) return value
+
+      const { minScroll, maxScroll, containerHeight } = bounds
+      if (value < minScroll) {
+        const overscroll = minScroll - value
+        return minScroll - rubberbandDistance(overscroll, containerHeight)
+      }
+      if (value > maxScroll) {
+        const overscroll = value - maxScroll
+        return maxScroll + rubberbandDistance(overscroll, containerHeight)
+      }
+      return value
+    },
+    [getScrollBounds],
+  )
+
+  const stopScrollAnimation = useCallback(() => {
+    if (scrollAnimationRef.current) {
+      scrollAnimationRef.current.stop()
+      scrollAnimationRef.current = null
+    }
+  }, [])
+
+  const setScrollYImmediate = useCallback(
+    (value: number) => {
+      stopScrollAnimation()
+      scrollY.set(value)
+    },
+    [scrollY, stopScrollAnimation],
+  )
+
+  const updateScrollY = useCallback(
+    (updater: (prev: number) => number) => {
+      const next = updater(scrollY.get())
+      scrollY.set(next)
+    },
+    [scrollY],
+  )
 
   // Get lyrics from state
   const lyrics = state._tag !== "Idle" ? state.lyrics : null
@@ -128,12 +174,12 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   }, [showChords, chordsData, lyrics, transposeSemitones])
 
   // Scroll to position a line at target position
-  const scrollToLine = useCallback((lineIndex: number): boolean => {
+  const getLineScrollTarget = useCallback((lineIndex: number): number | null => {
     const container = containerRef.current
     const activeLine = lineRefs.current[lineIndex]
 
     // Skip if container or line not ready
-    if (!container || !activeLine) return false
+    if (!container || !activeLine) return null
 
     const containerRect = container.getBoundingClientRect()
     const lineRect = activeLine.getBoundingClientRect()
@@ -146,9 +192,8 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
     // Adjust scroll by the difference
     const delta = lineCurrentY - targetY
-    setScrollY(prev => prev + delta)
-    return true
-  }, [])
+    return clampScroll(scrollY.get() + delta)
+  }, [clampScroll, scrollY])
 
   // Track if initial scroll has happened and what the initial scroll value was
   const hasInitialScroll = useRef(false)
@@ -168,13 +213,12 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
     for (const delay of delays) {
       const timeoutId = setTimeout(() => {
-        if (!hasInitialScroll.current && scrollToLine(firstLineIndex)) {
+        if (!hasInitialScroll.current) {
+          const target = getLineScrollTarget(firstLineIndex)
+          if (target === null) return
           hasInitialScroll.current = true
-          // Capture the scroll value after initial scroll completes
-          setScrollY(current => {
-            initialScrollValue.current = current
-            return current
-          })
+          initialScrollValue.current = target
+          setScrollYImmediate(target)
         }
       }, delay)
       timeoutIds.push(timeoutId)
@@ -185,15 +229,15 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
         clearTimeout(id)
       }
     }
-  }, [lyrics, scrollToLine, state._tag])
+  }, [getLineScrollTarget, lyrics, setScrollYImmediate, state._tag])
 
   // Reset state when lyrics change
   useEffect(() => {
     hasInitialScroll.current = false
-    setScrollY(0)
+    setScrollYImmediate(0)
     setIsManualScrolling(false)
     setShowManualScrollIndicator(false)
-  }, [lyrics])
+  }, [lyrics, setScrollYImmediate])
 
   // Only auto-scroll when playing AND not manually overridden
   const isPlaying = state._tag === "Playing"
@@ -205,7 +249,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     // Reset scroll position when transitioning to Ready (reset button pressed)
     if (prevStateTag.current !== "Ready" && state._tag === "Ready") {
       hasInitialScroll.current = false
-      setScrollY(initialScrollValue.current)
+      setScrollYImmediate(initialScrollValue.current)
       setIsManualScrolling(false)
       setShowManualScrollIndicator(false)
     }
@@ -240,7 +284,10 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     let rafId2: number | undefined
     const rafId1 = requestAnimationFrame(() => {
       rafId2 = requestAnimationFrame(() => {
-        scrollToLine(lineIndex)
+        const target = getLineScrollTarget(lineIndex)
+        if (target === null) return
+        stopScrollAnimation()
+        scrollAnimationRef.current = animate(scrollY, target, springs.scroll)
       })
     })
 
@@ -248,7 +295,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       cancelAnimationFrame(rafId1)
       if (rafId2 !== undefined) cancelAnimationFrame(rafId2)
     }
-  }, [currentLineIndex, isAutoScrollEnabled, lyrics, scrollToLine])
+  }, [currentLineIndex, getLineScrollTarget, isAutoScrollEnabled, lyrics, scrollY, stopScrollAnimation])
 
   // Check if active line is visible in viewport
   const isActiveLineVisible = useCallback(() => {
@@ -290,10 +337,14 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   // Handle wheel events
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
+      if (e.cancelable) {
+        e.preventDefault()
+      }
+      stopScrollAnimation()
       handleUserScroll()
-      setScrollY(prev => applyRubberband(prev + e.deltaY))
+      updateScrollY(prev => clampScroll(prev + e.deltaY))
     },
-    [handleUserScroll, applyRubberband],
+    [handleUserScroll, clampScroll, stopScrollAnimation, updateScrollY],
   )
 
   // Handle touch events for mobile with velocity-based momentum
@@ -302,27 +353,18 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const touchLastTime = useRef<number | null>(null)
   const touchVelocity = useRef<number>(0)
 
-  // Helper to get max scroll bounds
-  const getMaxScroll = useCallback(() => {
-    const container = containerRef.current
-    const content = contentRef.current
-    if (!container || !content) return 0
-    return Math.max(0, content.scrollHeight - container.clientHeight)
-  }, [])
-
   // Start momentum animation after touch ends
   const startMomentumScroll = useCallback(() => {
     const initialV = touchVelocity.current
 
     if (Math.abs(initialV) < MIN_VELOCITY) {
-      // Just snap back to bounds
-      const maxScroll = getMaxScroll()
-      setScrollY(prev => Math.min(Math.max(prev, initialScrollValue.current), maxScroll))
+      scrollY.set(clampScroll(scrollY.get()))
       return
     }
 
     let v = initialV
     let lastTime = performance.now()
+    stopScrollAnimation()
 
     const step = () => {
       const now = performance.now()
@@ -332,22 +374,20 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       // Velocity decays exponentially with friction
       v *= Math.exp(-MOMENTUM_FRICTION * dt)
 
-      let stop = false
-      setScrollY(prev => {
-        const next = applyRubberband(prev + v * dt)
-        const maxScroll = getMaxScroll()
+      const current = scrollY.get()
+      const next = applyRubberband(current + v * dt)
+      const bounds = getScrollBounds()
+      const isOverscrolled =
+        bounds ? next < bounds.minScroll || next > bounds.maxScroll : false
 
-        // Stop if past bounds and velocity pointing further out
-        if ((next < 0 && v < 0) || (next > maxScroll && v > 0)) {
-          stop = true
-        }
-        return next
-      })
+      if (isOverscrolled) {
+        v *= OVERSCROLL_DAMPING
+      }
 
-      if (stop || Math.abs(v) < MIN_VELOCITY) {
-        // Final clamp to bounds
-        const maxScroll = getMaxScroll()
-        setScrollY(prev => Math.min(Math.max(prev, initialScrollValue.current), maxScroll))
+      scrollY.set(next)
+
+      if (Math.abs(v) < MIN_VELOCITY) {
+        scrollY.set(clampScroll(scrollY.get()))
         momentumRafIdRef.current = null
         return
       }
@@ -356,7 +396,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     }
 
     momentumRafIdRef.current = requestAnimationFrame(step)
-  }, [applyRubberband, getMaxScroll])
+  }, [applyRubberband, clampScroll, getScrollBounds, scrollY, stopScrollAnimation])
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
@@ -372,14 +412,17 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
         momentumRafIdRef.current = null
       }
 
+      stopScrollAnimation()
       handleUserScroll()
     },
-    [handleUserScroll],
+    [handleUserScroll, stopScrollAnimation],
   )
 
   const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      const currentY = e.touches[0]?.clientY ?? 0
+    (
+      currentY: number,
+      event: Pick<TouchEvent, "cancelable" | "preventDefault">,
+    ) => {
       if (
         touchStartY.current === null ||
         touchLastY.current === null ||
@@ -398,13 +441,43 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       if (dt > 0) {
         // Calculate velocity (pixels per ms), clamped to avoid crazy spikes
         const v = dy / dt
-        touchVelocity.current = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, v))
+        const smoothed = touchVelocity.current * (1 - VELOCITY_SMOOTHING) + v * VELOCITY_SMOOTHING
+        touchVelocity.current = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, smoothed))
       }
 
-      setScrollY(prev => applyRubberband(prev + dy))
+      const bounds = getScrollBounds()
+      const minScroll = bounds?.minScroll ?? initialScrollValue.current
+      const currentScroll = scrollY.get()
+      const nextRaw = currentScroll + dy
+      const isAtTop = currentScroll <= minScroll + 0.5
+      const isPullingDown = dy < 0
+      const isRubberbanding = nextRaw < minScroll
+      const allowNativePullToRefresh = isPullingDown && isAtTop && isRubberbanding
+
+      if (!allowNativePullToRefresh && event.cancelable) {
+        event.preventDefault()
+      }
+
+      updateScrollY(prev => applyRubberband(prev + dy))
     },
-    [applyRubberband],
+    [applyRubberband, getScrollBounds, scrollY, updateScrollY],
   )
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleMove = (event: TouchEvent) => {
+      const currentY = event.touches[0]?.clientY
+      if (currentY === undefined) return
+      handleTouchMove(currentY, event)
+    }
+
+    container.addEventListener("touchmove", handleMove, { passive: false })
+    return () => {
+      container.removeEventListener("touchmove", handleMove)
+    }
+  }, [handleTouchMove])
 
   // Start momentum scroll when touch ends
   const handleTouchEnd = useCallback(() => {
@@ -422,6 +495,10 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       }
       if (momentumRafIdRef.current !== null) {
         cancelAnimationFrame(momentumRafIdRef.current)
+      }
+      if (scrollAnimationRef.current) {
+        scrollAnimationRef.current.stop()
+        scrollAnimationRef.current = null
       }
     }
   }, [])
@@ -462,13 +539,13 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       className={`relative overflow-hidden h-full ${className}`}
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       aria-label="Lyrics display"
     >
       {/* Manual scroll indicator */}
       {showManualScrollIndicator && (
-        <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-neutral-800/80 rounded-full text-sm text-neutral-400">
+        <div className="absolute top-4 right-4 z-30 px-3 py-1 bg-neutral-800/80 rounded-full text-sm text-neutral-400">
           Manual scroll
         </div>
       )}
@@ -476,8 +553,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       <motion.div
         ref={contentRef}
         className="py-[50vh] max-w-4xl mx-auto"
-        animate={{ y: -scrollY }}
-        transition={springs.scroll}
+        style={{ y: scrollYOffset }}
       >
         {lyrics.lines.map((line, index) => {
           const isActive = index === activeLineIndex

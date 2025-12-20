@@ -568,12 +568,12 @@ export default function SongPage() {
         )}
       </AnimatePresence>
 
-      <main className="pt-16 h-screen flex flex-col">
+      <main className="pt-16 h-[calc(100vh-4rem)] flex flex-col min-h-0">
         {lrclibId !== null && (
           <AnimatePresence initial={false}>
             {(!isLoaded || isHeaderVisible) && (
               <motion.div
-                className="relative"
+                className="sticky top-16 z-30 bg-neutral-950/80 backdrop-blur"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
