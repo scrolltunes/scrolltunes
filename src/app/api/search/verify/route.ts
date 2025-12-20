@@ -1,5 +1,6 @@
 import { LyricsAPIError, searchLRCLibTracks } from "@/lib/lyrics-client"
 import { buildLRCLibSearchQuery } from "@/lib/track-normalization"
+import { ServerLayer } from "@/services/server-layer"
 import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
   })
 
-  const result = await Effect.runPromiseExit(effect)
+  const result = await Effect.runPromiseExit(effect.pipe(Effect.provide(ServerLayer)))
 
   if (result._tag === "Failure") {
     const cause = result.cause

@@ -17,7 +17,10 @@ import {
   type SileroVADConfig,
   getPresetConfig,
 } from "@/lib/silero-vad-config"
-import { type AudioError, soundSystem } from "@/sounds"
+import type { AudioError } from "@/sounds"
+import { ClientLayer, type ClientLayerContext } from "@/services/client-layer"
+import { loadPublicConfig } from "@/services/public-config"
+import { SoundSystemService } from "@/services/sound-system"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
 import { type SileroLoadError, SileroVADEngine } from "./SileroVADEngine"
@@ -67,18 +70,18 @@ export class VADError extends Data.TaggedClass("VADError")<{
 
 // --- Logging Configuration ---
 
+const publicConfig = loadPublicConfig()
+
 function isDevMode(): boolean {
   if (typeof window === "undefined") return false
-  if (process.env.NODE_ENV !== "production") return true
+  if (publicConfig.nodeEnv !== "production") return true
   const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-  const isNotProduction = process.env.NEXT_PUBLIC_VERCEL_ENV !== "production"
+  const isNotProduction = publicConfig.vercelEnv !== "production"
   return isDev || isNotProduction
 }
 
-const DEV_VAD_LOGS_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DEV_VAD_LOGS === "true"
-
 function vadLog(category: string, message: string, data?: Record<string, unknown>): void {
-  if (!isDevMode() || !DEV_VAD_LOGS_ENABLED) return
+  if (!isDevMode()) return
   const timestamp = new Date().toISOString().substring(11, 23)
   const dataStr = data ? ` ${JSON.stringify(data)}` : ""
   console.log(`[VAD ${timestamp}] [${category}] ${message}${dataStr}`)
@@ -103,8 +106,7 @@ let serverLogFlushTimer: number | null = null
 
 function queueServerVADLog(entry: ServerVADLogEntry): void {
   if (typeof window === "undefined") return
-  if (process.env.NODE_ENV === "production") return
-  if (!DEV_VAD_LOGS_ENABLED) return
+  if (!isDevMode()) return
 
   if (serverLogQueue.length >= 200) {
     serverLogQueue = serverLogQueue.slice(-100)
@@ -192,6 +194,48 @@ export class VoiceActivityStore {
   private isEnergySpeaking = false
   private andGateEnabled = true
 
+  private runPromiseWithClientLayer<T, E, R extends ClientLayerContext>(
+    effect: Effect.Effect<T, E, R>,
+  ): Promise<T> {
+    return Effect.runPromise(
+      effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>,
+    )
+  }
+
+  private runSyncWithClientLayer<T, E, R extends ClientLayerContext>(
+    effect: Effect.Effect<T, E, R>,
+  ): T {
+    return Effect.runSync(
+      effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>,
+    )
+  }
+
+  private getMicrophoneAnalyserEffect(): Effect.Effect<AnalyserNode, VADError, SoundSystemService> {
+    return SoundSystemService.pipe(
+      Effect.flatMap(({ getMicrophoneAnalyser }) =>
+        Effect.mapError(getMicrophoneAnalyser, e => new VADError({ cause: e })),
+      ),
+    )
+  }
+
+  private readonly stopMicrophoneEffect: Effect.Effect<
+    void,
+    never,
+    SoundSystemService
+  > = SoundSystemService.pipe(Effect.flatMap(({ stopMicrophone }) => stopMicrophone))
+
+  private readonly playVoiceDetectedEffect: Effect.Effect<
+    void,
+    never,
+    SoundSystemService
+  > = SoundSystemService.pipe(
+    Effect.flatMap(({ playVoiceDetected }) =>
+      Effect.catchAll(playVoiceDetected, () =>
+        Effect.logWarning("Failed to play voice detected sound"),
+      ),
+    ),
+  )
+
   // --- Observable pattern ---
 
   subscribe = (listener: () => void): (() => void) => {
@@ -272,7 +316,7 @@ export class VoiceActivityStore {
 
   // --- Event handlers ---
 
-  readonly dispatch = (event: VADEvent): Effect.Effect<void, VADError> => {
+  readonly dispatch = (event: VADEvent): Effect.Effect<void, VADError, SoundSystemService> => {
     switch (event._tag) {
       case "StartListening":
         return this.startListeningEffect
@@ -289,7 +333,7 @@ export class VoiceActivityStore {
 
   // --- Silero VAD integration ---
 
-  private tryStartSilero(): Effect.Effect<boolean, VADError> {
+  private tryStartSilero(): Effect.Effect<boolean, VADError, SoundSystemService> {
     return Effect.gen(this, function* (_) {
       if (!SileroVADEngine.isSupported()) {
         vadLog("SILERO", "AudioWorklet not supported, skipping Silero VAD")
@@ -358,7 +402,9 @@ export class VoiceActivityStore {
               level: this.smoothedSileroLevel.toFixed(3),
               energySpeaking: this.isEnergySpeaking,
             })
-            Effect.runPromise(Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void))
+            void this.runPromiseWithClientLayer(
+              Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void),
+            )
           },
           onSpeechEnd: () => {
             if (!this.state.isListening) return
@@ -366,7 +412,7 @@ export class VoiceActivityStore {
               threshold: this.sileroConfig.negativeSpeechThreshold,
             })
             this.pendingSileroStartAt = null
-            Effect.runSync(this.dispatch(new VoiceStop({})))
+            this.runSyncWithClientLayer(this.dispatch(new VoiceStop({})))
           },
           onFrameProcessed: ({ isSpeech }) => {
             if (!this.state.isListening) return
@@ -409,7 +455,9 @@ export class VoiceActivityStore {
                   level: this.smoothedSileroLevel.toFixed(3),
                   threshold: this.sileroConfig.positiveSpeechThreshold,
                 })
-                Effect.runPromise(Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void))
+                void this.runPromiseWithClientLayer(
+                  Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void),
+                )
               } else if (prerelease) {
                 this.pendingSileroStartAt = null
                 vadLog("SILERO", "Speech start preroll release (high raw prob)", {
@@ -417,13 +465,17 @@ export class VoiceActivityStore {
                   smoothed: this.smoothedSileroLevel.toFixed(3),
                   threshold: this.sileroConfig.positiveSpeechThreshold,
                 })
-                Effect.runPromise(Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void))
+                void this.runPromiseWithClientLayer(
+                  Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void),
+                )
               } else if (age > 600) {
                 this.pendingSileroStartAt = null
               }
             }
 
-            Effect.runSync(this.dispatch(new UpdateLevel({ level: this.smoothedSileroLevel })))
+            this.runSyncWithClientLayer(
+              this.dispatch(new UpdateLevel({ level: this.smoothedSileroLevel })),
+            )
           },
         }),
         e => new VADError({ cause: e }),
@@ -458,13 +510,11 @@ export class VoiceActivityStore {
 
   // --- Energy monitoring for AND-gate (no event dispatching) ---
 
-  private startEnergyMonitoring(): Effect.Effect<void, VADError> {
+  private startEnergyMonitoring(): Effect.Effect<void, VADError, SoundSystemService> {
     return Effect.gen(this, function* (_) {
       vadLog("ENERGY", "Starting energy monitoring for AND-gate...")
 
-      const analyser = yield* _(
-        Effect.mapError(soundSystem.getMicrophoneAnalyserEffect, e => new VADError({ cause: e })),
-      )
+      const analyser = yield* _(this.getMicrophoneAnalyserEffect())
 
       this.analyser = analyser
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
@@ -526,13 +576,11 @@ export class VoiceActivityStore {
 
   // --- Energy-based fallback ---
 
-  private startEnergyFallback(): Effect.Effect<void, VADError> {
+  private startEnergyFallback(): Effect.Effect<void, VADError, SoundSystemService> {
     return Effect.gen(this, function* (_) {
       vadLog("ENERGY", "Starting energy-based VAD fallback...")
 
-      const analyser = yield* _(
-        Effect.mapError(soundSystem.getMicrophoneAnalyserEffect, e => new VADError({ cause: e })),
-      )
+      const analyser = yield* _(this.getMicrophoneAnalyserEffect())
 
       this.analyser = analyser
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
@@ -542,7 +590,11 @@ export class VoiceActivityStore {
     })
   }
 
-  private readonly startListeningEffect: Effect.Effect<void, VADError> = Effect.gen(
+  private readonly startListeningEffect: Effect.Effect<
+    void,
+    VADError,
+    SoundSystemService
+  > = Effect.gen(
     this,
     function* (_) {
       if (this.state.isListening) return
@@ -592,7 +644,7 @@ export class VoiceActivityStore {
 
     // Stop energy-based / monitoring
     this.stopAnalysisLoop()
-    soundSystem.stopMicrophone()
+    this.runSyncWithClientLayer(this.stopMicrophoneEffect)
     this.analyser = null
     this.dataArray = null
     this.isEnergySpeaking = false
@@ -607,7 +659,11 @@ export class VoiceActivityStore {
     vadLog("STOP", "Voice detection stopped")
   }
 
-  private readonly handleVoiceStartEffect: Effect.Effect<void, VADError> = Effect.gen(
+  private readonly handleVoiceStartEffect: Effect.Effect<
+    void,
+    VADError,
+    SoundSystemService
+  > = Effect.gen(
     this,
     function* (_) {
       vadLog("VOICE", "🎤 Voice activity started", { engine: this.state.engine })
@@ -615,11 +671,7 @@ export class VoiceActivityStore {
         isSpeaking: true,
         lastSpeakingAt: Date.now(),
       })
-      yield* _(
-        Effect.catchAll(soundSystem.playVoiceDetectedEffect, () =>
-          Effect.logWarning("Failed to play voice detected sound"),
-        ),
-      )
+      yield* _(this.playVoiceDetectedEffect)
     },
   )
 
@@ -660,15 +712,19 @@ export class VoiceActivityStore {
       }
 
       if (now - this.runtime.lastStateChangeTime > 50 || prevSpeaking !== nextRuntime.isSpeaking) {
-        Effect.runSync(this.dispatch(new UpdateLevel({ level: this.runtime.smoothedLevel })))
+        this.runSyncWithClientLayer(
+          this.dispatch(new UpdateLevel({ level: this.runtime.smoothedLevel })),
+        )
       }
 
       if (!prevSpeaking && nextRuntime.isSpeaking) {
         vadLog("ENERGY", "🎤 Energy threshold crossed - voice start")
-        Effect.runPromise(Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void))
+        void this.runPromiseWithClientLayer(
+          Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void),
+        )
       } else if (prevSpeaking && !nextRuntime.isSpeaking) {
         vadLog("ENERGY", "🔇 Energy threshold crossed - voice stop")
-        Effect.runSync(this.dispatch(new VoiceStop({})))
+        this.runSyncWithClientLayer(this.dispatch(new VoiceStop({})))
       }
 
       if (this.state.isListening) {
@@ -689,7 +745,7 @@ export class VoiceActivityStore {
   // --- Convenience methods ---
 
   async startListening(): Promise<void> {
-    await Effect.runPromise(
+    await this.runPromiseWithClientLayer(
       Effect.catchAll(this.startListeningEffect, e => {
         console.error("Failed to start listening:", e)
         if (
@@ -707,7 +763,7 @@ export class VoiceActivityStore {
   }
 
   stopListening(): void {
-    Effect.runSync(this.dispatch(new StopListening({})))
+    this.runSyncWithClientLayer(this.dispatch(new StopListening({})))
   }
 
   isSpeaking(): boolean {
@@ -736,7 +792,7 @@ export class VoiceActivityStore {
     }
 
     this.stopAnalysisLoop()
-    soundSystem.stopMicrophone()
+    this.runSyncWithClientLayer(this.stopMicrophoneEffect)
     this.analyser = null
     this.dataArray = null
     this.isEnergySpeaking = false

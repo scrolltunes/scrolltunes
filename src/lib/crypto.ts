@@ -1,15 +1,14 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto"
+import { loadServerConfig } from "@/services/server-config"
 
 const ALGORITHM = "aes-256-gcm"
 const IV_LENGTH = 12
 const TAG_LENGTH = 16
 
+const { authSecret } = loadServerConfig()
+
 function getEncryptionKey(): Buffer {
-  const secret = process.env.AUTH_SECRET
-  if (!secret) {
-    throw new Error("AUTH_SECRET environment variable is required for encryption")
-  }
-  return Buffer.from(secret.slice(0, 32).padEnd(32, "0"))
+  return Buffer.from(authSecret.slice(0, 32).padEnd(32, "0"))
 }
 
 export function encryptToken(plaintext: string): string {

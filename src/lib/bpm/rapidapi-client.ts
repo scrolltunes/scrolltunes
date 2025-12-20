@@ -16,16 +16,14 @@
  */
 
 import { Redis } from "@upstash/redis"
+import { PublicConfig } from "@/services/public-config"
+import { ServerConfig } from "@/services/server-config"
 import { Effect } from "effect"
 
-function getRedisClient() {
-  const url = process.env.KV_REST_API_URL
-  const token = process.env.KV_REST_API_TOKEN
-  if (!url || !token) {
-    return null
-  }
-  return new Redis({ url, token })
-}
+const getRedisClient: Effect.Effect<Redis, never, ServerConfig> = Effect.gen(function* () {
+  const { kvRestApiUrl, kvRestApiToken } = yield* ServerConfig
+  return new Redis({ url: kvRestApiUrl, token: kvRestApiToken })
+})
 import { BPMAPIError, BPMNotFoundError } from "./bpm-errors"
 import type { BPMProvider } from "./bpm-provider"
 import type { BPMResult, BPMTrackQuery } from "./bpm-types"
@@ -61,26 +59,27 @@ interface SongContext {
   readonly spotifyId: string
 }
 
-async function sendUsageWarning(
+const sendUsageWarning = (
   current: number,
   threshold: number,
   song: SongContext,
-): Promise<void> {
-  const accessKey = process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY
-  if (!accessKey) return
-
+): Effect.Effect<void, never, PublicConfig> =>
+  Effect.gen(function* () {
+    const { web3FormsAccessKey } = yield* PublicConfig
+    const accessKey = web3FormsAccessKey
   const percentage = Math.round(threshold * 100)
   const spotifyUrl = `https://open.spotify.com/track/${song.spotifyId}`
 
-  try {
-    await fetch("https://api.web3forms.com/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        access_key: accessKey,
-        subject: `[ScrollTunes] RapidAPI usage at ${percentage}%`,
-        from_name: "ScrollTunes Rate Limiter",
-        message: `RapidAPI Spotify Audio Features usage warning:
+    yield* Effect.tryPromise({
+      try: () =>
+        fetch("https://api.web3forms.com/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            access_key: accessKey,
+            subject: `[ScrollTunes] RapidAPI usage at ${percentage}%`,
+            from_name: "ScrollTunes Rate Limiter",
+            message: `RapidAPI Spotify Audio Features usage warning:
 
 Current usage: ${current}/${DAILY_REQUEST_CAP} requests (${percentage}%)
 Date: ${getToday()}
@@ -92,51 +91,61 @@ Triggered by:
   Spotify URL: ${spotifyUrl}
 
 The free tier allows 20 requests/day. Exceeding this will incur $0.50/request charges.`,
-      }),
-    })
-  } catch {
-    // Silently ignore notification failures
-  }
-}
+          }),
+        }),
+      catch: () => null,
+    }).pipe(Effect.asVoid)
+  }).pipe(Effect.catchAll(() => Effect.void))
 
-async function checkAndSendWarnings(
+const checkAndSendWarnings = (
   redis: Redis,
   current: number,
   song: SongContext,
-): Promise<void> {
-  for (const threshold of WARNING_THRESHOLDS) {
-    const thresholdCount = Math.floor(DAILY_REQUEST_CAP * threshold)
-    if (current >= thresholdCount) {
+): Effect.Effect<void, BPMAPIError, ServerConfig | PublicConfig> =>
+  Effect.gen(function* () {
+    for (const threshold of WARNING_THRESHOLDS) {
+      const thresholdCount = Math.floor(DAILY_REQUEST_CAP * threshold)
+      if (current < thresholdCount) continue
       const warnedKey = getWarnedKey(threshold)
-      const alreadyWarned = await redis.get<boolean>(warnedKey)
+      const alreadyWarned = yield* Effect.tryPromise({
+        try: () => redis.get<boolean>(warnedKey),
+        catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
+      })
       if (!alreadyWarned) {
-        await redis.set(warnedKey, true, { ex: 48 * 60 * 60 })
-        await sendUsageWarning(current, threshold, song)
+        yield* Effect.tryPromise({
+          try: () => redis.set(warnedKey, true, { ex: 48 * 60 * 60 }),
+          catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
+        })
+        yield* sendUsageWarning(current, threshold, song)
       }
     }
-  }
-}
+  })
 
-const checkAndIncrementUsage = (song: SongContext): Effect.Effect<boolean, BPMAPIError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const redis = getRedisClient()
-      if (!redis) {
-        return true
-      }
-      const key = getTodayKey()
-      const current = await redis.get<number>(key)
-      if (current !== null && current >= DAILY_REQUEST_CAP) {
-        return false
-      }
-      const newCount = await redis.incr(key)
-      if (current === null) {
-        await redis.expire(key, 48 * 60 * 60)
-      }
-      await checkAndSendWarnings(redis, newCount, song)
-      return true
-    },
-    catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
+const checkAndIncrementUsage = (
+  song: SongContext,
+): Effect.Effect<boolean, BPMAPIError, ServerConfig | PublicConfig> =>
+  Effect.gen(function* () {
+    const redis = yield* getRedisClient
+    const key = getTodayKey()
+    const current = yield* Effect.tryPromise({
+      try: () => redis.get<number>(key),
+      catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
+    })
+    if (current !== null && current >= DAILY_REQUEST_CAP) {
+      return false
+    }
+    const newCount = yield* Effect.tryPromise({
+      try: () => redis.incr(key),
+      catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
+    })
+    if (current === null) {
+      yield* Effect.tryPromise({
+        try: () => redis.expire(key, 48 * 60 * 60),
+        catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
+      })
+    }
+    yield* checkAndSendWarnings(redis, newCount, song)
+    return true
   })
 
 interface RapidAPIResponse {
@@ -174,10 +183,12 @@ const enforceRateLimit = (): Effect.Effect<void> =>
  * Requires a spotifyId in the query and RAPIDAPI_KEY env var.
  * Silently returns BPMNotFoundError on quota exceeded (429) to allow fallback.
  */
-export const rapidApiSpotifyProvider: BPMProvider = {
+export const rapidApiSpotifyProvider: BPMProvider<ServerConfig | PublicConfig> = {
   name: "RapidAPI",
 
-  getBpm(query: BPMTrackQuery): Effect.Effect<BPMResult, BPMNotFoundError | BPMAPIError> {
+  getBpm(
+    query: BPMTrackQuery,
+  ): Effect.Effect<BPMResult, BPMNotFoundError | BPMAPIError, ServerConfig | PublicConfig> {
     return Effect.gen(function* () {
       const spotifyId = (query as ReccoBeatsQuery).spotifyId
       if (!spotifyId) {
@@ -186,18 +197,8 @@ export const rapidApiSpotifyProvider: BPMProvider = {
         )
       }
 
-      if (process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS === "true") {
-        return yield* Effect.fail(
-          new BPMNotFoundError({ title: query.title, artist: query.artist }),
-        )
-      }
-
-      const apiKey = process.env.RAPIDAPI_KEY
-      if (!apiKey) {
-        return yield* Effect.fail(
-          new BPMNotFoundError({ title: query.title, artist: query.artist }),
-        )
-      }
+      const { rapidApiKey } = yield* ServerConfig
+      const apiKey = rapidApiKey
 
       const songContext: SongContext = {
         title: query.title,

@@ -14,9 +14,9 @@ import type { BPMResult, BPMTrackQuery } from "./bpm-types"
  * Interface for BPM data providers.
  * Implement this to add new BPM sources.
  */
-export interface BPMProvider {
+export interface BPMProvider<R = never> {
   readonly name: string
-  getBpm(query: BPMTrackQuery): Effect.Effect<BPMResult, BPMError>
+  getBpm(query: BPMTrackQuery): Effect.Effect<BPMResult, BPMError, R>
 }
 
 /**
@@ -25,10 +25,10 @@ export interface BPMProvider {
  * Only BPMNotFoundError triggers fallback to next provider.
  * Other errors (BPMAPIError, BPMRateLimitError) bubble up immediately.
  */
-export function getBpmWithFallback(
-  providers: readonly BPMProvider[],
+export function getBpmWithFallback<R>(
+  providers: readonly BPMProvider<R>[],
   query: BPMTrackQuery,
-): Effect.Effect<BPMResult, BPMError> {
+): Effect.Effect<BPMResult, BPMError, R> {
   if (providers.length === 0) {
     return Effect.fail(
       new BPMNotFoundError({
@@ -69,10 +69,10 @@ export function getBpmWithFallback(
  * Uses Effect.firstSuccessOf to run all providers in parallel.
  * Only fails if ALL providers fail.
  */
-export function getBpmRace(
-  providers: readonly BPMProvider[],
+export function getBpmRace<R>(
+  providers: readonly BPMProvider<R>[],
   query: BPMTrackQuery,
-): Effect.Effect<BPMResult, BPMError> {
+): Effect.Effect<BPMResult, BPMError, R> {
   if (providers.length === 0) {
     return Effect.fail(
       new BPMNotFoundError({

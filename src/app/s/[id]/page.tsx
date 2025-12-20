@@ -1,4 +1,5 @@
 import { extractLrclibId, makeCanonicalPath } from "@/lib/slug"
+import { loadServerConfig } from "@/services/server-config"
 import { redirect } from "next/navigation"
 
 interface PageProps {
@@ -13,9 +14,7 @@ export default async function ShortUrlRedirect({ params }: PageProps) {
     redirect("/")
   }
 
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000"
+  const { baseUrl } = loadServerConfig()
 
   try {
     const response = await fetch(`${baseUrl}/api/lyrics/${numericId}`)

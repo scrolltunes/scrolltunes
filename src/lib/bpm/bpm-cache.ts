@@ -16,11 +16,11 @@ const cache = new Map<string, BPMResult>()
 /**
  * Wrap a provider with in-memory caching
  */
-export function withInMemoryCache(base: BPMProvider): BPMProvider {
+export function withInMemoryCache<R>(base: BPMProvider<R>): BPMProvider<R> {
   return {
     name: `${base.name}Cached`,
 
-    getBpm(query: BPMTrackQuery): Effect.Effect<BPMResult, BPMError> {
+    getBpm(query: BPMTrackQuery): Effect.Effect<BPMResult, BPMError, R> {
       const key = makeCacheKey(query)
       const cached = cache.get(key)
 

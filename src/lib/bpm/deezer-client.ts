@@ -66,12 +66,6 @@ export const deezerBpmProvider: BPMProvider = {
     return Effect.gen(function* () {
       const normalized = normalizeTrackKey(query)
 
-      if (process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS === "true") {
-        return yield* Effect.fail(
-          new BPMNotFoundError({ title: query.title, artist: query.artist }),
-        )
-      }
-
       const normalizedArtist = normalizeForSearch(query.artist)
       const normalizedTrack = normalizeForSearch(query.title)
       const searchQuery = encodeURIComponent(

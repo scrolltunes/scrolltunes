@@ -6,7 +6,9 @@
  * - Fetch ChordPro data from song pages
  */
 
-import { Effect } from "effect"
+import { FetchService } from "@/services/fetch"
+import { ServerBaseLayer } from "@/services/server-base-layer"
+import { Context, Effect, Layer } from "effect"
 import type {
   ChordProDocument,
   RawChordProDocument,
@@ -47,51 +49,166 @@ function toSongsterrSlug(text: string): string {
     .replace(/^-|-$/g, "")
 }
 
+export class SongsterrService extends Context.Tag("SongsterrService")<
+  SongsterrService,
+  {
+    readonly searchSongs: (query: string) => Effect.Effect<SongsterrSearchResult[], SongsterrError>
+    readonly getRawChordProData: (
+      songId: number,
+      artist: string,
+      title: string,
+    ) => Effect.Effect<RawChordProDocument, SongsterrError | SongsterrNotFoundError | SongsterrParseError>
+    readonly getChordData: (
+      songId: number,
+      artist: string,
+      title: string,
+    ) => Effect.Effect<ChordProDocument, SongsterrError | SongsterrNotFoundError | SongsterrParseError>
+  }
+>() {}
+
+const makeSongsterrService = Effect.gen(function* () {
+  const { fetch } = yield* FetchService
+
+  const fetchResponse = (url: string, init?: RequestInit, message = "Network error") =>
+    fetch(url, init).pipe(
+      Effect.mapError(() => new SongsterrError({ status: 0, message })),
+    )
+
+  const searchSongs = (query: string): Effect.Effect<SongsterrSearchResult[], SongsterrError> =>
+    Effect.gen(function* () {
+      const params = new URLSearchParams({ pattern: query })
+      const url = `${SONGSTERR_API_URL}?${params.toString()}`
+
+      const response = yield* fetchResponse(url, { headers })
+
+      if (!response.ok) {
+        return yield* Effect.fail(
+          new SongsterrError({
+            status: response.status,
+            message: response.statusText,
+          }),
+        )
+      }
+
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<readonly SongsterrApiResult[]>,
+        catch: () => new SongsterrError({ status: 0, message: "Failed to parse response" }),
+      })
+
+      const results: SongsterrSearchResult[] = []
+      for (const item of data) {
+        if (item.hasChords) {
+          results.push({
+            songId: item.songId,
+            title: item.title,
+            artist: item.artist,
+            hasChords: item.hasChords,
+          })
+        }
+      }
+
+      return results
+    })
+
+  const getRawChordProData = (
+    songId: number,
+    artist: string,
+    title: string,
+  ): Effect.Effect<RawChordProDocument, SongsterrError | SongsterrNotFoundError | SongsterrParseError> =>
+    Effect.gen(function* () {
+      const artistSlug = toSongsterrSlug(artist)
+      const titleSlug = toSongsterrSlug(title)
+      const url = `${SONGSTERR_BASE_URL}/a/wsa/${artistSlug}-${titleSlug}-chords-s${songId}`
+
+      const response = yield* fetchResponse(url, { headers })
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return yield* Effect.fail(new SongsterrNotFoundError({ songId, artist, title }))
+        }
+        return yield* Effect.fail(
+          new SongsterrError({
+            status: response.status,
+            message: response.statusText,
+          }),
+        )
+      }
+
+      const html = yield* Effect.tryPromise({
+        try: () => response.text(),
+        catch: () => new SongsterrError({ status: 0, message: "Failed to read response" }),
+      })
+
+      const scriptMatch = html.match(/<script\s+id="state"[^>]*>([\s\S]*?)<\/script>/i)
+      if (!scriptMatch?.[1]) {
+        return yield* Effect.fail(
+          new SongsterrParseError({ message: "Could not find state script in HTML" }),
+        )
+      }
+
+      let stateData: SongsterrStateData
+      try {
+        stateData = JSON.parse(scriptMatch[1]) as SongsterrStateData
+      } catch {
+        return yield* Effect.fail(new SongsterrParseError({ message: "Failed to parse state JSON" }))
+      }
+
+      const chordproLines = stateData.chordpro?.current
+      if (!chordproLines || !Array.isArray(chordproLines)) {
+        return yield* Effect.fail(
+          new SongsterrParseError({ message: "No chordpro data found in state" }),
+        )
+      }
+
+      return chordproLines as RawChordProDocument
+    })
+
+  const getChordData = (
+    songId: number,
+    artist: string,
+    title: string,
+  ): Effect.Effect<ChordProDocument, SongsterrError | SongsterrNotFoundError | SongsterrParseError> =>
+    Effect.gen(function* () {
+      const rawDoc = yield* getRawChordProData(songId, artist, title)
+
+      const lines = rawDoc.map(line => {
+        if (typeof line === "string") {
+          return { type: "lyrics" as const, content: line }
+        }
+        if (typeof line === "object" && line !== null) {
+          const lineObj = line as Record<string, unknown>
+          return {
+            type: (lineObj.type as "lyrics" | "chord" | "section" | "comment") ?? "lyrics",
+            content: (lineObj.content as string) ?? "",
+            chord: lineObj.chord as string | undefined,
+          }
+        }
+        return { type: "lyrics" as const, content: "" }
+      })
+
+      return {
+        songId,
+        title,
+        artist,
+        lines,
+      }
+    })
+
+  return {
+    searchSongs,
+    getRawChordProData,
+    getChordData,
+  }
+})
+
+export const SongsterrServiceLive = Layer.effect(SongsterrService, makeSongsterrService)
+
+const SongsterrRuntimeLayer = SongsterrServiceLive.pipe(Layer.provide(ServerBaseLayer))
+
 export const searchSongs = (
   query: string,
-): Effect.Effect<SongsterrSearchResult[], SongsterrError> => {
-  return Effect.gen(function* () {
-    if (process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS === "true") {
-      return []
-    }
-
-    const params = new URLSearchParams({ pattern: query })
-    const url = `${SONGSTERR_API_URL}?${params.toString()}`
-
-    const response = yield* Effect.tryPromise({
-      try: () => fetch(url, { headers }),
-      catch: () => new SongsterrError({ status: 0, message: "Network error" }),
-    })
-
-    if (!response.ok) {
-      return yield* Effect.fail(
-        new SongsterrError({
-          status: response.status,
-          message: response.statusText,
-        }),
-      )
-    }
-
-    const data = yield* Effect.tryPromise({
-      try: () => response.json() as Promise<readonly SongsterrApiResult[]>,
-      catch: () => new SongsterrError({ status: 0, message: "Failed to parse response" }),
-    })
-
-    const results: SongsterrSearchResult[] = []
-    for (const item of data) {
-      if (item.hasChords) {
-        results.push({
-          songId: item.songId,
-          title: item.title,
-          artist: item.artist,
-          hasChords: item.hasChords,
-        })
-      }
-    }
-
-    return results
-  })
-}
+): Effect.Effect<SongsterrSearchResult[], SongsterrError, SongsterrService> =>
+  SongsterrService.pipe(Effect.flatMap(service => service.searchSongs(query)))
 
 export const getRawChordProData = (
   songId: number,
@@ -99,63 +216,9 @@ export const getRawChordProData = (
   title: string,
 ): Effect.Effect<
   RawChordProDocument,
-  SongsterrError | SongsterrNotFoundError | SongsterrParseError
-> => {
-  return Effect.gen(function* () {
-    if (process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS === "true") {
-      return yield* Effect.fail(new SongsterrNotFoundError({ songId, artist, title }))
-    }
-
-    const artistSlug = toSongsterrSlug(artist)
-    const titleSlug = toSongsterrSlug(title)
-    const url = `${SONGSTERR_BASE_URL}/a/wsa/${artistSlug}-${titleSlug}-chords-s${songId}`
-
-    const response = yield* Effect.tryPromise({
-      try: () => fetch(url, { headers }),
-      catch: () => new SongsterrError({ status: 0, message: "Network error" }),
-    })
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return yield* Effect.fail(new SongsterrNotFoundError({ songId, artist, title }))
-      }
-      return yield* Effect.fail(
-        new SongsterrError({
-          status: response.status,
-          message: response.statusText,
-        }),
-      )
-    }
-
-    const html = yield* Effect.tryPromise({
-      try: () => response.text(),
-      catch: () => new SongsterrError({ status: 0, message: "Failed to read response" }),
-    })
-
-    const scriptMatch = html.match(/<script\s+id="state"[^>]*>([\s\S]*?)<\/script>/i)
-    if (!scriptMatch?.[1]) {
-      return yield* Effect.fail(
-        new SongsterrParseError({ message: "Could not find state script in HTML" }),
-      )
-    }
-
-    let stateData: SongsterrStateData
-    try {
-      stateData = JSON.parse(scriptMatch[1]) as SongsterrStateData
-    } catch {
-      return yield* Effect.fail(new SongsterrParseError({ message: "Failed to parse state JSON" }))
-    }
-
-    const chordproLines = stateData.chordpro?.current
-    if (!chordproLines || !Array.isArray(chordproLines)) {
-      return yield* Effect.fail(
-        new SongsterrParseError({ message: "No chordpro data found in state" }),
-      )
-    }
-
-    return chordproLines as RawChordProDocument
-  })
-}
+  SongsterrError | SongsterrNotFoundError | SongsterrParseError,
+  SongsterrService
+> => SongsterrService.pipe(Effect.flatMap(service => service.getRawChordProData(songId, artist, title)))
 
 export const getChordData = (
   songId: number,
@@ -163,37 +226,16 @@ export const getChordData = (
   title: string,
 ): Effect.Effect<
   ChordProDocument,
-  SongsterrError | SongsterrNotFoundError | SongsterrParseError
-> => {
-  return Effect.gen(function* () {
-    const rawDoc = yield* getRawChordProData(songId, artist, title)
-
-    const lines = rawDoc.map(line => {
-      if (typeof line === "string") {
-        return { type: "lyrics" as const, content: line }
-      }
-      if (typeof line === "object" && line !== null) {
-        const lineObj = line as Record<string, unknown>
-        return {
-          type: (lineObj.type as "lyrics" | "chord" | "section" | "comment") ?? "lyrics",
-          content: (lineObj.content as string) ?? "",
-          chord: lineObj.chord as string | undefined,
-        }
-      }
-      return { type: "lyrics" as const, content: "" }
-    })
-
-    return {
-      songId,
-      title,
-      artist,
-      lines,
-    }
-  })
-}
+  SongsterrError | SongsterrNotFoundError | SongsterrParseError,
+  SongsterrService
+> => SongsterrService.pipe(Effect.flatMap(service => service.getChordData(songId, artist, title)))
 
 export async function searchSongsAsync(query: string): Promise<SongsterrSearchResult[]> {
-  return Effect.runPromise(searchSongs(query))
+  return Effect.runPromise(
+    searchSongs(query).pipe(
+      Effect.provide(SongsterrRuntimeLayer),
+    ),
+  )
 }
 
 export async function getChordDataAsync(
@@ -201,5 +243,9 @@ export async function getChordDataAsync(
   artist: string,
   title: string,
 ): Promise<ChordProDocument> {
-  return Effect.runPromise(getChordData(songId, artist, title))
+  return Effect.runPromise(
+    getChordData(songId, artist, title).pipe(
+      Effect.provide(SongsterrRuntimeLayer),
+    ),
+  )
 }

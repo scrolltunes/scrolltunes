@@ -1,4 +1,7 @@
-import { Data, Effect } from "effect"
+import { FetchService } from "@/services/fetch"
+import { ServerBaseLayer } from "@/services/server-base-layer"
+import { ServerConfig } from "@/services/server-config"
+import { Context, Data, Effect, Layer } from "effect"
 
 // --- Error Types ---
 
@@ -11,10 +14,6 @@ export class SpotifyAPIError extends Data.TaggedClass("SpotifyAPIError")<{
   readonly message: string
 }> {}
 
-export class SpotifyConfigError extends Data.TaggedClass("SpotifyConfigError")<{
-  readonly message: string
-}> {}
-
 export class SpotifyRateLimitError extends Data.TaggedClass("SpotifyRateLimitError")<{
   readonly retryAfter: number
 }> {}
@@ -22,7 +21,6 @@ export class SpotifyRateLimitError extends Data.TaggedClass("SpotifyRateLimitErr
 export type SpotifyError =
   | SpotifyAuthError
   | SpotifyAPIError
-  | SpotifyConfigError
   | SpotifyRateLimitError
 
 // --- Spotify Types ---
@@ -66,6 +64,17 @@ export interface SpotifySearchResult {
   }
 }
 
+export class SpotifyService extends Context.Tag("SpotifyService")<
+  SpotifyService,
+  {
+    readonly searchTracks: (
+      query: string,
+      limit?: number,
+    ) => Effect.Effect<SpotifySearchResult, SpotifyError>
+    readonly getTrack: (trackId: string) => Effect.Effect<SpotifyTrack, SpotifyError>
+  }
+>() {}
+
 // --- Token Cache ---
 
 interface TokenCache {
@@ -77,43 +86,38 @@ let tokenCache: TokenCache | null = null
 
 // --- Internal Helpers ---
 
-const getCredentials = (): Effect.Effect<
-  { clientId: string; clientSecret: string },
-  SpotifyConfigError
-> =>
-  Effect.suspend(() => {
-    const clientId = process.env.SPOTIFY_CLIENT_ID
-    const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
+const getCredentials = () =>
+  ServerConfig.pipe(
+    Effect.map(config => ({
+      clientId: config.spotifyClientId,
+      clientSecret: config.spotifyClientSecret,
+    })),
+  )
 
-    if (!clientId || !clientSecret) {
-      return Effect.fail(
-        new SpotifyConfigError({
-          message: "Missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET environment variables",
-        }),
-      )
-    }
+const fetchResponse = (
+  url: string,
+  init?: RequestInit,
+  message = "Network error",
+) =>
+  FetchService.pipe(
+    Effect.flatMap(({ fetch }) =>
+      fetch(url, init).pipe(
+        Effect.mapError(() => new SpotifyAPIError({ status: 0, message })),
+      ),
+    ),
+  )
 
-    return Effect.succeed({ clientId, clientSecret })
-  })
-
-const fetchTokenFromSpotify = (
-  clientId: string,
-  clientSecret: string,
-): Effect.Effect<{ access_token: string; expires_in: number }, SpotifyAPIError> =>
+const fetchTokenFromSpotify = (clientId: string, clientSecret: string) =>
   Effect.gen(function* () {
     const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
 
-    const response = yield* Effect.tryPromise({
-      try: () =>
-        fetch("https://accounts.spotify.com/api/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            Authorization: `Basic ${credentials}`,
-          },
-          body: "grant_type=client_credentials",
-        }),
-      catch: () => new SpotifyAPIError({ status: 0, message: "Network error" }),
+    const response = yield* fetchResponse("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${credentials}`,
+      },
+      body: "grant_type=client_credentials",
     })
 
     if (!response.ok) {
@@ -132,7 +136,7 @@ const fetchTokenFromSpotify = (
     })
   })
 
-const fetchAccessToken = (): Effect.Effect<string, SpotifyError> =>
+const fetchAccessToken = () =>
   Effect.gen(function* () {
     const now = Date.now()
     if (tokenCache && tokenCache.expiresAt > now + 60000) {
@@ -150,19 +154,12 @@ const fetchAccessToken = (): Effect.Effect<string, SpotifyError> =>
     return data.access_token
   })
 
-const fetchFromSpotifyAPI = <T>(
-  accessToken: string,
-  url: string,
-): Effect.Effect<T, SpotifyAPIError | SpotifyRateLimitError> =>
+const fetchFromSpotifyAPI = <T>(accessToken: string, url: string) =>
   Effect.gen(function* () {
-    const response = yield* Effect.tryPromise({
-      try: () =>
-        fetch(url, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }),
-      catch: () => new SpotifyAPIError({ status: 0, message: "Network error" }),
+    const response = yield* fetchResponse(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     })
 
     if (response.status === 429) {
@@ -185,11 +182,11 @@ const fetchFromSpotifyAPI = <T>(
     })
   })
 
-const withRetry = <T>(
-  makeEffect: () => Effect.Effect<T, SpotifyError>,
+const withRetry = <T, R>(
+  makeEffect: () => Effect.Effect<T, SpotifyError, R>,
   maxRetries = 3,
-): Effect.Effect<T, SpotifyError> => {
-  const loop = (attempt: number): Effect.Effect<T, SpotifyError> =>
+) => {
+  const loop = (attempt: number): Effect.Effect<T, SpotifyError, R> =>
     Effect.catchTag(makeEffect(), "SpotifyRateLimitError", error => {
       if (attempt >= maxRetries) {
         console.log(`[Spotify] Rate limit: max retries (${maxRetries}) exceeded`)
@@ -205,10 +202,7 @@ const withRetry = <T>(
   return loop(0)
 }
 
-const spotifyFetch = <T>(
-  path: string,
-  params?: Record<string, string>,
-): Effect.Effect<T, SpotifyError> =>
+const spotifyFetch = <T>(path: string, params?: Record<string, string>) =>
   withRetry(() =>
     Effect.gen(function* () {
       const accessToken = yield* fetchAccessToken()
@@ -226,27 +220,64 @@ const spotifyFetch = <T>(
 
 // --- Public API (Effect-based) ---
 
-export const searchTracksEffect = (
-  query: string,
-  limit = 20,
-): Effect.Effect<SpotifySearchResult, SpotifyError> =>
+const searchTracksRaw = (query: string, limit = 20) =>
   spotifyFetch<SpotifySearchResult>("/search", {
     q: query,
     type: "track",
     limit: String(Math.min(50, Math.max(1, limit))),
   })
 
-export const getTrackEffect = (trackId: string): Effect.Effect<SpotifyTrack, SpotifyError> =>
+const getTrackRaw = (trackId: string) =>
   spotifyFetch<SpotifyTrack>(`/tracks/${encodeURIComponent(trackId)}`)
+
+const makeSpotifyService = Effect.gen(function* () {
+  const serverConfig = yield* ServerConfig
+  const fetchService = yield* FetchService
+
+  const provideDeps = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    effect.pipe(
+      Effect.provideService(ServerConfig, serverConfig),
+      Effect.provideService(FetchService, fetchService),
+    )
+
+  return {
+    searchTracks: (query: string, limit?: number) =>
+      provideDeps(searchTracksRaw(query, limit)),
+    getTrack: (trackId: string) => provideDeps(getTrackRaw(trackId)),
+  }
+})
+
+export const SpotifyServiceLive = Layer.effect(SpotifyService, makeSpotifyService)
+
+const SpotifyRuntimeLayer = SpotifyServiceLive.pipe(Layer.provide(ServerBaseLayer))
+
+export const searchTracksEffect = (
+  query: string,
+  limit = 20,
+): Effect.Effect<SpotifySearchResult, SpotifyError, SpotifyService> =>
+  SpotifyService.pipe(Effect.flatMap(service => service.searchTracks(query, limit)))
+
+export const getTrackEffect = (
+  trackId: string,
+): Effect.Effect<SpotifyTrack, SpotifyError, SpotifyService> =>
+  SpotifyService.pipe(Effect.flatMap(service => service.getTrack(trackId)))
 
 // --- Public API (Async wrappers) ---
 
 export async function searchTracks(query: string, limit?: number): Promise<SpotifySearchResult> {
-  return Effect.runPromise(searchTracksEffect(query, limit))
+  return Effect.runPromise(
+    searchTracksEffect(query, limit).pipe(
+      Effect.provide(SpotifyRuntimeLayer),
+    ),
+  )
 }
 
 export async function getTrack(trackId: string): Promise<SpotifyTrack> {
-  return Effect.runPromise(getTrackEffect(trackId))
+  return Effect.runPromise(
+    getTrackEffect(trackId).pipe(
+      Effect.provide(SpotifyRuntimeLayer),
+    ),
+  )
 }
 
 // --- Utility Functions ---

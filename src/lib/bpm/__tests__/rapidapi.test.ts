@@ -10,6 +10,9 @@
  */
 
 import { Redis } from "@upstash/redis"
+import type { PublicConfig } from "@/services/public-config"
+import type { ServerConfig } from "@/services/server-config"
+import { ConfigLayer } from "@/services/server-base-layer"
 import { Effect } from "effect"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { rapidApiSpotifyProvider } from "../rapidapi-client"
@@ -33,6 +36,17 @@ const mockRapidApiResponse = (data: { tempo: string; key: string; mode: string }
 })
 
 const originalFetch = globalThis.fetch
+
+const runWithConfig = <A, E>(
+  effect: Effect.Effect<A, E, PublicConfig | ServerConfig>,
+) => Effect.runPromise(effect.pipe(Effect.provide(ConfigLayer)))
+
+const runWithConfigExit = <A, E>(
+  effect: Effect.Effect<A, E, PublicConfig | ServerConfig>,
+) => Effect.runPromiseExit(effect.pipe(Effect.provide(ConfigLayer)))
+
+const hasRealRedis =
+  !!process.env.KV_REST_API_URL && process.env.KV_REST_API_URL !== "https://test-kv.example.com"
 
 function getRedis() {
   const url = process.env.KV_REST_API_URL
@@ -60,8 +74,7 @@ describe("rapidApiSpotifyProvider unit tests", () => {
 
   beforeEach(() => {
     process.env.RAPIDAPI_KEY = "test-api-key"
-    process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS = "false"
-    process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY = ""
+    process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY = "test-web3forms-key"
   })
 
   afterEach(() => {
@@ -71,21 +84,14 @@ describe("rapidApiSpotifyProvider unit tests", () => {
 
   test("fails without spotifyId", async () => {
     const effect = rapidApiSpotifyProvider.getBpm({ title: "Song", artist: "Artist" })
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
     expect(exit._tag).toBe("Failure")
   })
 
   test("fails without RAPIDAPI_KEY", async () => {
     process.env.RAPIDAPI_KEY = ""
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
-    const exit = await Effect.runPromiseExit(effect)
-    expect(exit._tag).toBe("Failure")
-  })
-
-  test("fails when external APIs disabled", async () => {
-    process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS = "true"
-    const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
     expect(exit._tag).toBe("Failure")
   })
 })
@@ -95,9 +101,9 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
   let redis: Redis | null = null
 
   beforeEach(async () => {
+    if (!hasRealRedis) return
     process.env.RAPIDAPI_KEY = "test-api-key"
-    process.env.NEXT_PUBLIC_DISABLE_EXTERNAL_APIS = "false"
-    process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY = ""
+    process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY = "test-web3forms-key"
 
     redis = getRedis()
     if (redis) {
@@ -106,6 +112,7 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
   })
 
   afterEach(async () => {
+    if (!hasRealRedis) return
     globalThis.fetch = originalFetch
     Object.assign(process.env, originalEnv)
 
@@ -114,44 +121,44 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     }
   })
 
-  test.skipIf(!process.env.KV_REST_API_URL)("returns BPM on successful lookup", async () => {
+  test.skipIf(!hasRealRedis)("returns BPM on successful lookup", async () => {
     globalThis.fetch = mockFetchForRapidApiOnly(
       mockRapidApiResponse({ tempo: "120.5", key: "C", mode: "1" }),
     )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
 
     expect(result.bpm).toBe(121)
     expect(result.source).toBe("RapidAPI")
     expect(result.key).toBe("C major")
   })
 
-  test.skipIf(!process.env.KV_REST_API_URL)("formats key correctly for minor", async () => {
+  test.skipIf(!hasRealRedis)("formats key correctly for minor", async () => {
     globalThis.fetch = mockFetchForRapidApiOnly(
       mockRapidApiResponse({ tempo: "100", key: "C#", mode: "0" }),
     )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
 
     expect(result.key).toBe("C# minor")
   })
 
-  test.skipIf(!process.env.KV_REST_API_URL)("increments usage counter in Redis", async () => {
+  test.skipIf(!hasRealRedis)("increments usage counter in Redis", async () => {
     if (!redis) return
     globalThis.fetch = mockFetchForRapidApiOnly(
       mockRapidApiResponse({ tempo: "120", key: "C", mode: "1" }),
     )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
-    await Effect.runPromise(effect)
+    await runWithConfig(effect)
 
     const count = await redis.get<number>(getTodayKey())
     expect(count).toBeGreaterThanOrEqual(1)
   })
 
-  test.skipIf(!process.env.KV_REST_API_URL)("blocks requests when cap is reached", async () => {
+  test.skipIf(!hasRealRedis)("blocks requests when cap is reached", async () => {
     if (!redis) return
 
     await redis.set(getTodayKey(), 20, { ex: 60 })
@@ -161,7 +168,7 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
     if (exit._tag === "Failure" && exit.cause._tag === "Fail") {
@@ -169,7 +176,7 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     }
   })
 
-  test.skipIf(!process.env.KV_REST_API_URL)("allows requests under cap", async () => {
+  test.skipIf(!hasRealRedis)("allows requests under cap", async () => {
     if (!redis) return
 
     await redis.set(getTodayKey(), 19, { ex: 60 })
@@ -179,7 +186,7 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
-    const result = await Effect.runPromise(effect)
+    const result = await runWithConfig(effect)
 
     expect(result.bpm).toBe(120)
 
@@ -187,7 +194,7 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     expect(newCount).toBe(20)
   })
 
-  test.skipIf(!process.env.KV_REST_API_URL)("multiple requests increment counter", async () => {
+  test.skipIf(!hasRealRedis)("multiple requests increment counter", async () => {
     if (!redis) return
     await redis.del(getTodayKey())
 
@@ -197,14 +204,14 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
 
     for (let i = 0; i < 3; i++) {
       const effect = rapidApiSpotifyProvider.getBpm(createQuery(`spotify${i}`))
-      await Effect.runPromise(effect)
+      await runWithConfig(effect)
     }
 
     const count = await redis.get<number>(getTodayKey())
     expect(count).toBeGreaterThanOrEqual(3)
   })
 
-  test.skipIf(!process.env.KV_REST_API_URL)("handles 404 as BPMNotFoundError", async () => {
+  test.skipIf(!hasRealRedis)("handles 404 as BPMNotFoundError", async () => {
     globalThis.fetch = mockFetchForRapidApiOnly({
       ok: false,
       status: 404,
@@ -212,12 +219,12 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     } as ReturnType<typeof mockRapidApiResponse>)
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
-    const exit = await Effect.runPromiseExit(effect)
+    const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
   })
 
-  test.skipIf(!process.env.KV_REST_API_URL)(
+  test.skipIf(!hasRealRedis)(
     "handles 429 rate limit as BPMNotFoundError",
     async () => {
       globalThis.fetch = mockFetchForRapidApiOnly({
@@ -227,7 +234,7 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
       } as ReturnType<typeof mockRapidApiResponse>)
 
       const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
-      const exit = await Effect.runPromiseExit(effect)
+      const exit = await runWithConfigExit(effect)
 
       expect(exit._tag).toBe("Failure")
     },

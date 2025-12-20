@@ -44,6 +44,13 @@ Vercel auto-deploys from git. Just commit and push — no manual deploy needed.
 - Copy: imperative mood ("Detect voice"), no ending punctuation
 - Prefer Effect.ts conventions over pure TypeScript patterns
 
+## Effect.ts Requirements (Critical)
+
+- Use Effect for everything: async work, fanout/parallelism, timeouts, retries, and fallbacks.
+- Dependencies must be modeled as services and provided via `Layer` at the composition root.
+- Errors must be typed and handled through Effect error channels (no `try/catch` in domain logic).
+- All environment/config access must use `Effect.Config` + `ConfigProvider`; validate required config at startup.
+
 ## Core Concepts
 
 ### 1. LyricsPlayer

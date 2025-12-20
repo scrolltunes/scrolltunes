@@ -1,3 +1,4 @@
+import "@/services/validate-env"
 import { auth } from "@/auth"
 import { AuthProvider } from "@/components/auth"
 import { DevTitle, Footer, FooterProvider, ThemeProvider } from "@/components/layout"

@@ -6,7 +6,10 @@
  */
 
 import { Redis } from "@upstash/redis"
-import { Effect } from "effect"
+import { FetchService, type FetchError } from "@/services/fetch"
+import { PublicConfig } from "@/services/public-config"
+import { ServerConfig } from "@/services/server-config"
+import { Context, Effect, Layer } from "effect"
 
 const MONTHLY_SECONDS_CAP = 3600 // 60 minutes
 const KV_KEY_PREFIX = "speech:usage:"
@@ -14,19 +17,15 @@ const KV_WARNED_PREFIX = "speech:warned:"
 const WARNING_THRESHOLDS = [0.75, 0.85, 0.95] as const
 const HIDE_THRESHOLD = 0.99 // Hide button at 99%
 
-interface UsageContext {
+export interface UsageContext {
   readonly userId: string
   readonly durationSeconds: number
 }
 
-function getRedisClient(): Redis | null {
-  const url = process.env.KV_REST_API_URL
-  const token = process.env.KV_REST_API_TOKEN
-  if (!url || !token) {
-    return null
-  }
-  return new Redis({ url, token })
-}
+type FetchEffect = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Effect.Effect<Response, FetchError>
 
 function getMonthKey(): string {
   return new Date().toISOString().slice(0, 7) // YYYY-MM
@@ -46,14 +45,13 @@ function formatDuration(seconds: number): string {
   return `${mins}m ${secs}s`
 }
 
-async function sendUsageWarning(
+const sendUsageWarning = (
+  fetchEffect: FetchEffect,
+  accessKey: string,
   current: number,
   threshold: number,
   context: UsageContext,
-): Promise<void> {
-  const accessKey = process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY
-  if (!accessKey) return
-
+): Effect.Effect<void, Error> => {
   const percentage = Math.round(threshold * 100)
   const monthKey = getMonthKey()
   const [year, month] = monthKey.split("-")
@@ -61,15 +59,14 @@ async function sendUsageWarning(
     month: "long",
   })
 
-  try {
-    await fetch("https://api.web3forms.com/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        access_key: accessKey,
-        subject: `[ScrollTunes] Speech-to-Text usage at ${percentage}%`,
-        from_name: "ScrollTunes Rate Limiter",
-        message: `Google Speech-to-Text API usage warning:
+  return fetchEffect("https://api.web3forms.com/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      access_key: accessKey,
+      subject: `[ScrollTunes] Speech-to-Text usage at ${percentage}%`,
+      from_name: "ScrollTunes Rate Limiter",
+      message: `Google Speech-to-Text API usage warning:
 
 Current usage: ${formatDuration(current)} / ${formatDuration(MONTHLY_SECONDS_CAP)} (${percentage}%)
 Month: ${monthName} ${year}
@@ -79,96 +76,130 @@ Triggered by:
   Duration: ${formatDuration(context.durationSeconds)}
 
 The free tier allows 60 minutes/month. Exceeding this will incur charges.`,
-      }),
-    })
-  } catch {
-    // Silently ignore notification failures
-  }
+    }),
+  }).pipe(
+    Effect.asVoid,
+    Effect.catchAll(() => Effect.void),
+  )
 }
 
-async function checkAndSendWarnings(
+const checkAndSendWarnings = (
   redis: Redis,
+  fetchEffect: FetchEffect,
+  accessKey: string,
   current: number,
   context: UsageContext,
-): Promise<void> {
-  for (const threshold of WARNING_THRESHOLDS) {
-    const thresholdSeconds = Math.floor(MONTHLY_SECONDS_CAP * threshold)
-    if (current >= thresholdSeconds) {
+): Effect.Effect<void, Error> =>
+  Effect.gen(function* () {
+    for (const threshold of WARNING_THRESHOLDS) {
+      const thresholdSeconds = Math.floor(MONTHLY_SECONDS_CAP * threshold)
+      if (current < thresholdSeconds) continue
       const warnedKey = getWarnedKey(threshold)
-      const alreadyWarned = await redis.get<boolean>(warnedKey)
+      const alreadyWarned = yield* Effect.tryPromise({
+        try: () => redis.get<boolean>(warnedKey),
+        catch: error => new Error(`Failed to read warning flag: ${String(error)}`),
+      })
       if (!alreadyWarned) {
         // Expire warning flags after 35 days (covers full month + buffer)
-        await redis.set(warnedKey, true, { ex: 35 * 24 * 60 * 60 })
-        await sendUsageWarning(current, threshold, context)
+        yield* Effect.tryPromise({
+          try: () => redis.set(warnedKey, true, { ex: 35 * 24 * 60 * 60 }),
+          catch: error => new Error(`Failed to persist warning flag: ${String(error)}`),
+        })
+        yield* sendUsageWarning(fetchEffect, accessKey, current, threshold, context)
       }
     }
+  })
+
+export class SpeechUsageTracker extends Context.Tag("SpeechUsageTracker")<
+  SpeechUsageTracker,
+  {
+    readonly checkQuotaAvailable: Effect.Effect<boolean, Error>
+    readonly incrementUsage: (context: UsageContext) => Effect.Effect<void, Error>
+    readonly getUsageStats: Effect.Effect<{ used: number; cap: number; percentUsed: number }, Error>
   }
-}
+>() {}
+
+const makeSpeechUsageTracker = Effect.gen(function* () {
+  const { kvRestApiUrl, kvRestApiToken } = yield* ServerConfig
+  const { web3FormsAccessKey } = yield* PublicConfig
+  const { fetch } = yield* FetchService
+
+  const redis = new Redis({ url: kvRestApiUrl, token: kvRestApiToken })
+
+  const checkQuotaAvailable: Effect.Effect<boolean, Error> = Effect.gen(function* () {
+    const key = getUsageKey()
+    const current = yield* Effect.tryPromise({
+      try: () => redis.get<number>(key),
+      catch: error => new Error(`Failed to check quota: ${String(error)}`),
+    })
+    if (current === null) {
+      return true
+    }
+    const hideThresholdSeconds = Math.floor(MONTHLY_SECONDS_CAP * HIDE_THRESHOLD)
+    return current < hideThresholdSeconds
+  })
+
+  const incrementUsage = (context: UsageContext): Effect.Effect<void, Error> =>
+    Effect.gen(function* () {
+      const key = getUsageKey()
+      const current = yield* Effect.tryPromise({
+        try: () => redis.get<number>(key),
+        catch: error => new Error(`Failed to increment usage: ${String(error)}`),
+      })
+      const newCount = yield* Effect.tryPromise({
+        try: () => redis.incrby(key, context.durationSeconds),
+        catch: error => new Error(`Failed to increment usage: ${String(error)}`),
+      })
+      if (current === null) {
+        // Expire usage key after 35 days (covers full month + buffer)
+        yield* Effect.tryPromise({
+          try: () => redis.expire(key, 35 * 24 * 60 * 60),
+          catch: error => new Error(`Failed to set expiration: ${String(error)}`),
+        })
+      }
+      yield* checkAndSendWarnings(redis, fetch, web3FormsAccessKey, newCount, context)
+    })
+
+  const getUsageStats: Effect.Effect<{ used: number; cap: number; percentUsed: number }, Error> =
+    Effect.gen(function* () {
+      const key = getUsageKey()
+      const current = yield* Effect.tryPromise({
+        try: () => redis.get<number>(key),
+        catch: error => new Error(`Failed to get usage stats: ${String(error)}`),
+      })
+      const used = current ?? 0
+      const percentUsed = Math.round((used / MONTHLY_SECONDS_CAP) * 100)
+      return { used, cap: MONTHLY_SECONDS_CAP, percentUsed }
+    })
+
+  return {
+    checkQuotaAvailable,
+    incrementUsage,
+    getUsageStats,
+  }
+})
+
+export const SpeechUsageTrackerLive = Layer.effect(SpeechUsageTracker, makeSpeechUsageTracker)
 
 /**
  * Check if quota allows usage (returns false if >= 99%)
  */
-export function checkQuotaAvailable(): Effect.Effect<boolean, Error> {
-  return Effect.tryPromise({
-    try: async () => {
-      const redis = getRedisClient()
-      if (!redis) {
-        return true // Allow if no Redis configured
-      }
-      const key = getUsageKey()
-      const current = await redis.get<number>(key)
-      if (current === null) {
-        return true
-      }
-      const hideThresholdSeconds = Math.floor(MONTHLY_SECONDS_CAP * HIDE_THRESHOLD)
-      return current < hideThresholdSeconds
-    },
-    catch: error => new Error(`Failed to check quota: ${String(error)}`),
-  })
-}
+export const checkQuotaAvailable = (): Effect.Effect<boolean, Error, SpeechUsageTracker> =>
+  SpeechUsageTracker.pipe(Effect.flatMap(service => service.checkQuotaAvailable))
 
 /**
  * Increment usage after transcription
  */
-export function incrementUsage(context: UsageContext): Effect.Effect<void, Error> {
-  return Effect.tryPromise({
-    try: async () => {
-      const redis = getRedisClient()
-      if (!redis) {
-        return
-      }
-      const key = getUsageKey()
-      const current = await redis.get<number>(key)
-      const newCount = await redis.incrby(key, context.durationSeconds)
-      if (current === null) {
-        // Expire usage key after 35 days (covers full month + buffer)
-        await redis.expire(key, 35 * 24 * 60 * 60)
-      }
-      await checkAndSendWarnings(redis, newCount, context)
-    },
-    catch: error => new Error(`Failed to increment usage: ${String(error)}`),
-  })
-}
+export const incrementUsage = (
+  context: UsageContext,
+): Effect.Effect<void, Error, SpeechUsageTracker> =>
+  SpeechUsageTracker.pipe(Effect.flatMap(service => service.incrementUsage(context)))
 
 /**
  * Get current usage stats
  */
-export function getUsageStats(): Effect.Effect<
+export const getUsageStats = (): Effect.Effect<
   { used: number; cap: number; percentUsed: number },
-  Error
-> {
-  return Effect.tryPromise({
-    try: async () => {
-      const redis = getRedisClient()
-      if (!redis) {
-        return { used: 0, cap: MONTHLY_SECONDS_CAP, percentUsed: 0 }
-      }
-      const key = getUsageKey()
-      const current = await redis.get<number>(key)
-      const used = current ?? 0
-      const percentUsed = Math.round((used / MONTHLY_SECONDS_CAP) * 100)
-      return { used, cap: MONTHLY_SECONDS_CAP, percentUsed }
-    },
-    catch: error => new Error(`Failed to get usage stats: ${String(error)}`),
-  })
-}
+  Error,
+  SpeechUsageTracker
+> => SpeechUsageTracker.pipe(Effect.flatMap(service => service.getUsageStats))

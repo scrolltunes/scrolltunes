@@ -2,6 +2,7 @@ import type { Metadata, ResolvingMetadata } from "next"
 import { type LyricsApiResponse, isLyricsApiSuccess } from "@/lib"
 import { parseTrackSlugWithId } from "@/lib/slug"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
+import { loadServerConfig } from "@/services/server-config"
 
 interface GenerateMetadataProps {
   params: Promise<{ artistSlug: string; trackSlugWithId: string }>
@@ -25,9 +26,7 @@ export async function generateMetadata(
   }
 
   try {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000"
+    const { baseUrl } = loadServerConfig()
 
     const url = spotifyId
       ? `${baseUrl}/api/lyrics/${lrclibId}?spotifyId=${spotifyId}`

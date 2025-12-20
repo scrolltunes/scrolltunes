@@ -1,6 +1,7 @@
 import { encryptToken } from "@/lib/crypto"
 import { db } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
+import { loadServerConfig } from "@/services/server-config"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
 import NextAuth, { type DefaultSession } from "next-auth"
 import Google from "next-auth/providers/google"
@@ -23,6 +24,8 @@ declare module "@auth/core/jwt" {
   }
 }
 
+const serverConfig = loadServerConfig()
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db, {
     usersTable: schema.users,
@@ -38,12 +41,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+      clientId: serverConfig.googleClientId,
+      clientSecret: serverConfig.googleClientSecret,
     }),
     Spotify({
-      clientId: process.env.SPOTIFY_CLIENT_ID ?? "",
-      clientSecret: process.env.SPOTIFY_CLIENT_SECRET ?? "",
+      clientId: serverConfig.spotifyClientId,
+      clientSecret: serverConfig.spotifyClientSecret,
       authorization: {
         params: {
           scope: "user-read-email user-read-private",

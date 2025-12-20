@@ -6,7 +6,14 @@ import {
 } from "@/lib/lyrics-client"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import type { SearchResultTrack } from "@/lib/search-api-types"
-import { formatArtists, getAlbumImageUrl, searchTracksEffect } from "@/lib/spotify-client"
+import {
+  formatArtists,
+  getAlbumImageUrl,
+  searchTracksEffect,
+  type SpotifyService,
+} from "@/lib/spotify-client"
+import type { FetchService } from "@/services/fetch"
+import { ServerLayer } from "@/services/server-layer"
 import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
 
@@ -55,7 +62,7 @@ function findSpotifyMatch(
   query: string,
   trackName: string,
   artistName: string,
-): Effect.Effect<SpotifyMatch | null, never> {
+): Effect.Effect<SpotifyMatch | null, never, SpotifyService> {
   return searchTracksEffect(query, 10).pipe(
     Effect.map(result => {
       const normalizedTrack = normalizeForMatch(trackName)
@@ -117,7 +124,7 @@ function dedupeKey(trackName: string, artistName: string): string {
 function searchLRCLib(
   query: string,
   limit: number,
-): Effect.Effect<SearchResultTrack[], LyricsError> {
+): Effect.Effect<SearchResultTrack[], LyricsError, FetchService | SpotifyService> {
   return Effect.gen(function* () {
     // Use Spotify-first flow for better accuracy
     const results = yield* searchLRCLibBySpotifyMetadata(query)
@@ -194,7 +201,9 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const result = await Effect.runPromiseExit(searchLRCLib(query, parsedLimit))
+  const result = await Effect.runPromiseExit(
+    searchLRCLib(query, parsedLimit).pipe(Effect.provide(ServerLayer)),
+  )
 
   if (result._tag === "Failure") {
     const cause = result.cause

@@ -1,16 +1,19 @@
 "use client"
 
 import { ReportIssueModal } from "@/components/feedback"
+import { loadPublicConfig } from "@/services/public-config"
 import { Bug, Info, XLogo } from "@phosphor-icons/react"
 import Link from "next/link"
 import { useState } from "react"
 import { useFooterSlot } from "./FooterContext"
 
+const publicConfig = loadPublicConfig()
+
 export function Footer() {
   const [showReportModal, setShowReportModal] = useState(false)
-  const sha = process.env.NEXT_PUBLIC_GIT_SHA ?? "dev"
+  const sha = publicConfig.gitSha
   const shortSha = sha.slice(0, 7)
-  const env = process.env.NEXT_PUBLIC_VERCEL_ENV
+  const env = publicConfig.vercelEnv
   const { slot } = useFooterSlot()
 
   return (

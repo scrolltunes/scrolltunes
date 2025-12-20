@@ -1,4 +1,5 @@
 import { searchSongs } from "@/lib/chords/songsterr-client"
+import { ServerLayer } from "@/services/server-layer"
 import { Effect } from "effect"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   const query = `${artist} ${title}`
 
-  const result = await Effect.runPromiseExit(searchSongs(query))
+  const result = await Effect.runPromiseExit(searchSongs(query).pipe(Effect.provide(ServerLayer)))
 
   if (result._tag === "Failure") {
     return NextResponse.json({ error: "Search failed" }, { status: 500 })
