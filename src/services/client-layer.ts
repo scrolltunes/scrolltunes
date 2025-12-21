@@ -11,11 +11,7 @@ import { SoundSystemLive } from "./sound-system"
 import type { StorageService } from "./storage"
 import { StorageServiceLive } from "./storage"
 
-export type ClientLayerContext =
-  | FetchService
-  | PublicConfig
-  | SoundSystemService
-  | StorageService
+export type ClientLayerContext = FetchService | PublicConfig | SoundSystemService | StorageService
 
 const ClientConfigLayer = PublicConfigLive.pipe(Layer.provide(AppConfigProviderLive))
 
