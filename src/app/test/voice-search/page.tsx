@@ -9,8 +9,44 @@ import {
   useIsWebSpeechAvailable,
   useAccount,
 } from "@/core"
-import { Microphone, Stop, Warning, GoogleLogo, Globe } from "@phosphor-icons/react"
+import { Microphone, Stop, Warning, GoogleLogo, Globe, Detective } from "@phosphor-icons/react"
 import { memo, useCallback, useEffect, useState } from "react"
+
+// Mobile detection pattern (same as SpeechRecognitionStore)
+const MOBILE_UA_REGEX = /Android|iPhone|iPad|iPod/i
+
+interface BraveDetectionInfo {
+  readonly isMobile: boolean
+  readonly hasBraveApi: boolean
+  readonly isBrave: boolean
+  readonly isBraveDesktop: boolean
+  readonly userAgent: string
+}
+
+async function detectBraveInfo(): Promise<BraveDetectionInfo> {
+  const userAgent = navigator.userAgent
+  const isMobile = MOBILE_UA_REGEX.test(userAgent)
+
+  const nav = navigator as Navigator & { brave?: { isBrave?: () => Promise<boolean> } }
+  const hasBraveApi = !!nav.brave?.isBrave
+
+  let isBrave = false
+  if (hasBraveApi) {
+    try {
+      isBrave = (await nav.brave?.isBrave?.()) ?? false
+    } catch {
+      // Ignore errors
+    }
+  }
+
+  return {
+    isMobile,
+    hasBraveApi,
+    isBrave,
+    isBraveDesktop: isBrave && !isMobile,
+    userAgent,
+  }
+}
 
 function StatusBadge({ active, label }: { active: boolean; label: string }) {
   return (
@@ -392,6 +428,11 @@ const VoiceSearchTester = memo(function VoiceSearchTester() {
     stats?: { used: number; cap: number; percentUsed: number }
   } | null>(null)
   const [isCheckingQuota, setIsCheckingQuota] = useState(false)
+  const [braveInfo, setBraveInfo] = useState<BraveDetectionInfo | null>(null)
+
+  useEffect(() => {
+    detectBraveInfo().then(setBraveInfo)
+  }, [])
 
   const handleCheckQuota = useCallback(async () => {
     setIsCheckingQuota(true)
@@ -509,6 +550,42 @@ const VoiceSearchTester = memo(function VoiceSearchTester() {
         </div>
       </section>
 
+      {/* Brave Detection */}
+      <section className="p-4 bg-neutral-900 rounded-xl space-y-3 border border-orange-500/30">
+        <div className="flex items-center gap-3">
+          <Detective size={24} weight="bold" className="text-orange-400" />
+          <h2 className="text-sm font-medium text-orange-400 uppercase tracking-wider">
+            Brave Detection
+          </h2>
+        </div>
+        <p className="text-xs text-neutral-500">
+          Brave desktop blocks Web Speech API. Detection skips Web Speech and uses Google STT directly.
+        </p>
+        {braveInfo ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge active={braveInfo.isMobile} label="Mobile" />
+              <StatusBadge active={braveInfo.hasBraveApi} label="Brave API" />
+              <StatusBadge active={braveInfo.isBrave} label="Is Brave" />
+              <StatusBadge active={braveInfo.isBraveDesktop} label="Brave Desktop" />
+            </div>
+            {braveInfo.isBraveDesktop && (
+              <div className="p-2 bg-orange-900/20 border border-orange-500/30 rounded text-orange-300 text-sm">
+                ⚡ Brave desktop detected — will use Google STT directly
+              </div>
+            )}
+            <div>
+              <span className="text-neutral-500 text-xs">User Agent:</span>
+              <p className="text-neutral-400 font-mono text-xs break-all bg-neutral-800 rounded px-2 py-1 mt-1">
+                {braveInfo.userAgent}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-neutral-500 text-sm">Detecting...</p>
+        )}
+      </section>
+
       {/* Tiered System Test (Combined Flow) */}
       <section className="p-4 bg-neutral-900 rounded-xl space-y-4 border border-indigo-500/30">
         <h2 className="text-sm font-medium text-indigo-400 uppercase tracking-wider">
@@ -528,6 +605,27 @@ const VoiceSearchTester = memo(function VoiceSearchTester() {
           <div className="pt-2">
             <span className="text-neutral-400 text-sm mr-2">Active Tier:</span>
             <TierBadge tier={tier} />
+          </div>
+        )}
+
+        {/* Silence Detection Status (Google STT mode only) */}
+        {speechState.isSilenceDetectionActive && (
+          <div className="p-3 bg-cyan-900/20 border border-cyan-500/30 rounded-lg space-y-2">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  speechState.isSilent ? "bg-cyan-500" : "bg-green-500 animate-pulse"
+                }`}
+              />
+              <span className="text-cyan-400 text-sm font-medium">Silence Detection Active</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge active={speechState.hasSpeechBeenDetected} label="Speech Detected" />
+              <StatusBadge active={speechState.isSilent} label="Silent" />
+            </div>
+            <p className="text-xs text-neutral-500">
+              Auto-stops after 1.5s of silence following speech
+            </p>
           </div>
         )}
 

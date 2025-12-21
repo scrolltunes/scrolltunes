@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react"
 
 export function useVoiceSearch() {
   const speechState = useSpeechState()
-  const { start, stop, checkQuota, clearTranscript } = useSpeechControls()
+  const { start, stop, checkQuota, clearTranscript, clearError } = useSpeechControls()
   const isAuthenticated = useIsAuthenticated()
   const isQuotaAvailable = useIsQuotaAvailable()
   const hasPrefetchedQuotaRef = useRef(false)
@@ -34,12 +34,24 @@ export function useVoiceSearch() {
       setIsProcessing(true)
     }
 
-    if (speechState.finalTranscript || speechState.errorMessage) {
-      // Got results or error, done processing
+    // Clear processing on any of: final transcript, error message, or error code
+    if (speechState.finalTranscript || speechState.errorMessage || speechState.errorCode) {
       setIsProcessing(false)
       wasRecordingRef.current = false
     }
-  }, [speechState.isRecording, speechState.finalTranscript, speechState.errorMessage])
+  }, [speechState.isRecording, speechState.finalTranscript, speechState.errorMessage, speechState.errorCode])
+
+  // Safety timeout: clear processing state after 10 seconds max
+  useEffect(() => {
+    if (!isProcessing) return
+
+    const timeoutId = setTimeout(() => {
+      setIsProcessing(false)
+      wasRecordingRef.current = false
+    }, 10000)
+
+    return () => clearTimeout(timeoutId)
+  }, [isProcessing])
 
   // Determine if speech is being detected (has partial transcript)
   const isSpeechDetected = speechState.isRecording && speechState.partialTranscript.length > 0
@@ -62,5 +74,6 @@ export function useVoiceSearch() {
     stop,
     checkQuota,
     clearTranscript,
+    clearError,
   }
 }

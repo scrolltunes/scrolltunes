@@ -271,7 +271,6 @@
 - [ ] Add host controls
 
 ### Voice Search ✅
-- [x] **Design doc**: [docs/voice-search-design.md](docs/voice-search-design.md)
 - [x] **Tiered plan**: [docs/voice-search-webspeech-google-stt-plan.md](docs/voice-search-webspeech-google-stt-plan.md)
 - [x] Phase 1: Backend transcription via Google STT V2 (latest_short model)
 - [x] Phase 2: SpeechRecognitionStore + audio capture (MediaRecorder)
@@ -285,6 +284,14 @@
   - [x] `tierUsed` state tracking (`"google_stt"` | `"webspeech"`)
   - [x] Quota API returns `webSpeechAvailable` flag
   - [x] Test page at `/test/voice-search`
+- [x] Phase 7: Brave desktop detection + VAD-based end-of-utterance
+  - [x] Detect Brave desktop via `navigator.brave.isBrave()` API
+  - [x] Skip Web Speech on Brave desktop (blocks connections to Google speech servers)
+  - [x] Mobile Brave excluded (uses native OS speech, works fine)
+  - [x] VAD-based end-of-utterance for Google STT mode using VoiceActivityStore
+  - [x] AND-gate disabled for voice search (only voice detection needed)
+  - [x] 1.5s silence timer after voice stops (handles pauses between words)
+  - [x] Brave detection section on test page at `/test/voice-search`
 - [ ] Use named recognizer instead of `_` to enable `audio_durations` metric for Google Cloud monitoring
 
 ### Advanced Features

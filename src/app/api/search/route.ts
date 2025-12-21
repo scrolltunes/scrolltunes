@@ -185,6 +185,10 @@ function searchLRCLib(
 }
 
 export async function GET(request: NextRequest) {
+  // Log user agent for testing mobile detection
+  const userAgent = request.headers.get("user-agent")
+  console.log("[SEARCH] User-Agent:", userAgent)
+
   const searchParams = request.nextUrl.searchParams
   const query = searchParams.get("q")?.trim()
   const limit = searchParams.get("limit")

@@ -22,9 +22,23 @@ Deliverables: client-side recording + STT orchestration, backend STT endpoint, s
 - Google STT fallback only when confidence is low AND quota available
 - `tierUsed` state tracks which tier produced the final transcript
 - Test page at `/test/voice-search`
+- **Brave desktop detection** — skips Web Speech and uses Google STT directly
+- **VAD-based end-of-utterance** for Google STT mode using VoiceActivityStore
+
+**Brave Desktop Handling:**
+- Brave desktop blocks Web Speech API connections to Google's speech servers
+- Detection via `navigator.brave.isBrave()` API at initialization
+- Mobile Brave uses native OS speech recognition (works fine) — excluded via user-agent pattern `/Android|iPhone|iPad|iPod/i`
+- When Brave desktop detected: `useGoogleSTTOnly` flag is set, Web Speech is skipped entirely
+
+**End-of-utterance in Google STT Mode:**
+- Uses `VoiceActivityStore` with Silero VAD for robust voice detection in noisy environments
+- AND-gate is temporarily disabled (only voice detection needed, not singing+energy gate)
+- When VAD reports voice stopped after minimum 500ms of speech, starts a 1.5s silence timer
+- If voice resumes before timer fires, timer is cancelled (handles pauses between words)
+- If silence persists for 1.5s, recording auto-stops and audio is sent to Google STT
 
 **Not using:**
-- Custom VAD for voice search (removed in favor of Web Speech native detection)
 - Parallel race strategy (simplified to sequential: Web Speech first, fallback if needed)
 
 ---

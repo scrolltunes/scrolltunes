@@ -326,6 +326,10 @@ export const SongSearch = memo(function SongSearch({
     if (voiceSearch.isRecording) {
       voiceSearch.stop()
     } else {
+      // Clear any previous error before retrying
+      if (voiceSearch.error) {
+        voiceSearch.clearError()
+      }
       voiceSearch.start()
     }
   }, [voiceSearch])

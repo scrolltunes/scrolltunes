@@ -14,7 +14,13 @@ interface ErrorResponse {
   error: string
 }
 
-export async function GET(): Promise<NextResponse<QuotaResponse | ErrorResponse>> {
+export async function GET(
+  request: Request,
+): Promise<NextResponse<QuotaResponse | ErrorResponse>> {
+  // Log user agent for testing mobile detection
+  const userAgent = request.headers.get("user-agent")
+  console.log("[QUOTA] User-Agent:", userAgent)
+
   const session = await auth()
 
   if (!session?.user?.id) {

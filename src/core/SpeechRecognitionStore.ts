@@ -5,6 +5,7 @@ import { loadPublicConfig } from "@/services/public-config"
 import { SoundSystemService } from "@/services/sound-system"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
+import { voiceActivityStore } from "./VoiceActivityStore"
 
 // Web Speech API types
 declare global {
@@ -33,6 +34,10 @@ export interface SpeechState {
   readonly lastUpdatedAt: number | null
   readonly errorCode: string | null
   readonly errorMessage: string | null
+  // Silence detection state (for Google STT only mode)
+  readonly isSilenceDetectionActive: boolean
+  readonly hasSpeechBeenDetected: boolean
+  readonly isSilent: boolean
 }
 
 // --- Tagged Events ---
@@ -91,9 +96,47 @@ function speechLog(category: string, message: string, data?: Record<string, unkn
 const MAX_RECORDING_DURATION_MS = 10000
 const SAMPLE_RATE = 16000
 
+// VAD-based end-of-utterance detection for Google STT only mode
+const SPEECH_MIN_DURATION_MS = 500 // Minimum speech before silence timer starts
+const SILENCE_DURATION_MS = 1500 // Wait this long after voice stops before auto-stopping
+
 // Confidence thresholds for Web Speech fallback decision
 const MIN_TRANSCRIPT_LENGTH = 2
 const GARBAGE_CHARS_REGEX = /[^a-zA-Z0-9\s'''-]/g
+
+// Mobile detection pattern
+const MOBILE_UA_REGEX = /Android|iPhone|iPad|iPod/i
+
+// --- Brave Desktop Detection ---
+
+// Brave exposes navigator.brave on desktop, but mobile Brave uses native OS speech recognition
+// which works fine. So we only want to detect desktop Brave.
+async function detectBraveDesktop(): Promise<boolean> {
+  if (typeof navigator === "undefined") return false
+
+  // Check if mobile - Brave mobile uses native OS speech recognition which works
+  const isMobile = MOBILE_UA_REGEX.test(navigator.userAgent)
+  if (isMobile) {
+    speechLog("DETECT", "Mobile browser detected, Web Speech should work")
+    return false
+  }
+
+  // Check for Brave browser via navigator.brave
+  const nav = navigator as Navigator & { brave?: { isBrave?: () => Promise<boolean> } }
+  if (nav.brave?.isBrave) {
+    try {
+      const isBrave = await nav.brave.isBrave()
+      if (isBrave) {
+        speechLog("DETECT", "Brave desktop detected, will use Google STT directly")
+        return true
+      }
+    } catch {
+      // If the check fails, assume not Brave
+    }
+  }
+
+  return false
+}
 
 // --- SpeechRecognitionStore Class ---
 
@@ -115,6 +158,9 @@ export class SpeechRecognitionStore {
     lastUpdatedAt: null,
     errorCode: null,
     errorMessage: null,
+    isSilenceDetectionActive: false,
+    hasSpeechBeenDetected: false,
+    isSilent: false,
   }
 
   private checkWebSpeechSupport(): boolean {
@@ -138,6 +184,18 @@ export class SpeechRecognitionStore {
   // Web Speech transcript (stored for fallback evaluation)
   private webSpeechTranscript: string | null = null
   private webSpeechLanguageCode: string | null = null
+
+  // Skip Web Speech and use Google STT directly (set after network error or Brave desktop detection)
+  private useGoogleSTTOnly = false
+
+  // Brave desktop detection (detected once at initialization)
+  private isBraveDesktop = false
+  private braveDetectionPromise: Promise<boolean> | null = null
+
+  // VAD-based end-of-utterance detection for Google STT only mode
+  private vadUnsubscribe: (() => void) | null = null
+  private speechStartedAt: number | null = null
+  private silenceTimerId: ReturnType<typeof setTimeout> | null = null
 
   private runPromiseWithClientLayer<T, E, R extends ClientLayerContext>(
     effect: Effect.Effect<T, E, R>,
@@ -264,7 +322,18 @@ export class SpeechRecognitionStore {
   }
 
   async initialize(): Promise<void> {
-    // No-op - quota is checked lazily when needed
+    // Detect Brave desktop once (deduplicated)
+    if (!this.braveDetectionPromise) {
+      this.braveDetectionPromise = detectBraveDesktop().then(isBrave => {
+        this.isBraveDesktop = isBrave
+        if (isBrave) {
+          this.useGoogleSTTOnly = true
+          speechLog("INIT", "Brave desktop detected, enabling Google STT only mode")
+        }
+        return isBrave
+      })
+    }
+    await this.braveDetectionPromise
   }
 
   // --- Event dispatch ---
@@ -308,40 +377,84 @@ export class SpeechRecognitionStore {
   > = Effect.gen(
     this,
     function* (_) {
+      speechLog("START", "startRecognitionEffect called", {
+        isRecording: this.state.isRecording,
+        isConnecting: this.state.isConnecting,
+        currentError: this.state.errorCode,
+      })
+
       if (this.state.isRecording || this.state.isConnecting) {
         speechLog("START", "Already recording or connecting, ignoring")
         return
       }
 
+      // Ensure Brave detection has run
+      yield* _(Effect.promise(() => this.initialize()))
+
+      // Check if we should use Google STT only (Brave desktop or previous network error)
+      const useGoogleSTTOnly = this.useGoogleSTTOnly
+      speechLog("START", "Mode check", {
+        useGoogleSTTOnly,
+        isBraveDesktop: this.isBraveDesktop,
+        quotaAvailable: this.state.isQuotaAvailable,
+      })
+
+      // For Google STT only mode (Brave desktop), we must check quota first
+      if (useGoogleSTTOnly) {
+        const quotaAvailable = yield* _(Effect.promise(() => this.checkQuota()))
+        if (!quotaAvailable) {
+          speechLog("START", "Google STT required but quota not available")
+          this.handleSetError(
+            "QUOTA_REQUIRED",
+            "Voice search unavailable. Please try again later.",
+          )
+          return
+        }
+      }
+
       // Check if Web Speech is available (primary tier)
       const isWebSpeechAvailable = this.checkWebSpeechSupport()
+      speechLog("START", "Web Speech support check", {
+        isWebSpeechAvailable,
+        hasSpeechRecognition: typeof window !== "undefined" && !!window.SpeechRecognition,
+        hasWebkitSpeechRecognition:
+          typeof window !== "undefined" && !!window.webkitSpeechRecognition,
+      })
 
-      if (!isWebSpeechAvailable) {
-        speechLog("START", "Web Speech API not available in this browser")
-        this.handleSetError("WEBSPEECH_NOT_SUPPORTED", "Voice search requires a browser with Web Speech API support (Chrome, Edge, Safari)")
+      if (!isWebSpeechAvailable && !useGoogleSTTOnly) {
+        speechLog("START", "Web Speech API not available")
+        this.handleSetError(
+          "WEBSPEECH_NOT_SUPPORTED",
+          "Voice search requires a browser with Web Speech API support (Chrome, Edge, Safari)",
+        )
         return
       }
 
       // Pre-check quota for potential fallback (non-blocking)
-      void this.checkQuota()
+      if (!useGoogleSTTOnly) {
+        void this.checkQuota()
+      }
 
-      speechLog("START", "Starting speech recognition with Web Speech API (primary)...")
+      const tierName = useGoogleSTTOnly ? "Google STT" : "Web Speech API"
+      speechLog("START", `Starting speech recognition with ${tierName}...`)
       this.setState({
         isConnecting: true,
-        tierUsed: "webspeech",
+        tierUsed: useGoogleSTTOnly ? "google_stt" : "webspeech",
         errorCode: null,
         errorMessage: null,
         partialTranscript: "",
         finalTranscript: null,
       })
 
-      // Store tier - always start with webspeech
-      this.currentTier = "webspeech"
+      // Store tier
+      this.currentTier = useGoogleSTTOnly ? "google_stt" : "webspeech"
       this.webSpeechTranscript = null
       this.webSpeechLanguageCode = null
 
       // Get microphone access via SoundSystem
+      speechLog("START", "Getting microphone analyser...")
       const analyser = yield* _(this.getMicrophoneAnalyserEffect())
+      speechLog("START", "Got microphone analyser", { hasAnalyser: !!analyser })
 
       if (!analyser) {
         yield* _(
@@ -357,14 +470,24 @@ export class SpeechRecognitionStore {
 
       this.setState({ hasAudioPermission: true })
 
-      // Set up audio capture using MediaRecorder (needed for Google STT fallback)
+      // Set up audio capture using MediaRecorder
+      speechLog("START", "Setting up audio capture...")
       yield* _(this.setupAudioCapture())
+      speechLog("START", "Audio capture setup complete")
 
       // Set up max duration auto-stop (safety net)
       this.setupMaxDurationTimeout()
 
-      // Start Web Speech recognition (primary) - uses native end-of-utterance detection
-      this.setupWebSpeechRecognition()
+      // Only start Web Speech if not in Google STT only mode
+      if (!useGoogleSTTOnly) {
+        speechLog("START", "Setting up Web Speech recognition...")
+        this.setupWebSpeechRecognition()
+        speechLog("START", "Web Speech recognition setup complete")
+      } else {
+        speechLog("START", "Skipping Web Speech, using Google STT only mode")
+        // Start VAD for end-of-utterance detection in Google STT mode
+        yield* _(Effect.promise(() => this.startVADDetection()))
+      }
 
       this.setState({
         isConnecting: false,
@@ -372,7 +495,7 @@ export class SpeechRecognitionStore {
         lastUpdatedAt: Date.now(),
       })
 
-      speechLog("START", "Speech recognition started with Web Speech API")
+      speechLog("START", `Speech recognition started with ${tierName}`)
     },
   )
 
@@ -474,6 +597,21 @@ export class SpeechRecognitionStore {
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       speechLog("WEBSPEECH", "Recognition error", { error: event.error, message: event.message })
+
+      // On network error, set flag to skip Web Speech next time and show message
+      if (event.error === "network") {
+        speechLog("WEBSPEECH", "Network error - enabling Google STT only mode for next attempt")
+        this.useGoogleSTTOnly = true
+        this.cleanupWebSpeechRecognition()
+        this.handleStopRecognition()
+        // Show helpful message
+        this.handleSetError(
+          "WEBSPEECH_NETWORK",
+          "Voice recognition blocked. Tap again to use alternative service.",
+        )
+        return
+      }
+
       // Don't fail on no-speech - just means no transcript
       if (event.error !== "no-speech" && event.error !== "aborted") {
         this.runSyncWithClientLayer(
@@ -507,6 +645,100 @@ export class SpeechRecognitionStore {
       this.webSpeechRecognition.abort()
       this.webSpeechRecognition = null
     }
+  }
+
+  // --- VAD-based end-of-utterance detection for Google STT only mode ---
+
+  private async startVADDetection(): Promise<void> {
+    speechLog("VAD", "Starting VAD-based end-of-utterance detection")
+
+    this.speechStartedAt = null
+
+    this.setState({
+      isSilenceDetectionActive: true,
+      hasSpeechBeenDetected: false,
+      isSilent: true,
+    })
+
+    // Disable AND-gate for voice search (we just need voice detection, not singing detection)
+    voiceActivityStore.setAndGateEnabled(false)
+
+    // Start VAD listening
+    await voiceActivityStore.startListening()
+
+    // Subscribe to voice events
+    this.vadUnsubscribe = voiceActivityStore.subscribeToVoiceEvents(() => {
+      const vadState = voiceActivityStore.getSnapshot()
+
+      if (vadState.isSpeaking) {
+        // Voice started - cancel any pending silence timer
+        if (this.silenceTimerId !== null) {
+          clearTimeout(this.silenceTimerId)
+          this.silenceTimerId = null
+          speechLog("VAD", "Voice resumed, cancelled silence timer")
+        }
+
+        if (this.speechStartedAt === null) {
+          this.speechStartedAt = Date.now()
+          speechLog("VAD", "Voice activity started")
+        }
+        this.setState({ hasSpeechBeenDetected: true, isSilent: false })
+      } else {
+        // Voice stopped - start silence timer
+        this.setState({ isSilent: true })
+
+        if (this.speechStartedAt !== null) {
+          const speechDuration = Date.now() - this.speechStartedAt
+          if (speechDuration >= SPEECH_MIN_DURATION_MS) {
+            // Start silence timer
+            if (this.silenceTimerId === null) {
+              speechLog("VAD", "Voice stopped, starting silence timer", {
+                speechDuration,
+                silenceTimeout: SILENCE_DURATION_MS,
+              })
+              this.silenceTimerId = setTimeout(() => {
+                this.silenceTimerId = null
+                speechLog("VAD", "Silence timeout reached, auto-stopping recording")
+                this.setState({ isAutoStopping: true })
+                this.handleStopRecognition()
+              }, SILENCE_DURATION_MS)
+            }
+          } else {
+            speechLog("VAD", "Voice stopped but speech too short, waiting for more", {
+              speechDuration,
+              minRequired: SPEECH_MIN_DURATION_MS,
+            })
+          }
+        }
+      }
+    })
+
+    speechLog("VAD", "VAD detection started")
+  }
+
+  private stopVADDetection(): void {
+    if (this.vadUnsubscribe) {
+      this.vadUnsubscribe()
+      this.vadUnsubscribe = null
+    }
+
+    if (this.silenceTimerId !== null) {
+      clearTimeout(this.silenceTimerId)
+      this.silenceTimerId = null
+    }
+
+    voiceActivityStore.stopListening()
+    voiceActivityStore.setAndGateEnabled(true) // Re-enable AND-gate for normal use
+
+    this.speechStartedAt = null
+
+    this.setState({
+      isSilenceDetectionActive: false,
+      hasSpeechBeenDetected: false,
+      isSilent: false,
+    })
+
+    speechLog("VAD", "VAD detection stopped")
   }
 
   private isLowConfidenceTranscript(transcript: string | null): boolean {
@@ -587,6 +819,10 @@ export class SpeechRecognitionStore {
             }),
           ),
         )
+      } else {
+        // No audio and no Web Speech result
+        speechLog("AUDIO", "No audio and no Web Speech result")
+        this.handleSetError("NO_SPEECH", "No speech detected. Please try again.")
       }
       return
     }
@@ -668,6 +904,10 @@ export class SpeechRecognitionStore {
               }),
             ),
           )
+        } else {
+          // No result from either tier
+          speechLog("API", "No transcript from either tier")
+          this.handleSetError("NO_SPEECH", "No speech detected. Please try again.")
         }
       }
     } catch (e) {
@@ -682,6 +922,10 @@ export class SpeechRecognitionStore {
             }),
           ),
         )
+      } else {
+        // No result from either tier
+        speechLog("API", "No transcript from either tier (network error)")
+        this.handleSetError("NO_SPEECH", "No speech detected. Please try again.")
       }
     }
   }
@@ -712,6 +956,9 @@ export class SpeechRecognitionStore {
 
     // Clear max duration timeout
     this.clearMaxDurationTimeout()
+
+    // Stop VAD detection
+    this.stopVADDetection()
 
     // Cleanup Web Speech if active
     this.cleanupWebSpeechRecognition()
@@ -781,8 +1028,13 @@ export class SpeechRecognitionStore {
   // --- Convenience methods ---
 
   async start(): Promise<void> {
+    speechLog("START", "start() called")
     await this.runPromiseWithClientLayer(
       Effect.catchAll(this.dispatch(new StartRecognition({})), e => {
+        speechLog("START", "Effect error caught in start()", {
+          code: e.code,
+          message: e.message,
+        })
         this.setState({
           errorCode: e.code,
           errorMessage: e.message,
@@ -792,6 +1044,10 @@ export class SpeechRecognitionStore {
         return Effect.void
       }),
     )
+    speechLog("START", "start() completed", {
+      isRecording: this.state.isRecording,
+      errorCode: this.state.errorCode,
+    })
   }
 
   stop(): void {
@@ -833,6 +1089,9 @@ export class SpeechRecognitionStore {
       lastUpdatedAt: null,
       errorCode: null,
       errorMessage: null,
+      isSilenceDetectionActive: false,
+      hasSpeechBeenDetected: false,
+      isSilent: false,
     })
   }
 
@@ -863,6 +1122,9 @@ const DEFAULT_STATE: SpeechState = {
   lastUpdatedAt: null,
   errorCode: null,
   errorMessage: null,
+  isSilenceDetectionActive: false,
+  hasSpeechBeenDetected: false,
+  isSilent: false,
 }
 
 export function useSpeechState(): SpeechState {
