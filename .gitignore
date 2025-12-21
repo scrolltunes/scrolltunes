@@ -19,6 +19,7 @@ build
 
 # debug
 npm-debug.log*
+vad-debug.log
 
 # local env files
 .env*.local

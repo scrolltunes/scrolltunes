@@ -14,8 +14,8 @@ import {
   chordsStore,
   metronomeStore,
   recentSongsStore,
-  useDetailedActivityStatus,
   useChordsState,
+  useDetailedActivityStatus,
   usePlayerControls,
   usePlayerState,
   usePreferences,
@@ -144,9 +144,7 @@ export default function SongPage() {
 
   // Status label for footer
   useEffect(() => {
-    setSlot(
-      <StatusLabel playerState={playerState} detailedStatus={detailedStatus} />,
-    )
+    setSlot(<StatusLabel playerState={playerState} detailedStatus={detailedStatus} />)
     return () => setSlot(null)
   }, [playerState, detailedStatus, setSlot])
 
@@ -573,7 +571,9 @@ export default function SongPage() {
                 />
                 <ChordInfoPanel
                   isOpen={showChordPanel}
-                  {...(chordsState.data?.tuning !== undefined && { tuning: chordsState.data.tuning })}
+                  {...(chordsState.data?.tuning !== undefined && {
+                    tuning: chordsState.data.tuning,
+                  })}
                   {...(loadState._tag === "Loaded" &&
                     loadState.key !== null && { musicalKey: loadState.key })}
                   {...(chordsState.data?.capo !== undefined && { capo: chordsState.data.capo })}
