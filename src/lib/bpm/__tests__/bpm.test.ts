@@ -2,7 +2,10 @@ import type { PublicConfig } from "@/services/public-config"
 import { ConfigLayer } from "@/services/server-base-layer"
 import type { ServerConfig } from "@/services/server-config"
 import { Effect } from "effect"
+import type { Mock } from "vitest"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
+
+const mockFetch = (mock: Mock) => mock as unknown as typeof fetch
 import { clearBpmCache, withInMemoryCache } from "../bpm-cache"
 import { BPMAPIError, BPMNotFoundError, BPMRateLimitError } from "../bpm-errors"
 import { type BPMProvider, getBpmRace, getBpmWithFallback } from "../bpm-provider"
@@ -253,15 +256,17 @@ describe("getSongBpmProvider", () => {
   })
 
   test("returns BPM on successful lookup", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          search: [
-            { id: "1", title: "Song", artist: { name: "Artist" }, tempo: "120", key_of: "C" },
-          ],
-        }),
-    })
+    global.fetch = mockFetch(
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            search: [
+              { id: "1", title: "Song", artist: { name: "Artist" }, tempo: "120", key_of: "C" },
+            ],
+          }),
+      }),
+    )
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
     const result = await runWithConfig(effect)
@@ -272,10 +277,12 @@ describe("getSongBpmProvider", () => {
   })
 
   test("fails with BPMNotFoundError when no match", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ search: [] }),
-    })
+    global.fetch = mockFetch(
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ search: [] }),
+      }),
+    )
 
     const effect = getSongBpmProvider.getBpm({ title: "Unknown", artist: "Nobody" })
     const exit = await runWithConfigExit(effect)
@@ -284,11 +291,13 @@ describe("getSongBpmProvider", () => {
   })
 
   test("fails with BPMAPIError on HTTP error", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      statusText: "Internal Server Error",
-    })
+    global.fetch = mockFetch(
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+      }),
+    )
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
     const exit = await runWithConfigExit(effect)
@@ -297,7 +306,7 @@ describe("getSongBpmProvider", () => {
   })
 
   test("fails with BPMAPIError on network error", async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error("Network error"))
+    global.fetch = mockFetch(vi.fn().mockRejectedValue(new Error("Network error")))
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
     const exit = await runWithConfigExit(effect)
@@ -306,15 +315,17 @@ describe("getSongBpmProvider", () => {
   })
 
   test("matches by normalized title/artist", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          search: [
-            { id: "1", title: "HELLO WORLD", artist: { name: "TEST ARTIST" }, tempo: "100" },
-          ],
-        }),
-    })
+    global.fetch = mockFetch(
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            search: [
+              { id: "1", title: "HELLO WORLD", artist: { name: "TEST ARTIST" }, tempo: "100" },
+            ],
+          }),
+      }),
+    )
 
     const effect = getSongBpmProvider.getBpm({ title: "hello world", artist: "test artist" })
     const result = await runWithConfig(effect)
@@ -323,13 +334,15 @@ describe("getSongBpmProvider", () => {
   })
 
   test("returns null key when key_of is not provided", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          search: [{ id: "1", title: "Song", artist: { name: "Artist" }, tempo: "120" }],
-        }),
-    })
+    global.fetch = mockFetch(
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            search: [{ id: "1", title: "Song", artist: { name: "Artist" }, tempo: "120" }],
+          }),
+      }),
+    )
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
     const result = await runWithConfig(effect)
@@ -347,11 +360,13 @@ describe("getSongBpmProvider", () => {
   })
 
   test("fails with BPMNotFoundError on 404", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 404,
-      statusText: "Not Found",
-    })
+    global.fetch = mockFetch(
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+      }),
+    )
 
     const effect = getSongBpmProvider.getBpm({ title: "Song", artist: "Artist" })
     const exit = await runWithConfigExit(effect)
@@ -368,19 +383,21 @@ describe("deezerBpmProvider", () => {
   })
 
   test("returns BPM when track found with valid BPM", async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            data: [{ id: 123, title: "Song", artist: { name: "Artist" } }],
-          }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ bpm: 120 }),
-      })
+    global.fetch = mockFetch(
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: [{ id: 123, title: "Song", artist: { name: "Artist" } }],
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ bpm: 120 }),
+        }),
+    )
 
     const effect = deezerBpmProvider.getBpm({ title: "Song", artist: "Artist" })
     const result = await runWithConfig(effect)
@@ -391,19 +408,21 @@ describe("deezerBpmProvider", () => {
   })
 
   test("fails with BPMNotFoundError when BPM is 0", async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            data: [{ id: 123, title: "Song", artist: { name: "Artist" } }],
-          }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ bpm: 0 }),
-      })
+    global.fetch = mockFetch(
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: [{ id: 123, title: "Song", artist: { name: "Artist" } }],
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ bpm: 0 }),
+        }),
+    )
 
     const effect = deezerBpmProvider.getBpm({ title: "Song", artist: "Artist" })
     const exit = await runWithConfigExit(effect)
@@ -415,10 +434,12 @@ describe("deezerBpmProvider", () => {
   })
 
   test("fails with BPMNotFoundError when no search results", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ data: [] }),
-    })
+    global.fetch = mockFetch(
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: [] }),
+      }),
+    )
 
     const effect = deezerBpmProvider.getBpm({ title: "Unknown", artist: "Nobody" })
     const exit = await runWithConfigExit(effect)
@@ -430,7 +451,7 @@ describe("deezerBpmProvider", () => {
   })
 
   test("fails with BPMAPIError on network error", async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error("Network error"))
+    global.fetch = mockFetch(vi.fn().mockRejectedValue(new Error("Network error")))
 
     const effect = deezerBpmProvider.getBpm({ title: "Song", artist: "Artist" })
     const exit = await runWithConfigExit(effect)
@@ -442,19 +463,21 @@ describe("deezerBpmProvider", () => {
   })
 
   test("matches by normalized title/artist", async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            data: [{ id: 456, title: "HELLO WORLD", artist: { name: "TEST ARTIST" } }],
-          }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ bpm: 100 }),
-      })
+    global.fetch = mockFetch(
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: [{ id: 456, title: "HELLO WORLD", artist: { name: "TEST ARTIST" } }],
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ bpm: 100 }),
+        }),
+    )
 
     const effect = deezerBpmProvider.getBpm({ title: "hello world", artist: "test artist" })
     const result = await runWithConfig(effect)

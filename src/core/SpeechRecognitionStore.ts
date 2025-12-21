@@ -1,5 +1,6 @@
 "use client"
 
+import { sttStreamClient } from "@/lib/stt-stream-client"
 import { ClientLayer, type ClientLayerContext } from "@/services/client-layer"
 import { loadPublicConfig } from "@/services/public-config"
 import { SoundSystemService } from "@/services/sound-system"
@@ -170,6 +171,14 @@ export class SpeechRecognitionStore {
   private vadUnsubscribe: (() => void) | null = null
   private speechStartedAt: number | null = null
   private silenceTimerId: ReturnType<typeof setTimeout> | null = null
+
+  // Streaming STT mode (WebSocket-based)
+  private isStreamingMode = false
+  private streamingUnsubscribe: (() => void) | null = null
+  private audioContext: AudioContext | null = null
+  private audioWorkletNode: AudioWorkletNode | null = null
+  private mediaStreamSource: MediaStreamAudioSourceNode | null = null
+  private streamingMediaStream: MediaStream | null = null
 
   private runPromiseWithClientLayer<T, E, R extends ClientLayerContext>(
     effect: Effect.Effect<T, E, R>,
@@ -494,9 +503,21 @@ export class SpeechRecognitionStore {
       this.setupWebSpeechRecognition()
       speechLog("START", "Web Speech recognition setup complete")
     } else {
-      speechLog("START", "Skipping Web Speech, using Google STT only mode")
-      // Start VAD for end-of-utterance detection in Google STT mode
-      yield* _(this.startVADDetectionEffect)
+      // Check if streaming STT is available (WebSocket bridge configured)
+      const streamingAvailable = sttStreamClient.isStreamingAvailable
+      speechLog("START", "Checking streaming availability", {
+        streamingAvailable,
+        sttWsUrl: publicConfig.sttWsUrl,
+      })
+      if (streamingAvailable) {
+        speechLog("START", "Using streaming STT mode (WebSocket)")
+        this.isStreamingMode = true
+        yield* _(this.startStreamingSTTEffect)
+      } else {
+        speechLog("START", "Skipping Web Speech, using REST-based Google STT")
+        // Start VAD for end-of-utterance detection in Google STT mode
+        yield* _(this.startVADDetectionEffect)
+      }
     }
 
     this.setState({
@@ -760,6 +781,253 @@ export class SpeechRecognitionStore {
     speechLog("VAD", "VAD detection stopped")
   }
 
+  // --- Streaming STT (WebSocket) ---
+
+  private readonly setupAudioWorkletEffect: Effect.Effect<void, SpeechRecognitionError> =
+    Effect.gen(this, function* () {
+      speechLog("STREAM", "Setting up AudioWorklet for PCM streaming")
+
+      // Get microphone stream
+      const stream = yield* Effect.tryPromise({
+        try: () =>
+          navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: SAMPLE_RATE,
+            },
+          }),
+        catch: e =>
+          new SpeechRecognitionError({
+            code: "MIC_ERROR",
+            message: `Failed to access microphone: ${String(e)}`,
+          }),
+      })
+
+      // Store stream for cleanup
+      this.streamingMediaStream = stream
+
+      // Create AudioContext
+      this.audioContext = new AudioContext({ sampleRate: SAMPLE_RATE })
+
+      const audioContext = this.audioContext
+
+      // Load the PCM worklet
+      yield* Effect.tryPromise({
+        try: () => audioContext.audioWorklet.addModule("/pcm-worklet.js"),
+        catch: e =>
+          new SpeechRecognitionError({
+            code: "WORKLET_ERROR",
+            message: `Failed to load PCM worklet: ${String(e)}`,
+          }),
+      })
+
+      // Create worklet node
+      this.audioWorkletNode = new AudioWorkletNode(audioContext, "pcm-processor")
+
+      // Connect microphone to worklet
+      this.mediaStreamSource = this.audioContext.createMediaStreamSource(stream)
+      this.mediaStreamSource.connect(this.audioWorkletNode)
+
+      // Handle PCM data from worklet
+      this.audioWorkletNode.port.onmessage = event => {
+        const pcmData = event.data as ArrayBuffer
+        sttStreamClient.sendAudioFrame(pcmData)
+      }
+
+      speechLog("STREAM", "AudioWorklet setup complete", {
+        sampleRate: this.audioContext.sampleRate,
+      })
+    })
+
+  private readonly startStreamingSTTEffect: Effect.Effect<void, SpeechRecognitionError> =
+    Effect.gen(this, function* () {
+      this.setState({ isSilenceDetectionActive: true })
+
+      // Connect to WebSocket STT bridge FIRST (before setting up audio capture)
+      // Note: alternativeLanguageCodes can be added later for multi-language detection
+      const connectResult = yield* Effect.either(
+        sttStreamClient.connect({
+          languageCode: "en-US",
+        }),
+      )
+
+      if (connectResult._tag === "Left") {
+        const error = connectResult.left
+        speechLog("STREAM", "Failed to connect to streaming STT", { error: error.message })
+        return yield* Effect.fail(
+          new SpeechRecognitionError({
+            code: error.code,
+            message: error.message,
+          }),
+        )
+      }
+
+      speechLog("STREAM", "Connected to streaming STT")
+
+      // Now set up AudioContext and AudioWorklet for PCM streaming
+      // This ensures no audio frames are sent before the WS is ready
+      yield* this.setupAudioWorkletEffect
+
+      // Track last values to avoid duplicate processing
+      let lastPartialText = ""
+      let lastFinalText: string | null = null
+      let hasEnded = false
+
+      // Subscribe to streaming client state for transcripts
+      this.streamingUnsubscribe = sttStreamClient.subscribe(() => {
+        const streamState = sttStreamClient.getSnapshot()
+
+        // Forward partial transcripts (only if changed)
+        if (streamState.partialText && streamState.partialText !== lastPartialText) {
+          lastPartialText = streamState.partialText
+          this.runSyncWithClientLayer(
+            this.dispatch(
+              new ReceivePartial({
+                text: streamState.partialText,
+                languageCode: streamState.detectedLanguageCode,
+              }),
+            ),
+          )
+        }
+
+        // Forward final transcripts (only once)
+        if (streamState.finalText && streamState.finalText !== lastFinalText) {
+          lastFinalText = streamState.finalText
+          this.runSyncWithClientLayer(
+            this.dispatch(
+              new ReceiveFinal({
+                text: streamState.finalText,
+                languageCode: streamState.detectedLanguageCode,
+              }),
+            ),
+          )
+        }
+
+        // Handle errors
+        if (streamState.status === "error" && streamState.error) {
+          speechLog("STREAM", "Streaming error", { error: streamState.error })
+          this.handleSetError("STREAM_ERROR", streamState.error)
+        }
+
+        // Handle session end (only once)
+        if (streamState.status === "ended" && !hasEnded) {
+          hasEnded = true
+          speechLog("STREAM", "Streaming session ended")
+          this.handleStopRecognition()
+        }
+      })
+
+      // Start VAD for end-of-utterance detection
+      yield* this.startStreamingVADEffect
+    })
+
+  private readonly startStreamingVADEffect: Effect.Effect<void, SpeechRecognitionError> =
+    Effect.gen(this, function* () {
+      // Start the speech detection service
+      yield* Effect.tryPromise({
+        try: () => speechDetectionStore.startListening(),
+        catch: e =>
+          new SpeechRecognitionError({
+            code: "VAD_START_ERROR",
+            message: `Failed to start VAD: ${String(e)}`,
+          }),
+      })
+
+      // Subscribe to voice events for end-of-utterance detection
+      this.vadUnsubscribe = speechDetectionStore.subscribeToVoiceEvents(() => {
+        const vadState = speechDetectionStore.getSnapshot()
+
+        if (vadState.isSpeaking) {
+          // Voice started - cancel any pending silence timer
+          if (this.silenceTimerId !== null) {
+            clearTimeout(this.silenceTimerId)
+            this.silenceTimerId = null
+            speechLog("STREAM-VAD", "Voice resumed, cancelled silence timer")
+          }
+
+          if (this.speechStartedAt === null) {
+            this.speechStartedAt = Date.now()
+            speechLog("STREAM-VAD", "Voice activity started")
+          }
+          this.setState({ hasSpeechBeenDetected: true, isSilent: false })
+        } else {
+          // Voice stopped - start silence timer
+          this.setState({ isSilent: true })
+
+          if (this.speechStartedAt !== null) {
+            const speechDuration = Date.now() - this.speechStartedAt
+            if (speechDuration >= SPEECH_MIN_DURATION_MS) {
+              // Start silence timer
+              if (this.silenceTimerId === null) {
+                speechLog("STREAM-VAD", "Voice stopped, starting silence timer", {
+                  speechDuration,
+                  silenceTimeout: SILENCE_DURATION_MS,
+                })
+                this.silenceTimerId = setTimeout(() => {
+                  this.silenceTimerId = null
+                  speechLog("STREAM-VAD", "Silence timeout reached, sending end command")
+                  this.setState({ isAutoStopping: true })
+                  // Send end command to WebSocket instead of stopping
+                  sttStreamClient.endUtterance()
+                }, SILENCE_DURATION_MS)
+              }
+            } else {
+              speechLog("STREAM-VAD", "Voice stopped but speech too short, waiting for more", {
+                speechDuration,
+                minRequired: SPEECH_MIN_DURATION_MS,
+              })
+            }
+          }
+        }
+      })
+
+      speechLog("STREAM-VAD", "Streaming VAD detection started")
+    })
+
+  private stopStreamingSTT(): void {
+    // Unsubscribe from streaming client
+    if (this.streamingUnsubscribe) {
+      this.streamingUnsubscribe()
+      this.streamingUnsubscribe = null
+    }
+
+    // Close streaming connection
+    sttStreamClient.close()
+
+    // Stop audio worklet
+    if (this.audioWorkletNode) {
+      this.audioWorkletNode.disconnect()
+      this.audioWorkletNode = null
+    }
+
+    if (this.mediaStreamSource) {
+      this.mediaStreamSource.disconnect()
+      this.mediaStreamSource = null
+    }
+
+    if (this.audioContext) {
+      this.audioContext.close().catch(() => {})
+      this.audioContext = null
+    }
+
+    // Stop microphone stream tracks
+    if (this.streamingMediaStream) {
+      for (const track of this.streamingMediaStream.getTracks()) {
+        track.stop()
+      }
+      this.streamingMediaStream = null
+    }
+
+    // Stop VAD
+    this.stopVADDetection()
+
+    this.isStreamingMode = false
+
+    speechLog("STREAM", "Streaming STT stopped")
+  }
+
   private isLowConfidenceTranscript(transcript: string | null): boolean {
     if (!transcript) return true
 
@@ -1010,37 +1278,63 @@ export class SpeechRecognitionStore {
   // --- Stop recognition ---
 
   private handleStopRecognition(): void {
-    speechLog("STOP", "Stopping speech recognition...", { tier: this.currentTier })
+    // Capture streaming mode before cleanup (stopStreamingSTT sets it to false)
+    const wasStreamingMode = this.isStreamingMode
+
+    speechLog("STOP", "Stopping speech recognition...", {
+      tier: this.currentTier,
+      isStreamingMode: wasStreamingMode,
+    })
 
     // Clear max duration timeout
     this.clearMaxDurationTimeout()
 
-    // Stop VAD detection
-    this.stopVADDetection()
+    // Stop streaming STT if active
+    if (wasStreamingMode) {
+      this.stopStreamingSTT()
+    } else {
+      // Stop VAD detection (non-streaming mode)
+      this.stopVADDetection()
+    }
 
     // Cleanup Web Speech if active
     this.cleanupWebSpeechRecognition()
 
-    // Stop MediaRecorder and send final audio
+    // Stop MediaRecorder
     if (this.mediaRecorder) {
       const recorder = this.mediaRecorder
-      if (recorder.state !== "inactive") {
-        // Set up onstop handler to send audio after all data is collected
-        recorder.onstop = () => {
-          speechLog("STOP", "MediaRecorder stopped, sending final audio", {
-            chunks: this.audioChunks.length,
-          })
-          this.sendFinalAudio()
-          // Stop all tracks after onstop fires
+      if (wasStreamingMode) {
+        // Streaming mode: just stop MediaRecorder, don't send audio (already handled by WebSocket)
+        if (recorder.state !== "inactive") {
+          recorder.onstop = () => {
+            for (const track of recorder.stream.getTracks()) {
+              track.stop()
+            }
+          }
+          recorder.stop()
+        } else {
           for (const track of recorder.stream.getTracks()) {
             track.stop()
           }
         }
-        recorder.stop()
+        this.audioChunks = []
       } else {
-        // Already inactive, just stop tracks
-        for (const track of recorder.stream.getTracks()) {
-          track.stop()
+        // Non-streaming mode: send final audio for Web Speech evaluation
+        if (recorder.state !== "inactive") {
+          recorder.onstop = () => {
+            speechLog("STOP", "MediaRecorder stopped, sending final audio", {
+              chunks: this.audioChunks.length,
+            })
+            this.sendFinalAudio()
+            for (const track of recorder.stream.getTracks()) {
+              track.stop()
+            }
+          }
+          recorder.stop()
+        } else {
+          for (const track of recorder.stream.getTracks()) {
+            track.stop()
+          }
         }
       }
       this.mediaRecorder = null

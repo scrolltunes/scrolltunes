@@ -5,6 +5,7 @@ const publicEnvEntries = [
   ["NEXT_PUBLIC_VERCEL_ENV", process.env.NEXT_PUBLIC_VERCEL_ENV],
   ["NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY", process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY],
   ["NEXT_PUBLIC_GIT_SHA", process.env.NEXT_PUBLIC_GIT_SHA],
+  ["NEXT_PUBLIC_STT_WS_URL", process.env.NEXT_PUBLIC_STT_WS_URL],
 ] as const
 
 const publicEnvMap = new Map(

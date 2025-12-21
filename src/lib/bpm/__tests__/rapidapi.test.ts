@@ -60,7 +60,7 @@ function mockFetchForRapidApiOnly(response: ReturnType<typeof mockRapidApiRespon
       return Promise.resolve(response as Response)
     }
     return originalFetch(input, init)
-  })
+  }) as unknown as typeof fetch
 }
 
 function getTodayKey() {

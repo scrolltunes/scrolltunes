@@ -12,6 +12,7 @@ export function useVoiceSearch() {
   const hasPrefetchedQuotaRef = useRef(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const wasRecordingRef = useRef(false)
+  const receivedFinalTranscriptRef = useRef(false)
 
   // Prefetch quota asynchronously to avoid first-start latency
   useEffect(() => {
@@ -26,17 +27,29 @@ export function useVoiceSearch() {
 
   // Track processing state: after recording stops, before final transcript arrives
   useEffect(() => {
-    if (speechState.isRecording) {
+    // Only reset receivedFinalTranscriptRef when recording STARTS (not on every render while recording)
+    if (speechState.isRecording && !wasRecordingRef.current) {
+      // Recording just started - reset state
       wasRecordingRef.current = true
+      receivedFinalTranscriptRef.current = false
       setIsProcessing(false)
-    } else if (wasRecordingRef.current && !speechState.finalTranscript) {
-      // Recording just stopped, waiting for results
+    } else if (!speechState.isRecording && wasRecordingRef.current && !receivedFinalTranscriptRef.current) {
+      // Recording just stopped and we haven't received a final transcript yet
       setIsProcessing(true)
     }
 
-    // Clear processing on any of: final transcript, error message, or error code
-    if (speechState.finalTranscript || speechState.errorMessage || speechState.errorCode) {
+    // Track when we receive a final transcript (even if it gets cleared later)
+    if (speechState.finalTranscript) {
+      receivedFinalTranscriptRef.current = true
+    }
+
+    // Clear processing on any of: final transcript received, error message, or error code
+    if (receivedFinalTranscriptRef.current || speechState.errorMessage || speechState.errorCode) {
       setIsProcessing(false)
+    }
+
+    // Reset refs when recording stops
+    if (!speechState.isRecording) {
       wasRecordingRef.current = false
     }
   }, [
@@ -61,9 +74,13 @@ export function useVoiceSearch() {
   // Determine if speech is being detected (has partial transcript)
   const isSpeechDetected = speechState.isRecording && speechState.partialTranscript.length > 0
 
+  // Don't show recording state after we've received a final transcript
+  // (there's a brief delay before isRecording becomes false)
+  const isActivelyRecording = speechState.isRecording && !receivedFinalTranscriptRef.current
+
   return {
     // State
-    isRecording: speechState.isRecording,
+    isRecording: isActivelyRecording,
     isConnecting: speechState.isConnecting,
     isProcessing,
     isSpeechDetected,

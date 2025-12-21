@@ -1,0 +1,20 @@
+{
+  "name": "sst-ws-bridge",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch server.ts",
+    "start": "bun run server.ts",
+    "deploy": "gcloud run deploy stt-ws-bridge --source . --region us-central1 --allow-unauthenticated --session-affinity --timeout 300"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@google-cloud/speech": "^7.2.1"
+  }
+}

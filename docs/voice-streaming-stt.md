@@ -227,6 +227,27 @@ This avoids “noise burst then finalize” behavior.
 - Attach a service account with Speech-to-Text permissions.
 - Keep the service stateless per connection.
 
+### Required environment variables
+The bridge service needs these credentials (same as ScrollTunes backend):
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLOUD_PROJECT_ID` | GCP project ID (e.g., `api-project-640068751634`) |
+| `GOOGLE_CLOUD_CLIENT_EMAIL` | Service account email |
+| `GOOGLE_CLOUD_PRIVATE_KEY` | Service account private key (PEM format) |
+
+Verify with:
+```bash
+grep -E "^(GOOGLE_CLOUD_PROJECT_ID|GOOGLE_CLOUD_CLIENT_EMAIL|GOOGLE_CLOUD_PRIVATE_KEY)=" .env.local | cut -d= -f1
+```
+
+Verify gcloud CLI setup:
+```bash
+gcloud config get-value project
+gcloud services list --enabled --filter="name:speech.googleapis.com"
+gcloud auth list --filter=status:ACTIVE --format="value(account)"
+```
+
 ---
 
 ## 7) Rollout plan (minimize risk)
