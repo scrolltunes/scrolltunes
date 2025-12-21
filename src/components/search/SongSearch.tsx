@@ -362,7 +362,7 @@ export const SongSearch = memo(function SongSearch({
         {/* Search input */}
         <div className="relative z-10">
           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
-            {voiceSearch.isRecording ? (
+            {voiceSearch.isRecording || voiceSearch.isProcessing ? (
               <ListeningWaveform />
             ) : isLoading ? (
               <CircleNotch size={20} weight="bold" className="text-indigo-500 animate-spin" />
@@ -371,11 +371,15 @@ export const SongSearch = memo(function SongSearch({
             )}
           </div>
 
-          {/* Partial transcript overlay when recording */}
-          {voiceSearch.isRecording && (
+          {/* Status overlay when recording or processing */}
+          {(voiceSearch.isRecording || voiceSearch.isProcessing) && (
             <div className="absolute left-12 top-1/2 -translate-y-1/2 right-20 pointer-events-none overflow-hidden">
               <span className="text-indigo-400 truncate block">
-                {voiceSearch.partialTranscript || "Listening..."}
+                {voiceSearch.isProcessing
+                  ? "Processing..."
+                  : voiceSearch.isSpeechDetected
+                    ? voiceSearch.partialTranscript
+                    : "Listening..."}
               </span>
             </div>
           )}
@@ -384,10 +388,14 @@ export const SongSearch = memo(function SongSearch({
             type="text"
             value={query}
             onChange={handleInputChange}
-            placeholder={voiceSearch.isRecording ? "" : "Search by song title or artist name"}
+            placeholder={
+              voiceSearch.isRecording || voiceSearch.isProcessing
+                ? ""
+                : "Search by song title or artist name"
+            }
             maxLength={INPUT_LIMITS.SEARCH_QUERY}
             className={`w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 border transition-colors ${
-              voiceSearch.isRecording
+              voiceSearch.isRecording || voiceSearch.isProcessing
                 ? "border-indigo-500 ring-2 ring-indigo-500/20 text-transparent caret-transparent"
                 : "border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             } ${isAuthenticated ? (query ? "pr-20" : "pr-12") : "pr-10"}`}
