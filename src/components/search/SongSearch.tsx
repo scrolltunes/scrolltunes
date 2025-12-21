@@ -363,7 +363,7 @@ export const SongSearch = memo(function SongSearch({
         <div className="relative z-10">
           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
             {voiceSearch.isRecording || voiceSearch.isProcessing ? (
-              <ListeningWaveform />
+              <ListeningWaveform variant={voiceSearch.isProcessing ? "processing" : "listening"} />
             ) : isLoading ? (
               <CircleNotch size={20} weight="bold" className="text-indigo-500 animate-spin" />
             ) : (
@@ -374,7 +374,9 @@ export const SongSearch = memo(function SongSearch({
           {/* Status overlay when recording or processing */}
           {(voiceSearch.isRecording || voiceSearch.isProcessing) && (
             <div className="absolute left-12 top-1/2 -translate-y-1/2 right-20 pointer-events-none overflow-hidden">
-              <span className="text-indigo-400 truncate block">
+              <span
+                className={`truncate block ${voiceSearch.isProcessing ? "text-emerald-400" : "text-indigo-400"}`}
+              >
                 {voiceSearch.isProcessing
                   ? "Processing..."
                   : voiceSearch.isSpeechDetected
@@ -395,9 +397,11 @@ export const SongSearch = memo(function SongSearch({
             }
             maxLength={INPUT_LIMITS.SEARCH_QUERY}
             className={`w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 border transition-colors ${
-              voiceSearch.isRecording || voiceSearch.isProcessing
-                ? "border-indigo-500 ring-2 ring-indigo-500/20 text-transparent caret-transparent"
-                : "border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              voiceSearch.isProcessing
+                ? "border-emerald-500 ring-2 ring-emerald-500/20 text-transparent caret-transparent"
+                : voiceSearch.isRecording
+                  ? "border-indigo-500 ring-2 ring-indigo-500/20 text-transparent caret-transparent"
+                  : "border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             } ${isAuthenticated ? (query ? "pr-20" : "pr-12") : "pr-10"}`}
             aria-label="Search for a song"
           />
