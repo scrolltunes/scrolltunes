@@ -560,7 +560,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
 
       <motion.div
         ref={contentRef}
-        className="py-[50vh] max-w-4xl mx-auto"
+        className="pt-[50vh] pb-[25vh] max-w-4xl mx-auto"
         style={{ y: scrollYOffset }}
       >
         {lyrics.lines.map((line, index) => {
