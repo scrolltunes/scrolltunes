@@ -59,11 +59,23 @@ export default function AboutPage() {
             <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
               How it works
             </h2>
-            <div className="p-4 bg-neutral-900 rounded-xl">
-              <p className="text-neutral-300 leading-relaxed">
-                Voice detection syncs lyrics to your performance. Start singing and ScrollTunes
-                begins scrolling automatically. Pause with a tap, double-tap, or keyboard shortcut
-              </p>
+            <div className="p-4 bg-neutral-900 rounded-xl space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-neutral-400 mb-2">Voice Detection</h3>
+                <p className="text-neutral-300 leading-relaxed">
+                  Start singing and ScrollTunes begins scrolling automatically. Voice detection runs
+                  entirely on your device — no audio is ever recorded or sent anywhere. Pause with a
+                  tap, double-tap, or keyboard shortcut
+                </p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-neutral-400 mb-2">Voice Search</h3>
+                <p className="text-neutral-300 leading-relaxed">
+                  Find songs hands-free by speaking the title. This optional feature requires an
+                  account and uses third-party speech recognition (Google Cloud or OpenAI Whisper)
+                  to transcribe your voice
+                </p>
+              </div>
             </div>
           </section>
 
@@ -176,7 +188,8 @@ export default function AboutPage() {
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />
                   <p className="text-neutral-300">
-                    Microphone is still never recorded - voice detection runs locally
+                    Voice detection runs locally; voice search sends audio to third-party providers
+                    for transcription only
                   </p>
                 </div>
               </div>

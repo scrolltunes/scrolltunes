@@ -53,7 +53,7 @@ export default function PrivacyPage() {
               </div>
               <div className="flex items-center gap-2 text-green-400">
                 <span>✓</span>
-                <span>Microphone audio is never recorded or transmitted</span>
+                <span>Voice detection runs locally — audio never leaves your device</span>
               </div>
               <div className="flex items-center gap-2 text-green-400">
                 <span>✓</span>
@@ -126,16 +126,36 @@ export default function PrivacyPage() {
             </div>
 
             <div>
+              <h3 className="font-medium text-white mb-2">Voice Features</h3>
+              <p className="text-neutral-300 leading-relaxed">
+                ScrollTunes offers two distinct voice features:
+              </p>
+              <ul className="list-disc list-inside text-neutral-300 space-y-2 ml-2 mt-2">
+                <li>
+                  <strong className="text-white">Voice detection:</strong> Used to start and sync
+                  lyrics scrolling. This runs entirely on your device — no audio is ever recorded or
+                  sent anywhere
+                </li>
+                <li>
+                  <strong className="text-white">Voice search:</strong> An optional, account-only
+                  feature that lets you search for songs by speaking. This requires sending audio to
+                  third-party speech recognition services (Google Cloud Speech-to-Text or OpenAI
+                  Whisper) for transcription
+                </li>
+              </ul>
+            </div>
+
+            <div>
               <h3 className="font-medium text-white mb-2">AI and LLM Processing</h3>
               <p className="text-neutral-300 leading-relaxed">
                 We may use third-party AI services (such as Google Cloud AI or OpenAI) for features
-                like smart search suggestions, lyrics correction or enhancement, and personalized
-                recommendations.
+                like voice search transcription, smart search suggestions, lyrics correction or
+                enhancement, and personalized recommendations.
               </p>
               <p className="text-neutral-300 leading-relaxed mt-2">
-                When you use these features, relevant data (such as search queries or song metadata)
-                may be sent to these services for processing. We do not send your personal
-                information or microphone audio to AI services.
+                When you use these features, relevant data (such as search queries, song metadata,
+                or voice search audio) may be sent to these services for processing. We do not send
+                your personal information to AI services.
               </p>
             </div>
 
@@ -143,8 +163,9 @@ export default function PrivacyPage() {
               <h3 className="font-medium text-white mb-2">What We Never Do</h3>
               <ul className="list-disc list-inside text-neutral-300 space-y-2 ml-2">
                 <li>
-                  We do <strong className="text-white">not</strong> record or store any microphone
-                  audio. Microphone access is used only locally in your browser for voice detection
+                  We do <strong className="text-white">not</strong> store voice recordings. Voice
+                  detection audio never leaves your device; voice search audio is processed by
+                  third-party providers and immediately discarded after transcription
                 </li>
                 <li>
                   We do <strong className="text-white">not</strong> sell your personal data to third
@@ -256,7 +277,9 @@ export default function PrivacyPage() {
                 <li>Upstash Redis (rate limiting)</li>
                 <li>Google and Spotify (authentication)</li>
                 <li>Google Analytics (usage analytics)</li>
-                <li>AI/LLM services (smart features, when used)</li>
+                <li>
+                  Google Cloud Speech-to-Text and/or OpenAI Whisper (voice search transcription)
+                </li>
               </ul>
               <p className="text-neutral-300 leading-relaxed mt-3">
                 These providers act as data processors on our behalf. We only share the minimum
@@ -331,10 +354,20 @@ export default function PrivacyPage() {
               <div>
                 <h3 className="font-medium text-white mb-2">Microphone Access</h3>
                 <p>
-                  ScrollTunes requests microphone access for voice activity detection to enable
-                  hands-free scrolling. Audio is processed entirely on your device and is never
-                  recorded, stored, or transmitted to any server.
+                  ScrollTunes requests microphone access for two features:
                 </p>
+                <ul className="list-disc list-inside space-y-2 ml-2 mt-2">
+                  <li>
+                    <strong className="text-white">Voice detection:</strong> Enables hands-free
+                    scrolling by detecting when you sing. Audio is processed entirely on your device
+                    and is never recorded, stored, or transmitted
+                  </li>
+                  <li>
+                    <strong className="text-white">Voice search (account-only):</strong> Lets you
+                    search for songs by speaking. Audio is sent to third-party speech recognition
+                    services (Google Cloud or OpenAI Whisper) for transcription
+                  </li>
+                </ul>
               </div>
             </div>
           </section>

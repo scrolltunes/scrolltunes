@@ -57,8 +57,24 @@ export default function TermsOfService() {
                 personal information
               </li>
               <li>
-                <strong>Microphone privacy</strong> — Voice detection runs locally; audio is never
-                recorded, transmitted, or stored
+                <strong>Microphone privacy</strong> — Voice detection runs entirely on your device;
+                audio is never recorded, transmitted, or stored
+              </li>
+            </ul>
+            <h3 className="mb-2 text-lg font-medium text-neutral-200">Voice Features</h3>
+            <p className="mb-4 leading-relaxed text-neutral-300">
+              ScrollTunes offers two distinct voice features with different privacy characteristics:
+            </p>
+            <ul className="mb-6 list-disc space-y-2 pl-6 text-neutral-300">
+              <li>
+                <strong>Voice detection</strong> — Used to start and sync lyrics scrolling. This
+                runs entirely on your device; no audio is ever recorded or sent anywhere
+              </li>
+              <li>
+                <strong>Voice search</strong> — An optional, account-only feature that lets you
+                search for songs by speaking. This requires sending audio to third-party speech
+                recognition services (Google Cloud Speech-to-Text or OpenAI Whisper) for
+                transcription
               </li>
             </ul>
             <h3 className="mb-2 text-lg font-medium text-neutral-200">Account Holders</h3>
