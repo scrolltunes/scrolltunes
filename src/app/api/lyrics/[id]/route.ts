@@ -12,7 +12,7 @@ import {
   findBestAlternativeLyrics,
   getLyricsById,
 } from "@/lib/lyrics-client"
-import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
+import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import {
   formatArtists,
   getAlbumImageUrl,
@@ -51,6 +51,7 @@ interface SpotifyLookupResult {
   readonly spotifyId: string
   readonly trackName: string
   readonly artistName: string
+  readonly albumName?: string
   readonly albumArt: string | null
 }
 
@@ -62,6 +63,7 @@ function lookupSpotifyById(
       spotifyId: track.id,
       trackName: normalizeTrackName(track.name),
       artistName: normalizeArtistName(formatArtists(track.artists)),
+      albumName: normalizeAlbumName(track.album.name),
       albumArt: getAlbumImageUrl(track.album, "medium"),
     })),
     Effect.catchAll(() => Effect.succeed(null)),
@@ -92,6 +94,7 @@ function lookupSpotifyBySearch(
         spotifyId: match.id,
         trackName: normalizeTrackName(match.name),
         artistName: normalizeArtistName(formatArtists(match.artists)),
+        albumName: normalizeAlbumName(match.album.name),
         albumArt: getAlbumImageUrl(match.album, "medium"),
       }
     }),
@@ -130,6 +133,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const resolvedSpotifyId = spotifyResult?.spotifyId
         const spotifyTrackName = spotifyResult?.trackName ?? null
         const spotifyArtistName = spotifyResult?.artistName ?? null
+        const spotifyAlbumName = spotifyResult?.albumName
         const spotifyAlbumArt = spotifyResult?.albumArt ?? null
 
         const bpmQuery = {
@@ -175,6 +179,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           bpm,
           spotifyTrackName,
           spotifyArtistName,
+          spotifyAlbumName,
           spotifyAlbumArt,
           resolvedSpotifyId,
         }))
@@ -216,6 +221,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     bpm: bpmResult,
     spotifyTrackName,
     spotifyArtistName,
+    spotifyAlbumName,
     spotifyAlbumArt,
     resolvedSpotifyId,
   } = result.value
@@ -226,6 +232,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     ...lyrics,
     title: spotifyTrackName ?? normalizeTrackName(lyrics.title),
     artist: spotifyArtistName ?? normalizeArtistName(lyrics.artist),
+    ...(spotifyAlbumName !== undefined && { album: spotifyAlbumName }),
   }
 
   const body: LyricsApiSuccessResponse = {

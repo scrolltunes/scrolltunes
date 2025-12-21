@@ -25,6 +25,7 @@ interface SetlistSong {
   readonly songProvider: string
   readonly songTitle: string
   readonly songArtist: string
+  readonly songAlbum?: string
   readonly sortOrder: number
 }
 
@@ -135,6 +136,7 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
         songProvider: song.songProvider,
         title: song.songTitle,
         artist: song.songArtist,
+        ...(song.songAlbum !== undefined && { album: song.songAlbum }),
       })
 
       if (addedSong) {

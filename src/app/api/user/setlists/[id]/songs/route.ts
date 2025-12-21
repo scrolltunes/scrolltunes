@@ -40,7 +40,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params
   const body = await request.json()
-  const { songId, songProvider, title, artist } = body
+  const { songId, songProvider, title, artist, album } = body
 
   if (!songId || !songProvider || !title || !artist) {
     return NextResponse.json(
@@ -91,6 +91,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         songProvider,
         songTitle: title,
         songArtist: artist,
+        ...(album !== undefined && { songAlbum: album }),
         sortOrder: maxSortOrder + 1,
       }),
     )

@@ -43,6 +43,7 @@ export const SongListItem = memo(function SongListItem({
   const [isLoading, setIsLoading] = useState(!initialAlbumArt && externalLoadingAlbumArt !== false)
   const [displayTitle, setDisplayTitle] = useState(title)
   const [displayArtist, setDisplayArtist] = useState(artist)
+  const [displayAlbum, setDisplayAlbum] = useState(album)
 
   useEffect(() => {
     // Always try to load cached normalized titles
@@ -50,6 +51,7 @@ export const SongListItem = memo(function SongListItem({
     if (cached) {
       if (cached.lyrics.title) setDisplayTitle(cached.lyrics.title)
       if (cached.lyrics.artist) setDisplayArtist(cached.lyrics.artist)
+      if (cached.lyrics.album) setDisplayAlbum(cached.lyrics.album)
       if (cached.albumArt) setAlbumArt(cached.albumArt)
     }
 
@@ -97,6 +99,7 @@ export const SongListItem = memo(function SongListItem({
           })
           if (data.lyrics.title) setDisplayTitle(data.lyrics.title)
           if (data.lyrics.artist) setDisplayArtist(data.lyrics.artist)
+          if (data.lyrics.album) setDisplayAlbum(data.lyrics.album)
         }
 
         setAlbumArt(art)
@@ -140,7 +143,10 @@ export const SongListItem = memo(function SongListItem({
 
         <div className="flex-1 min-w-0">
           <p className="text-white font-medium truncate">{displayTitle}</p>
-          <p className="text-sm text-neutral-500 truncate">{displayArtist}</p>
+          <p className="text-sm text-neutral-500 truncate">
+            {displayArtist}
+            {displayAlbum && ` • ${displayAlbum}`}
+          </p>
         </div>
       </Link>
 

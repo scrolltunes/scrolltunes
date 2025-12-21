@@ -33,6 +33,7 @@ export interface Lyrics {
   readonly songId: string
   readonly title: string
   readonly artist: string
+  readonly album?: string
   readonly lines: readonly LyricLine[]
   readonly duration: number // total duration in seconds
 }

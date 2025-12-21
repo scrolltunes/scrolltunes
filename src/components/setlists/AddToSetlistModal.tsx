@@ -22,6 +22,7 @@ export interface AddToSetlistModalProps {
     readonly songId: number
     readonly title: string
     readonly artist: string
+    readonly album?: string
   }
 }
 
@@ -80,6 +81,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
           songProvider: "lrclib",
           title: song.title,
           artist: song.artist,
+          ...(song.album !== undefined && { album: song.album }),
         })
         success = addedSong !== null
       }

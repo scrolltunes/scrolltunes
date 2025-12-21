@@ -256,7 +256,7 @@ export default function SongPage() {
           id,
           title: cached.lyrics.title,
           artist: cached.lyrics.artist,
-          album: "",
+          album: cached.lyrics.album ?? "",
           durationSeconds: cached.lyrics.duration,
           albumArt: cached.albumArt,
         })
@@ -318,7 +318,7 @@ export default function SongPage() {
           id,
           title: data.lyrics.title,
           artist: data.lyrics.artist,
-          album: "",
+          album: data.lyrics.album ?? "",
           durationSeconds: data.lyrics.duration,
           albumArt: data.albumArt ?? undefined,
         })
@@ -661,6 +661,7 @@ export default function SongPage() {
             songId: lrclibId,
             title: loadState.lyrics.title,
             artist: loadState.lyrics.artist,
+            ...(loadState.lyrics.album !== undefined && { album: loadState.lyrics.album }),
           }}
         />
       )}

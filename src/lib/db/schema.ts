@@ -185,6 +185,7 @@ export const userSetlistSongs = pgTable(
     songProvider: text("song_provider").notNull(),
     songTitle: text("song_title").notNull(),
     songArtist: text("song_artist").notNull(),
+    songAlbum: text("song_album"),
     sortOrder: integer("sort_order").notNull().default(0),
     addedAt: timestamp("added_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
   },

@@ -109,11 +109,11 @@ export const SongSearch = memo(function SongSearch({
   const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastFinalTranscriptRef = useRef<string | null>(null)
 
-  const localMatches = useMemo((): NormalizedSearchResult[] => {
+  const localMatches = useMemo((): Array<NormalizedSearchResult & { score: number }> => {
     const trimmed = query.trim()
     if (!trimmed || trimmed.length < 2) return []
 
-    const matches = fuzzyMatchSongs(trimmed, localSongCache, 0.3)
+    const matches = fuzzyMatchSongs(trimmed, localSongCache, 0.7)
 
     return matches.slice(0, 5).map(match => ({
       id: `lrclib-${match.item.id}`,
@@ -127,6 +127,7 @@ export const SongSearch = memo(function SongSearch({
       displayName: normalizeTrackName(match.item.title),
       displayArtist: normalizeArtistName(match.item.artist),
       displayAlbum: match.item.album ? normalizeAlbumName(match.item.album) : "",
+      score: match.score,
     }))
   }, [query, localSongCache])
 
@@ -136,7 +137,10 @@ export const SongSearch = memo(function SongSearch({
     const localIds = new Set(localMatches.map(m => m.id))
     const filteredApiResults = apiResults.filter(r => !localIds.has(r.id))
 
-    return [...localMatches, ...filteredApiResults]
+    const highConfidenceLocals = localMatches.filter(m => m.score >= 0.85)
+    const lowerConfidenceLocals = localMatches.filter(m => m.score < 0.85)
+
+    return [...highConfidenceLocals, ...filteredApiResults, ...lowerConfidenceLocals]
   }, [localMatches, apiResults])
 
   const searchTracks = useCallback(async (searchQuery: string) => {

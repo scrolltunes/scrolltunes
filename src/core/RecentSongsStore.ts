@@ -171,6 +171,7 @@ class RecentSongsStore {
         const updated: RecentSong = {
           ...existing,
           ...song,
+          album: song.album || existing.album,
           albumArt: song.albumArt ?? existing.albumArt,
         }
         return [...prev.slice(0, existingIndex), updated, ...prev.slice(existingIndex + 1)]

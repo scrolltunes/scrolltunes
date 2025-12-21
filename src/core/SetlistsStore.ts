@@ -8,6 +8,7 @@ export interface SetlistSong {
   readonly songProvider: string
   readonly songTitle: string
   readonly songArtist: string
+  readonly songAlbum?: string
   readonly sortOrder: number
 }
 
@@ -221,7 +222,7 @@ export class SetlistsStore {
 
   async addSong(
     setlistId: string,
-    song: { songId: string; songProvider: string; title: string; artist: string },
+    song: { songId: string; songProvider: string; title: string; artist: string; album?: string },
   ): Promise<SetlistSong | null> {
     try {
       const response = await fetch(`/api/user/setlists/${setlistId}/songs`, {

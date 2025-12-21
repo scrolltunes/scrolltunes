@@ -5,27 +5,33 @@
  * Use these helpers when inserting or updating song data.
  */
 
-import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
+import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 
 export interface SongInput {
   readonly songTitle: string
   readonly songArtist: string
+  readonly songAlbum?: string | null | undefined
 }
 
 export interface NormalizedSongInput {
   readonly songTitle: string
   readonly songArtist: string
+  readonly songAlbum?: string
 }
 
 /**
- * Normalize song title and artist before database insert/update
+ * Normalize song title, artist, and album before database insert/update
  */
 export function normalizeSongInput<T extends SongInput>(input: T): T {
-  return {
+  const result = {
     ...input,
     songTitle: normalizeTrackName(input.songTitle),
     songArtist: normalizeArtistName(input.songArtist),
+  } as T
+  if (input.songAlbum != null) {
+    ;(result as T & { songAlbum: string }).songAlbum = normalizeAlbumName(input.songAlbum)
   }
+  return result
 }
 
 /**
