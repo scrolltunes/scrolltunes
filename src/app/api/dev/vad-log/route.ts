@@ -1,6 +1,8 @@
 import { appendFileSync, existsSync, mkdirSync } from "node:fs"
 import { dirname } from "node:path"
+import { loadDevConfig } from "@/services/dev-config"
 import { loadPublicConfig } from "@/services/public-config"
+import { Option } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
 
 type LogEntry = {
@@ -14,17 +16,28 @@ type Payload = {
   readonly entries: readonly LogEntry[]
 }
 
-const VAD_LOG_FILE = process.env.VAD_LOG_FILE ?? "./vad-debug.log"
+function isDevMode(): boolean {
+  return loadPublicConfig().nodeEnv !== "production"
+}
 
-function ensureLogDir(): void {
-  const dir = dirname(VAD_LOG_FILE)
+function getLogFile(): string | null {
+  if (!isDevMode()) return null
+  const devConfig = loadDevConfig()
+  return Option.getOrNull(devConfig.vadLogFile)
+}
+
+function ensureLogDir(logFile: string): void {
+  const dir = dirname(logFile)
   if (dir && dir !== "." && !existsSync(dir)) {
     mkdirSync(dir, { recursive: true })
   }
 }
 
 export async function POST(req: NextRequest) {
-  if (loadPublicConfig().nodeEnv === "production") {
+  const logFile = getLogFile()
+
+  // No file configured or not in dev mode
+  if (!logFile) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
@@ -41,7 +54,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  ensureLogDir()
+  ensureLogDir(logFile)
 
   const lines: string[] = []
   for (const entry of payload.entries) {
@@ -54,7 +67,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (lines.length > 0) {
-    appendFileSync(VAD_LOG_FILE, `${lines.join("\n")}\n`)
+    appendFileSync(logFile, `${lines.join("\n")}\n`)
   }
 
   return NextResponse.json({ ok: true })
