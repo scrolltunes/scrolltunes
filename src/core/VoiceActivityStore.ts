@@ -241,17 +241,7 @@ export class VoiceActivityStore {
     SoundSystemService
   > = SoundSystemService.pipe(Effect.flatMap(({ stopMicrophone }) => stopMicrophone))
 
-  private readonly playVoiceDetectedEffect: Effect.Effect<
-    void,
-    never,
-    SoundSystemService
-  > = SoundSystemService.pipe(
-    Effect.flatMap(({ playVoiceDetected }) =>
-      Effect.catchAll(playVoiceDetected, () =>
-        Effect.logWarning("Failed to play voice detected sound"),
-      ),
-    ),
-  )
+
 
   // --- Observable pattern ---
 
@@ -713,21 +703,14 @@ export class VoiceActivityStore {
     vadLog("STOP", "Voice detection stopped")
   }
 
-  private readonly handleVoiceStartEffect: Effect.Effect<
-    void,
-    VADError,
-    SoundSystemService
-  > = Effect.gen(
-    this,
-    function* (_) {
+  private readonly handleVoiceStartEffect: Effect.Effect<void, VADError, never> =
+    Effect.sync(() => {
       vadLog("VOICE", "🎤 Voice activity started", { engine: this.state.engine })
       this.setState({
         isSpeaking: true,
         lastSpeakingAt: Date.now(),
       })
-      yield* _(this.playVoiceDetectedEffect)
-    },
-  )
+    })
 
   private handleVoiceStop(): void {
     vadLog("VOICE", "🔇 Voice activity stopped", { engine: this.state.engine })

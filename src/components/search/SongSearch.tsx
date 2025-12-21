@@ -1,7 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
-import { VoiceSearchButton } from "@/components/audio"
+import { ListeningWaveform, VoiceSearchButton } from "@/components/audio"
 import { INPUT_LIMITS } from "@/constants/limits"
 import { useIsAuthenticated } from "@/core"
 import { useLocalSongCache, useVoiceSearch } from "@/hooks"
@@ -362,22 +362,35 @@ export const SongSearch = memo(function SongSearch({
         {/* Search input */}
         <div className="relative z-10">
           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
-            {isLoading ? (
+            {voiceSearch.isRecording ? (
+              <ListeningWaveform />
+            ) : isLoading ? (
               <CircleNotch size={20} weight="bold" className="text-indigo-500 animate-spin" />
             ) : (
               <MagnifyingGlass size={20} weight="bold" />
             )}
           </div>
 
+          {/* Partial transcript overlay when recording */}
+          {voiceSearch.isRecording && (
+            <div className="absolute left-12 top-1/2 -translate-y-1/2 right-20 pointer-events-none overflow-hidden">
+              <span className="text-indigo-400 truncate block">
+                {voiceSearch.partialTranscript || "Listening..."}
+              </span>
+            </div>
+          )}
+
           <input
             type="text"
             value={query}
             onChange={handleInputChange}
-            placeholder="Search by song title or artist name"
+            placeholder={voiceSearch.isRecording ? "" : "Search by song title or artist name"}
             maxLength={INPUT_LIMITS.SEARCH_QUERY}
-            className={`w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 border border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ${
-              isAuthenticated ? (query ? "pr-20" : "pr-12") : "pr-10"
-            }`}
+            className={`w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 border transition-colors ${
+              voiceSearch.isRecording
+                ? "border-indigo-500 ring-2 ring-indigo-500/20 text-transparent caret-transparent"
+                : "border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            } ${isAuthenticated ? (query ? "pr-20" : "pr-12") : "pr-10"}`}
             aria-label="Search for a song"
           />
 
