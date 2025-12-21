@@ -36,9 +36,9 @@ function ensureLogDir(logFile: string): void {
 export async function POST(req: NextRequest) {
   const logFile = getLogFile()
 
-  // No file configured or not in dev mode
+  // No file configured or not in dev mode - silently accept
   if (!logFile) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
+    return NextResponse.json({ ok: true })
   }
 
   let payload: Payload | null = null
