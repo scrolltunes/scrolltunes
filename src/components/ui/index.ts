@@ -13,3 +13,4 @@ export {
   type AlbumArtSkeletonProps,
 } from "./Skeleton"
 export { SongListItem, type SongListItemProps } from "./SongListItem"
+export { StatusLabel, type StatusLabelProps, type StatusConfig } from "./StatusLabel"

@@ -7,13 +7,14 @@ import { FloatingActions, LyricsDisplay, SongActionBar, SongInfoModal } from "@/
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
-import { FavoriteButton } from "@/components/ui"
+import { FavoriteButton, StatusLabel } from "@/components/ui"
 
 import {
   type Lyrics,
   chordsStore,
   metronomeStore,
   recentSongsStore,
+  useDetailedActivityStatus,
   useChordsState,
   usePlayerControls,
   usePlayerState,
@@ -48,7 +49,7 @@ import {
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 type ErrorType = "invalid-url" | "not-found" | "network" | "invalid-lyrics"
 
@@ -113,6 +114,7 @@ export default function SongPage() {
     autoPlay: true,
     resumeOnVoice: true,
   })
+  const detailedStatus = useDetailedActivityStatus()
 
   const lrclibId = parseTrackSlugWithId(params.trackSlugWithId)
 
@@ -140,33 +142,13 @@ export default function SongPage() {
     }
   }, [])
 
-  // Status text for footer
-  const statusText = useMemo(() => {
-    const parts: string[] = []
-
-    if (playerState._tag === "Playing") {
-      parts.push("Playing")
-    } else if (playerState._tag === "Paused") {
-      parts.push("Paused")
-    } else if (playerState._tag === "Ready") {
-      parts.push("Ready")
-    }
-
-    if (isListening && !isSpeaking && playerState._tag !== "Playing") {
-      parts.push("Listening for voice")
-    }
-
-    return parts.length > 0 ? parts.join(" • ") : null
-  }, [playerState._tag, isListening, isSpeaking])
-
+  // Status label for footer
   useEffect(() => {
-    if (statusText) {
-      setSlot(<span className="text-neutral-400">{statusText}</span>)
-    } else {
-      setSlot(null)
-    }
+    setSlot(
+      <StatusLabel playerState={playerState} detailedStatus={detailedStatus} />,
+    )
     return () => setSlot(null)
-  }, [statusText, setSlot])
+  }, [playerState, detailedStatus, setSlot])
 
   useWakeLock({ enabled: isLoaded && preferences.wakeLockEnabled })
 

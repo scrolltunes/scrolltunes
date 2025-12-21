@@ -38,6 +38,16 @@ type VADEngineType = "silero" | "energy"
 export type MicPermissionStatus = "unknown" | "granted" | "denied" | "prompt"
 
 /**
+ * Detailed activity status for UI display
+ */
+export type DetailedActivityStatus =
+  | "idle" // Not listening
+  | "listening" // Listening, no activity
+  | "singing" // Voice detected (Silero + energy agree)
+  | "instrument" // Energy detected but not voice (likely guitar/instrument)
+  | "noisy" // High sustained energy without voice (noisy environment)
+
+/**
  * Voice activity state
  */
 export interface VoiceState {
@@ -48,6 +58,7 @@ export interface VoiceState {
   readonly permissionDenied: boolean
   readonly permissionStatus: MicPermissionStatus
   readonly engine: VADEngineType // which engine is active
+  readonly detailedStatus: DetailedActivityStatus
 }
 
 /**
@@ -173,6 +184,7 @@ export class VoiceActivityStore {
     permissionDenied: false,
     permissionStatus: "unknown",
     engine: "energy",
+    detailedStatus: "idle",
   }
 
   private config: VADConfig = DEFAULT_VAD_CONFIG
@@ -193,6 +205,11 @@ export class VoiceActivityStore {
   // Energy gate for Silero AND-gate (both must agree for voice start)
   private isEnergySpeaking = false
   private andGateEnabled = true
+
+  // Noisy room detection: tracks sustained high energy without voice
+  private sustainedEnergyStartAt: number | null = null
+  private static readonly NOISY_THRESHOLD = 0.15 // Energy level to consider "high"
+  private static readonly NOISY_SUSTAIN_MS = 3000 // Duration to consider "noisy room"
 
   private runPromiseWithClientLayer<T, E, R extends ClientLayerContext>(
     effect: Effect.Effect<T, E, R>,
@@ -264,9 +281,46 @@ export class VoiceActivityStore {
 
   // --- State management ---
 
+  private computeDetailedStatus(): DetailedActivityStatus {
+    if (!this.state.isListening) {
+      return "idle"
+    }
+
+    // Voice detected (Silero confirmed singing)
+    if (this.state.isSpeaking) {
+      return "singing"
+    }
+
+    // Energy without voice = likely instrument
+    if (this.isEnergySpeaking && !this.state.isSpeaking) {
+      return "instrument"
+    }
+
+    // Check for noisy room: sustained high energy without voice
+    const now = Date.now()
+    if (this.state.level >= VoiceActivityStore.NOISY_THRESHOLD) {
+      if (this.sustainedEnergyStartAt === null) {
+        this.sustainedEnergyStartAt = now
+      } else if (now - this.sustainedEnergyStartAt >= VoiceActivityStore.NOISY_SUSTAIN_MS) {
+        return "noisy"
+      }
+    } else {
+      this.sustainedEnergyStartAt = null
+    }
+
+    return "listening"
+  }
+
   private setState(partial: Partial<VoiceState>): void {
     const previousSpeaking = this.state.isSpeaking
     this.state = { ...this.state, ...partial }
+
+    // Recompute detailed status after state update
+    const detailedStatus = this.computeDetailedStatus()
+    if (detailedStatus !== this.state.detailedStatus) {
+      this.state = { ...this.state, detailedStatus }
+    }
+
     this.notify()
 
     if (previousSpeaking !== this.state.isSpeaking) {
@@ -800,6 +854,7 @@ export class VoiceActivityStore {
     this.config = DEFAULT_VAD_CONFIG
     this.sileroConfig = DEFAULT_SILERO_VAD_CONFIG
     this.runtime = INITIAL_VAD_RUNTIME
+    this.sustainedEnergyStartAt = null
     this.state = {
       isListening: false,
       isSpeaking: false,
@@ -808,6 +863,7 @@ export class VoiceActivityStore {
       permissionDenied: false,
       permissionStatus: this.state.permissionStatus, // Preserve permission status
       engine: "energy",
+      detailedStatus: "idle",
     }
     this.notify()
   }
@@ -887,6 +943,11 @@ export function useVoiceActivity(): VoiceState {
 export function useIsSpeaking(): boolean {
   const state = useVoiceActivity()
   return state.isSpeaking
+}
+
+export function useDetailedActivityStatus(): DetailedActivityStatus {
+  const state = useVoiceActivity()
+  return state.detailedStatus
 }
 
 export function useVoiceControls() {
