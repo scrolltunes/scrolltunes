@@ -5,10 +5,10 @@
 
 import {
   SpeechAPIError,
+  type SpeechError,
   SpeechNetworkError,
   SpeechNotSupportedError,
   SpeechPermissionError,
-  type SpeechError,
 } from "@/lib/speech-errors"
 import { Context, Effect, Layer } from "effect"
 

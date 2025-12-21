@@ -18,10 +18,7 @@ export class SpotifyRateLimitError extends Data.TaggedClass("SpotifyRateLimitErr
   readonly retryAfter: number
 }> {}
 
-export type SpotifyError =
-  | SpotifyAuthError
-  | SpotifyAPIError
-  | SpotifyRateLimitError
+export type SpotifyError = SpotifyAuthError | SpotifyAPIError | SpotifyRateLimitError
 
 // --- Spotify Types ---
 
@@ -94,16 +91,10 @@ const getCredentials = () =>
     })),
   )
 
-const fetchResponse = (
-  url: string,
-  init?: RequestInit,
-  message = "Network error",
-) =>
+const fetchResponse = (url: string, init?: RequestInit, message = "Network error") =>
   FetchService.pipe(
     Effect.flatMap(({ fetch }) =>
-      fetch(url, init).pipe(
-        Effect.mapError(() => new SpotifyAPIError({ status: 0, message })),
-      ),
+      fetch(url, init).pipe(Effect.mapError(() => new SpotifyAPIError({ status: 0, message }))),
     ),
   )
 
@@ -182,10 +173,7 @@ const fetchFromSpotifyAPI = <T>(accessToken: string, url: string) =>
     })
   })
 
-const withRetry = <T, R>(
-  makeEffect: () => Effect.Effect<T, SpotifyError, R>,
-  maxRetries = 3,
-) => {
+const withRetry = <T, R>(makeEffect: () => Effect.Effect<T, SpotifyError, R>, maxRetries = 3) => {
   const loop = (attempt: number): Effect.Effect<T, SpotifyError, R> =>
     Effect.catchTag(makeEffect(), "SpotifyRateLimitError", error => {
       if (attempt >= maxRetries) {
@@ -241,8 +229,7 @@ const makeSpotifyService = Effect.gen(function* () {
     )
 
   return {
-    searchTracks: (query: string, limit?: number) =>
-      provideDeps(searchTracksRaw(query, limit)),
+    searchTracks: (query: string, limit?: number) => provideDeps(searchTracksRaw(query, limit)),
     getTrack: (trackId: string) => provideDeps(getTrackRaw(trackId)),
   }
 })
@@ -266,18 +253,12 @@ export const getTrackEffect = (
 
 export async function searchTracks(query: string, limit?: number): Promise<SpotifySearchResult> {
   return Effect.runPromise(
-    searchTracksEffect(query, limit).pipe(
-      Effect.provide(SpotifyRuntimeLayer),
-    ),
+    searchTracksEffect(query, limit).pipe(Effect.provide(SpotifyRuntimeLayer)),
   )
 }
 
 export async function getTrack(trackId: string): Promise<SpotifyTrack> {
-  return Effect.runPromise(
-    getTrackEffect(trackId).pipe(
-      Effect.provide(SpotifyRuntimeLayer),
-    ),
-  )
+  return Effect.runPromise(getTrackEffect(trackId).pipe(Effect.provide(SpotifyRuntimeLayer)))
 }
 
 // --- Utility Functions ---

@@ -1,7 +1,7 @@
+import { loadServerConfig } from "@/services/server-config"
 import { neon } from "@neondatabase/serverless"
 import { drizzle } from "drizzle-orm/neon-http"
 import * as schema from "./schema"
-import { loadServerConfig } from "@/services/server-config"
 
 const { postgresUrl } = loadServerConfig()
 

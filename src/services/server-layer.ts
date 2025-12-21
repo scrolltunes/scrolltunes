@@ -1,9 +1,9 @@
 import { SongsterrServiceLive } from "@/lib/chords/songsterr-client"
 import { SpeechClientServiceLive } from "@/lib/google-speech-client"
-import { SpotifyServiceLive } from "@/lib/spotify-client"
 import { SpeechUsageTrackerLive } from "@/lib/speech-usage-tracker"
-import { Layer } from "effect"
+import { SpotifyServiceLive } from "@/lib/spotify-client"
 import { BpmProvidersLive } from "@/services/bpm-providers"
+import { Layer } from "effect"
 import { ServerBaseLayer } from "./server-base-layer"
 
 export const ServerLayer = Layer.mergeAll(

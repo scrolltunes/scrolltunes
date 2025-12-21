@@ -105,7 +105,7 @@ export default function TestLandingPage() {
         </div>
 
         <div className="grid gap-4">
-          {testPages.map((page) => (
+          {testPages.map(page => (
             <TestPageCard
               key={page.href}
               page={page}

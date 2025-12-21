@@ -1,14 +1,7 @@
 "use client"
 
 import type { DetailedActivityStatus, PlayerState } from "@/core"
-import {
-  Circle,
-  Guitar,
-  Microphone,
-  Pause,
-  Play,
-  Warning,
-} from "@phosphor-icons/react"
+import { Circle, Guitar, Microphone, Pause, Play, Warning } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useMemo } from "react"
 

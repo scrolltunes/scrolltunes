@@ -1,8 +1,4 @@
-import {
-  type BPMResult,
-  getBpmRace,
-  getBpmWithFallback,
-} from "@/lib/bpm"
+import { type BPMResult, getBpmRace, getBpmWithFallback } from "@/lib/bpm"
 import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
 import {
   LyricsAPIError,

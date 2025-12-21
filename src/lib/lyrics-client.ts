@@ -26,7 +26,7 @@ import type { Lyrics } from "@/core"
 import { FetchService } from "@/services/fetch"
 import { Data, Effect } from "effect"
 import { parseLRC } from "./lyrics-parser"
-import { formatArtists, searchTracksEffect, type SpotifyService } from "./spotify-client"
+import { type SpotifyService, formatArtists, searchTracksEffect } from "./spotify-client"
 
 // --- Error Classes ---
 
@@ -91,9 +91,7 @@ const fetchResponse = (
 ): Effect.Effect<Response, LyricsAPIError, FetchService> =>
   FetchService.pipe(
     Effect.flatMap(({ fetch }) =>
-      fetch(url, init).pipe(
-        Effect.mapError(() => new LyricsAPIError({ status: 0, message })),
-      ),
+      fetch(url, init).pipe(Effect.mapError(() => new LyricsAPIError({ status: 0, message }))),
     ),
   )
 
@@ -311,9 +309,7 @@ export const searchLyrics = (
  * Uses the `/api/get/{id}` endpoint to fetch lyrics by database ID.
  * Useful when you already have a track ID from a previous search.
  */
-export const getLyricsById = (
-  id: number,
-): Effect.Effect<Lyrics, LyricsError, LyricsClientEnv> => {
+export const getLyricsById = (id: number): Effect.Effect<Lyrics, LyricsError, LyricsClientEnv> => {
   return Effect.gen(function* () {
     const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/get/${id}`, {
       headers,

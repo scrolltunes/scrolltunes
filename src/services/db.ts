@@ -1,10 +1,10 @@
+import * as schema from "@/lib/db/schema"
+import { ConfigLayer } from "@/services/server-base-layer"
+import { ServerConfig } from "@/services/server-config"
 import { neon } from "@neondatabase/serverless"
 import { drizzle } from "drizzle-orm/neon-http"
-import { Context, Data, Effect, Layer } from "effect"
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http"
-import * as schema from "@/lib/db/schema"
-import { ServerConfig } from "@/services/server-config"
-import { ConfigLayer } from "@/services/server-base-layer"
+import { Context, Data, Effect, Layer } from "effect"
 
 type Database = NeonHttpDatabase<typeof schema>
 
@@ -36,9 +36,6 @@ const makeDb: Effect.Effect<Database, DbConfigError, ServerConfig> = Effect.gen(
   ),
 )
 
-export const DbServiceLive = Layer.effect(
-  DbService,
-  makeDb.pipe(Effect.map(db => ({ db }))),
-)
+export const DbServiceLive = Layer.effect(DbService, makeDb.pipe(Effect.map(db => ({ db }))))
 
 export const DbLayer = DbServiceLive.pipe(Layer.provide(ConfigLayer))

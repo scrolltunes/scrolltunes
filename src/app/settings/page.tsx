@@ -343,8 +343,6 @@ export default function SettingsPage() {
     preferencesStore.setShakeToRestartEnabled(!preferences.shakeToRestartEnabled)
   }, [preferences.shakeToRestartEnabled])
 
-
-
   const handleAutoHideChange = useCallback((value: number) => {
     preferencesStore.setAutoHideControlsMs(value)
   }, [])

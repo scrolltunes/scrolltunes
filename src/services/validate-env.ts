@@ -1,6 +1,6 @@
 import { Effect } from "effect"
-import { ConfigLayer } from "./server-base-layer"
 import { PublicConfig } from "./public-config"
+import { ConfigLayer } from "./server-base-layer"
 import { ServerConfig } from "./server-config"
 
 const validateEnv = Effect.gen(function* () {
@@ -8,6 +8,4 @@ const validateEnv = Effect.gen(function* () {
   yield* ServerConfig
 })
 
-Effect.runSync(
-  validateEnv.pipe(Effect.provide(ConfigLayer)),
-)
+Effect.runSync(validateEnv.pipe(Effect.provide(ConfigLayer)))

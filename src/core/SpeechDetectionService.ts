@@ -1,14 +1,10 @@
 "use client"
 
-import {
-  type SileroPreset,
-  type SileroVADConfig,
-  getPresetConfig,
-} from "@/lib/silero-vad-config"
-import type { AudioError } from "@/sounds"
+import { type SileroPreset, type SileroVADConfig, getPresetConfig } from "@/lib/silero-vad-config"
 import { ClientLayer, type ClientLayerContext } from "@/services/client-layer"
 import { loadPublicConfig } from "@/services/public-config"
 import { SoundSystemService } from "@/services/sound-system"
+import type { AudioError } from "@/sounds"
 import { Context, Data, Effect, Layer } from "effect"
 import { useSyncExternalStore } from "react"
 import { type SileroLoadError, SileroVADEngine } from "./SileroVADEngine"
@@ -103,16 +99,14 @@ class SpeechDetectionStore implements VoiceDetectionService<SpeechDetectionState
     permissionStatus: "unknown",
   }
 
-  private sileroConfig: SileroVADConfig = getPresetConfig("normal")
+  private sileroConfig: SileroVADConfig = getPresetConfig("voice-search")
   private sileroEngine: SileroVADEngine | null = null
   private smoothedLevel = 0
 
   private runSyncWithClientLayer<T, E, R extends ClientLayerContext>(
     effect: Effect.Effect<T, E, R>,
   ): T {
-    return Effect.runSync(
-      effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>,
-    )
+    return Effect.runSync(effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>)
   }
 
   private readonly stopMicrophoneEffect: Effect.Effect<void, never, SoundSystemService> =
@@ -177,9 +171,7 @@ class SpeechDetectionStore implements VoiceDetectionService<SpeechDetectionState
 
   // --- Event dispatch ---
 
-  readonly dispatch = (
-    event: SpeechEvent,
-  ): Effect.Effect<void, SpeechDetectionError, never> => {
+  readonly dispatch = (event: SpeechEvent): Effect.Effect<void, SpeechDetectionError, never> => {
     return Effect.sync(() => {
       switch (event._tag) {
         case "SpeechStart":
@@ -220,7 +212,10 @@ class SpeechDetectionStore implements VoiceDetectionService<SpeechDetectionState
         yield* _(
           Effect.fail(
             new SpeechDetectionError({
-              cause: { _tag: "SileroLoadError", message: "AudioWorklet not supported" } as SileroLoadError,
+              cause: {
+                _tag: "SileroLoadError",
+                message: "AudioWorklet not supported",
+              } as SileroLoadError,
             }),
           ),
         )

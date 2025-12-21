@@ -83,14 +83,14 @@ export const SILERO_PRESET_GUITAR: SileroVADConfig = {
   redemptionMs: 500, // Wait longer before speech end
 }
 
-/** Preset for voice search - sensitive to speech, 2s silence before stopping */
+/** Preset for voice search - sensitive to speech, quick end-of-utterance detection */
 export const SILERO_PRESET_VOICE_SEARCH: SileroVADConfig = {
   onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/",
   baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/",
   positiveSpeechThreshold: 0.6, // More sensitive to detect speech quickly
   negativeSpeechThreshold: 0.35, // Standard hysteresis
   minSpeechMs: 200, // Quick detection
-  redemptionMs: 2000, // 2 seconds silence before stopping
+  redemptionMs: 300, // Short redemption, main silence wait is in SpeechRecognitionStore
 }
 
 export type SileroPreset = "quiet" | "normal" | "loud" | "guitar" | "voice-search"

@@ -1,6 +1,6 @@
 "use client"
 
-import { soundSystem, type AudioError, type AudioNotInitialized } from "@/sounds"
+import { type AudioError, type AudioNotInitialized, soundSystem } from "@/sounds"
 import { Context, type Effect, Layer } from "effect"
 
 export class SoundSystemService extends Context.Tag("SoundSystemService")<

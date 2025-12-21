@@ -33,7 +33,10 @@ const isEmptyLine = (text: string): boolean => {
 
 const rubberbandDistance = (distance: number, dimension: number): number => {
   if (distance <= 0 || dimension <= 0) return 0
-  return (distance * dimension * RUBBERBAND_COEFFICIENT) / (dimension + RUBBERBAND_COEFFICIENT * distance)
+  return (
+    (distance * dimension * RUBBERBAND_COEFFICIENT) /
+    (dimension + RUBBERBAND_COEFFICIENT * distance)
+  )
 }
 
 export interface LyricsDisplayProps {
@@ -134,7 +137,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     [scrollY],
   )
 
-
   // Get lyrics from state
   const lyrics = state._tag !== "Idle" ? state.lyrics : null
 
@@ -176,26 +178,29 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   }, [showChords, chordsData, lyrics, transposeSemitones])
 
   // Scroll to position a line at target position
-  const getLineScrollTarget = useCallback((lineIndex: number): number | null => {
-    const container = containerRef.current
-    const activeLine = lineRefs.current[lineIndex]
+  const getLineScrollTarget = useCallback(
+    (lineIndex: number): number | null => {
+      const container = containerRef.current
+      const activeLine = lineRefs.current[lineIndex]
 
-    // Skip if container or line not ready
-    if (!container || !activeLine) return null
+      // Skip if container or line not ready
+      if (!container || !activeLine) return null
 
-    const containerRect = container.getBoundingClientRect()
-    const lineRect = activeLine.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      const lineRect = activeLine.getBoundingClientRect()
 
-    // Where the line currently is (relative to container top)
-    const lineCurrentY = lineRect.top - containerRect.top
+      // Where the line currently is (relative to container top)
+      const lineCurrentY = lineRect.top - containerRect.top
 
-    // Target position: 25% from container top for comfortable reading
-    const targetY = containerRect.height * 0.25
+      // Target position: 25% from container top for comfortable reading
+      const targetY = containerRect.height * 0.25
 
-    // Adjust scroll by the difference
-    const delta = lineCurrentY - targetY
-    return clampScroll(scrollY.get() + delta)
-  }, [clampScroll, scrollY])
+      // Adjust scroll by the difference
+      const delta = lineCurrentY - targetY
+      return clampScroll(scrollY.get() + delta)
+    },
+    [clampScroll, scrollY],
+  )
 
   // Track if initial scroll has happened and what the initial scroll value was
   const hasInitialScroll = useRef(false)
@@ -297,7 +302,14 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       cancelAnimationFrame(rafId1)
       if (rafId2 !== undefined) cancelAnimationFrame(rafId2)
     }
-  }, [currentLineIndex, getLineScrollTarget, isAutoScrollEnabled, lyrics, scrollY, stopScrollAnimation])
+  }, [
+    currentLineIndex,
+    getLineScrollTarget,
+    isAutoScrollEnabled,
+    lyrics,
+    scrollY,
+    stopScrollAnimation,
+  ])
 
   // Check if active line is visible in viewport
   const isActiveLineVisible = useCallback(() => {
@@ -313,17 +325,20 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     return lineRect.bottom > containerRect.top && lineRect.top < containerRect.bottom
   }, [currentLineIndex])
 
-  const scheduleManualIndicatorHide = useCallback((delayMs: number) => {
-    if (manualIndicatorTimeoutRef.current) {
-      clearTimeout(manualIndicatorTimeoutRef.current)
-    }
-    manualIndicatorTimeoutRef.current = setTimeout(() => {
-      setShowManualScrollIndicator(false)
-      if (isPlaying && isActiveLineVisible()) {
-        setIsManualScrolling(false)
+  const scheduleManualIndicatorHide = useCallback(
+    (delayMs: number) => {
+      if (manualIndicatorTimeoutRef.current) {
+        clearTimeout(manualIndicatorTimeoutRef.current)
       }
-    }, delayMs)
-  }, [isPlaying, isActiveLineVisible])
+      manualIndicatorTimeoutRef.current = setTimeout(() => {
+        setShowManualScrollIndicator(false)
+        if (isPlaying && isActiveLineVisible()) {
+          setIsManualScrolling(false)
+        }
+      }, delayMs)
+    },
+    [isPlaying, isActiveLineVisible],
+  )
 
   // Handle manual scroll detection - sticky override until highlight leaves view
   // When playing and highlight goes out of view, resume auto-follow
@@ -349,7 +364,13 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       scheduleManualIndicatorHide(SCROLL_INDICATOR_TIMEOUT_WHEEL)
       updateScrollY(prev => clampScroll(prev + e.deltaY))
     },
-    [handleUserScroll, clampScroll, scheduleManualIndicatorHide, stopScrollAnimation, updateScrollY],
+    [
+      handleUserScroll,
+      clampScroll,
+      scheduleManualIndicatorHide,
+      stopScrollAnimation,
+      updateScrollY,
+    ],
   )
 
   // Handle touch events for mobile with velocity-based momentum
@@ -382,8 +403,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       const current = scrollY.get()
       const next = applyRubberband(current + v * dt)
       const bounds = getScrollBounds()
-      const isOverscrolled =
-        bounds ? next < bounds.minScroll || next > bounds.maxScroll : false
+      const isOverscrolled = bounds ? next < bounds.minScroll || next > bounds.maxScroll : false
 
       if (isOverscrolled) {
         v *= OVERSCROLL_DAMPING
@@ -424,10 +444,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   )
 
   const handleTouchMove = useCallback(
-    (
-      currentY: number,
-      event: Pick<TouchEvent, "cancelable" | "preventDefault">,
-    ) => {
+    (currentY: number, event: Pick<TouchEvent, "cancelable" | "preventDefault">) => {
       if (
         touchStartY.current === null ||
         touchLastY.current === null ||
@@ -509,7 +526,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     }
   }, [])
 
-
   // Handle line click
   const handleLineClick = useCallback(
     (index: number) => {
@@ -522,7 +538,11 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   // Blur the focused line when player state changes to avoid persistent focus ring
   useEffect(() => {
     const focused = document.activeElement as HTMLElement
-    if (focused && focused.tagName === "BUTTON" && lineRefs.current.includes(focused as HTMLButtonElement)) {
+    if (
+      focused &&
+      focused.tagName === "BUTTON" &&
+      lineRefs.current.includes(focused as HTMLButtonElement)
+    ) {
       focused.blur()
     }
   }, [state._tag])
@@ -556,7 +576,6 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
           Manual scroll
         </div>
       )}
-
 
       <motion.div
         ref={contentRef}

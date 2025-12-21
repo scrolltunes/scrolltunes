@@ -19,10 +19,7 @@ export interface ServerConfigValues {
   readonly baseUrl: string
 }
 
-export class ServerConfig extends Context.Tag("ServerConfig")<
-  ServerConfig,
-  ServerConfigValues
->() {}
+export class ServerConfig extends Context.Tag("ServerConfig")<ServerConfig, ServerConfigValues>() {}
 
 const serverConfig = Config.all({
   postgresUrl: Config.nonEmptyString("POSTGRES_URL"),

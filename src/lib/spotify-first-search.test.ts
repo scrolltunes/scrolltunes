@@ -20,9 +20,7 @@ describe("Spotify-first search", () => {
     const query = "my sacrifice"
 
     const results = await Effect.runPromise(
-      searchLRCLibBySpotifyMetadata(query).pipe(
-        Effect.provide(spotifyRuntimeLayer),
-      ),
+      searchLRCLibBySpotifyMetadata(query).pipe(Effect.provide(spotifyRuntimeLayer)),
     )
 
     // Spotify should normalize to "My Sacrifice" by Creed

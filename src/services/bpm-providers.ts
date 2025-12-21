@@ -1,11 +1,11 @@
-import { Context, Effect, Layer } from "effect"
+import { withInMemoryCache } from "@/lib/bpm/bpm-cache"
 import type { BPMProvider } from "@/lib/bpm/bpm-provider"
 import type { BPMTrackQuery } from "@/lib/bpm/bpm-types"
-import { withInMemoryCache } from "@/lib/bpm/bpm-cache"
 import { deezerBpmProvider } from "@/lib/bpm/deezer-client"
 import { getSongBpmProvider } from "@/lib/bpm/getsongbpm-client"
 import { rapidApiSpotifyProvider } from "@/lib/bpm/rapidapi-client"
 import { reccoBeatsProvider } from "@/lib/bpm/reccobeats-client"
+import { Context, Effect, Layer } from "effect"
 import { PublicConfig } from "./public-config"
 import { ServerConfig } from "./server-config"
 

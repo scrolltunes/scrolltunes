@@ -1,15 +1,15 @@
 "use client"
 
-import { BackButton } from "@/components/ui"
 import { UserMenu } from "@/components/auth/UserMenu"
+import { BackButton } from "@/components/ui"
 import {
-  useSpeechState,
-  useSpeechControls,
-  useSpeechTier,
-  useIsWebSpeechAvailable,
   useAccount,
+  useIsWebSpeechAvailable,
+  useSpeechControls,
+  useSpeechState,
+  useSpeechTier,
 } from "@/core"
-import { Microphone, Stop, Warning, GoogleLogo, Globe, Detective } from "@phosphor-icons/react"
+import { Detective, Globe, GoogleLogo, Microphone, Stop, Warning } from "@phosphor-icons/react"
 import { memo, useCallback, useEffect, useState } from "react"
 
 // Mobile detection pattern (same as SpeechRecognitionStore)
@@ -111,7 +111,7 @@ function GoogleSTTDirectTester() {
       })
 
       const chunks: Blob[] = []
-      recorder.ondataavailable = (event) => {
+      recorder.ondataavailable = event => {
         if (event.data.size > 0) {
           chunks.push(event.data)
           setAudioChunks([...chunks])
@@ -128,10 +128,10 @@ function GoogleSTTDirectTester() {
           return
         }
 
-        setState((prev) => ({ ...prev, isLoading: true }))
+        setState(prev => ({ ...prev, isLoading: true }))
 
         const audioBlob = new Blob(chunks, { type: recorder.mimeType })
-        const base64Audio = await new Promise<string>((resolve) => {
+        const base64Audio = await new Promise<string>(resolve => {
           const reader = new FileReader()
           reader.onloadend = () => {
             const dataUrl = reader.result as string
@@ -234,9 +234,7 @@ function GoogleSTTDirectTester() {
       </div>
 
       {isRecording && (
-        <div className="text-sm text-green-400">
-          Recording... ({audioChunks.length} chunks)
-        </div>
+        <div className="text-sm text-green-400">Recording... ({audioChunks.length} chunks)</div>
       )}
 
       {state.transcript && (
@@ -270,8 +268,7 @@ function WebSpeechDirectTester() {
   const [partialTranscript, setPartialTranscript] = useState("")
 
   const isSupported =
-    typeof window !== "undefined" &&
-    !!(window.SpeechRecognition ?? window.webkitSpeechRecognition)
+    typeof window !== "undefined" && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition)
 
   const handleStart = useCallback(() => {
     setState({ transcript: null, error: null, isLoading: false })
@@ -382,9 +379,7 @@ function WebSpeechDirectTester() {
             )}
           </div>
 
-          {isRecording && (
-            <div className="text-sm text-green-400">Listening...</div>
-          )}
+          {isRecording && <div className="text-sm text-green-400">Listening...</div>}
 
           {partialTranscript && (
             <div className="space-y-1">
@@ -559,7 +554,8 @@ const VoiceSearchTester = memo(function VoiceSearchTester() {
           </h2>
         </div>
         <p className="text-xs text-neutral-500">
-          Brave desktop blocks Web Speech API. Detection skips Web Speech and uses Google STT directly.
+          Brave desktop blocks Web Speech API. Detection skips Web Speech and uses Google STT
+          directly.
         </p>
         {braveInfo ? (
           <div className="space-y-3">
@@ -752,8 +748,9 @@ export default function VoiceSearchTestPage() {
       <main className="pt-20 pb-8 px-4 max-w-2xl mx-auto">
         <div className="mb-6 p-4 bg-amber-900/20 border border-amber-500/30 rounded-xl">
           <p className="text-amber-300 text-sm">
-            <strong>Test Page:</strong> This page tests the tiered voice search implementation.
-            Web Speech API is used first (fast, free). If low confidence, falls back to Google Cloud STT (if quota available).
+            <strong>Test Page:</strong> This page tests the tiered voice search implementation. Web
+            Speech API is used first (fast, free). If low confidence, falls back to Google Cloud STT
+            (if quota available).
           </p>
         </div>
 

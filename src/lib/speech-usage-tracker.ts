@@ -5,10 +5,10 @@
  * Uses Vercel KV (Upstash Redis) to track monthly usage and prevent overages.
  */
 
-import { Redis } from "@upstash/redis"
-import { FetchService, type FetchError } from "@/services/fetch"
+import { type FetchError, FetchService } from "@/services/fetch"
 import { PublicConfig } from "@/services/public-config"
 import { ServerConfig } from "@/services/server-config"
+import { Redis } from "@upstash/redis"
 import { Context, Effect, Layer } from "effect"
 
 const MONTHLY_SECONDS_CAP = 3600 // 60 minutes

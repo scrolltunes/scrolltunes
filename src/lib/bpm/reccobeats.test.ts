@@ -8,9 +8,9 @@
  */
 
 import { ServerBaseLayer } from "@/services/server-base-layer"
-import { SpotifyServiceLive } from "../spotify-client"
 import { Effect, Layer } from "effect"
 import { describe, expect, it } from "vitest"
+import { SpotifyServiceLive } from "../spotify-client"
 import { type SpotifyTrack, searchTracksEffect } from "../spotify-client"
 
 const RECCOBEATS_API = "https://api.reccobeats.com/v1"
@@ -86,9 +86,7 @@ async function lookupBpmViaReccoBeats(
 ): Promise<{ bpm: number; key: string | null; spotifyId: string; track: SpotifyTrack } | null> {
   const query = `track:${title} artist:${artist}`
   const exit = await Effect.runPromiseExit(
-    searchTracksEffect(query, 5).pipe(
-      Effect.provide(spotifyRuntimeLayer),
-    ),
+    searchTracksEffect(query, 5).pipe(Effect.provide(spotifyRuntimeLayer)),
   )
 
   if (exit._tag === "Failure") return null

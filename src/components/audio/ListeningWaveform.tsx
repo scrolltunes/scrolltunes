@@ -17,10 +17,7 @@ export const ListeningWaveform = memo(function ListeningWaveform({
   const barColor = variant === "processing" ? "bg-emerald-400" : "bg-indigo-400"
 
   return (
-    <div
-      className={`flex items-center justify-center gap-0.5 ${className}`}
-      aria-hidden="true"
-    >
+    <div className={`flex items-center justify-center gap-0.5 ${className}`} aria-hidden="true">
       {BAR_DELAYS.map((delay, i) => (
         <motion.div
           key={i}

@@ -1,8 +1,4 @@
-import {
-  type BPMResult,
-  getBpmRace,
-  getBpmWithFallback,
-} from "@/lib/bpm"
+import { type BPMResult, getBpmRace, getBpmWithFallback } from "@/lib/bpm"
 import { getAlbumArt } from "@/lib/deezer-client"
 import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
 import {
@@ -14,17 +10,16 @@ import {
 } from "@/lib/lyrics-client"
 import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import {
+  type SpotifyService,
   formatArtists,
   getAlbumImageUrl,
   getTrackEffect,
   searchTracksEffect,
-  type SpotifyService,
 } from "@/lib/spotify-client"
 import { BpmProviders } from "@/services/bpm-providers"
 import { ServerLayer } from "@/services/server-layer"
 import { Effect } from "effect"
 import { NextResponse } from "next/server"
-
 
 function getBpmAttribution(source: string): { name: string; url: string } {
   switch (source) {
@@ -142,37 +137,36 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           spotifyId: resolvedSpotifyId,
         }
 
-        const bpmEffect: Effect.Effect<BPMResult | null, never, BpmProviders> =
-          BpmProviders.pipe(
-            Effect.flatMap(({ fallbackProviders, raceProviders, lastResortProvider }) => {
-              const primaryBpmEffect = resolvedSpotifyId
-                ? getBpmRace(raceProviders, bpmQuery)
-                : getBpmWithFallback(fallbackProviders, bpmQuery)
+        const bpmEffect: Effect.Effect<BPMResult | null, never, BpmProviders> = BpmProviders.pipe(
+          Effect.flatMap(({ fallbackProviders, raceProviders, lastResortProvider }) => {
+            const primaryBpmEffect = resolvedSpotifyId
+              ? getBpmRace(raceProviders, bpmQuery)
+              : getBpmWithFallback(fallbackProviders, bpmQuery)
 
-              const bpmWithLastResort = resolvedSpotifyId
-                ? primaryBpmEffect.pipe(
-                    Effect.catchAll(error =>
-                      error._tag === "BPMNotFoundError"
-                        ? lastResortProvider.getBpm(bpmQuery)
-                        : Effect.fail(error),
-                    ),
-                  )
-                : primaryBpmEffect
+            const bpmWithLastResort = resolvedSpotifyId
+              ? primaryBpmEffect.pipe(
+                  Effect.catchAll(error =>
+                    error._tag === "BPMNotFoundError"
+                      ? lastResortProvider.getBpm(bpmQuery)
+                      : Effect.fail(error),
+                  ),
+                )
+              : primaryBpmEffect
 
-              return bpmWithLastResort.pipe(
-                Effect.catchAll(error => {
-                  if (error._tag === "BPMAPIError") {
-                    console.error("BPM API error:", error.status, error.message)
-                  }
-                  return Effect.succeed(null)
-                }),
-                Effect.catchAllDefect(defect => {
-                  console.error("BPM defect:", defect)
-                  return Effect.succeed(null)
-                }),
-              )
-            }),
-          )
+            return bpmWithLastResort.pipe(
+              Effect.catchAll(error => {
+                if (error._tag === "BPMAPIError") {
+                  console.error("BPM API error:", error.status, error.message)
+                }
+                return Effect.succeed(null)
+              }),
+              Effect.catchAllDefect(defect => {
+                console.error("BPM defect:", defect)
+                return Effect.succeed(null)
+              }),
+            )
+          }),
+        )
 
         return Effect.map(bpmEffect, bpm => ({
           lyrics,

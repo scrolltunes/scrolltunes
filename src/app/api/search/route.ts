@@ -7,10 +7,10 @@ import {
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import type { SearchResultTrack } from "@/lib/search-api-types"
 import {
+  type SpotifyService,
   formatArtists,
   getAlbumImageUrl,
   searchTracksEffect,
-  type SpotifyService,
 } from "@/lib/spotify-client"
 import type { FetchService } from "@/services/fetch"
 import { ServerLayer } from "@/services/server-layer"

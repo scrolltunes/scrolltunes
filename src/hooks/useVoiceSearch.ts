@@ -39,7 +39,12 @@ export function useVoiceSearch() {
       setIsProcessing(false)
       wasRecordingRef.current = false
     }
-  }, [speechState.isRecording, speechState.finalTranscript, speechState.errorMessage, speechState.errorCode])
+  }, [
+    speechState.isRecording,
+    speechState.finalTranscript,
+    speechState.errorMessage,
+    speechState.errorCode,
+  ])
 
   // Safety timeout: clear processing state after 10 seconds max
   useEffect(() => {

@@ -1,8 +1,8 @@
-import type { Metadata, ResolvingMetadata } from "next"
 import { type LyricsApiResponse, isLyricsApiSuccess } from "@/lib"
-import { parseTrackSlugWithId } from "@/lib/slug"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
+import { parseTrackSlugWithId } from "@/lib/slug"
 import { loadServerConfig } from "@/services/server-config"
+import type { Metadata, ResolvingMetadata } from "next"
 
 interface GenerateMetadataProps {
   params: Promise<{ artistSlug: string; trackSlugWithId: string }>

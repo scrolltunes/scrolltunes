@@ -353,9 +353,7 @@ export default function PrivacyPage() {
               </div>
               <div>
                 <h3 className="font-medium text-white mb-2">Microphone Access</h3>
-                <p>
-                  ScrollTunes requests microphone access for two features:
-                </p>
+                <p>ScrollTunes requests microphone access for two features:</p>
                 <ul className="list-disc list-inside space-y-2 ml-2 mt-2">
                   <li>
                     <strong className="text-white">Voice detection:</strong> Enables hands-free

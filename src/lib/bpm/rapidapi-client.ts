@@ -15,9 +15,9 @@
  * Uses Vercel KV to enforce daily request cap (prevents billing overages).
  */
 
-import { Redis } from "@upstash/redis"
 import { PublicConfig } from "@/services/public-config"
 import { ServerConfig } from "@/services/server-config"
+import { Redis } from "@upstash/redis"
 import { Effect } from "effect"
 
 const getRedisClient: Effect.Effect<Redis, never, ServerConfig> = Effect.gen(function* () {
@@ -67,8 +67,8 @@ const sendUsageWarning = (
   Effect.gen(function* () {
     const { web3FormsAccessKey } = yield* PublicConfig
     const accessKey = web3FormsAccessKey
-  const percentage = Math.round(threshold * 100)
-  const spotifyUrl = `https://open.spotify.com/track/${song.spotifyId}`
+    const percentage = Math.round(threshold * 100)
+    const spotifyUrl = `https://open.spotify.com/track/${song.spotifyId}`
 
     yield* Effect.tryPromise({
       try: () =>

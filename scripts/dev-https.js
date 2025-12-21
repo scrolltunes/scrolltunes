@@ -12,7 +12,7 @@ const keyPath = path.join(process.cwd(), "key.pem")
 if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
   console.error("❌ SSL certificates not found")
   console.error(
-    "Run: mkcert -key-file key.pem -cert-file cert.pem localhost 127.0.0.1 $(hostname -f)"
+    "Run: mkcert -key-file key.pem -cert-file cert.pem localhost 127.0.0.1 $(hostname -f)",
   )
   process.exit(1)
 }
@@ -27,7 +27,7 @@ const devServer = spawn("bun", ["run", "dev"], {
   stdio: "inherit",
 })
 
-devServer.on("error", (err) => {
+devServer.on("error", err => {
   console.error("Failed to start dev server:", err)
   process.exit(1)
 })
@@ -52,20 +52,22 @@ setTimeout(() => {
     key: fs.readFileSync(keyPath),
   }
 
-  https.createServer(options, (req, res) => {
-    proxy.web(req, res)
-  }).listen(httpsPort, "0.0.0.0", () => {
-    const localIP = Object.values(os.networkInterfaces())
-      .flat()
-      .find((addr) => addr.family === "IPv4" && !addr.internal)?.address
+  https
+    .createServer(options, (req, res) => {
+      proxy.web(req, res)
+    })
+    .listen(httpsPort, "0.0.0.0", () => {
+      const localIP = Object.values(os.networkInterfaces())
+        .flat()
+        .find(addr => addr.family === "IPv4" && !addr.internal)?.address
 
-    console.log(`
+      console.log(`
 ✅ HTTPS dev server running on port ${httpsPort}
 
   Local:        https://localhost:${httpsPort}
   Network:      https://${localIP || "0.0.0.0"}:${httpsPort}
   `)
-  })
+    })
 
   // Forward WebSocket upgrades
   https.createServer(options).on("upgrade", (req, socket, head) => {

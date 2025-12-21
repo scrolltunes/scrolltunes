@@ -11,30 +11,39 @@
  */
 
 import {
-  singingDetectionStore,
-  useSingingDetection,
-  useSingingControls,
-  useIsSinging,
-  useDetailedSingingStatus,
-  type SingingDetectionState,
-  type VADConfig,
-  type SileroVADConfig,
-  type SileroPreset,
-  type MicPermissionStatus,
   type DetailedActivityStatus,
-  type VADEngineType,
-  type VADEvent,
-  type VoiceDetectionService,
-  VADError,
+  type MicPermissionStatus,
+  type SileroPreset,
+  type SileroVADConfig,
+  type SingingDetectionState,
+  SingingDetectionStore,
   StartListening,
   StopListening,
+  UpdateLevel,
+  type VADConfig,
+  type VADEngineType,
+  VADError,
+  type VADEvent,
+  type VoiceDetectionService,
   VoiceStart,
   VoiceStop,
-  UpdateLevel,
-  SingingDetectionStore,
+  singingDetectionStore,
+  useDetailedSingingStatus,
+  useIsSinging,
+  useSingingControls,
+  useSingingDetection,
 } from "./SingingDetectionService"
 
-export type { VADConfig, SileroVADConfig, SileroPreset, MicPermissionStatus, DetailedActivityStatus, VADEngineType, VADEvent, VoiceDetectionService }
+export type {
+  VADConfig,
+  SileroVADConfig,
+  SileroPreset,
+  MicPermissionStatus,
+  DetailedActivityStatus,
+  VADEngineType,
+  VADEvent,
+  VoiceDetectionService,
+}
 export { VADError, StartListening, StopListening, VoiceStart, VoiceStop, UpdateLevel }
 
 export type VoiceState = SingingDetectionState

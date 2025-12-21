@@ -57,12 +57,18 @@ export class SongsterrService extends Context.Tag("SongsterrService")<
       songId: number,
       artist: string,
       title: string,
-    ) => Effect.Effect<RawChordProDocument, SongsterrError | SongsterrNotFoundError | SongsterrParseError>
+    ) => Effect.Effect<
+      RawChordProDocument,
+      SongsterrError | SongsterrNotFoundError | SongsterrParseError
+    >
     readonly getChordData: (
       songId: number,
       artist: string,
       title: string,
-    ) => Effect.Effect<ChordProDocument, SongsterrError | SongsterrNotFoundError | SongsterrParseError>
+    ) => Effect.Effect<
+      ChordProDocument,
+      SongsterrError | SongsterrNotFoundError | SongsterrParseError
+    >
   }
 >() {}
 
@@ -70,9 +76,7 @@ const makeSongsterrService = Effect.gen(function* () {
   const { fetch } = yield* FetchService
 
   const fetchResponse = (url: string, init?: RequestInit, message = "Network error") =>
-    fetch(url, init).pipe(
-      Effect.mapError(() => new SongsterrError({ status: 0, message })),
-    )
+    fetch(url, init).pipe(Effect.mapError(() => new SongsterrError({ status: 0, message })))
 
   const searchSongs = (query: string): Effect.Effect<SongsterrSearchResult[], SongsterrError> =>
     Effect.gen(function* () {
@@ -114,7 +118,10 @@ const makeSongsterrService = Effect.gen(function* () {
     songId: number,
     artist: string,
     title: string,
-  ): Effect.Effect<RawChordProDocument, SongsterrError | SongsterrNotFoundError | SongsterrParseError> =>
+  ): Effect.Effect<
+    RawChordProDocument,
+    SongsterrError | SongsterrNotFoundError | SongsterrParseError
+  > =>
     Effect.gen(function* () {
       const artistSlug = toSongsterrSlug(artist)
       const titleSlug = toSongsterrSlug(title)
@@ -150,7 +157,9 @@ const makeSongsterrService = Effect.gen(function* () {
       try {
         stateData = JSON.parse(scriptMatch[1]) as SongsterrStateData
       } catch {
-        return yield* Effect.fail(new SongsterrParseError({ message: "Failed to parse state JSON" }))
+        return yield* Effect.fail(
+          new SongsterrParseError({ message: "Failed to parse state JSON" }),
+        )
       }
 
       const chordproLines = stateData.chordpro?.current
@@ -167,7 +176,10 @@ const makeSongsterrService = Effect.gen(function* () {
     songId: number,
     artist: string,
     title: string,
-  ): Effect.Effect<ChordProDocument, SongsterrError | SongsterrNotFoundError | SongsterrParseError> =>
+  ): Effect.Effect<
+    ChordProDocument,
+    SongsterrError | SongsterrNotFoundError | SongsterrParseError
+  > =>
     Effect.gen(function* () {
       const rawDoc = yield* getRawChordProData(songId, artist, title)
 
@@ -218,7 +230,10 @@ export const getRawChordProData = (
   RawChordProDocument,
   SongsterrError | SongsterrNotFoundError | SongsterrParseError,
   SongsterrService
-> => SongsterrService.pipe(Effect.flatMap(service => service.getRawChordProData(songId, artist, title)))
+> =>
+  SongsterrService.pipe(
+    Effect.flatMap(service => service.getRawChordProData(songId, artist, title)),
+  )
 
 export const getChordData = (
   songId: number,
@@ -231,11 +246,7 @@ export const getChordData = (
 > => SongsterrService.pipe(Effect.flatMap(service => service.getChordData(songId, artist, title)))
 
 export async function searchSongsAsync(query: string): Promise<SongsterrSearchResult[]> {
-  return Effect.runPromise(
-    searchSongs(query).pipe(
-      Effect.provide(SongsterrRuntimeLayer),
-    ),
-  )
+  return Effect.runPromise(searchSongs(query).pipe(Effect.provide(SongsterrRuntimeLayer)))
 }
 
 export async function getChordDataAsync(
@@ -244,8 +255,6 @@ export async function getChordDataAsync(
   title: string,
 ): Promise<ChordProDocument> {
   return Effect.runPromise(
-    getChordData(songId, artist, title).pipe(
-      Effect.provide(SongsterrRuntimeLayer),
-    ),
+    getChordData(songId, artist, title).pipe(Effect.provide(SongsterrRuntimeLayer)),
   )
 }

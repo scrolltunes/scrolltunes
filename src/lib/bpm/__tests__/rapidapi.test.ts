@@ -9,10 +9,10 @@
  * - Run with: bun run test src/lib/bpm/__tests__/rapidapi-spotify.test.ts
  */
 
-import { Redis } from "@upstash/redis"
 import type { PublicConfig } from "@/services/public-config"
-import type { ServerConfig } from "@/services/server-config"
 import { ConfigLayer } from "@/services/server-base-layer"
+import type { ServerConfig } from "@/services/server-config"
+import { Redis } from "@upstash/redis"
 import { Effect } from "effect"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { rapidApiSpotifyProvider } from "../rapidapi-client"
@@ -37,13 +37,11 @@ const mockRapidApiResponse = (data: { tempo: string; key: string; mode: string }
 
 const originalFetch = globalThis.fetch
 
-const runWithConfig = <A, E>(
-  effect: Effect.Effect<A, E, PublicConfig | ServerConfig>,
-) => Effect.runPromise(effect.pipe(Effect.provide(ConfigLayer)))
+const runWithConfig = <A, E>(effect: Effect.Effect<A, E, PublicConfig | ServerConfig>) =>
+  Effect.runPromise(effect.pipe(Effect.provide(ConfigLayer)))
 
-const runWithConfigExit = <A, E>(
-  effect: Effect.Effect<A, E, PublicConfig | ServerConfig>,
-) => Effect.runPromiseExit(effect.pipe(Effect.provide(ConfigLayer)))
+const runWithConfigExit = <A, E>(effect: Effect.Effect<A, E, PublicConfig | ServerConfig>) =>
+  Effect.runPromiseExit(effect.pipe(Effect.provide(ConfigLayer)))
 
 const hasRealRedis =
   !!process.env.KV_REST_API_URL && process.env.KV_REST_API_URL !== "https://test-kv.example.com"
@@ -224,19 +222,16 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     expect(exit._tag).toBe("Failure")
   })
 
-  test.skipIf(!hasRealRedis)(
-    "handles 429 rate limit as BPMNotFoundError",
-    async () => {
-      globalThis.fetch = mockFetchForRapidApiOnly({
-        ok: false,
-        status: 429,
-        json: () => Promise.resolve({}),
-      } as ReturnType<typeof mockRapidApiResponse>)
+  test.skipIf(!hasRealRedis)("handles 429 rate limit as BPMNotFoundError", async () => {
+    globalThis.fetch = mockFetchForRapidApiOnly({
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({}),
+    } as ReturnType<typeof mockRapidApiResponse>)
 
-      const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
-      const exit = await runWithConfigExit(effect)
+    const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
+    const exit = await runWithConfigExit(effect)
 
-      expect(exit._tag).toBe("Failure")
-    },
-  )
+    expect(exit._tag).toBe("Failure")
+  })
 })

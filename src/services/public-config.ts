@@ -8,10 +8,7 @@ export interface PublicConfigValues {
   readonly gitSha: string
 }
 
-export class PublicConfig extends Context.Tag("PublicConfig")<
-  PublicConfig,
-  PublicConfigValues
->() {}
+export class PublicConfig extends Context.Tag("PublicConfig")<PublicConfig, PublicConfigValues>() {}
 
 const publicConfig = Config.all({
   nodeEnv: Config.literal("development", "production", "test")("NODE_ENV"),

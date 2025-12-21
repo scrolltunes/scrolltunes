@@ -1,6 +1,6 @@
 import type { PublicConfig } from "@/services/public-config"
-import type { ServerConfig } from "@/services/server-config"
 import { ConfigLayer } from "@/services/server-base-layer"
+import type { ServerConfig } from "@/services/server-config"
 import { Effect } from "effect"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { clearBpmCache, withInMemoryCache } from "../bpm-cache"
@@ -12,13 +12,11 @@ import { deezerBpmProvider } from "../deezer-client"
 import { getSongBpmProvider } from "../getsongbpm-client"
 import { getMockBpm, hasMockBpm, mockBpmProvider } from "../mock-bpm"
 
-const runWithConfig = <A, E>(
-  effect: Effect.Effect<A, E, PublicConfig | ServerConfig>,
-) => Effect.runPromise(effect.pipe(Effect.provide(ConfigLayer)))
+const runWithConfig = <A, E>(effect: Effect.Effect<A, E, PublicConfig | ServerConfig>) =>
+  Effect.runPromise(effect.pipe(Effect.provide(ConfigLayer)))
 
-const runWithConfigExit = <A, E>(
-  effect: Effect.Effect<A, E, PublicConfig | ServerConfig>,
-) => Effect.runPromiseExit(effect.pipe(Effect.provide(ConfigLayer)))
+const runWithConfigExit = <A, E>(effect: Effect.Effect<A, E, PublicConfig | ServerConfig>) =>
+  Effect.runPromiseExit(effect.pipe(Effect.provide(ConfigLayer)))
 
 const originalWeb3FormsKey = process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY
 

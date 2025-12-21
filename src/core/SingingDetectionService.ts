@@ -17,10 +17,10 @@ import {
   type SileroVADConfig,
   getPresetConfig,
 } from "@/lib/silero-vad-config"
-import type { AudioError } from "@/sounds"
 import { ClientLayer, type ClientLayerContext } from "@/services/client-layer"
 import { loadPublicConfig } from "@/services/public-config"
 import { SoundSystemService } from "@/services/sound-system"
+import type { AudioError } from "@/sounds"
 import { Context, Data, Effect, Layer } from "effect"
 import { useSyncExternalStore } from "react"
 import { type SileroLoadError, SileroVADEngine } from "./SileroVADEngine"
@@ -142,7 +142,10 @@ function flushServerVADLogs(): void {
   const body = JSON.stringify({ entries })
 
   if (navigator.sendBeacon) {
-    const ok = navigator.sendBeacon("/api/dev/vad-log", new Blob([body], { type: "application/json" }))
+    const ok = navigator.sendBeacon(
+      "/api/dev/vad-log",
+      new Blob([body], { type: "application/json" }),
+    )
     if (ok) return
   }
 
@@ -240,17 +243,13 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
   private runPromiseWithClientLayer<T, E, R extends ClientLayerContext>(
     effect: Effect.Effect<T, E, R>,
   ): Promise<T> {
-    return Effect.runPromise(
-      effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>,
-    )
+    return Effect.runPromise(effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>)
   }
 
   private runSyncWithClientLayer<T, E, R extends ClientLayerContext>(
     effect: Effect.Effect<T, E, R>,
   ): T {
-    return Effect.runSync(
-      effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>,
-    )
+    return Effect.runSync(effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>)
   }
 
   private getMicrophoneAnalyserEffect(): Effect.Effect<AnalyserNode, VADError, SoundSystemService> {
@@ -261,11 +260,8 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
     )
   }
 
-  private readonly stopMicrophoneEffect: Effect.Effect<
-    void,
-    never,
-    SoundSystemService
-  > = SoundSystemService.pipe(Effect.flatMap(({ stopMicrophone }) => stopMicrophone))
+  private readonly stopMicrophoneEffect: Effect.Effect<void, never, SoundSystemService> =
+    SoundSystemService.pipe(Effect.flatMap(({ stopMicrophone }) => stopMicrophone))
 
   // --- Observable pattern ---
 
@@ -452,15 +448,23 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
               }
               // If smoothed already exceeds threshold, note the high-confidence defer
               if (smoothedOverride) {
-                vadLog("SILERO", "Speech start deferred (smoothed above threshold, waiting energy)", {
-                  level: this.smoothedSileroLevel.toFixed(3),
-                  overrideThreshold: overrideThreshold.toFixed(3),
-                })
+                vadLog(
+                  "SILERO",
+                  "Speech start deferred (smoothed above threshold, waiting energy)",
+                  {
+                    level: this.smoothedSileroLevel.toFixed(3),
+                    overrideThreshold: overrideThreshold.toFixed(3),
+                  },
+                )
               } else {
-                vadLog("SILERO", "Speech start deferred (smoothed below threshold, waiting energy)", {
-                  level: this.smoothedSileroLevel.toFixed(3),
-                  overrideThreshold: overrideThreshold.toFixed(3),
-                })
+                vadLog(
+                  "SILERO",
+                  "Speech start deferred (smoothed below threshold, waiting energy)",
+                  {
+                    level: this.smoothedSileroLevel.toFixed(3),
+                    overrideThreshold: overrideThreshold.toFixed(3),
+                  },
+                )
               }
               return
             }
@@ -658,13 +662,8 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
     })
   }
 
-  private readonly startListeningEffect: Effect.Effect<
-    void,
-    VADError,
-    SoundSystemService
-  > = Effect.gen(
-    this,
-    function* (_) {
+  private readonly startListeningEffect: Effect.Effect<void, VADError, SoundSystemService> =
+    Effect.gen(this, function* (_) {
       if (this.state.isListening) return
 
       vadLog("START", "Starting singing detection...", {
@@ -696,8 +695,7 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
       yield* _(this.startEnergyFallback())
       this.setState({ isListening: true, engine: "energy" })
       vadLog("START", "Using energy-based VAD engine (fallback)")
-    },
-  )
+    })
 
   private handleStopListening(): void {
     vadLog("STOP", "Stopping singing detection...", { engine: this.state.engine })
@@ -727,14 +725,15 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
     vadLog("STOP", "Singing detection stopped")
   }
 
-  private readonly handleVoiceStartEffect: Effect.Effect<void, VADError, never> =
-    Effect.sync(() => {
+  private readonly handleVoiceStartEffect: Effect.Effect<void, VADError, never> = Effect.sync(
+    () => {
       vadLog("VOICE", "🎤 Singing detected", { engine: this.state.engine })
       this.setState({
         isSpeaking: true,
         lastSpeakingAt: Date.now(),
       })
-    })
+    },
+  )
 
   private handleVoiceStop(): void {
     vadLog("VOICE", "🔇 Singing stopped", { engine: this.state.engine })
@@ -939,10 +938,7 @@ export const singingDetectionStore = new SingingDetectionStore()
 
 // --- Effect Layer ---
 
-export const SingingDetectionLive = Layer.succeed(
-  SingingDetectionService,
-  singingDetectionStore,
-)
+export const SingingDetectionLive = Layer.succeed(SingingDetectionService, singingDetectionStore)
 
 // --- React hooks ---
 

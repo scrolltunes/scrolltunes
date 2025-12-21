@@ -43,9 +43,7 @@ const getHistoryCount = Effect.gen(function* () {
 })
 
 export async function GET() {
-  const exit = await Effect.runPromiseExit(
-    getHistoryCount.pipe(Effect.provide(DbLayer)),
-  )
+  const exit = await Effect.runPromiseExit(getHistoryCount.pipe(Effect.provide(DbLayer)))
 
   if (exit._tag === "Failure") {
     console.error("Failed to load history count", exit.cause)
