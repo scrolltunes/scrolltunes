@@ -5,13 +5,27 @@ Detailed implementation plan (for an LLM/agentic coder)
 
 Implement a voice-search pipeline for song titles (and optionally artists) optimized for **1–2 second clips**:
 
-- **Primary (Tier 1):** In-browser Web Speech API (fast, free, best on Chromium)
-- **Fallback (Tier 2):** Google Cloud Speech-to-Text (STT) called via a Vercel backend
+- **Primary:** In-browser Web Speech API (fast, free, native end-of-utterance detection)
+- **Fallback:** Google Cloud Speech-to-Text (STT) called via Vercel backend when Web Speech confidence is low
 - **Search:** Normalize transcript → generate candidates → rank → return results
-- **Reliability:** Heuristic triggers to decide when to fall back (since Web Speech provides unreliable confidence)
+- **Reliability:** Confidence-based fallback (transcript length, garbage ratio)
 - **Cost:** Keep fallback usage low (target < 20% of traffic) while maintaining high success rate
 
 Deliverables: client-side recording + STT orchestration, backend STT endpoint, search/ranking module, logging/monitoring, and rollout plan.
+
+## Current Implementation Status
+
+**Implemented:**
+- Web Speech API as primary tier with native end-of-utterance detection
+- MediaRecorder runs in parallel to capture audio for potential fallback
+- Confidence evaluation: min length (2 chars), garbage ratio (<30%)
+- Google STT fallback only when confidence is low AND quota available
+- `tierUsed` state tracks which tier produced the final transcript
+- Test page at `/test/voice-search`
+
+**Not using:**
+- Custom VAD for voice search (removed in favor of Web Speech native detection)
+- Parallel race strategy (simplified to sequential: Web Speech first, fallback if needed)
 
 ---
 

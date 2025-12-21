@@ -1,12 +1,11 @@
 "use client"
 
-import { useIsAuthenticated, useIsQuotaAvailable, useVoiceSearchVADState } from "@/core"
+import { useIsAuthenticated, useIsQuotaAvailable } from "@/core"
 import { useSpeechControls, useSpeechState } from "@/core/SpeechRecognitionStore"
 import { useEffect, useRef } from "react"
 
 export function useVoiceSearch() {
   const speechState = useSpeechState()
-  const vadState = useVoiceSearchVADState()
   const { start, stop, checkQuota, clearTranscript } = useSpeechControls()
   const isAuthenticated = useIsAuthenticated()
   const isQuotaAvailable = useIsQuotaAvailable()
@@ -33,8 +32,6 @@ export function useVoiceSearch() {
     error: speechState.errorMessage,
     errorCode: speechState.errorCode,
     isQuotaAvailable,
-    voiceLevel: vadState.level,
-    isSpeaking: vadState.isSpeaking,
 
     // Controls
     start,

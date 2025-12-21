@@ -404,8 +404,6 @@ export const SongSearch = memo(function SongSearch({
                 isRecording={voiceSearch.isRecording}
                 isConnecting={voiceSearch.isConnecting}
                 hasError={!!voiceSearch.error}
-                voiceLevel={voiceSearch.voiceLevel}
-                isSpeaking={voiceSearch.isSpeaking}
               />
             </div>
           )}

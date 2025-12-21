@@ -10,8 +10,6 @@ export interface VoiceSearchButtonProps {
   readonly isRecording: boolean
   readonly isConnecting: boolean
   readonly hasError: boolean
-  readonly voiceLevel: number // 0-1, from VAD
-  readonly isSpeaking: boolean // true when speech detected
   readonly className?: string
 }
 
@@ -20,8 +18,6 @@ export const VoiceSearchButton = memo(function VoiceSearchButton({
   isRecording,
   isConnecting,
   hasError,
-  voiceLevel,
-  isSpeaking,
   className = "",
 }: VoiceSearchButtonProps) {
   const getBackgroundColor = () => {
@@ -67,19 +63,6 @@ export const VoiceSearchButton = memo(function VoiceSearchButton({
       whileTap={{ scale: 0.95 }}
       aria-label={getAriaLabel()}
     >
-      {/* Glow effect when speaking */}
-      <AnimatePresence>
-        {isRecording && isSpeaking && (
-          <motion.div
-            className="absolute inset-[-2px] rounded-full bg-indigo-500/30 blur-md"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.4 + voiceLevel * 0.6 }}
-            exit={{ opacity: 0 }}
-            transition={springs.snap}
-          />
-        )}
-      </AnimatePresence>
-
       {/* Pulsing ring when recording */}
       <AnimatePresence>
         {isRecording && !hasError && (
@@ -87,27 +70,15 @@ export const VoiceSearchButton = memo(function VoiceSearchButton({
             className="absolute inset-0 rounded-full border-2 border-indigo-500"
             initial={{ scale: 1, opacity: 0.6 }}
             animate={{
-              scale: 1 + voiceLevel * 0.5,
-              opacity: 0.3 + voiceLevel * 0.4,
+              scale: [1, 1.15, 1],
+              opacity: [0.6, 0.3, 0.6],
             }}
             exit={{ scale: 1, opacity: 0 }}
-            transition={springs.snap}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Secondary outer ring when speaking */}
-      <AnimatePresence>
-        {isRecording && !hasError && isSpeaking && (
-          <motion.div
-            className="absolute inset-[-4px] rounded-full border border-indigo-500/50"
-            initial={{ scale: 1, opacity: 0 }}
-            animate={{
-              scale: 1 + voiceLevel * 0.3,
-              opacity: voiceLevel * 0.5,
+            transition={{
+              duration: 1.5,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
             }}
-            exit={{ scale: 1, opacity: 0 }}
-            transition={springs.snap}
           />
         )}
       </AnimatePresence>
@@ -139,7 +110,7 @@ export const VoiceSearchButton = memo(function VoiceSearchButton({
       <motion.div
         className={getIconColor()}
         animate={{
-          scale: isSpeaking ? 1 + voiceLevel * 0.2 : isRecording ? 1.05 : 1,
+          scale: isRecording ? 1.05 : 1,
           opacity: isConnecting ? 0.3 : 1,
         }}
         transition={springs.snap}

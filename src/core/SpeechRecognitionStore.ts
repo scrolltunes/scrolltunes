@@ -1,8 +1,5 @@
 "use client"
 
-import { VoiceActivityStore, type VoiceState } from "./VoiceActivityStore"
-import type { VADConfig } from "@/lib"
-import type { SileroVADConfig } from "@/lib/silero-vad-config"
 import { ClientLayer, type ClientLayerContext } from "@/services/client-layer"
 import { loadPublicConfig } from "@/services/public-config"
 import { SoundSystemService } from "@/services/sound-system"
@@ -93,29 +90,10 @@ function speechLog(category: string, message: string, data?: Record<string, unkn
 
 const MAX_RECORDING_DURATION_MS = 10000
 const SAMPLE_RATE = 16000
-const VAD_END_SILENCE_FALLBACK_MS = 900
-const VAD_POST_END_PAD_MS = 150
 
-// Speech-specific VAD tuning (no guitar): more sensitive energy gate, no burst suppression
-const VOICE_SEARCH_VAD_CONFIG: VADConfig = {
-  thresholdOn: 0.065,
-  thresholdOff: 0.04,
-  holdTimeMs: 160,
-  smoothingFactor: 0.12,
-  burstPeakThreshold: 1,
-  burstDecayThreshold: 1,
-  burstWindowMs: 150,
-}
-
-const VOICE_SEARCH_SILERO_CONFIG: Partial<SileroVADConfig> = {
-  positiveSpeechThreshold: 0.5, // easier to trigger on whispers
-  negativeSpeechThreshold: 0.3,
-  minSpeechMs: 150,
-  redemptionMs: 900,
-}
-
-// Dedicated VAD instance for voice search (keeps singing VAD isolated)
-export const voiceSearchVADStore = new VoiceActivityStore()
+// Confidence thresholds for Web Speech fallback decision
+const MIN_TRANSCRIPT_LENGTH = 2
+const GARBAGE_CHARS_REGEX = /[^a-zA-Z0-9\s'''-]/g
 
 // --- SpeechRecognitionStore Class ---
 
@@ -157,13 +135,9 @@ export class SpeechRecognitionStore {
   // Web Speech API instance (used when tier is "webspeech")
   private webSpeechRecognition: SpeechRecognition | null = null
 
-  // VAD integration
-  private hasDetectedSpeech = false
-  private lastSpeechAt: number | null = null
-  private utteranceSilenceMs = VAD_END_SILENCE_FALLBACK_MS
-  private utteranceStopTimeoutId: ReturnType<typeof setTimeout> | null = null
-  private vadUnsubscribe: (() => void) | null = null
-  private vadStateUnsubscribe: (() => void) | null = null
+  // Web Speech transcript (stored for fallback evaluation)
+  private webSpeechTranscript: string | null = null
+  private webSpeechLanguageCode: string | null = null
 
   private runPromiseWithClientLayer<T, E, R extends ClientLayerContext>(
     effect: Effect.Effect<T, E, R>,
@@ -339,44 +313,32 @@ export class SpeechRecognitionStore {
         return
       }
 
-      speechLog("START", "Checking quota before starting...")
-      const isQuotaAvailable = yield* _(
-        Effect.tryPromise({
-          try: () => this.checkQuota(),
-          catch: () =>
-            new SpeechRecognitionError({
-              code: "QUOTA_CHECK_ERROR",
-              message: "Failed to check quota",
-            }),
-        }),
-      )
+      // Check if Web Speech is available (primary tier)
+      const isWebSpeechAvailable = this.checkWebSpeechSupport()
 
-      // Determine which tier to use
-      const useWebSpeechFallback = !isQuotaAvailable && this.state.isWebSpeechAvailable
-      const tierToUse: SpeechTier = isQuotaAvailable ? "google_stt" : useWebSpeechFallback ? "webspeech" : null
-
-      if (!isQuotaAvailable && !useWebSpeechFallback) {
-        speechLog("START", "Quota exhausted and no Web Speech fallback available")
-        this.handleQuotaExceeded()
+      if (!isWebSpeechAvailable) {
+        speechLog("START", "Web Speech API not available in this browser")
+        this.handleSetError("WEBSPEECH_NOT_SUPPORTED", "Voice search requires a browser with Web Speech API support (Chrome, Edge, Safari)")
         return
       }
 
-      if (useWebSpeechFallback) {
-        speechLog("START", "Google STT quota exhausted, using Web Speech API fallback")
-      }
+      // Pre-check quota for potential fallback (non-blocking)
+      void this.checkQuota()
 
-      speechLog("START", "Starting speech recognition...", { tier: tierToUse })
+      speechLog("START", "Starting speech recognition with Web Speech API (primary)...")
       this.setState({
         isConnecting: true,
-        tierUsed: tierToUse,
+        tierUsed: "webspeech",
         errorCode: null,
         errorMessage: null,
         partialTranscript: "",
         finalTranscript: null,
       })
 
-      // Store tier for use in sendFinalAudio
-      this.currentTier = tierToUse
+      // Store tier - always start with webspeech
+      this.currentTier = "webspeech"
+      this.webSpeechTranscript = null
+      this.webSpeechLanguageCode = null
 
       // Get microphone access via SoundSystem
       const analyser = yield* _(this.getMicrophoneAnalyserEffect())
@@ -395,19 +357,14 @@ export class SpeechRecognitionStore {
 
       this.setState({ hasAudioPermission: true })
 
-      // Set up audio capture using MediaRecorder
+      // Set up audio capture using MediaRecorder (needed for Google STT fallback)
       yield* _(this.setupAudioCapture())
 
-      // Set up max duration auto-stop
+      // Set up max duration auto-stop (safety net)
       this.setupMaxDurationTimeout()
 
-      // Set up VAD for voice-based auto-stop
-      yield* _(Effect.promise(() => this.setupVADIntegration()))
-
-      // If using Web Speech API, start browser recognition
-      if (tierToUse === "webspeech") {
-        this.setupWebSpeechRecognition()
-      }
+      // Start Web Speech recognition (primary) - uses native end-of-utterance detection
+      this.setupWebSpeechRecognition()
 
       this.setState({
         isConnecting: false,
@@ -415,7 +372,7 @@ export class SpeechRecognitionStore {
         lastUpdatedAt: Date.now(),
       })
 
-      speechLog("START", "Speech recognition started", { tier: tierToUse })
+      speechLog("START", "Speech recognition started with Web Speech API")
     },
   )
 
@@ -498,14 +455,9 @@ export class SpeechRecognitionStore {
 
           if (isFinal) {
             speechLog("WEBSPEECH", "Final transcript received", { transcript })
-            this.runSyncWithClientLayer(
-              this.dispatch(
-                new ReceiveFinal({
-                  text: transcript,
-                  languageCode: recognition.lang,
-                }),
-              ),
-            )
+            // Store for fallback evaluation (don't emit final yet - wait for sendFinalAudio)
+            this.webSpeechTranscript = transcript
+            this.webSpeechLanguageCode = recognition.lang
           } else {
             this.runSyncWithClientLayer(
               this.dispatch(
@@ -536,8 +488,13 @@ export class SpeechRecognitionStore {
     }
 
     recognition.onend = () => {
-      speechLog("WEBSPEECH", "Recognition ended")
+      speechLog("WEBSPEECH", "Recognition ended (end-of-utterance detected)")
       this.webSpeechRecognition = null
+      // Web Speech detected end of utterance - trigger stop to process results
+      if (this.state.isRecording) {
+        this.setState({ isAutoStopping: true })
+        this.handleStopRecognition()
+      }
     }
 
     this.webSpeechRecognition = recognition
@@ -552,15 +509,85 @@ export class SpeechRecognitionStore {
     }
   }
 
+  private isLowConfidenceTranscript(transcript: string | null): boolean {
+    if (!transcript) return true
+
+    const trimmed = transcript.trim()
+
+    // Too short
+    if (trimmed.length < MIN_TRANSCRIPT_LENGTH) {
+      speechLog("CONFIDENCE", "Transcript too short", { length: trimmed.length })
+      return true
+    }
+
+    // High garbage ratio (non-alphanumeric characters)
+    const cleanedLength = trimmed.replace(GARBAGE_CHARS_REGEX, "").length
+    const garbageRatio = 1 - cleanedLength / trimmed.length
+    if (garbageRatio > 0.3) {
+      speechLog("CONFIDENCE", "High garbage ratio", { garbageRatio: garbageRatio.toFixed(2) })
+      return true
+    }
+
+    return false
+  }
+
   private async sendFinalAudio(): Promise<void> {
-    // If using Web Speech API, the transcript was already captured during recording
-    if (this.currentTier === "webspeech") {
-      speechLog("AUDIO", "Web Speech tier - transcript already captured during recording")
+    const webSpeechResult = this.webSpeechTranscript
+    const webSpeechLang = this.webSpeechLanguageCode
+    const isLowConfidence = this.isLowConfidenceTranscript(webSpeechResult)
+
+    speechLog("AUDIO", "Evaluating Web Speech result", {
+      transcript: webSpeechResult,
+      isLowConfidence,
+      quotaAvailable: this.state.isQuotaAvailable,
+    })
+
+    // If Web Speech gave a good result, use it directly
+    if (!isLowConfidence && webSpeechResult) {
+      speechLog("AUDIO", "Using Web Speech result (good confidence)")
+      this.runSyncWithClientLayer(
+        this.dispatch(
+          new ReceiveFinal({
+            text: webSpeechResult,
+            languageCode: webSpeechLang,
+          }),
+        ),
+      )
       return
     }
 
+    // Low confidence - try Google STT fallback if quota allows
+    if (!this.state.isQuotaAvailable) {
+      speechLog("AUDIO", "Low confidence but quota exhausted - using Web Speech result anyway")
+      if (webSpeechResult) {
+        this.runSyncWithClientLayer(
+          this.dispatch(
+            new ReceiveFinal({
+              text: webSpeechResult,
+              languageCode: webSpeechLang,
+            }),
+          ),
+        )
+      } else {
+        speechLog("AUDIO", "No Web Speech result and no quota - no transcript available")
+      }
+      return
+    }
+
+    // Try Google STT fallback
     if (this.audioChunks.length === 0) {
-      speechLog("AUDIO", "No audio chunks to send")
+      speechLog("AUDIO", "No audio chunks for Google STT fallback")
+      // Fall back to Web Speech result if available
+      if (webSpeechResult) {
+        this.runSyncWithClientLayer(
+          this.dispatch(
+            new ReceiveFinal({
+              text: webSpeechResult,
+              languageCode: webSpeechLang,
+            }),
+          ),
+        )
+      }
       return
     }
 
@@ -580,9 +607,10 @@ export class SpeechRecognitionStore {
       reader.readAsDataURL(audioBlob)
     })
 
-    speechLog("AUDIO", "Sending audio for transcription via Google STT", {
+    speechLog("AUDIO", "Falling back to Google STT (low confidence Web Speech)", {
       size: audioBlob.size,
       type: audioBlob.type,
+      webSpeechTranscript: webSpeechResult,
     })
 
     try {
@@ -596,12 +624,30 @@ export class SpeechRecognitionStore {
 
       if (!response.ok) {
         const errorText = await response.text()
-        speechLog("API", "Transcription failed", { status: response.status, error: errorText })
+        speechLog("API", "Google STT failed, using Web Speech result", {
+          status: response.status,
+          error: errorText,
+        })
+        // Fall back to Web Speech result
+        if (webSpeechResult) {
+          this.runSyncWithClientLayer(
+            this.dispatch(
+              new ReceiveFinal({
+                text: webSpeechResult,
+                languageCode: webSpeechLang,
+              }),
+            ),
+          )
+        }
         return
       }
 
       const data = (await response.json()) as { transcript?: string; languageCode?: string }
       if (data.transcript) {
+        // Update tier to indicate Google STT was used
+        this.currentTier = "google_stt"
+        this.setState({ tierUsed: "google_stt" })
+        speechLog("API", "Using Google STT result", { transcript: data.transcript })
         this.runSyncWithClientLayer(
           this.dispatch(
             new ReceiveFinal({
@@ -611,10 +657,32 @@ export class SpeechRecognitionStore {
           ),
         )
       } else {
-        speechLog("API", "No transcript in response", data)
+        speechLog("API", "No transcript from Google STT, using Web Speech result")
+        // Fall back to Web Speech result
+        if (webSpeechResult) {
+          this.runSyncWithClientLayer(
+            this.dispatch(
+              new ReceiveFinal({
+                text: webSpeechResult,
+                languageCode: webSpeechLang,
+              }),
+            ),
+          )
+        }
       }
     } catch (e) {
-      speechLog("API", "Failed to send audio", { error: String(e) })
+      speechLog("API", "Google STT network error, using Web Speech result", { error: String(e) })
+      // Fall back to Web Speech result
+      if (webSpeechResult) {
+        this.runSyncWithClientLayer(
+          this.dispatch(
+            new ReceiveFinal({
+              text: webSpeechResult,
+              languageCode: webSpeechLang,
+            }),
+          ),
+        )
+      }
     }
   }
 
@@ -637,141 +705,6 @@ export class SpeechRecognitionStore {
     }
   }
 
-  private clearUtteranceStopTimer(): void {
-    if (this.utteranceStopTimeoutId !== null) {
-      clearTimeout(this.utteranceStopTimeoutId)
-      this.utteranceStopTimeoutId = null
-    }
-  }
-
-  private scheduleUtteranceStop(
-    reason: "vad_stop" | "silence_timeout",
-    delayMs = VAD_POST_END_PAD_MS,
-  ): void {
-    if (!this.state.isRecording) return
-    if (this.utteranceStopTimeoutId !== null) return
-    this.utteranceStopTimeoutId = setTimeout(() => {
-      this.utteranceStopTimeoutId = null
-      this.setState({ isAutoStopping: true })
-      speechLog("VAD", "Auto-stopping recording after VAD silence", {
-        reason,
-        delayMs,
-      })
-      this.handleStopRecognition()
-    }, delayMs)
-  }
-
-  // --- VAD integration ---
-
-  private async setupVADIntegration(): Promise<void> {
-    speechLog("VAD", "Setting up voice activity detection for auto-stop")
-
-    this.hasDetectedSpeech = false
-    this.lastSpeechAt = null
-    this.clearUtteranceStopTimer()
-    voiceSearchVADStore.setSileroPreset("voice-search")
-    voiceSearchVADStore.setSileroConfig(VOICE_SEARCH_SILERO_CONFIG)
-    voiceSearchVADStore.setConfig(VOICE_SEARCH_VAD_CONFIG)
-    voiceSearchVADStore.setAndGateEnabled(false) // Disable AND-gate for voice search (no guitar)
-    this.utteranceSilenceMs = Math.max(
-      voiceSearchVADStore.getSileroConfig().redemptionMs,
-      VAD_END_SILENCE_FALLBACK_MS,
-    )
-
-    // Subscribe BEFORE starting listening to catch all events
-    let wasSpeaking = false
-    const levelStartThreshold = Math.max(VOICE_SEARCH_VAD_CONFIG.thresholdOn * 0.8, 0.03)
-    this.vadUnsubscribe = voiceSearchVADStore.subscribeToVoiceEvents(() => {
-      const state = voiceSearchVADStore.getSnapshot()
-      speechLog("VAD", "Voice event received", {
-        isSpeaking: state.isSpeaking,
-        wasSpeaking,
-        hasDetectedSpeech: this.hasDetectedSpeech,
-        isRecording: this.state.isRecording,
-        lastSpeechAt: this.lastSpeechAt,
-      })
-
-      if (state.isSpeaking && !wasSpeaking) {
-        speechLog("VAD", "Voice activity detected - speech started")
-        this.hasDetectedSpeech = true
-        this.lastSpeechAt = Date.now()
-        this.clearMaxDurationTimeout()
-      } else if (!state.isSpeaking && wasSpeaking && this.hasDetectedSpeech) {
-        speechLog("VAD", "Voice activity stopped after speech - scheduling auto-stop", {
-          silenceMs: this.utteranceSilenceMs,
-        })
-        this.scheduleUtteranceStop("vad_stop")
-      }
-
-      wasSpeaking = state.isSpeaking
-    })
-
-    this.vadStateUnsubscribe = voiceSearchVADStore.subscribe(() => {
-      if (!this.state.isRecording) return
-      const state = voiceSearchVADStore.getSnapshot()
-      const now = Date.now()
-
-      const hasPendingStop = this.utteranceStopTimeoutId !== null
-      const effectiveLevelThreshold = hasPendingStop
-        ? Math.max(levelStartThreshold * 2, 0.06) // avoid canceling pending stop on tiny blips
-        : levelStartThreshold
-      const levelTriggered = state.level >= effectiveLevelThreshold
-
-      if (state.isSpeaking || levelTriggered) {
-        if (!this.hasDetectedSpeech && levelTriggered) {
-          speechLog("VAD", "Level-based speech start (fallback)", {
-            level: state.level.toFixed(3),
-            threshold: effectiveLevelThreshold,
-          })
-          this.hasDetectedSpeech = true
-          this.clearMaxDurationTimeout()
-        }
-        this.lastSpeechAt = now
-        this.clearUtteranceStopTimer()
-        return
-      }
-
-      if (!this.hasDetectedSpeech || this.lastSpeechAt === null) return
-
-      const silenceMs = now - this.lastSpeechAt
-      if (silenceMs >= this.utteranceSilenceMs) {
-        speechLog("VAD", "Silence window exceeded - auto-stopping recording", {
-          silenceMs,
-          target: this.utteranceSilenceMs,
-        })
-        this.scheduleUtteranceStop("silence_timeout")
-      } else if (!this.utteranceStopTimeoutId) {
-        const remaining = Math.max(this.utteranceSilenceMs - silenceMs, VAD_POST_END_PAD_MS)
-        this.scheduleUtteranceStop("silence_timeout", remaining)
-      }
-    })
-
-    // Start listening after subscription is set up
-    await voiceSearchVADStore.startListening()
-    speechLog("VAD", "VAD listening started", {
-      isListening: voiceSearchVADStore.getSnapshot().isListening,
-      silenceWindowMs: this.utteranceSilenceMs,
-    })
-  }
-
-  private cleanupVADIntegration(): void {
-    this.clearUtteranceStopTimer()
-    this.lastSpeechAt = null
-    if (this.vadUnsubscribe) {
-      this.vadUnsubscribe()
-      this.vadUnsubscribe = null
-    }
-    if (this.vadStateUnsubscribe) {
-      this.vadStateUnsubscribe()
-      this.vadStateUnsubscribe = null
-    }
-
-    voiceSearchVADStore.stopListening()
-    voiceSearchVADStore.setAndGateEnabled(false)
-    this.hasDetectedSpeech = false
-    this.utteranceSilenceMs = VAD_END_SILENCE_FALLBACK_MS
-  }
-
   // --- Stop recognition ---
 
   private handleStopRecognition(): void {
@@ -779,10 +712,6 @@ export class SpeechRecognitionStore {
 
     // Clear max duration timeout
     this.clearMaxDurationTimeout()
-    this.clearUtteranceStopTimer()
-
-    // Cleanup VAD
-    this.cleanupVADIntegration()
 
     // Cleanup Web Speech if active
     this.cleanupWebSpeechRecognition()
@@ -887,6 +816,8 @@ export class SpeechRecognitionStore {
     speechLog("RESET", "Resetting SpeechRecognitionStore")
     this.handleStopRecognition()
     this.currentTier = null
+    this.webSpeechTranscript = null
+    this.webSpeechLanguageCode = null
     this.setState({
       isSupported: typeof window !== "undefined" && typeof navigator !== "undefined",
       isConnecting: false,
@@ -939,16 +870,6 @@ export function useSpeechState(): SpeechState {
     speechRecognitionStore.subscribe,
     speechRecognitionStore.getSnapshot,
     () => DEFAULT_STATE,
-  )
-}
-
-const DEFAULT_VOICE_SEARCH_VAD_STATE: VoiceState = voiceSearchVADStore.getSnapshot()
-
-export function useVoiceSearchVADState(): VoiceState {
-  return useSyncExternalStore(
-    voiceSearchVADStore.subscribe,
-    voiceSearchVADStore.getSnapshot,
-    () => DEFAULT_VOICE_SEARCH_VAD_STATE,
   )
 }
 

@@ -128,8 +128,6 @@ export {
   ReceivePartial,
   ReceiveFinal,
   SetSpeechError,
-  voiceSearchVADStore,
-  useVoiceSearchVADState,
 } from "./SpeechRecognitionStore"
 
 export {

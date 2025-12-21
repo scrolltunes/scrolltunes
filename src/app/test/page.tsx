@@ -33,7 +33,7 @@ const testPages: TestPageLink[] = [
     href: "/test/voice-search",
     title: "Voice Search",
     description:
-      "Test tiered voice search: Google Cloud STT (primary) and Web Speech API (fallback)",
+      "Test tiered voice search: Web Speech API (primary) with Google Cloud STT fallback on low confidence",
     requiresAuth: true,
     icon: <Microphone size={16} weight="bold" />,
   },

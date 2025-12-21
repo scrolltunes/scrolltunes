@@ -7,7 +7,6 @@ import {
   useSpeechControls,
   useSpeechTier,
   useIsWebSpeechAvailable,
-  useVoiceSearchVADState,
   useAccount,
 } from "@/core"
 import { Microphone, Stop, Warning, GoogleLogo, Globe } from "@phosphor-icons/react"
@@ -385,7 +384,6 @@ const VoiceSearchTester = memo(function VoiceSearchTester() {
   const { start, stop, clearError, clearTranscript, reset } = useSpeechControls()
   const tier = useSpeechTier()
   const isWebSpeechAvailable = useIsWebSpeechAvailable()
-  const vadState = useVoiceSearchVADState()
   const { isAuthenticated, isLoading: authLoading } = useAccount()
 
   const [quotaInfo, setQuotaInfo] = useState<{
@@ -589,26 +587,6 @@ const VoiceSearchTester = memo(function VoiceSearchTester() {
         </div>
       </section>
 
-      {/* VAD State */}
-      <section className="p-4 bg-neutral-900 rounded-xl space-y-3">
-        <h2 className="text-sm font-medium text-neutral-400 uppercase tracking-wider">
-          Voice Activity Detection
-        </h2>
-        <div className="flex items-center gap-4">
-          <StatusBadge active={vadState.isListening} label="Listening" />
-          <StatusBadge active={vadState.isSpeaking} label="Speaking" />
-        </div>
-        <div className="text-sm text-neutral-400">
-          Level: {(vadState.level * 100).toFixed(1)}%
-          <div className="mt-1 h-2 bg-neutral-800 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all ${vadState.isSpeaking ? "bg-green-500" : "bg-neutral-600"}`}
-              style={{ width: `${Math.min(vadState.level * 100, 100)}%` }}
-            />
-          </div>
-        </div>
-      </section>
-
       {/* Direct Tier Tests */}
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-white">Direct Tier Tests</h2>
@@ -677,7 +655,7 @@ export default function VoiceSearchTestPage() {
         <div className="mb-6 p-4 bg-amber-900/20 border border-amber-500/30 rounded-xl">
           <p className="text-amber-300 text-sm">
             <strong>Test Page:</strong> This page tests the tiered voice search implementation.
-            Google Cloud STT is used first (if quota available), then Web Speech API as fallback.
+            Web Speech API is used first (fast, free). If low confidence, falls back to Google Cloud STT (if quota available).
           </p>
         </div>
 
