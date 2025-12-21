@@ -6,7 +6,8 @@ import { NextResponse } from "next/server"
 
 interface QuotaResponse {
   available: boolean
-  percentUsed: number
+  webSpeechAvailable: boolean
+  stats?: { used: number; cap: number; percentUsed: number }
 }
 
 interface ErrorResponse {
@@ -30,8 +31,11 @@ export async function GET(): Promise<NextResponse<QuotaResponse | ErrorResponse>
     return NextResponse.json({ error: "Failed to check quota" }, { status: 500 })
   }
 
+  const stats = statsResult.value
+
   return NextResponse.json({
     available: availableResult.value,
-    percentUsed: statsResult.value.percentUsed,
+    webSpeechAvailable: true,
+    stats: { used: stats.used, cap: stats.cap, percentUsed: stats.percentUsed },
   })
 }

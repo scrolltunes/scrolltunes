@@ -15,100 +15,6 @@ Deliverables: client-side recording + STT orchestration, backend STT endpoint, s
 
 ---
 
-## 0.1 Access Control, Consent, and Compliance Requirements (Amended)
-
-**Voice search is a logged-in–only feature.** This is a hard requirement and applies uniformly across all speech recognition tiers.
-
-### Rationale
-- Both **Web Speech API** and **Google Cloud Speech-to-Text** send user audio to **Google-operated servers** for processing.
-- Even though Web Speech API is browser-native and does not require API keys or billing, audio still leaves the device and is processed by Google infrastructure.
-- Therefore, explicit user consent and agreement to Google-related Terms of Service (ToC) are required before enabling voice search.
-
-### Enforcement Rules
-The client **must not** activate microphone capture or speech recognition unless all conditions below are met:
-
-1. User is authenticated (logged in)
-2. User has explicitly accepted the voice search / Google processing ToC
-3. User has not revoked consent
-
-If any condition is false:
-- Voice search UI may be visible
-- Activating it must trigger a consent/login flow
-- No audio is captured or transmitted
-
----
-
-## 2.3 Speech Recognition Tier Policy (Authoritative)
-
-Speech recognition engines are gated as follows:
-
-| Tier | Engine | Sends Audio to Google | Login Required | ToC Required | Usage Quota Required |
-|-----|--------|----------------------|----------------|--------------|----------------------|
-| Tier 0 | Web Speech API | Yes | Yes | Yes | No |
-| Tier 1 | Google Cloud STT | Yes | Yes | Yes | Yes (60 min free tier) |
-| Tier 2 | Whisper (Hetzner) | No | Yes | No | No |
-
-### Notes
-- **Tier 0 and Tier 1 are both considered “Google-backed processing.”**
-- **Tier 1 (Google Cloud STT)** must remain gated behind the existing usage tracker (`speech-usage-tracker.ts`) to enforce the 60-minute free tier.
-- **Tier 2 (Whisper)** does not involve Google and does not consume quota, but is still restricted to logged-in users for consistency and abuse prevention.
-
----
-
-## 3.0 Updated Eligibility Check (Client-Side)
-
-Before starting voice search, the client must perform:
-
-```ts
-if (!user.isLoggedIn) {
-  blockVoiceSearch("LOGIN_REQUIRED")
-}
-
-if (!user.hasAcceptedVoiceSearchTOS) {
-  blockVoiceSearch("CONSENT_REQUIRED")
-}
-```
-
-Only after these checks pass may the system proceed to tier selection and microphone activation.
-
----
-
-## 3.1 Tier Selection Logic (Amended)
-
-```ts
-// Preconditions: user is logged in and ToC accepted
-
-if (webSpeechSupported) {
-  tryWebSpeech()
-  if (confidenceIsGood) return results
-}
-
-// Web Speech failed or low confidence
-if (googleMinutesRemaining > 0) {
-  tryGoogleSTT()
-  if (confidenceIsGood) return results
-}
-
-// Final fallback
-tryWhisper()
-return results
-```
-
----
-
-## 11.1 Privacy and Data Handling Clarification (Amended)
-
-- Web Speech API audio is transmitted directly from the browser to Google servers.
-- Google Cloud STT audio is transmitted from the browser to Google Cloud APIs.
-- Whisper audio is transmitted only to self-hosted infrastructure (Hetzner).
-- The application must clearly disclose these data flows in the ToC.
-- Consent must be stored per-user and revocable.
-
----
-
-
----
-
 ## 1) Assumptions and Constraints
 
 ### 1.1 Product constraints
@@ -152,6 +58,138 @@ return results
 3. If Web Speech unsupported or fails:
    - Immediately call backend STT
 4. Return results, include metadata on which tier was used
+
+---
+
+
+---
+
+## 3.2 Fallback Race/Fanout Strategy (Most Reliable → Least Reliable)
+
+This section defines how to “race” multiple STT backends and pick the best result quickly, while preserving reliability and minimizing cost.
+
+### Reliability ordering (authoritative)
+From **most reliable** to **least reliable** for this product:
+
+1. **Google Cloud STT (Tier 1)**  
+   - Highest quality and consistency across browsers/devices
+   - **Must** remain gated by: logged-in + ToS + usage tracker (60-minute free tier)
+
+2. **Self-hosted Whisper (Oracle Always Free, Tier 2)**  
+   - Reliability depends on your service uptime and latency
+   - No Google data processing; no quota
+   - CPU-only, so slower under load than Google, but stable if traffic is low
+
+3. **Web Speech API (Tier 0)**  
+   - Browser/vendor-dependent behavior
+   - No SLA, sometimes fails silently, and language handling varies
+   - Still sends audio to Google servers, so requires logged-in + ToS
+
+> Note: Web Speech is often the *fastest* in Chromium, but it is not the most reliable. We use it as a low-latency opportunistic path, not as the reliability anchor.
+
+---
+
+### Fanout goals
+- Keep median “time to usable results” low
+- Avoid wasting quota minutes when Web Speech already produced a good transcript
+- Prefer higher-reliability engines when results are ambiguous or low-confidence
+
+---
+
+### Fanout mode A: “Speculative Google” (recommended default)
+
+**Trigger:** user is eligible for Google STT (logged-in + ToS accepted + minutes remaining).
+
+1. Start mic capture + VAD.
+2. Start **Web Speech** immediately (for speed).
+3. In parallel, record the short clip (always).
+4. When VAD signals end-of-utterance (or max duration reached):
+   - Send recorded audio to **Google STT** immediately.
+   - Do **not** wait for Web Speech to finish if it is stalling.
+
+**Winner selection:**
+- If Web Speech returns a final transcript first:
+  - Run search and compute confidence.
+  - If confidence ≥ threshold and not ambiguous → accept Web Speech result and **cancel/ignore** Google result when it arrives.
+  - Otherwise, use Google transcript when it arrives.
+- If Google returns first:
+  - Accept Google transcript (and cancel/ignore Web Speech if still running).
+
+**Why this works:** you get Web Speech speed when it’s good, but Google reliability when it’s needed.
+
+---
+
+### Fanout mode B: “Google + Whisper race” (for reliability-critical queries)
+
+**Trigger:** either of:
+- search confidence is low after Web Speech, or
+- user is in a browser known to be flaky for Web Speech, or
+- you’re seeing increased Google STT errors/timeouts.
+
+At end-of-utterance:
+- Send audio to **Google STT** and **Whisper (Oracle)** concurrently.
+- First acceptable transcript wins, but apply a quality gate:
+
+**Quality gate rule:**
+- If Whisper returns first, accept it **only** if:
+  - transcript passes normalization checks (not empty/garbage), and
+  - search confidence is good (≥ threshold and not ambiguous)
+- Otherwise, wait for Google and use Google.
+
+This keeps Whisper from “winning” with a fast but wrong transcript.
+
+---
+
+### Fanout mode C: “Whisper-first” (quota exhausted or Google disabled)
+
+**Trigger:** Google STT is disallowed due to:
+- ToS not accepted (but voice search is locked anyway), or
+- usage quota depleted, or
+- Google STT outage.
+
+Run:
+1. Web Speech opportunistically (if supported)
+2. Whisper (Oracle) as the reliability anchor
+
+Winner selection:
+- If Web Speech gives a good result → accept
+- Else Whisper
+
+---
+
+### Timeouts and cancellation (implementation requirements)
+
+- Web Speech final timeout: ~2.0s after VAD stop
+- Google STT request timeout: e.g. 3–5s (clip is tiny)
+- Whisper request timeout: e.g. 3–5s (CPU-only)
+
+Use an `AbortController` per request and cancel losers:
+
+```ts
+const webAbort = new AbortController()
+const googleAbort = new AbortController()
+const whisperAbort = new AbortController()
+
+// start tasks...
+// when winner chosen:
+googleAbort.abort()
+whisperAbort.abort()
+webAbort.abort()
+```
+
+Even if you can’t truly cancel Web Speech mid-flight, you must ignore late results.
+
+---
+
+### Telemetry requirements
+Log:
+- which engines were started
+- which engine won
+- reasons for starting fanout (quota, low confidence, browser)
+- search confidence metrics for each engine transcript
+- end-to-end latency
+
+This is essential to tune thresholds and keep Google usage under control.
 
 ---
 
@@ -454,54 +492,46 @@ Pick regions close to users to reduce round-trip time.
 
 ---
 
-## 4.7 Self‑Hosted Whisper on Hetzner (tiny.en, CPU‑only)
+## 4.8 Self-Hosted Whisper on Oracle Cloud (Always Free, tiny.en)
 
-This section describes **the cheapest reliable setup** for hosting your own Whisper fallback using **Hetzner + whisper.cpp + tiny.en**, optimized for **1–2 second voice search clips**.
+This section documents an **alternative to Hetzner** that supports **on-demand `whisper.cpp` with `tiny.en`** using a **true free tier**.
 
-This is **not serverless**. It is an always‑on microservice with predictable cost and low latency.
+Oracle Cloud Infrastructure (OCI) offers an **Always Free** allocation that is sufficient for CPU-based Whisper inference on short clips.
 
 ---
 
-### 4.7.1 Recommended Hetzner instance
+### 4.8.1 Recommended Oracle Cloud configuration
 
-**Minimum viable (recommended to start):**
-- **Hetzner CX31**
-  - 4 vCPU
-  - 8 GB RAM
-  - ~€12/month
-  - x86_64
+**OCI Always Free – Ampere A1**
 
-This comfortably handles:
+- Architecture: ARM64 (Ampere A1)
+- Total Always Free allowance (per tenancy):
+  - **4 OCPUs**
+  - **24 GB RAM**
+- Cost: **$0/month** if you stay within limits
+
+This is enough to run:
 - `whisper.cpp tiny.en`
-- 1–2s clips
-- ~1–5 requests/sec sustained (much higher in bursts)
+- ffmpeg audio normalization
+- A small HTTP service
 
-If traffic grows:
-- Upgrade to **CX41 (8 vCPU / 16 GB)** before adding more nodes.
-
----
-
-### 4.7.2 Base system setup
-
-1. Create the server with **Ubuntu 22.04 LTS**
-2. SSH in and update packages:
-
-```bash
-apt update && apt upgrade -y
-apt install -y build-essential git ffmpeg curl
-```
-
-3. (Optional but recommended) Install Docker:
-
-```bash
-curl -fsSL https://get.docker.com | sh
-```
-
-Docker is optional; whisper.cpp can run directly on the host.
+Latency is slightly higher than x86 Hetzner CX machines, but acceptable for fallback STT.
 
 ---
 
-### 4.7.3 Build whisper.cpp
+### 4.8.2 OS and base setup
+
+1. Create an **Ampere A1 Compute Instance** in an Always Free region.
+2. Use **Ubuntu 22.04 LTS (ARM64)**.
+3. SSH into the instance and install dependencies:
+
+```bash
+sudo apt update && sudo apt install -y build-essential git ffmpeg
+```
+
+---
+
+### 4.8.3 Build whisper.cpp on ARM64
 
 ```bash
 git clone https://github.com/ggerganov/whisper.cpp.git
@@ -509,15 +539,11 @@ cd whisper.cpp
 make -j
 ```
 
-Download the **tiny.en** model:
+Download the model:
 
 ```bash
 bash ./models/download-ggml-model.sh tiny.en
 ```
-
-You should now have:
-- `main` (binary)
-- `models/ggml-tiny.en.bin`
 
 Test locally:
 
@@ -527,125 +553,62 @@ Test locally:
 
 ---
 
-### 4.7.4 Audio normalization
+### 4.8.4 Service architecture
 
-Your service should accept browser audio formats (usually `webm/opus`) and normalize them.
+Use the same microservice design as the Hetzner setup:
 
-Use ffmpeg:
+- HTTP endpoint accepting short audio uploads
+- Strict limits:
+  - Max duration: **3 seconds**
+  - Max payload size: **~500 KB**
+- ffmpeg normalization to 16kHz mono WAV
+- Execute whisper.cpp per request
+- Return transcript JSON
 
-```bash
-ffmpeg -y -i input.webm -ac 1 -ar 16000 -f wav audio.wav
-```
+Example response:
 
-Keep clips **≤ 3 seconds** to avoid CPU spikes.
-
----
-
-### 4.7.5 Whisper microservice (HTTP)
-
-Create a minimal HTTP service that:
-1. Accepts audio upload
-2. Converts audio to WAV
-3. Runs whisper.cpp
-4. Returns transcript JSON
-
-**Example architecture:**
-- Language: Node.js, Python, or Go
-- Process model:
-  - Keep whisper binary + model on disk
-  - Execute per request
-  - Optionally serialize requests (simple mutex) to avoid CPU thrash
-
-**Input constraints (enforce strictly):**
-- Max duration: 3s
-- Max size: ~500 KB
-- MIME allowlist: `audio/webm`, `audio/wav`, `audio/mpeg`
-
-**Output:**
 ```json
 {
-  "transcript": "halo",
+  "transcript": "bohemian rhapsody",
   "model": "tiny.en",
   "engine": "whisper.cpp",
-  "latency_ms": 87
+  "infra": "oracle-always-free"
 }
 ```
 
 ---
 
-### 4.7.6 Process management
+### 4.8.5 Networking, security, and availability
 
-Run the service using one of:
-- `systemd` (simplest)
-- Docker container
-- `pm2` (Node.js)
-
-Ensure:
-- Auto‑restart on crash
-- Logs written to disk or stdout
-
----
-
-### 4.7.7 Networking & security
-
-**Never expose Whisper raw to the public internet without protection.**
-
-Recommended:
-- Put **Cloudflare** in front
-- Enable:
-  - HTTPS
-  - Rate limiting
-  - Basic bot protection
-- Require:
-  - API key header
-  - or signed requests from your app
+- Oracle instances are public by default:
+  - Restrict ingress to required ports only
+- Strongly recommended:
+  - Place **Cloudflare** in front
+  - Enforce API key authentication
+  - Add basic rate limiting
+- Expect:
+  - No autoscaling
+  - Occasional noisy-neighbor effects
+  - Acceptable uptime for a fallback tier
 
 ---
 
-### 4.7.8 Client integration
+### 4.8.6 When to prefer Oracle over Hetzner
 
-From the browser:
-- Call your Whisper endpoint **only when**:
-  - Web Speech fails
-  - Google STT fails
-  - or search confidence remains low
+| Criterion | Oracle Always Free | Hetzner CX |
+|---------|-------------------|------------|
+| Monthly cost | **$0** | €12+ |
+| CPU performance | Medium | High |
+| Architecture | ARM64 | x86_64 |
+| Predictability | Medium | High |
+| Best use | Low-volume fallback | Primary fallback |
 
-Suggested priority:
-1. Web Speech API
-2. Google Cloud STT (direct)
-3. **Hetzner Whisper fallback**
-
-Include metadata:
-- `tier_used: "whisper"`
-- `fallback_reason`
-
----
-
-### 4.7.9 Expected performance & cost
-
-**Latency (1–2s clips):**
-- Inference: ~30–100 ms
-- ffmpeg: ~20–40 ms
-- Total server time: ~70–150 ms
-
-**Cost:**
-- ~€12/month flat
-- No per‑request cost
-- No cold starts
-
-This is typically cheaper than Google STT once usage exceeds a few hundred thousand short queries/month.
-
----
-
-### 4.7.10 Scaling strategy
-
-When CX31 saturates:
-1. Upgrade vertically (CX41)
-2. Add second node
-3. Put both behind a load balancer
-4. Sticky sessions not required
-
-Do **not** autoscale aggressively; Whisper prefers warm CPU cache.
+**Recommendation:**
+- Use **Oracle Always Free** for:
+  - early-stage
+  - low traffic
+  - cost-zero fallback
+- Migrate to **Hetzner** once Whisper becomes performance-critical or traffic grows.
 
 ---
 

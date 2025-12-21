@@ -272,12 +272,20 @@
 
 ### Voice Search ✅
 - [x] **Design doc**: [docs/voice-search-design.md](docs/voice-search-design.md)
+- [x] **Tiered plan**: [docs/voice-search-webspeech-google-stt-plan.md](docs/voice-search-webspeech-google-stt-plan.md)
 - [x] Phase 1: Backend transcription via Google STT V2 (latest_short model)
 - [x] Phase 2: SpeechRecognitionStore + audio capture (MediaRecorder)
 - [x] Phase 3: Integrate with VoiceActivityStore for auto-stop on 2s silence
 - [x] Phase 4: UI integration with SongSearch (mic button with VAD animation)
 - [x] Phase 5: Quota tracking, error handling, usage alerts
+- [x] Phase 6: Tiered speech recognition (Google STT primary → Web Speech API fallback)
+  - [x] WebSpeechService with Effect.ts patterns (`src/lib/web-speech.ts`)
+  - [x] Tier selection logic in SpeechRecognitionStore
+  - [x] `tierUsed` state tracking (`"google_stt"` | `"webspeech"`)
+  - [x] Quota API returns `webSpeechAvailable` flag
+  - [x] Test page at `/test/voice-search`
 - [ ] Use named recognizer instead of `_` to enable `audio_durations` metric for Google Cloud monitoring
+- [ ] Add confidence-based fallback (retry with other tier if low confidence)
 
 ### Advanced Features
 - [x] Metronome mode (UI for existing `SoundSystem.playMetronomeTick`)

@@ -9,7 +9,17 @@ import { SoundSystemService } from "@/services/sound-system"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
 
+// Web Speech API types
+declare global {
+  interface Window {
+    SpeechRecognition?: typeof SpeechRecognition
+    webkitSpeechRecognition?: typeof SpeechRecognition
+  }
+}
+
 // --- Types ---
+
+export type SpeechTier = "google_stt" | "webspeech" | null
 
 export interface SpeechState {
   readonly isSupported: boolean
@@ -18,6 +28,8 @@ export interface SpeechState {
   readonly hasAudioPermission: boolean
   readonly isAutoStopping: boolean
   readonly isQuotaAvailable: boolean
+  readonly isWebSpeechAvailable: boolean
+  readonly tierUsed: SpeechTier
   readonly partialTranscript: string
   readonly finalTranscript: string | null
   readonly detectedLanguageCode: string | null
@@ -117,6 +129,8 @@ export class SpeechRecognitionStore {
     hasAudioPermission: false,
     isAutoStopping: false,
     isQuotaAvailable: true,
+    isWebSpeechAvailable: this.checkWebSpeechSupport(),
+    tierUsed: null,
     partialTranscript: "",
     finalTranscript: null,
     detectedLanguageCode: null,
@@ -125,12 +139,23 @@ export class SpeechRecognitionStore {
     errorMessage: null,
   }
 
+  private checkWebSpeechSupport(): boolean {
+    if (typeof window === "undefined") return false
+    return !!(window.SpeechRecognition ?? window.webkitSpeechRecognition)
+  }
+
   // Audio capture
   private mediaRecorder: MediaRecorder | null = null
   private audioChunks: Blob[] = []
 
   // Max duration timeout
   private maxDurationTimeoutId: ReturnType<typeof setTimeout> | null = null
+
+  // Current tier being used for this recognition session
+  private currentTier: SpeechTier = null
+
+  // Web Speech API instance (used when tier is "webspeech")
+  private webSpeechRecognition: SpeechRecognition | null = null
 
   // VAD integration
   private hasDetectedSpeech = false
@@ -241,13 +266,18 @@ export class SpeechRecognitionStore {
         return false
       }
 
-      const data = (await response.json()) as { available?: boolean }
+      const data = (await response.json()) as {
+        available?: boolean
+        webSpeechAvailable?: boolean
+      }
       const isAvailable = data.available ?? false
+      const isWebSpeechAvailable = data.webSpeechAvailable ?? this.checkWebSpeechSupport()
       if (!isAvailable) {
-        speechLog("QUOTA", "Quota exhausted")
+        speechLog("QUOTA", "Google STT quota exhausted", { webSpeechAvailable: isWebSpeechAvailable })
       }
       this.setState({
         isQuotaAvailable: isAvailable,
+        isWebSpeechAvailable,
         errorCode: null,
         errorMessage: null,
       })
@@ -321,20 +351,32 @@ export class SpeechRecognitionStore {
         }),
       )
 
-      if (!isQuotaAvailable) {
-        speechLog("START", "Quota not available, dispatching QuotaExceeded")
+      // Determine which tier to use
+      const useWebSpeechFallback = !isQuotaAvailable && this.state.isWebSpeechAvailable
+      const tierToUse: SpeechTier = isQuotaAvailable ? "google_stt" : useWebSpeechFallback ? "webspeech" : null
+
+      if (!isQuotaAvailable && !useWebSpeechFallback) {
+        speechLog("START", "Quota exhausted and no Web Speech fallback available")
         this.handleQuotaExceeded()
         return
       }
 
-      speechLog("START", "Starting speech recognition...")
+      if (useWebSpeechFallback) {
+        speechLog("START", "Google STT quota exhausted, using Web Speech API fallback")
+      }
+
+      speechLog("START", "Starting speech recognition...", { tier: tierToUse })
       this.setState({
         isConnecting: true,
+        tierUsed: tierToUse,
         errorCode: null,
         errorMessage: null,
         partialTranscript: "",
         finalTranscript: null,
       })
+
+      // Store tier for use in sendFinalAudio
+      this.currentTier = tierToUse
 
       // Get microphone access via SoundSystem
       const analyser = yield* _(this.getMicrophoneAnalyserEffect())
@@ -362,13 +404,18 @@ export class SpeechRecognitionStore {
       // Set up VAD for voice-based auto-stop
       yield* _(Effect.promise(() => this.setupVADIntegration()))
 
+      // If using Web Speech API, start browser recognition
+      if (tierToUse === "webspeech") {
+        this.setupWebSpeechRecognition()
+      }
+
       this.setState({
         isConnecting: false,
         isRecording: true,
         lastUpdatedAt: Date.now(),
       })
 
-      speechLog("START", "Speech recognition started")
+      speechLog("START", "Speech recognition started", { tier: tierToUse })
     },
   )
 
@@ -422,7 +469,96 @@ export class SpeechRecognitionStore {
     return "audio/webm"
   }
 
+  private setupWebSpeechRecognition(): void {
+    const SpeechRecognitionClass = window.SpeechRecognition ?? window.webkitSpeechRecognition
+    if (!SpeechRecognitionClass) {
+      speechLog("WEBSPEECH", "Web Speech API not available")
+      return
+    }
+
+    speechLog("WEBSPEECH", "Setting up Web Speech API recognition")
+
+    const recognition = new SpeechRecognitionClass()
+    recognition.lang = "en-US"
+    recognition.interimResults = true
+    recognition.continuous = false
+    recognition.maxAlternatives = 1
+
+    recognition.onstart = () => {
+      speechLog("WEBSPEECH", "Recognition started")
+    }
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const result = event.results[event.results.length - 1]
+      if (result) {
+        const alternative = result[0]
+        if (alternative) {
+          const transcript = alternative.transcript
+          const isFinal = result.isFinal
+
+          if (isFinal) {
+            speechLog("WEBSPEECH", "Final transcript received", { transcript })
+            this.runSyncWithClientLayer(
+              this.dispatch(
+                new ReceiveFinal({
+                  text: transcript,
+                  languageCode: recognition.lang,
+                }),
+              ),
+            )
+          } else {
+            this.runSyncWithClientLayer(
+              this.dispatch(
+                new ReceivePartial({
+                  text: transcript,
+                  languageCode: recognition.lang,
+                }),
+              ),
+            )
+          }
+        }
+      }
+    }
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      speechLog("WEBSPEECH", "Recognition error", { error: event.error, message: event.message })
+      // Don't fail on no-speech - just means no transcript
+      if (event.error !== "no-speech" && event.error !== "aborted") {
+        this.runSyncWithClientLayer(
+          this.dispatch(
+            new SetSpeechError({
+              code: `WEBSPEECH_${event.error.toUpperCase().replace(/-/g, "_")}`,
+              message: event.message || `Web Speech error: ${event.error}`,
+            }),
+          ),
+        )
+      }
+    }
+
+    recognition.onend = () => {
+      speechLog("WEBSPEECH", "Recognition ended")
+      this.webSpeechRecognition = null
+    }
+
+    this.webSpeechRecognition = recognition
+    recognition.start()
+  }
+
+  private cleanupWebSpeechRecognition(): void {
+    if (this.webSpeechRecognition) {
+      speechLog("WEBSPEECH", "Cleaning up Web Speech recognition")
+      this.webSpeechRecognition.abort()
+      this.webSpeechRecognition = null
+    }
+  }
+
   private async sendFinalAudio(): Promise<void> {
+    // If using Web Speech API, the transcript was already captured during recording
+    if (this.currentTier === "webspeech") {
+      speechLog("AUDIO", "Web Speech tier - transcript already captured during recording")
+      return
+    }
+
     if (this.audioChunks.length === 0) {
       speechLog("AUDIO", "No audio chunks to send")
       return
@@ -444,7 +580,7 @@ export class SpeechRecognitionStore {
       reader.readAsDataURL(audioBlob)
     })
 
-    speechLog("AUDIO", "Sending audio for transcription", {
+    speechLog("AUDIO", "Sending audio for transcription via Google STT", {
       size: audioBlob.size,
       type: audioBlob.type,
     })
@@ -639,7 +775,7 @@ export class SpeechRecognitionStore {
   // --- Stop recognition ---
 
   private handleStopRecognition(): void {
-    speechLog("STOP", "Stopping speech recognition...")
+    speechLog("STOP", "Stopping speech recognition...", { tier: this.currentTier })
 
     // Clear max duration timeout
     this.clearMaxDurationTimeout()
@@ -647,6 +783,9 @@ export class SpeechRecognitionStore {
 
     // Cleanup VAD
     this.cleanupVADIntegration()
+
+    // Cleanup Web Speech if active
+    this.cleanupWebSpeechRecognition()
 
     // Stop MediaRecorder and send final audio
     if (this.mediaRecorder) {
@@ -747,6 +886,7 @@ export class SpeechRecognitionStore {
   reset(): void {
     speechLog("RESET", "Resetting SpeechRecognitionStore")
     this.handleStopRecognition()
+    this.currentTier = null
     this.setState({
       isSupported: typeof window !== "undefined" && typeof navigator !== "undefined",
       isConnecting: false,
@@ -754,6 +894,8 @@ export class SpeechRecognitionStore {
       hasAudioPermission: false,
       isAutoStopping: false,
       isQuotaAvailable: true,
+      isWebSpeechAvailable: this.checkWebSpeechSupport(),
+      tierUsed: null,
       partialTranscript: "",
       finalTranscript: null,
       detectedLanguageCode: null,
@@ -782,6 +924,8 @@ const DEFAULT_STATE: SpeechState = {
   hasAudioPermission: false,
   isAutoStopping: false,
   isQuotaAvailable: true,
+  isWebSpeechAvailable: false,
+  tierUsed: null,
   partialTranscript: "",
   finalTranscript: null,
   detectedLanguageCode: null,
@@ -823,4 +967,14 @@ export function useSpeechControls() {
 export function useIsQuotaAvailable(): boolean {
   const state = useSpeechState()
   return state.isQuotaAvailable
+}
+
+export function useSpeechTier(): SpeechTier {
+  const state = useSpeechState()
+  return state.tierUsed
+}
+
+export function useIsWebSpeechAvailable(): boolean {
+  const state = useSpeechState()
+  return state.isWebSpeechAvailable
 }
