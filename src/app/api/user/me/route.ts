@@ -36,6 +36,7 @@ export async function GET() {
           consentVersion: profile.consentVersion,
           consentGivenAt: profile.consentGivenAt.toISOString(),
           displayName: profile.displayName,
+          isAdmin: profile.isAdmin,
         }
       : null,
   })

@@ -24,6 +24,7 @@ export function AuthProvider({ children, session }: AuthProviderProps) {
 
     // Initialize stores for authenticated users (no await - fire and forget)
     if (session !== null) {
+      accountStore.initialize() // Fetch full profile including isAdmin
       setlistsStore.fetchAll()
       preferencesStore.initialize()
     }

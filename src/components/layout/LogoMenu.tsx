@@ -1,14 +1,23 @@
 "use client"
 
 import { Logo } from "@/components/ui"
-import { useAccount } from "@/core"
-import { CaretDown, GearSix, Heart, House, Info, MusicNotes } from "@phosphor-icons/react"
+import { useAccount, useIsAdmin } from "@/core"
+import {
+  CaretDown,
+  GearSix,
+  Heart,
+  House,
+  Info,
+  MusicNotes,
+  ShieldCheck,
+} from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 
 export const LogoMenu = memo(function LogoMenu() {
   const { isAuthenticated } = useAccount()
+  const isAdmin = useIsAdmin()
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -45,6 +54,11 @@ export const LogoMenu = memo(function LogoMenu() {
       >
         <Logo size={24} className="text-indigo-500" />
         <span className="text-lg font-semibold text-white">ScrollTunes</span>
+        {isAdmin && (
+          <span className="px-2 py-0.5 text-xs font-bold bg-amber-500 text-black rounded-full uppercase tracking-wide">
+            Admin
+          </span>
+        )}
         <CaretDown size={12} className="text-neutral-500" />
       </button>
 
@@ -74,6 +88,16 @@ export const LogoMenu = memo(function LogoMenu() {
                 <GearSix size={20} />
                 <span>Settings</span>
               </Link>
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={handleClose}
+                  className="flex items-center gap-3 px-4 py-2 text-amber-400 hover:bg-neutral-800 transition-colors"
+                >
+                  <ShieldCheck size={20} />
+                  <span>Admin</span>
+                </Link>
+              )}
             </div>
 
             <div className="border-t border-neutral-800 py-2">

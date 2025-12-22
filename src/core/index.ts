@@ -86,6 +86,7 @@ export {
   accountStore,
   useAccount,
   useIsAuthenticated,
+  useIsAdmin,
   useUser,
   type AccountState,
   type AccountUser,

@@ -13,6 +13,7 @@ export interface AccountUser {
 export interface AccountProfile {
   readonly consentVersion: string
   readonly displayName: string | null
+  readonly isAdmin: boolean
 }
 
 export interface AccountState {
@@ -154,4 +155,9 @@ export function useIsAuthenticated(): boolean {
 export function useUser(): AccountUser | null {
   const state = useAccount()
   return state.user
+}
+
+export function useIsAdmin(): boolean {
+  const state = useAccount()
+  return state.profile?.isAdmin ?? false
 }

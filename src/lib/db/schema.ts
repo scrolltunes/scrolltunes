@@ -24,6 +24,8 @@ export const users = pgTable("user", {
   email: text("email").unique(),
   emailVerified: timestamp("emailVerified", { mode: "date", withTimezone: true }),
   image: text("image"),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
 })
 
 export const accounts = pgTable(
@@ -88,6 +90,7 @@ export const appUserProfiles = pgTable("app_user_profiles", {
   preferencesJson: jsonb("preferences_json").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  isAdmin: boolean("is_admin").notNull().default(false),
 })
 
 export const userSongItems = pgTable(
