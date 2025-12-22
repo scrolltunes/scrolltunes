@@ -33,24 +33,32 @@ export function useVoiceSearch() {
       wasRecordingRef.current = true
       receivedFinalTranscriptRef.current = false
       setIsProcessing(false)
-    } else if (!speechState.isRecording && wasRecordingRef.current && !receivedFinalTranscriptRef.current) {
+    } else if (
+      !speechState.isRecording &&
+      wasRecordingRef.current &&
+      !receivedFinalTranscriptRef.current
+    ) {
       // Recording just stopped and we haven't received a final transcript yet
       setIsProcessing(true)
     }
 
-    // Track when we receive a final transcript (even if it gets cleared later)
+    // Track when we receive a final transcript
     if (speechState.finalTranscript) {
       receivedFinalTranscriptRef.current = true
     }
 
     // Clear processing on any of: final transcript received, error message, or error code
-    if (receivedFinalTranscriptRef.current || speechState.errorMessage || speechState.errorCode) {
+    if (speechState.finalTranscript || speechState.errorMessage || speechState.errorCode) {
       setIsProcessing(false)
     }
 
     // Reset refs when recording stops
     if (!speechState.isRecording) {
       wasRecordingRef.current = false
+      // Reset the final transcript ref when recording stops so next session starts fresh
+      if (!speechState.finalTranscript) {
+        receivedFinalTranscriptRef.current = false
+      }
     }
   }, [
     speechState.isRecording,
@@ -74,9 +82,9 @@ export function useVoiceSearch() {
   // Determine if speech is being detected (has partial transcript)
   const isSpeechDetected = speechState.isRecording && speechState.partialTranscript.length > 0
 
-  // Don't show recording state after we've received a final transcript
-  // (there's a brief delay before isRecording becomes false)
-  const isActivelyRecording = speechState.isRecording && !receivedFinalTranscriptRef.current
+  // Show recording state when isRecording is true and we don't have a final transcript yet
+  // Use the actual state value instead of ref to avoid race conditions
+  const isActivelyRecording = speechState.isRecording && !speechState.finalTranscript
 
   return {
     // State

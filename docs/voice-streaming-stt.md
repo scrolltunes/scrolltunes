@@ -1,292 +1,276 @@
-# ScrollTunes Voice Search: Streaming Google STT (gRPC) + VAD Tuning + Integration
+# ScrollTunes Voice Search: Streaming Google STT Implementation
 
-This document is the practical “do this next” guide for integrating **Google Speech-to-Text streaming** (for **partial / interim transcripts**) into ScrollTunes, while reusing the existing **Silero VAD** “end-of-utterance” behavior described in:
+This document describes the streaming Speech-to-Text implementation for ScrollTunes, providing real-time transcription via WebSocket for browsers without Web Speech API support (e.g., Brave desktop).
 
-- `docs/voice-search-webspeech-google-stt-plan.md` (raw URL provided)
+## Architecture Overview
 
-It covers:
+```
+┌─────────────────┐      WebSocket       ┌──────────────────┐      gRPC       ┌─────────────────┐
+│  Browser        │◄────────────────────►│  sst-ws-bridge   │◄───────────────►│  Google STT V2  │
+│  (Next.js)      │   PCM audio frames   │  (Cloud Run)     │  Streaming API  │  (Speech API)   │
+│                 │   JSON transcripts   │                  │                 │                 │
+└─────────────────┘                      └──────────────────┘                 └─────────────────┘
+```
 
-1. **Whether to alter VAD activation parameters** (recommended adjustments for better UX with partials).
-2. A concrete **WebSocket ↔ Cloud Run ↔ Google gRPC** design.
-3. **Actionable integration points** (what to change in ScrollTunes and where, conceptually).
-4. **Client consumption** patterns for Next.js on Vercel.
+### Why This Split Exists
 
-> Note: I could not reliably browse the repository’s source tree from this environment at the time of writing (GitHub views intermittently error). The integration points below are grounded in the design doc’s described `VoiceActivityStore` responsibilities and common VAD wiring patterns. If you paste/upload the relevant source files, I can produce a fully path-accurate integration map.
-
----
-
-## 1) Should we alter the VAD activation parameters?
-
-### Current parameters (from the plan)
-- **Min speech to count:** 500ms
-- **Silence to finalize:** 1.5s (after VAD transitions to “no voice”)
-
-This is sensible when you record a blob and then transcribe. For **streaming STT**, you already get partial results during speech, so VAD’s job shifts to: **when to finalize** (end the stream and trigger the search).
-
-### Recommendation (yes, adjust)
-For a search-box UX, the default can be faster without being reckless:
-
-#### Default (“Fast Search”) preset
-- `minSpeechMs`: **300ms** (down from 500ms)
-- `silenceToFinalizeMs`: **900ms** (down from 1500ms)
-- `stableTranscriptMs`: **400ms** (new guard)
-- `minCharsBeforeFinalize`: **3–5** (new guard)
-- `minTotalSpeechMsBeforeFinalize`: **600ms** (new guard)
-
-#### Why these changes help
-- Users see *something* in the search box quickly (interim text), so they feel progress immediately.
-- Lower silence-to-finalize reduces “dead air” at the end.
-- The stability guard prevents cutting off slow speakers or mid-phrase pauses.
-
-### Stability guard (high-impact)
-When the VAD silence timer fires, only finalize if:
-
-- VAD indicates silence for `silenceToFinalizeMs`, **and**
-- the interim transcript hasn’t changed for `stableTranscriptMs`
-
-If it *is* still changing, extend the finalize timer by 200–300ms and re-check.
-
-This single rule eliminates a lot of premature-finalize annoyances.
-
-### Noisy environment preset (optional)
-- `minSpeechMs`: **450ms**
-- `silenceToFinalizeMs`: **1200ms**
-- `stableTranscriptMs`: **500ms**
-- `minCharsBeforeFinalize`: **5–8**
-- `minTotalSpeechMsBeforeFinalize`: **800ms**
-
-Use this if you observe many “false starts” in noisy rooms.
+- **Google streaming STT** (interim results) requires **bidirectional gRPC streaming**
+- Vercel-hosted Next.js cannot run long-lived WebSocket servers
+- Solution: keep UI on Vercel, run a small bridge service on Cloud Run
 
 ---
 
-## 2) Architecture (Vercel UI + Cloud Run streaming bridge)
+## Implementation Status
 
-### Why this split exists
-- **Google streaming STT** (interim results) is **bidirectional streaming gRPC**.
-- Vercel-hosted Next.js is not a great place to run a long-lived WebSocket server.
-- Solution: keep UI on Vercel, run a small bridge service elsewhere (Cloud Run recommended).
+### ✅ Completed
 
-### Data flow
-1) Browser captures mic audio as PCM frames.
-2) Browser sends PCM frames over **WebSocket** to the bridge service.
-3) Bridge forwards audio into Google STT **streamingRecognize** (gRPC).
-4) Bridge emits interim / final transcripts back to the browser over the same WebSocket.
-5) ScrollTunes VAD decides when to send `{type:"end"}` (finalize).
+#### Client-Side (Next.js on Vercel)
+
+- [x] **SpeechRecognitionStore** (`src/core/SpeechRecognitionStore.ts`)
+  - Effect.ts patterns for async operations and error handling
+  - Tagged events (`StartRecognition`, `ReceivePartial`, `ReceiveFinal`, etc.)
+  - Brave desktop detection via `navigator.brave.isBrave()`
+  - Streaming mode integration with `sttStreamClient`
+  - VAD-based end-of-utterance detection
+
+- [x] **SttStreamClient** (`src/lib/stt-stream-client.ts`)
+  - WebSocket client with Effect.ts patterns
+  - Token-based authentication via `/api/stt-token`
+  - Binary PCM audio frame transmission
+  - Partial/final transcript handling
+  - Observable state with `useSyncExternalStore`
+
+- [x] **Audio Capture** (`public/pcm-worklet.js`)
+  - AudioWorklet processor for low-latency PCM capture
+  - Float32 → PCM16 conversion
+  - Configurable buffer size (4096 samples)
+
+- [x] **Token Endpoint** (`src/app/api/stt-token/route.ts`)
+  - HMAC-signed session tokens (60s TTL)
+  - User authentication required
+  - Nonce for replay protection
+
+- [x] **useVoiceSearch Hook** (`src/hooks/useVoiceSearch.ts`)
+  - React integration for voice search UI
+  - Processing state tracking
+  - Quota prefetching
+
+#### Backend Bridge (sst-ws-bridge on Cloud Run)
+
+- [x] **WebSocket Server** (`sst-ws-bridge/server.ts`)
+  - Bun-based WebSocket server
+  - Google Speech V2 streaming API integration
+  - Token verification with timing-safe comparison
+  - Rate limiting per IP
+  - Origin validation
+  - Session timeouts and idle detection
+
+- [x] **Google Server-Side VAD** (`sst-ws-bridge/server.ts`)
+  - Uses Google's built-in `voiceActivityTimeout` for end-of-utterance detection
+  - `speechStartTimeout`: 5 seconds (max wait for speech to begin)
+  - `speechEndTimeout`: 1 second (silence duration to finalize)
+  - Server sends `{ type: "ended" }` on `END_OF_SINGLE_UTTERANCE` event
+
+- [x] **Client-Side VAD** (non-streaming mode only)
+  - Three presets: `fast`, `default`, `noisy`
+  - Runtime switching via `setVADPreset()`
+  - Only used for REST-based Google STT fallback, not streaming mode
+
+### ⚠️ Partially Implemented / Known Deviations
+
+#### Multi-Language Detection
+- Server supports `alternativeLanguageCodes` in config
+- Client currently hardcodes `languageCode: "en-US"` without alternatives
+- Wiring from preferences → streaming config not implemented
+
+### ❌ Not Implemented
+
+1. **Telemetry / Timing Metrics**
+   - `{ type: "timing", tFirstPartialMs, tFinalMs }` messages
+   - Premature-finalize rate tracking
+   - Current: basic console logging only
 
 ---
 
-## 3) WebSocket protocol (recommended contract)
+## WebSocket Protocol
 
 ### Client → Server
-1) Initial config message (JSON, text frame):
+
+1. **Config message** (JSON, text frame, first message):
 ```json
 {
-  "type": "config",
   "languageCode": "en-US",
-  "sampleRateHertz": 16000
+  "sampleRateHertz": 16000,
+  "alternativeLanguageCodes": ["he-IL", "es-ES"]
 }
 ```
 
-2) Audio frames (binary frames):
-- PCM16 little-endian
-- mono
-- 16kHz
-- small chunks (10–40ms each is typical; don’t batch into multi-second blobs)
+2. **Audio frames** (binary frames):
+   - PCM16 little-endian, mono, 16kHz
+   - ~4096 samples per frame (~256ms)
 
-3) End utterance control (JSON, text frame):
+3. **End utterance** (JSON, text frame):
 ```json
 { "type": "end" }
 ```
 
-4) Abort / cancel (optional):
+4. **Cancel** (JSON, text frame):
 ```json
 { "type": "cancel" }
 ```
 
 ### Server → Client
-- Ready:
+
+- **Hello** (after connection):
+```json
+{ "type": "hello", "userId": "..." }
+```
+
+- **Ready** (after config processed):
 ```json
 { "type": "ready" }
 ```
 
-- Transcript:
+- **Transcript** (interim or final):
 ```json
-{ "type": "transcript", "isFinal": false, "text": "bohemian rha..." }
+{ "type": "transcript", "isFinal": false, "text": "bohemian rha...", "languageCode": "en-US" }
 ```
 
+- **Session ended**:
 ```json
-{ "type": "transcript", "isFinal": true, "text": "bohemian rhapsody" }
+{ "type": "ended" }
 ```
 
-- Error:
+- **Error**:
 ```json
 { "type": "error", "message": "..." }
 ```
 
-- Optional telemetry:
-```json
-{ "type": "timing", "tFirstPartialMs": 180, "tFinalMs": 980 }
-```
+---
+
+## Technical Details
+
+### Google Speech V2 API
+
+- Uses `_streamingRecognize()` private method for bidirectional streaming
+- First message must be config request with recognizer path
+- Audio sent as `{ audio: base64String }`
+- Model: `"long"` (streaming compatible)
+- `languageCodes` array for multi-language detection
+- `enableVoiceActivityEvents: true` enables server-side VAD
+- `voiceActivityTimeout` controls speech start/end detection
+- Server emits `END_OF_SINGLE_UTTERANCE` when speech ends
+
+### Authentication Flow
+
+1. Client calls `/api/stt-token` to get HMAC-signed token
+2. Token includes: `exp`, `userId`, `nonce`
+3. Client connects to WebSocket with `?session=<token>`
+4. Bridge verifies token signature and expiration
+5. Token TTL: 60s (connect window)
+6. Session max: 30s (enforced server-side)
+
+### Rate Limiting
+
+- **Per IP**: 10 connections per 60 seconds
+- **Per session**: 5MB max audio, 30s max duration
+- **Idle timeout**: 10s with no audio
 
 ---
 
-## 4) Client-side integration (Next.js on Vercel)
+## Key Files
 
-### A) Add a streaming mode in the voice-search state machine
-Where ScrollTunes currently has a “Google STT fallback / record then transcribe” path, add a parallel streaming mode:
-
-Suggested states:
-- `google_stream_connecting`
-- `google_stream_listening`
-- `google_stream_finalizing`
-- `google_stream_done`
-- `google_stream_error`
-
-Suggested state fields:
-- `partialText`
-- `finalText`
-- `lastTranscriptChangeAt`
-- `vadState` (`speech | silence`)
-- `finalizeTimerId`
-
-### B) Implement a `useGoogleSttStream()` hook/module
-Responsibilities:
-- Open the WebSocket
-- Send config
-- Send binary PCM frames
-- Receive transcripts and update:
-  - `partialText` for `isFinal:false`
-  - `finalText` for `isFinal:true`
-
-API surface:
-- `connect({ languageCode })`
-- `sendAudioFrame(arrayBuffer)`
-- `endUtterance()`
-- `close()`
-- state: `status`, `partialText`, `finalText`, `lastTranscriptChangeAt`, `error`
-
-### C) Audio capture: AudioWorklet (preferred)
-Use an AudioWorklet to get low-latency PCM and stream it immediately.
-
-Pipeline:
-- `getUserMedia({ audio:true })`
-- `AudioContext`
-- `audioWorklet.addModule("/pcm-worklet.js")`
-- `AudioWorkletNode` posts Float32 frames
-- Convert Float32 → PCM16 and send as binary
-
-**Important:** Some browsers won’t truly operate at 16kHz. If the audio context ends up at 48kHz, resample client-side (or resample server-side). Start simple, measure quality, then add resampling only if needed.
-
-### D) Bind interim transcripts to the search input
-While streaming:
-- update the search box’s value with `partialText`
-- show a “listening” indicator
-When final arrives:
-- set input to `finalText`
-- trigger search immediately
-- cleanup audio + ws + VAD
+| Component | File | Description |
+|-----------|------|-------------|
+| Speech Store | `src/core/SpeechRecognitionStore.ts` | Main state machine |
+| Stream Client | `src/lib/stt-stream-client.ts` | WebSocket client |
+| Voice Search Hook | `src/hooks/useVoiceSearch.ts` | React integration |
+| Token Endpoint | `src/app/api/stt-token/route.ts` | Auth token generation |
+| PCM Worklet | `public/pcm-worklet.js` | Audio capture |
+| Bridge Server | `sst-ws-bridge/server.ts` | Cloud Run service |
 
 ---
 
-## 5) VAD wiring (VoiceActivityStore integration points)
+## Environment Variables
 
-The design doc describes `VoiceActivityStore` using Silero VAD to determine end-of-utterance in Google STT mode. In streaming mode:
-
-### Replace “stop recording + upload blob” with “send end control”
-- On VAD “speech end”:
-  - start a silence timer: `silenceToFinalizeMs`
-- If speech resumes:
-  - cancel timer
-- When timer fires:
-  - apply **stability guard**:
-    - if transcript stable for `stableTranscriptMs` AND meets minimum guards:
-      - send `{type:"end"}`
-      - transition to `google_stream_finalizing`
-    - else:
-      - extend timer by 200–300ms and check again
-
-### Minimum guards (recommended)
-Only finalize if:
-- `minTotalSpeechMsBeforeFinalize` satisfied OR `partialText.length >= minCharsBeforeFinalize`
-
-This avoids “noise burst then finalize” behavior.
-
----
-
-## 6) Backend bridge service (Cloud Run)
-
-### Responsibilities
-- Accept WebSocket at `/ws`
-- On config: create `streamingRecognize({ interimResults: true, config })`
-- On binary frame: `recognizeStream.write({ audioContent })`
-- On `{type:"end"}`: `recognizeStream.end()`
-- Forward STT responses to the client
-
-### Deployment notes
-- Set Cloud Run timeout high enough for expected sessions (e.g. 3600s).
-- Attach a service account with Speech-to-Text permissions.
-- Keep the service stateless per connection.
-
-### Required environment variables
-The bridge service needs these credentials (same as ScrollTunes backend):
+### ScrollTunes (Vercel)
 
 | Variable | Description |
 |----------|-------------|
-| `GOOGLE_CLOUD_PROJECT_ID` | GCP project ID (e.g., `api-project-640068751634`) |
+| `WS_SESSION_SECRET` | HMAC secret for token signing (shared with bridge) |
+| `NEXT_PUBLIC_STT_WS_URL` | WebSocket bridge URL (e.g., `wss://stt-ws-bridge-xxx.run.app/ws`) |
+
+### sst-ws-bridge (Cloud Run)
+
+| Variable | Description |
+|----------|-------------|
+| `WS_SESSION_SECRET` | HMAC secret for token verification (shared with app) |
+| `GOOGLE_CLOUD_PROJECT_ID` | GCP project ID |
 | `GOOGLE_CLOUD_CLIENT_EMAIL` | Service account email |
-| `GOOGLE_CLOUD_PRIVATE_KEY` | Service account private key (PEM format) |
+| `GOOGLE_CLOUD_PRIVATE_KEY` | Service account private key (PEM) |
 
-Verify with:
+---
+
+## Deployment
+
+### Bridge Service (Cloud Run)
+
 ```bash
-grep -E "^(GOOGLE_CLOUD_PROJECT_ID|GOOGLE_CLOUD_CLIENT_EMAIL|GOOGLE_CLOUD_PRIVATE_KEY)=" .env.local | cut -d= -f1
+cd sst-ws-bridge
+bun run deploy
+# or manually:
+gcloud run deploy stt-ws-bridge \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --session-affinity \
+  --timeout 300
 ```
 
-Verify gcloud CLI setup:
-```bash
-gcloud config get-value project
-gcloud services list --enabled --filter="name:speech.googleapis.com"
-gcloud auth list --filter=status:ACTIVE --format="value(account)"
-```
+---
+
+## Architecture Decisions
+
+### Client-Side Effect.ts Usage
+
+`SpeechRecognitionStore` follows Effect.ts patterns:
+- Async operations as `Effect.Effect<T, E, R>`
+- Tagged errors (`SpeechRecognitionError`)
+- Dependency injection via `ClientLayer`
+- Tagged events for state transitions
+
+**Known Deviations** (documented, not issues):
+- `sttStreamClient` is a global singleton, not injected via Layer
+- `speechDetectionStore` is a global singleton for VAD
+- Direct browser APIs (`getUserMedia`, `AudioContext`) inside Effects
+
+### Bridge Service (sst-ws-bridge)
+
+**Intentionally does NOT use Effect.ts**. This is a standalone Bun server with:
+- Plain TypeScript / Bun runtime
+- Event-driven async (callbacks, not Effect)
+- try/catch error handling
+- Global mutable state for rate limiting
+
+See `sst-ws-bridge/AGENTS.md` for documented architectural violations.
 
 ---
 
-## 7) Rollout plan (minimize risk)
-1) Enable streaming mode only for the already-planned “Google STT only” path (e.g. Brave desktop).
-2) Keep Web Speech primary path unchanged.
-3) Add logs/metrics:
-   - time to first partial
-   - time from VAD finalize trigger to final transcript
-   - premature-finalize rate (user quickly restarts mic)
-4) Tune parameters after collecting real data.
+## Future Work
 
----
+1. **Multi-Language Wiring**
+   - Pass `alternativeLanguageCodes` from preferences
+   - UI for language selection
 
-## 8) Checklist
+2. **Named Recognizer**
+   - Use named recognizer instead of `_` for Google Cloud monitoring
+   - Enables `audio_durations` metric
 
-### Client
-- [ ] Add streaming states + fields to voice-search store
-- [ ] Implement `useGoogleSttStream()`
-- [ ] Implement AudioWorklet PCM streaming
-- [ ] Wire VAD silence timer to `{type:"end"}`
-- [ ] Update search box live from interim transcripts
-- [ ] Trigger search on final transcript
+3. **Telemetry**
+   - Time to first partial
+   - Time to final transcript
+   - Premature-finalize rate
 
-### Backend
-- [ ] Implement WS server
-- [ ] Implement Google gRPC streaming bridge
-- [ ] Deploy to Cloud Run with appropriate timeout
-- [ ] Add basic logging + error messages
-
----
-
-## Appendix: What I still need to make this path-accurate
-To turn this into precise “edit these files / functions” instructions, share:
-- the `VoiceActivityStore` implementation file
-- the voice-search UI component/hook that starts/stops recording
-- any existing Google STT fallback code path
-
-Then I can map:
-- exact event names
-- store APIs
-- where to insert the streaming hook
-- and where to replace blob upload with WS streaming.
+4. **VAD Preset UI**
+   - Expose preset selection in settings
+   - Auto-detect noisy environment (optional)

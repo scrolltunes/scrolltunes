@@ -222,11 +222,13 @@ const server = Bun.serve<ConnectionState>({
         }, IDLE_TIMEOUT_MS)
       }
 
-      const startStream = (cfg: {
-        sampleRateHertz?: number
-        languageCode?: string
-        alternativeLanguageCodes?: string[]
-      } = {}) => {
+      const startStream = (
+        cfg: {
+          sampleRateHertz?: number
+          languageCode?: string
+          alternativeLanguageCodes?: string[]
+        } = {},
+      ) => {
         // Build V2 recognition config
         // Use explicit encoding for PCM16 audio from browser
         const explicitDecodingConfig = {
@@ -256,6 +258,11 @@ const server = Bun.serve<ConnectionState>({
           config: recognitionConfig,
           streamingFeatures: {
             interimResults: true,
+            enableVoiceActivityEvents: true,
+            voiceActivityTimeout: {
+              speechStartTimeout: { seconds: 5 },
+              speechEndTimeout: { seconds: 1 },
+            },
           },
         }
 
@@ -273,18 +280,40 @@ const server = Bun.serve<ConnectionState>({
         // V2 uses _streamingRecognize (private method)
         state.recognizeStream = speechClient
           ._streamingRecognize()
-          .on("data", (response: { results?: Array<{ alternatives?: Array<{ transcript?: string }>; isFinal?: boolean; languageCode?: string }> }) => {
-            const result = response.results?.[0]
-            const alt = result?.alternatives?.[0]
-            if (!alt) return
+          .on(
+            "data",
+            (response: {
+              results?: Array<{
+                alternatives?: Array<{ transcript?: string }>
+                isFinal?: boolean
+                languageCode?: string
+              }>
+              speechEventType?: string
+            }) => {
+              // Handle voice activity events from Google's VAD
+              if (response.speechEventType === "END_OF_SINGLE_UTTERANCE") {
+                log("INFO", "Google VAD detected end of utterance", {
+                  ip: state.ip,
+                  userId: state.claims.userId,
+                })
+                safeSend(ws, { type: "ended" })
+                cleanup("google_vad_end")
+                ws.close(1000, "End of utterance")
+                return
+              }
 
-            safeSend(ws, {
-              type: "transcript",
-              isFinal: !!result.isFinal,
-              text: alt.transcript ?? "",
-              languageCode: result.languageCode ?? null,
-            })
-          })
+              const result = response.results?.[0]
+              const alt = result?.alternatives?.[0]
+              if (!alt) return
+
+              safeSend(ws, {
+                type: "transcript",
+                isFinal: !!result.isFinal,
+                text: alt.transcript ?? "",
+                languageCode: result.languageCode ?? null,
+              })
+            },
+          )
           .on("error", (err: Error) => {
             log("ERROR", "STT stream error", {
               ip: state.ip,

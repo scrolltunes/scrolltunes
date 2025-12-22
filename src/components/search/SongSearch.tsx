@@ -70,17 +70,17 @@ function formatDuration(ms: number): string {
 function SearchSkeleton() {
   return (
     <div
-      className="absolute top-full left-0 right-0 z-50 mt-3 rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800 shadow-2xl"
+      className="absolute top-full left-0 right-0 z-50 mt-3 rounded-xl border border-neutral-700 bg-neutral-800 divide-y divide-neutral-700 shadow-2xl"
       aria-label="Loading search results"
     >
       {[0, 1, 2, 3].map(i => (
         <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
-          <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-800" />
+          <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-700" />
           <div className="flex-1 min-w-0 space-y-2">
-            <div className="h-4 w-3/5 rounded bg-neutral-800" />
-            <div className="h-3 w-4/5 rounded bg-neutral-800" />
+            <div className="h-4 w-3/5 rounded bg-neutral-700" />
+            <div className="h-3 w-4/5 rounded bg-neutral-700" />
           </div>
-          <div className="flex-shrink-0 h-4 w-10 rounded bg-neutral-800" />
+          <div className="flex-shrink-0 h-4 w-10 rounded bg-neutral-700" />
         </div>
       ))}
     </div>
@@ -502,7 +502,7 @@ export const SongSearch = memo(function SongSearch({
 
         {!error && results.length > 0 && (
           <ul
-            className="absolute top-full left-0 right-0 z-50 mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900 divide-y divide-neutral-800 shadow-2xl"
+            className="absolute top-full left-0 right-0 z-50 mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-700 bg-neutral-800 divide-y divide-neutral-700 shadow-2xl"
             aria-label="Search results"
           >
             {results.map(track => (
@@ -510,10 +510,10 @@ export const SongSearch = memo(function SongSearch({
                 <button
                   type="button"
                   onClick={() => handleTrackClick(track)}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:bg-neutral-800 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                  className="w-full flex items-center gap-3 p-3 bg-neutral-800 hover:bg-neutral-700 transition-colors focus:outline-none focus-visible:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
                   aria-label={`${track.name} by ${track.artist}`}
                 >
-                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-800 overflow-hidden flex items-center justify-center">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-700 overflow-hidden flex items-center justify-center">
                     {track.albumArt ? (
                       <img
                         src={track.albumArt}

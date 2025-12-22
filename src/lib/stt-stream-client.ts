@@ -45,14 +45,6 @@ export class SttStreamError extends Data.TaggedClass("SttStreamError")<{
   readonly message: string
 }> {}
 
-export class SttTokenError extends Data.TaggedClass("SttTokenError")<{
-  readonly message: string
-}> {}
-
-export class SttConnectionError extends Data.TaggedClass("SttConnectionError")<{
-  readonly message: string
-}> {}
-
 // --- Types ---
 
 export type SttStreamStatus =
@@ -373,7 +365,17 @@ export class SttStreamClient {
 
         if (!hasResumed) {
           hasResumed = true
-          if (ev.code !== 1000) {
+          if (ev.code === 1000) {
+            // Code 1000 before ready means unexpected early close
+            resume(
+              Effect.fail(
+                new SttStreamError({
+                  code: "WS_EARLY_CLOSE",
+                  message: "Connection closed before ready",
+                }),
+              ),
+            )
+          } else {
             resume(
               Effect.fail(
                 new SttStreamError({

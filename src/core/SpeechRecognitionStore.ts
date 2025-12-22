@@ -97,9 +97,61 @@ function speechLog(category: string, message: string, data?: Record<string, unkn
 const MAX_RECORDING_DURATION_MS = 10000
 const SAMPLE_RATE = 16000
 
-// VAD-based end-of-utterance detection for Google STT only mode
-const SPEECH_MIN_DURATION_MS = 500 // Minimum speech before silence timer starts
-const SILENCE_DURATION_MS = 1000 // Wait this long after voice stops before auto-stopping
+// --- VAD Configuration ---
+
+interface VADConfig {
+  /** Minimum speech duration before silence timer can start (ms) */
+  readonly minSpeechMs: number
+  /** How long to wait in silence before finalizing (ms) */
+  readonly silenceToFinalizeMs: number
+  /** Transcript must be stable for this long before finalizing (ms) - stability guard */
+  readonly stableTranscriptMs: number
+  /** Minimum transcript length before allowing finalize */
+  readonly minCharsBeforeFinalize: number
+  /** Extension time if transcript is still changing (ms) */
+  readonly silenceExtensionMs: number
+}
+
+const VAD_PRESETS = {
+  /** Fast search - optimized for quick voice queries */
+  fast: {
+    minSpeechMs: 300,
+    silenceToFinalizeMs: 900,
+    stableTranscriptMs: 400,
+    minCharsBeforeFinalize: 3,
+    silenceExtensionMs: 250,
+  },
+  /** Default - balanced for most environments */
+  default: {
+    minSpeechMs: 400,
+    silenceToFinalizeMs: 1000,
+    stableTranscriptMs: 450,
+    minCharsBeforeFinalize: 3,
+    silenceExtensionMs: 300,
+  },
+  /** Noisy environment - more conservative to avoid false triggers */
+  noisy: {
+    minSpeechMs: 500,
+    silenceToFinalizeMs: 1200,
+    stableTranscriptMs: 500,
+    minCharsBeforeFinalize: 5,
+    silenceExtensionMs: 350,
+  },
+} as const satisfies Record<string, VADConfig>
+
+type VADPreset = keyof typeof VAD_PRESETS
+
+// Active VAD config (can be changed at runtime)
+let activeVADConfig: VADConfig = VAD_PRESETS.default
+
+export function setVADPreset(preset: VADPreset): void {
+  activeVADConfig = VAD_PRESETS[preset]
+  speechLog("VAD", "VAD preset changed", { preset, config: activeVADConfig })
+}
+
+export function getVADConfig(): VADConfig {
+  return activeVADConfig
+}
 
 // Confidence thresholds for Web Speech fallback decision
 const MIN_TRANSCRIPT_LENGTH = 2
@@ -171,6 +223,7 @@ export class SpeechRecognitionStore {
   private vadUnsubscribe: (() => void) | null = null
   private speechStartedAt: number | null = null
   private silenceTimerId: ReturnType<typeof setTimeout> | null = null
+  private lastTranscriptChangeAt: number | null = null
 
   // Streaming STT mode (WebSocket-based)
   private isStreamingMode = false
@@ -730,24 +783,22 @@ export class SpeechRecognitionStore {
 
           if (this.speechStartedAt !== null) {
             const speechDuration = Date.now() - this.speechStartedAt
-            if (speechDuration >= SPEECH_MIN_DURATION_MS) {
+            if (speechDuration >= activeVADConfig.minSpeechMs) {
               // Start silence timer
               if (this.silenceTimerId === null) {
                 speechLog("VAD", "Voice stopped, starting silence timer", {
                   speechDuration,
-                  silenceTimeout: SILENCE_DURATION_MS,
+                  silenceTimeout: activeVADConfig.silenceToFinalizeMs,
                 })
-                this.silenceTimerId = setTimeout(() => {
-                  this.silenceTimerId = null
-                  speechLog("VAD", "Silence timeout reached, auto-stopping recording")
-                  this.setState({ isAutoStopping: true })
-                  this.handleStopRecognition()
-                }, SILENCE_DURATION_MS)
+                this.silenceTimerId = setTimeout(
+                  () => this.checkTranscriptStabilityAndFinalize(),
+                  activeVADConfig.silenceToFinalizeMs,
+                )
               }
             } else {
               speechLog("VAD", "Voice stopped but speech too short, waiting for more", {
                 speechDuration,
-                minRequired: SPEECH_MIN_DURATION_MS,
+                minRequired: activeVADConfig.minSpeechMs,
               })
             }
           }
@@ -771,6 +822,7 @@ export class SpeechRecognitionStore {
     speechDetectionStore.stopListening()
 
     this.speechStartedAt = null
+    this.lastTranscriptChangeAt = null
 
     this.setState({
       isSilenceDetectionActive: false,
@@ -779,6 +831,48 @@ export class SpeechRecognitionStore {
     })
 
     speechLog("VAD", "VAD detection stopped")
+  }
+
+  private checkTranscriptStabilityAndFinalize(): void {
+    const config = activeVADConfig
+    const now = Date.now()
+    const currentTranscript = this.state.partialTranscript
+
+    if (currentTranscript.length < config.minCharsBeforeFinalize) {
+      speechLog("VAD", "Transcript too short, extending silence timer", {
+        length: currentTranscript.length,
+        minRequired: config.minCharsBeforeFinalize,
+      })
+      this.silenceTimerId = setTimeout(
+        () => this.checkTranscriptStabilityAndFinalize(),
+        config.silenceExtensionMs,
+      )
+      return
+    }
+
+    const transcriptAge = this.lastTranscriptChangeAt
+      ? now - this.lastTranscriptChangeAt
+      : Number.POSITIVE_INFINITY
+
+    if (transcriptAge < config.stableTranscriptMs) {
+      speechLog("VAD", "Transcript still changing, extending silence timer", {
+        transcriptAge,
+        requiredStability: config.stableTranscriptMs,
+      })
+      this.silenceTimerId = setTimeout(
+        () => this.checkTranscriptStabilityAndFinalize(),
+        config.silenceExtensionMs,
+      )
+      return
+    }
+
+    speechLog("VAD", "Stability checks passed, finalizing", {
+      transcriptLength: currentTranscript.length,
+      transcriptAge,
+    })
+    this.silenceTimerId = null
+    this.setState({ isAutoStopping: true })
+    this.handleStopRecognition()
   }
 
   // --- Streaming STT (WebSocket) ---
@@ -843,13 +937,13 @@ export class SpeechRecognitionStore {
 
   private readonly startStreamingSTTEffect: Effect.Effect<void, SpeechRecognitionError> =
     Effect.gen(this, function* () {
-      this.setState({ isSilenceDetectionActive: true })
-
       // Connect to WebSocket STT bridge FIRST (before setting up audio capture)
-      // Note: alternativeLanguageCodes can be added later for multi-language detection
+      // Google streaming API supports up to 3 language codes for auto-detection
+      // Primary: English, with Hebrew and Russian as alternatives (most common for our users)
       const connectResult = yield* Effect.either(
         sttStreamClient.connect({
           languageCode: "en-US",
+          alternativeLanguageCodes: ["iw-IL", "ru-RU"],
         }),
       )
 
@@ -876,6 +970,8 @@ export class SpeechRecognitionStore {
       let hasEnded = false
 
       // Subscribe to streaming client state for transcripts
+      // Note: End-of-utterance detection is handled by Google's server-side VAD
+      // which sends "ended" event when speech ends
       this.streamingUnsubscribe = sttStreamClient.subscribe(() => {
         const streamState = sttStreamClient.getSnapshot()
 
@@ -892,9 +988,10 @@ export class SpeechRecognitionStore {
           )
         }
 
-        // Forward final transcripts (only once)
+        // Forward final transcripts (only once) and stop recording
         if (streamState.finalText && streamState.finalText !== lastFinalText) {
           lastFinalText = streamState.finalText
+          hasEnded = true
           this.runSyncWithClientLayer(
             this.dispatch(
               new ReceiveFinal({
@@ -903,6 +1000,10 @@ export class SpeechRecognitionStore {
               }),
             ),
           )
+          // Stop recording immediately after receiving final transcript
+          speechLog("STREAM", "Final transcript received, stopping")
+          this.handleStopRecognition()
+          return
         }
 
         // Handle errors
@@ -911,79 +1012,13 @@ export class SpeechRecognitionStore {
           this.handleSetError("STREAM_ERROR", streamState.error)
         }
 
-        // Handle session end (only once)
+        // Handle session end from Google VAD (only once)
         if (streamState.status === "ended" && !hasEnded) {
           hasEnded = true
-          speechLog("STREAM", "Streaming session ended")
+          speechLog("STREAM", "Google VAD ended session")
           this.handleStopRecognition()
         }
       })
-
-      // Start VAD for end-of-utterance detection
-      yield* this.startStreamingVADEffect
-    })
-
-  private readonly startStreamingVADEffect: Effect.Effect<void, SpeechRecognitionError> =
-    Effect.gen(this, function* () {
-      // Start the speech detection service
-      yield* Effect.tryPromise({
-        try: () => speechDetectionStore.startListening(),
-        catch: e =>
-          new SpeechRecognitionError({
-            code: "VAD_START_ERROR",
-            message: `Failed to start VAD: ${String(e)}`,
-          }),
-      })
-
-      // Subscribe to voice events for end-of-utterance detection
-      this.vadUnsubscribe = speechDetectionStore.subscribeToVoiceEvents(() => {
-        const vadState = speechDetectionStore.getSnapshot()
-
-        if (vadState.isSpeaking) {
-          // Voice started - cancel any pending silence timer
-          if (this.silenceTimerId !== null) {
-            clearTimeout(this.silenceTimerId)
-            this.silenceTimerId = null
-            speechLog("STREAM-VAD", "Voice resumed, cancelled silence timer")
-          }
-
-          if (this.speechStartedAt === null) {
-            this.speechStartedAt = Date.now()
-            speechLog("STREAM-VAD", "Voice activity started")
-          }
-          this.setState({ hasSpeechBeenDetected: true, isSilent: false })
-        } else {
-          // Voice stopped - start silence timer
-          this.setState({ isSilent: true })
-
-          if (this.speechStartedAt !== null) {
-            const speechDuration = Date.now() - this.speechStartedAt
-            if (speechDuration >= SPEECH_MIN_DURATION_MS) {
-              // Start silence timer
-              if (this.silenceTimerId === null) {
-                speechLog("STREAM-VAD", "Voice stopped, starting silence timer", {
-                  speechDuration,
-                  silenceTimeout: SILENCE_DURATION_MS,
-                })
-                this.silenceTimerId = setTimeout(() => {
-                  this.silenceTimerId = null
-                  speechLog("STREAM-VAD", "Silence timeout reached, sending end command")
-                  this.setState({ isAutoStopping: true })
-                  // Send end command to WebSocket instead of stopping
-                  sttStreamClient.endUtterance()
-                }, SILENCE_DURATION_MS)
-              }
-            } else {
-              speechLog("STREAM-VAD", "Voice stopped but speech too short, waiting for more", {
-                speechDuration,
-                minRequired: SPEECH_MIN_DURATION_MS,
-              })
-            }
-          }
-        }
-      })
-
-      speechLog("STREAM-VAD", "Streaming VAD detection started")
     })
 
   private stopStreamingSTT(): void {
@@ -993,8 +1028,8 @@ export class SpeechRecognitionStore {
       this.streamingUnsubscribe = null
     }
 
-    // Close streaming connection
-    sttStreamClient.close()
+    // Reset streaming connection (clears finalText, partialText, etc.)
+    sttStreamClient.reset()
 
     // Stop audio worklet
     if (this.audioWorkletNode) {
@@ -1022,6 +1057,9 @@ export class SpeechRecognitionStore {
 
     // Stop VAD
     this.stopVADDetection()
+
+    // Reset to default VAD preset
+    activeVADConfig = VAD_PRESETS.default
 
     this.isStreamingMode = false
 
@@ -1433,6 +1471,7 @@ export class SpeechRecognitionStore {
     this.currentTier = null
     this.webSpeechTranscript = null
     this.webSpeechLanguageCode = null
+    this.lastTranscriptChangeAt = null
     this.setState({
       isSupported: typeof window !== "undefined" && typeof navigator !== "undefined",
       isConnecting: false,

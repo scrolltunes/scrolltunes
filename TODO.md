@@ -292,6 +292,19 @@
   - [x] AND-gate disabled for voice search (only voice detection needed)
   - [x] 1.5s silence timer after voice stops (handles pauses between words)
   - [x] Brave detection section on test page at `/test/voice-search`
+- [x] Phase 8: Streaming STT via WebSocket bridge (Brave desktop + no Web Speech)
+  - [x] **Design doc**: [docs/voice-streaming-stt.md](docs/voice-streaming-stt.md)
+  - [x] WebSocket bridge server (`sst-ws-bridge/`) deployed to Cloud Run
+  - [x] Google Speech V2 streaming API integration
+  - [x] HMAC-signed session tokens via `/api/stt-token`
+  - [x] SttStreamClient with Effect.ts patterns (`src/lib/stt-stream-client.ts`)
+  - [x] AudioWorklet for low-latency PCM capture (`public/pcm-worklet.js`)
+  - [x] VAD-based end-of-utterance for streaming mode
+  - [x] Real-time partial transcript display
+  - [x] Automatic punctuation disabled for music search
+  - [x] Stability guard (wait for transcript stability before finalizing)
+  - [x] VAD parameter presets (fast search, noisy environment)
+  - [ ] Multi-language wiring (pass alternativeLanguageCodes from preferences)
 - [ ] Use named recognizer instead of `_` to enable `audio_durations` metric for Google Cloud monitoring
 
 ### Advanced Features
