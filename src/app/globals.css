@@ -3,12 +3,16 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --scrollbar-thumb: #d4d4d4;
+  --scrollbar-thumb-hover: #a3a3a3;
 }
 
 /* Dark mode via class */
 :root.dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --scrollbar-thumb: #404040;
+  --scrollbar-thumb-hover: #525252;
 }
 
 /* System preference fallback (when no explicit class) */
@@ -16,6 +20,8 @@
   :root:not(.light):not(.dark) {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --scrollbar-thumb: #404040;
+    --scrollbar-thumb-hover: #525252;
   }
 }
 
@@ -42,7 +48,7 @@ body {
   filter: invert(1) hue-rotate(180deg);
 }
 
-/* Custom scrollbar styling */
+/* Custom scrollbar styling using CSS variables */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -52,51 +58,21 @@ body {
   background: transparent;
 }
 
-/* Light mode scrollbar */
-:root:not(.dark) ::-webkit-scrollbar-thumb {
-  background: #d4d4d4;
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
+  transition: background-color 0.2s ease;
 }
 
-:root:not(.dark) ::-webkit-scrollbar-thumb:hover {
-  background: #a3a3a3;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }
 
-:root:not(.dark) * {
+/* Firefox scrollbar */
+html {
   scrollbar-width: thin;
-  scrollbar-color: #d4d4d4 transparent;
-}
-
-/* Dark mode scrollbar */
-:root.dark ::-webkit-scrollbar-thumb {
-  background: #404040;
-  border-radius: 4px;
-}
-
-:root.dark ::-webkit-scrollbar-thumb:hover {
-  background: #525252;
-}
-
-:root.dark * {
-  scrollbar-width: thin;
-  scrollbar-color: #404040 transparent;
-}
-
-/* System dark mode scrollbar fallback */
-@media (prefers-color-scheme: dark) {
-  :root:not(.light):not(.dark) ::-webkit-scrollbar-thumb {
-    background: #404040;
-    border-radius: 4px;
-  }
-
-  :root:not(.light):not(.dark) ::-webkit-scrollbar-thumb:hover {
-    background: #525252;
-  }
-
-  :root:not(.light):not(.dark) * {
-    scrollbar-width: thin;
-    scrollbar-color: #404040 transparent;
-  }
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  transition: scrollbar-color 0.2s ease;
 }
 
 /* Chord diagram SVG styling - always black on white */
