@@ -1,13 +1,12 @@
 "use client"
 
 import { springs } from "@/animations"
-import { useIsAdmin, useIsAuthenticated } from "@/core"
+import { useAccount, useIsAdmin } from "@/core"
 import {
   ArrowLeft,
   ChartBar,
   Heart,
   ListChecks,
-  Prohibit,
   ShieldWarning,
   Textbox,
   Users,
@@ -17,12 +16,14 @@ import { motion } from "motion/react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 
+interface FavoriteSong {
+  title: string
+  artist: string
+  favoriteCount: number
+}
+
 interface AdminStats {
-  mostLikedSong: {
-    title: string
-    artist: string
-    favoriteCount: number
-  } | null
+  topFavorites: FavoriteSong[]
   totalUsers: number
   lastJoinedUser: {
     email: string
@@ -30,13 +31,12 @@ interface AdminStats {
   } | null
 }
 
-type AdminSection = "analytics" | "users" | "content" | "takedowns"
+type AdminSection = "analytics" | "users" | "content"
 
 const sections: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
   { id: "analytics", label: "Analytics", icon: <ChartBar size={20} /> },
   { id: "users", label: "User Management", icon: <UsersThree size={20} /> },
   { id: "content", label: "Content Updates", icon: <Textbox size={20} /> },
-  { id: "takedowns", label: "Removals & Takedowns", icon: <Prohibit size={20} /> },
 ]
 
 function Header() {
@@ -146,21 +146,39 @@ function AnalyticsSection({ stats, isLoading }: { stats: AdminStats | null; isLo
 
   return (
     <div className="space-y-4">
-      <StatCard
-        icon={<Heart size={20} />}
-        label="Most liked song"
-        value={
-          stats?.mostLikedSong
-            ? `${stats.mostLikedSong.title} - ${stats.mostLikedSong.artist}`
-            : "No favorites yet"
-        }
-        subtext={
-          stats?.mostLikedSong
-            ? `${stats.mostLikedSong.favoriteCount} ${stats.mostLikedSong.favoriteCount === 1 ? "favorite" : "favorites"}`
-            : undefined
-        }
-        delay={0.1}
-      />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ ...springs.default, delay: 0.1 }}
+        className="p-5 rounded-xl bg-neutral-900"
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center text-indigo-400">
+            <Heart size={20} />
+          </div>
+          <span className="text-sm text-neutral-400">Top 5 favorite songs</span>
+        </div>
+        {stats?.topFavorites && stats.topFavorites.length > 0 ? (
+          <ol className="space-y-3">
+            {stats.topFavorites.map((song, index) => (
+              <li key={`${song.title}-${song.artist}`} className="flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-neutral-800 flex items-center justify-center text-xs font-medium text-neutral-400">
+                  {index + 1}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white truncate">{song.title}</p>
+                  <p className="text-sm text-neutral-500 truncate">{song.artist}</p>
+                </div>
+                <span className="text-sm text-neutral-400">
+                  {song.favoriteCount} {song.favoriteCount === 1 ? "fav" : "favs"}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-neutral-500">No favorites yet</p>
+        )}
+      </motion.div>
 
       <StatCard
         icon={<Users size={20} />}
@@ -196,6 +214,36 @@ function ComingSoonSection({ title }: { title: string }) {
   )
 }
 
+function MobileTabs({
+  activeSection,
+  onSectionChange,
+}: {
+  activeSection: AdminSection
+  onSectionChange: (section: AdminSection) => void
+}) {
+  return (
+    <nav className="md:hidden mb-6 -mx-4 px-4 overflow-x-auto">
+      <div className="flex gap-2 min-w-max pb-2">
+        {sections.map(section => (
+          <button
+            key={section.id}
+            type="button"
+            onClick={() => onSectionChange(section.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+              activeSection === section.id
+                ? "bg-indigo-600 text-white"
+                : "bg-neutral-900 text-neutral-400 hover:text-white"
+            }`}
+          >
+            {section.icon}
+            <span>{section.label}</span>
+          </button>
+        ))}
+      </div>
+    </nav>
+  )
+}
+
 function Sidebar({
   activeSection,
   onSectionChange,
@@ -204,7 +252,7 @@ function Sidebar({
   onSectionChange: (section: AdminSection) => void
 }) {
   return (
-    <nav className="w-64 flex-shrink-0">
+    <nav className="hidden md:block w-64 flex-shrink-0">
       <ul className="space-y-1">
         {sections.map(section => (
           <li key={section.id}>
@@ -227,8 +275,24 @@ function Sidebar({
   )
 }
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-neutral-950 text-white">
+      <Header />
+      <main className="pt-20 pb-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <div className="h-8 w-40 bg-neutral-800 rounded animate-pulse mb-2" />
+            <div className="h-5 w-32 bg-neutral-800 rounded animate-pulse" />
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}
+
 export default function AdminPage() {
-  const isAuthenticated = useIsAuthenticated()
+  const { isAuthenticated, isLoading: isAuthLoading } = useAccount()
   const isAdmin = useIsAdmin()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -254,6 +318,10 @@ export default function AdminPage() {
     fetchStats()
   }, [isAuthenticated, isAdmin])
 
+  if (isAuthLoading) {
+    return <LoadingScreen />
+  }
+
   if (!isAuthenticated || !isAdmin) {
     return <AccessDenied />
   }
@@ -266,8 +334,6 @@ export default function AdminPage() {
         return <ComingSoonSection title="User Management" />
       case "content":
         return <ComingSoonSection title="Content Updates" />
-      case "takedowns":
-        return <ComingSoonSection title="Removals & Takedowns" />
     }
   }
 
@@ -282,6 +348,8 @@ export default function AdminPage() {
             <h1 className="text-2xl font-semibold mb-1">Admin Panel</h1>
             <p className="text-neutral-400">Manage ScrollTunes</p>
           </div>
+
+          <MobileTabs activeSection={activeSection} onSectionChange={setActiveSection} />
 
           <div className="flex gap-8">
             <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
