@@ -105,8 +105,13 @@ export class LyricsPlayer {
   private state: PlayerState = { _tag: "Idle" }
   private scrollSpeed = DEFAULT_SCROLL_SPEED
   private animationFrameId: number | null = null
+  private _resetCount = 0
 
   constructor(private now: () => number = () => performance.now() / 1000) {}
+
+  get resetCount(): number {
+    return this._resetCount
+  }
 
   // --- Observable pattern (for useSyncExternalStore) ---
 
@@ -268,6 +273,7 @@ export class LyricsPlayer {
     this.stopPlaybackLoop()
     const lyrics = this.getLyrics()
     if (this.state._tag !== "Idle" && lyrics) {
+      this._resetCount++
       this.setState({ _tag: "Ready", lyrics })
     }
   }
@@ -427,6 +433,17 @@ export function usePlayerState(): PlayerState {
 export function useCurrentLineIndex(): number {
   const state = usePlayerState()
   return computeLineIndex(state)
+}
+
+/**
+ * Hook to get reset count - increments each time reset is called
+ */
+export function useResetCount(): number {
+  return useSyncExternalStore(
+    lyricsPlayer.subscribe,
+    () => lyricsPlayer.resetCount,
+    () => lyricsPlayer.resetCount,
+  )
 }
 
 // Stable controls object (singleton methods don't change)

@@ -7,6 +7,7 @@ import {
   usePlayerControls,
   usePlayerState,
   usePreferences,
+  useResetCount,
   useShowChords,
   useTranspose,
   useVariableSpeedPainting,
@@ -52,6 +53,7 @@ export interface LyricsDisplayProps {
 export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const state = usePlayerState()
   const currentLineIndex = useCurrentLineIndex()
+  const resetCount = useResetCount()
   const { jumpToLine } = usePlayerControls()
   const { fontSize } = usePreferences()
   const chordsData = useChordsData()
@@ -202,6 +204,39 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     [clampScroll, scrollY],
   )
 
+  // Calculate initial scroll position for a line (independent of current scrollY)
+  const getInitialScrollTarget = useCallback(
+    (lineIndex: number): number | null => {
+      const container = containerRef.current
+      const content = contentRef.current
+      const targetLine = lineRefs.current[lineIndex]
+
+      if (!container || !content || !targetLine) return null
+
+      const containerHeight = container.clientHeight
+      const contentHeight = content.scrollHeight
+      const currentScroll = scrollY.get()
+
+      // Get line's current visual position relative to container
+      const containerRect = container.getBoundingClientRect()
+      const lineRect = targetLine.getBoundingClientRect()
+      const lineCurrentY = lineRect.top - containerRect.top
+
+      // Target position: 25% from container top
+      const targetY = containerHeight * 0.25
+
+      // Calculate what scroll value would position the line at targetY
+      // lineCurrentY is based on currentScroll, so we need to account for that
+      const target = currentScroll + (lineCurrentY - targetY)
+
+      // Clamp to valid scroll range
+      const minScroll = 0
+      const maxScroll = Math.max(0, contentHeight - containerHeight)
+      return Math.min(Math.max(target, minScroll), maxScroll)
+    },
+    [scrollY],
+  )
+
   // Track if initial scroll has happened and what the initial scroll value was
   const hasInitialScroll = useRef(false)
   const initialScrollValue = useRef(0)
@@ -250,18 +285,31 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const isPlaying = state._tag === "Playing"
   const isAutoScrollEnabled = isPlaying && !isManualScrolling
 
-  // Reset scroll and state when player is reset to Ready, or manual scroll when play is pressed
-  const prevStateTag = useRef(state._tag)
+  // Reset scroll position when reset button is pressed
+  const prevResetCount = useRef(resetCount)
   useEffect(() => {
-    // Reset scroll position when transitioning to Ready (reset button pressed)
-    if (prevStateTag.current !== "Ready" && state._tag === "Ready") {
-      hasInitialScroll.current = false
-      setScrollYImmediate(initialScrollValue.current)
+    if (resetCount > prevResetCount.current) {
+      // Try to recalculate, fall back to cached initial value
+      let target: number | null = null
+      if (lyrics) {
+        const idx = lyrics.lines.findIndex(line => line.text.trim() !== "")
+        const firstLineIndex = idx !== -1 ? idx : 0
+        target = getInitialScrollTarget(firstLineIndex)
+      }
+
+      const scrollTarget = target ?? initialScrollValue.current
+      setScrollYImmediate(scrollTarget)
+      hasInitialScroll.current = true
       setIsManualScrolling(false)
       setShowManualScrollIndicator(false)
     }
-    // Clear manual scroll when transitioning to Playing
-    else if (prevStateTag.current !== "Playing" && state._tag === "Playing") {
+    prevResetCount.current = resetCount
+  }, [resetCount, lyrics, getInitialScrollTarget, setScrollYImmediate])
+
+  // Clear manual scroll when transitioning to Playing
+  const prevStateTag = useRef(state._tag)
+  useEffect(() => {
+    if (prevStateTag.current !== "Playing" && state._tag === "Playing") {
       setIsManualScrolling(false)
       setShowManualScrollIndicator(false)
     }
