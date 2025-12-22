@@ -1,4 +1,4 @@
-# sst-ws-bridge
+# stt-ws-bridge
 
 WebSocket bridge service for streaming Google Speech-to-Text. Deployed to Cloud Run.
 

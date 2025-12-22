@@ -1,7 +1,7 @@
 "use client"
 
 import { loadPublicConfig } from "@/services/public-config"
-import { Data, Effect, Option } from "effect"
+import { Context, Data, Effect, Layer, Option } from "effect"
 
 /**
  * STT Stream Client
@@ -400,6 +400,45 @@ export class SttStreamClient {
 // --- Singleton Instance ---
 
 export const sttStreamClient = new SttStreamClient()
+
+// --- Effect Service ---
+
+/**
+ * SttStreamService - Effect service wrapper for STT streaming client
+ *
+ * Provides dependency injection for the STT streaming client following Effect.ts patterns.
+ * Domain logic should depend on this service tag instead of importing the singleton directly.
+ */
+export class SttStreamService extends Context.Tag("SttStreamService")<
+  SttStreamService,
+  {
+    readonly connect: (config?: SttStreamConfig) => Effect.Effect<void, SttStreamError>
+    readonly sendAudioFrame: (data: ArrayBuffer | Uint8Array) => Effect.Effect<void, never>
+    readonly endUtterance: Effect.Effect<void, never>
+    readonly cancel: Effect.Effect<void, never>
+    readonly close: Effect.Effect<void, never>
+    readonly reset: Effect.Effect<void, never>
+    readonly getState: Effect.Effect<SttStreamState, never>
+    readonly subscribe: (listener: () => void) => Effect.Effect<() => void, never>
+    readonly isStreamingAvailable: Effect.Effect<boolean, never>
+  }
+>() {}
+
+/**
+ * Live layer that adapts the singleton SttStreamClient to the SttStreamService interface
+ */
+export const SttStreamLive = Layer.succeed(SttStreamService, {
+  connect: (config?: SttStreamConfig) => sttStreamClient.connect(config),
+  sendAudioFrame: (data: ArrayBuffer | Uint8Array) =>
+    Effect.sync(() => sttStreamClient.sendAudioFrame(data)),
+  endUtterance: Effect.sync(() => sttStreamClient.endUtterance()),
+  cancel: Effect.sync(() => sttStreamClient.cancel()),
+  close: Effect.sync(() => sttStreamClient.close()),
+  reset: Effect.sync(() => sttStreamClient.reset()),
+  getState: Effect.sync(() => sttStreamClient.getSnapshot()),
+  subscribe: (listener: () => void) => Effect.sync(() => sttStreamClient.subscribe(listener)),
+  isStreamingAvailable: Effect.sync(() => sttStreamClient.isStreamingAvailable),
+})
 
 // --- React Hooks ---
 

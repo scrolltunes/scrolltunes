@@ -6,7 +6,7 @@ This document describes the streaming Speech-to-Text implementation for ScrollTu
 
 ```
 ┌─────────────────┐      WebSocket       ┌──────────────────┐      gRPC       ┌─────────────────┐
-│  Browser        │◄────────────────────►│  sst-ws-bridge   │◄───────────────►│  Google STT V2  │
+│  Browser        │◄────────────────────►│  stt-ws-bridge   │◄───────────────►│  Google STT V2  │
 │  (Next.js)      │   PCM audio frames   │  (Cloud Run)     │  Streaming API  │  (Speech API)   │
 │                 │   JSON transcripts   │                  │                 │                 │
 └─────────────────┘                      └──────────────────┘                 └─────────────────┘
@@ -55,9 +55,9 @@ This document describes the streaming Speech-to-Text implementation for ScrollTu
   - Processing state tracking
   - Quota prefetching
 
-#### Backend Bridge (sst-ws-bridge on Cloud Run)
+#### Backend Bridge (stt-ws-bridge on Cloud Run)
 
-- [x] **WebSocket Server** (`sst-ws-bridge/server.ts`)
+- [x] **WebSocket Server** (`stt-ws-bridge/server.ts`)
   - Bun-based WebSocket server
   - Google Speech V2 streaming API integration
   - Token verification with timing-safe comparison
@@ -65,7 +65,7 @@ This document describes the streaming Speech-to-Text implementation for ScrollTu
   - Origin validation
   - Session timeouts and idle detection
 
-- [x] **Google Server-Side VAD** (`sst-ws-bridge/server.ts`)
+- [x] **Google Server-Side VAD** (`stt-ws-bridge/server.ts`)
   - Uses Google's built-in `voiceActivityTimeout` for end-of-utterance detection
   - `speechStartTimeout`: 5 seconds (max wait for speech to begin)
   - `speechEndTimeout`: 1 second (silence duration to finalize)
@@ -187,7 +187,7 @@ This document describes the streaming Speech-to-Text implementation for ScrollTu
 | Voice Search Hook | `src/hooks/useVoiceSearch.ts` | React integration |
 | Token Endpoint | `src/app/api/stt-token/route.ts` | Auth token generation |
 | PCM Worklet | `public/pcm-worklet.js` | Audio capture |
-| Bridge Server | `sst-ws-bridge/server.ts` | Cloud Run service |
+| Bridge Server | `stt-ws-bridge/server.ts` | Cloud Run service |
 
 ---
 
@@ -200,7 +200,7 @@ This document describes the streaming Speech-to-Text implementation for ScrollTu
 | `WS_SESSION_SECRET` | HMAC secret for token signing (shared with bridge) |
 | `NEXT_PUBLIC_STT_WS_URL` | WebSocket bridge URL (e.g., `wss://stt-ws-bridge-xxx.run.app/ws`) |
 
-### sst-ws-bridge (Cloud Run)
+### stt-ws-bridge (Cloud Run)
 
 | Variable | Description |
 |----------|-------------|
@@ -216,7 +216,7 @@ This document describes the streaming Speech-to-Text implementation for ScrollTu
 ### Bridge Service (Cloud Run)
 
 ```bash
-cd sst-ws-bridge
+cd stt-ws-bridge
 bun run deploy
 # or manually:
 gcloud run deploy stt-ws-bridge \
@@ -244,7 +244,7 @@ gcloud run deploy stt-ws-bridge \
 - `speechDetectionStore` is a global singleton for VAD
 - Direct browser APIs (`getUserMedia`, `AudioContext`) inside Effects
 
-### Bridge Service (sst-ws-bridge)
+### Bridge Service (stt-ws-bridge)
 
 **Intentionally does NOT use Effect.ts**. This is a standalone Bun server with:
 - Plain TypeScript / Bun runtime
@@ -252,7 +252,7 @@ gcloud run deploy stt-ws-bridge \
 - try/catch error handling
 - Global mutable state for rate limiting
 
-See `sst-ws-bridge/AGENTS.md` for documented architectural violations.
+See `stt-ws-bridge/AGENTS.md` for documented architectural violations.
 
 ---
 

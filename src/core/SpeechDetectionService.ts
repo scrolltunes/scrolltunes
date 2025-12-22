@@ -75,6 +75,7 @@ export class SpeechDetectionService extends Context.Tag("SpeechDetectionService"
     readonly startListening: Effect.Effect<void, SpeechDetectionError>
     readonly stopListening: Effect.Effect<void, never>
     readonly getState: Effect.Effect<SpeechDetectionState, never>
+    readonly subscribeToVoiceEvents: (listener: () => void) => Effect.Effect<() => void, never>
   }
 >() {}
 
@@ -423,6 +424,8 @@ export const SpeechDetectionLive = Layer.succeed(SpeechDetectionService, {
   startListening: speechDetectionStore.startListeningEffect,
   stopListening: speechDetectionStore.stopListeningEffect,
   getState: Effect.sync(() => speechDetectionStore.getSnapshot()),
+  subscribeToVoiceEvents: (listener: () => void) =>
+    Effect.sync(() => speechDetectionStore.subscribeToVoiceEvents(listener)),
 })
 
 // --- React hooks ---

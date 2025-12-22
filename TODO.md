@@ -294,7 +294,7 @@
   - [x] Brave detection section on test page at `/test/voice-search`
 - [x] Phase 8: Streaming STT via WebSocket bridge (Brave desktop + no Web Speech)
   - [x] **Design doc**: [docs/voice-streaming-stt.md](docs/voice-streaming-stt.md)
-  - [x] WebSocket bridge server (`sst-ws-bridge/`) deployed to Cloud Run
+  - [x] WebSocket bridge server (`stt-ws-bridge/`) deployed to Cloud Run
   - [x] Google Speech V2 streaming API integration
   - [x] HMAC-signed session tokens via `/api/stt-token`
   - [x] SttStreamClient with Effect.ts patterns (`src/lib/stt-stream-client.ts`)

@@ -1,5 +1,5 @@
 {
-  "name": "sst-ws-bridge",
+  "name": "stt-ws-bridge",
   "module": "index.ts",
   "type": "module",
   "private": true,

@@ -1,4 +1,4 @@
-# sst-ws-bridge
+# stt-ws-bridge
 
 To install dependencies:
 

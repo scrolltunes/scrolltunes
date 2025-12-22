@@ -1,12 +1,12 @@
 "use client"
 
-import { sttStreamClient } from "@/lib/stt-stream-client"
+import { SttStreamService, sttStreamClient } from "@/lib/stt-stream-client"
 import { ClientLayer, type ClientLayerContext } from "@/services/client-layer"
 import { loadPublicConfig } from "@/services/public-config"
 import { SoundSystemService } from "@/services/sound-system"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
-import { speechDetectionStore } from "./SpeechDetectionService"
+import { SpeechDetectionService, speechDetectionStore } from "./SpeechDetectionService"
 
 // Web Speech API types
 declare global {
@@ -418,7 +418,11 @@ export class SpeechRecognitionStore {
 
   readonly dispatch = (
     event: SpeechEvent,
-  ): Effect.Effect<void, SpeechRecognitionError, SoundSystemService> => {
+  ): Effect.Effect<
+    void,
+    SpeechRecognitionError,
+    SoundSystemService | SttStreamService | SpeechDetectionService
+  > => {
     switch (event._tag) {
       case "StartRecognition":
         return this.startRecognitionEffect
@@ -451,7 +455,7 @@ export class SpeechRecognitionStore {
   private readonly startRecognitionEffect: Effect.Effect<
     void,
     SpeechRecognitionError,
-    SoundSystemService
+    SoundSystemService | SttStreamService | SpeechDetectionService
   > = Effect.gen(this, function* (_) {
     speechLog("START", "startRecognitionEffect called", {
       isRecording: this.state.isRecording,
@@ -557,7 +561,8 @@ export class SpeechRecognitionStore {
       speechLog("START", "Web Speech recognition setup complete")
     } else {
       // Check if streaming STT is available (WebSocket bridge configured)
-      const streamingAvailable = sttStreamClient.isStreamingAvailable
+      const stt = yield* _(SttStreamService)
+      const streamingAvailable = yield* _(stt.isStreamingAvailable)
       speechLog("START", "Checking streaming availability", {
         streamingAvailable,
         sttWsUrl: publicConfig.sttWsUrl,
@@ -738,75 +743,82 @@ export class SpeechRecognitionStore {
 
   // --- VAD-based end-of-utterance detection for Google STT only mode ---
 
-  private readonly startVADDetectionEffect: Effect.Effect<void, SpeechRecognitionError> =
-    Effect.gen(this, function* () {
-      speechLog("VAD", "Starting VAD-based end-of-utterance detection")
+  private readonly startVADDetectionEffect: Effect.Effect<
+    void,
+    SpeechRecognitionError,
+    SpeechDetectionService
+  > = Effect.gen(this, function* () {
+    speechLog("VAD", "Starting VAD-based end-of-utterance detection")
 
-      this.speechStartedAt = null
+    const vad = yield* SpeechDetectionService
 
-      this.setState({
-        isSilenceDetectionActive: true,
-        hasSpeechBeenDetected: false,
-        isSilent: true,
-      })
+    this.speechStartedAt = null
 
-      // Start speech detection VAD (uses SpeechDetectionService - simpler, no AND-gate)
-      yield* Effect.tryPromise({
-        try: () => speechDetectionStore.startListening(),
-        catch: e =>
-          new SpeechRecognitionError({
-            code: "VAD_START_ERROR",
-            message: `Failed to start VAD: ${String(e)}`,
-          }),
-      })
+    this.setState({
+      isSilenceDetectionActive: true,
+      hasSpeechBeenDetected: false,
+      isSilent: true,
+    })
 
-      // Subscribe to voice events (synchronous)
-      this.vadUnsubscribe = speechDetectionStore.subscribeToVoiceEvents(() => {
-        const vadState = speechDetectionStore.getSnapshot()
+    // Start speech detection VAD via service
+    yield* Effect.mapError(
+      vad.startListening,
+      e =>
+        new SpeechRecognitionError({
+          code: "VAD_START_ERROR",
+          message: `Failed to start VAD: ${String(e)}`,
+        }),
+    )
 
-        if (vadState.isSpeaking) {
-          // Voice started - cancel any pending silence timer
-          if (this.silenceTimerId !== null) {
-            clearTimeout(this.silenceTimerId)
-            this.silenceTimerId = null
-            speechLog("VAD", "Voice resumed, cancelled silence timer")
-          }
+    // Subscribe to voice events via service
+    // Note: Inside the callback we use speechDetectionStore.getSnapshot() directly
+    // since the callback is synchronous and we need the current state
+    this.vadUnsubscribe = yield* vad.subscribeToVoiceEvents(() => {
+      const vadState = speechDetectionStore.getSnapshot()
 
-          if (this.speechStartedAt === null) {
-            this.speechStartedAt = Date.now()
-            speechLog("VAD", "Voice activity started")
-          }
-          this.setState({ hasSpeechBeenDetected: true, isSilent: false })
-        } else {
-          // Voice stopped - start silence timer
-          this.setState({ isSilent: true })
+      if (vadState.isSpeaking) {
+        // Voice started - cancel any pending silence timer
+        if (this.silenceTimerId !== null) {
+          clearTimeout(this.silenceTimerId)
+          this.silenceTimerId = null
+          speechLog("VAD", "Voice resumed, cancelled silence timer")
+        }
 
-          if (this.speechStartedAt !== null) {
-            const speechDuration = Date.now() - this.speechStartedAt
-            if (speechDuration >= activeVADConfig.minSpeechMs) {
-              // Start silence timer
-              if (this.silenceTimerId === null) {
-                speechLog("VAD", "Voice stopped, starting silence timer", {
-                  speechDuration,
-                  silenceTimeout: activeVADConfig.silenceToFinalizeMs,
-                })
-                this.silenceTimerId = setTimeout(
-                  () => this.checkTranscriptStabilityAndFinalize(),
-                  activeVADConfig.silenceToFinalizeMs,
-                )
-              }
-            } else {
-              speechLog("VAD", "Voice stopped but speech too short, waiting for more", {
+        if (this.speechStartedAt === null) {
+          this.speechStartedAt = Date.now()
+          speechLog("VAD", "Voice activity started")
+        }
+        this.setState({ hasSpeechBeenDetected: true, isSilent: false })
+      } else {
+        // Voice stopped - start silence timer
+        this.setState({ isSilent: true })
+
+        if (this.speechStartedAt !== null) {
+          const speechDuration = Date.now() - this.speechStartedAt
+          if (speechDuration >= activeVADConfig.minSpeechMs) {
+            // Start silence timer
+            if (this.silenceTimerId === null) {
+              speechLog("VAD", "Voice stopped, starting silence timer", {
                 speechDuration,
-                minRequired: activeVADConfig.minSpeechMs,
+                silenceTimeout: activeVADConfig.silenceToFinalizeMs,
               })
+              this.silenceTimerId = setTimeout(
+                () => this.checkTranscriptStabilityAndFinalize(),
+                activeVADConfig.silenceToFinalizeMs,
+              )
             }
+          } else {
+            speechLog("VAD", "Voice stopped but speech too short, waiting for more", {
+              speechDuration,
+              minRequired: activeVADConfig.minSpeechMs,
+            })
           }
         }
-      })
-
-      speechLog("VAD", "VAD detection started")
+      }
     })
+
+    speechLog("VAD", "VAD detection started")
+  })
 
   private stopVADDetection(): void {
     if (this.vadUnsubscribe) {
@@ -935,91 +947,97 @@ export class SpeechRecognitionStore {
       })
     })
 
-  private readonly startStreamingSTTEffect: Effect.Effect<void, SpeechRecognitionError> =
-    Effect.gen(this, function* () {
-      // Connect to WebSocket STT bridge FIRST (before setting up audio capture)
-      // Google streaming API supports up to 3 language codes for auto-detection
-      // Primary: English, with Hebrew and Russian as alternatives (most common for our users)
-      const connectResult = yield* Effect.either(
-        sttStreamClient.connect({
-          languageCode: "en-US",
-          alternativeLanguageCodes: ["iw-IL", "ru-RU"],
+  private readonly startStreamingSTTEffect: Effect.Effect<
+    void,
+    SpeechRecognitionError,
+    SttStreamService
+  > = Effect.gen(this, function* () {
+    const stt = yield* SttStreamService
+
+    // Connect to WebSocket STT bridge FIRST (before setting up audio capture)
+    // Google streaming API supports up to 3 language codes for auto-detection
+    // Primary: English, with Hebrew and Russian as alternatives (most common for our users)
+    const connectResult = yield* Effect.either(
+      stt.connect({
+        languageCode: "en-US",
+        alternativeLanguageCodes: ["iw-IL", "ru-RU"],
+      }),
+    )
+
+    if (connectResult._tag === "Left") {
+      const error = connectResult.left
+      speechLog("STREAM", "Failed to connect to streaming STT", { error: error.message })
+      return yield* Effect.fail(
+        new SpeechRecognitionError({
+          code: error.code,
+          message: error.message,
         }),
       )
+    }
 
-      if (connectResult._tag === "Left") {
-        const error = connectResult.left
-        speechLog("STREAM", "Failed to connect to streaming STT", { error: error.message })
-        return yield* Effect.fail(
-          new SpeechRecognitionError({
-            code: error.code,
-            message: error.message,
-          }),
+    speechLog("STREAM", "Connected to streaming STT")
+
+    // Now set up AudioContext and AudioWorklet for PCM streaming
+    // This ensures no audio frames are sent before the WS is ready
+    yield* this.setupAudioWorkletEffect
+
+    // Track last values to avoid duplicate processing
+    let lastPartialText = ""
+    let lastFinalText: string | null = null
+    let hasEnded = false
+
+    // Subscribe to streaming client state for transcripts
+    // Note: End-of-utterance detection is handled by Google's server-side VAD
+    // which sends "ended" event when speech ends
+    // We use the singleton for subscription since this is a sync callback pattern
+    this.streamingUnsubscribe = sttStreamClient.subscribe(() => {
+      const streamState = sttStreamClient.getSnapshot()
+
+      // Forward partial transcripts (only if changed)
+      if (streamState.partialText && streamState.partialText !== lastPartialText) {
+        lastPartialText = streamState.partialText
+        this.runSyncWithClientLayer(
+          this.dispatch(
+            new ReceivePartial({
+              text: streamState.partialText,
+              languageCode: streamState.detectedLanguageCode,
+            }),
+          ),
         )
       }
 
-      speechLog("STREAM", "Connected to streaming STT")
+      // Forward final transcripts (only once) and stop recording
+      if (streamState.finalText && streamState.finalText !== lastFinalText) {
+        lastFinalText = streamState.finalText
+        hasEnded = true
+        this.runSyncWithClientLayer(
+          this.dispatch(
+            new ReceiveFinal({
+              text: streamState.finalText,
+              languageCode: streamState.detectedLanguageCode,
+            }),
+          ),
+        )
+        // Stop recording immediately after receiving final transcript
+        speechLog("STREAM", "Final transcript received, stopping")
+        this.handleStopRecognition()
+        return
+      }
 
-      // Now set up AudioContext and AudioWorklet for PCM streaming
-      // This ensures no audio frames are sent before the WS is ready
-      yield* this.setupAudioWorkletEffect
+      // Handle errors
+      if (streamState.status === "error" && streamState.error) {
+        speechLog("STREAM", "Streaming error", { error: streamState.error })
+        this.handleSetError("STREAM_ERROR", streamState.error)
+      }
 
-      // Track last values to avoid duplicate processing
-      let lastPartialText = ""
-      let lastFinalText: string | null = null
-      let hasEnded = false
-
-      // Subscribe to streaming client state for transcripts
-      // Note: End-of-utterance detection is handled by Google's server-side VAD
-      // which sends "ended" event when speech ends
-      this.streamingUnsubscribe = sttStreamClient.subscribe(() => {
-        const streamState = sttStreamClient.getSnapshot()
-
-        // Forward partial transcripts (only if changed)
-        if (streamState.partialText && streamState.partialText !== lastPartialText) {
-          lastPartialText = streamState.partialText
-          this.runSyncWithClientLayer(
-            this.dispatch(
-              new ReceivePartial({
-                text: streamState.partialText,
-                languageCode: streamState.detectedLanguageCode,
-              }),
-            ),
-          )
-        }
-
-        // Forward final transcripts (only once) and stop recording
-        if (streamState.finalText && streamState.finalText !== lastFinalText) {
-          lastFinalText = streamState.finalText
-          hasEnded = true
-          this.runSyncWithClientLayer(
-            this.dispatch(
-              new ReceiveFinal({
-                text: streamState.finalText,
-                languageCode: streamState.detectedLanguageCode,
-              }),
-            ),
-          )
-          // Stop recording immediately after receiving final transcript
-          speechLog("STREAM", "Final transcript received, stopping")
-          this.handleStopRecognition()
-          return
-        }
-
-        // Handle errors
-        if (streamState.status === "error" && streamState.error) {
-          speechLog("STREAM", "Streaming error", { error: streamState.error })
-          this.handleSetError("STREAM_ERROR", streamState.error)
-        }
-
-        // Handle session end from Google VAD (only once)
-        if (streamState.status === "ended" && !hasEnded) {
-          hasEnded = true
-          speechLog("STREAM", "Google VAD ended session")
-          this.handleStopRecognition()
-        }
-      })
+      // Handle session end from Google VAD (only once)
+      if (streamState.status === "ended" && !hasEnded) {
+        hasEnded = true
+        speechLog("STREAM", "Google VAD ended session")
+        this.handleStopRecognition()
+      }
     })
+  })
 
   private stopStreamingSTT(): void {
     // Unsubscribe from streaming client

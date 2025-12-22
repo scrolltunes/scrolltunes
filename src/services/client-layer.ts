@@ -1,5 +1,7 @@
 "use client"
 
+import { SpeechDetectionLive, type SpeechDetectionService } from "@/core/SpeechDetectionService"
+import { SttStreamLive, type SttStreamService } from "@/lib/stt-stream-client"
 import { Layer } from "effect"
 import { AppConfigProviderLive } from "./config-provider"
 import type { FetchService } from "./fetch"
@@ -11,7 +13,13 @@ import { SoundSystemLive } from "./sound-system"
 import type { StorageService } from "./storage"
 import { StorageServiceLive } from "./storage"
 
-export type ClientLayerContext = FetchService | PublicConfig | SoundSystemService | StorageService
+export type ClientLayerContext =
+  | FetchService
+  | PublicConfig
+  | SoundSystemService
+  | StorageService
+  | SttStreamService
+  | SpeechDetectionService
 
 const ClientConfigLayer = PublicConfigLive.pipe(Layer.provide(AppConfigProviderLive))
 
@@ -20,4 +28,6 @@ export const ClientLayer = Layer.mergeAll(
   ClientConfigLayer,
   SoundSystemLive,
   StorageServiceLive,
+  SttStreamLive,
+  SpeechDetectionLive,
 )
