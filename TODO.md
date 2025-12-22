@@ -305,6 +305,12 @@
   - [x] Stability guard (wait for transcript stability before finalizing)
   - [x] VAD parameter presets (fast search, noisy environment)
   - [ ] Multi-language wiring (pass alternativeLanguageCodes from preferences)
+- [x] Phase 9: Private key handling & test page improvements
+  - [x] Private key normalization: strips surrounding quotes, handles single-line PEM keys
+  - [x] Test page (`/test/voice-search`) improvements:
+    - [x] Google Cloud STT Direct Tester with VAD auto-stop toggle
+    - [x] Web Speech API Direct Tester with Brave detection (disables when Brave detected)
+    - [x] Streaming STT Direct Tester
 - [ ] Use named recognizer instead of `_` to enable `audio_durations` metric for Google Cloud monitoring
 
 ### Advanced Features

@@ -9,8 +9,19 @@ import {
   useSpeechState,
   useSpeechTier,
 } from "@/core"
-import { Detective, Globe, GoogleLogo, Microphone, Stop, Warning } from "@phosphor-icons/react"
-import { memo, useCallback, useEffect, useState } from "react"
+import { speechDetectionStore } from "@/core/SpeechDetectionService"
+import { useSttStreamControls, useSttStreamState } from "@/lib/stt-stream-client"
+import {
+  Broadcast,
+  Detective,
+  Globe,
+  GoogleLogo,
+  Microphone,
+  Stop,
+  Warning,
+} from "@phosphor-icons/react"
+import { Effect } from "effect"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
 
 // Mobile detection pattern (same as SpeechRecognitionStore)
 const MOBILE_UA_REGEX = /Android|iPhone|iPad|iPod/i
@@ -80,6 +91,11 @@ interface DirectTestResult {
   readonly languageCode?: string | null
 }
 
+const VAD_CONFIG = {
+  minSpeechMs: 300,
+  silenceToFinalizeMs: 1500,
+}
+
 function GoogleSTTDirectTester() {
   const [state, setState] = useState<DirectTestResult>({
     transcript: null,
@@ -87,12 +103,44 @@ function GoogleSTTDirectTester() {
     isLoading: false,
   })
   const [isRecording, setIsRecording] = useState(false)
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const [audioChunks, setAudioChunks] = useState<Blob[]>([])
+  const [vadEnabled, setVadEnabled] = useState(true)
+  const [hasSpeechBeenDetected, setHasSpeechBeenDetected] = useState(false)
+  const [isSilent, setIsSilent] = useState(true)
+
+  const speechStartedAtRef = useRef<number | null>(null)
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const vadUnsubscribeRef = useRef<(() => void) | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop()
+    }
+
+    mediaRecorderRef.current = null
+    setIsRecording(false)
+
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
+    if (vadUnsubscribeRef.current) {
+      vadUnsubscribeRef.current()
+      vadUnsubscribeRef.current = null
+    }
+    speechDetectionStore.stopListening()
+    speechStartedAtRef.current = null
+    setHasSpeechBeenDetected(false)
+    setIsSilent(true)
+  }, [])
 
   const handleStart = useCallback(async () => {
     setState({ transcript: null, error: null, isLoading: false })
     setAudioChunks([])
+    setHasSpeechBeenDetected(false)
+    setIsSilent(true)
+    speechStartedAtRef.current = null
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -122,6 +170,12 @@ function GoogleSTTDirectTester() {
         for (const track of stream.getTracks()) {
           track.stop()
         }
+
+        if (vadUnsubscribeRef.current) {
+          vadUnsubscribeRef.current()
+          vadUnsubscribeRef.current = null
+        }
+        speechDetectionStore.stopListening()
 
         if (chunks.length === 0) {
           setState({ transcript: null, error: "No audio recorded", isLoading: false })
@@ -174,9 +228,39 @@ function GoogleSTTDirectTester() {
         }
       }
 
-      setMediaRecorder(recorder)
+      mediaRecorderRef.current = recorder
+
       recorder.start()
       setIsRecording(true)
+
+      if (vadEnabled) {
+        await speechDetectionStore.startListening()
+        vadUnsubscribeRef.current = speechDetectionStore.subscribeToVoiceEvents(() => {
+          const currentVadState = speechDetectionStore.getSnapshot()
+
+          if (currentVadState.isSpeaking) {
+            if (silenceTimerRef.current) {
+              clearTimeout(silenceTimerRef.current)
+              silenceTimerRef.current = null
+            }
+            if (speechStartedAtRef.current === null) {
+              speechStartedAtRef.current = Date.now()
+            }
+            setHasSpeechBeenDetected(true)
+            setIsSilent(false)
+          } else {
+            setIsSilent(true)
+            if (speechStartedAtRef.current !== null) {
+              const speechDuration = Date.now() - speechStartedAtRef.current
+              if (speechDuration >= VAD_CONFIG.minSpeechMs && !silenceTimerRef.current) {
+                silenceTimerRef.current = setTimeout(() => {
+                  stopRecording()
+                }, VAD_CONFIG.silenceToFinalizeMs)
+              }
+            }
+          }
+        })
+      }
     } catch (e) {
       setState({
         transcript: null,
@@ -184,15 +268,11 @@ function GoogleSTTDirectTester() {
         isLoading: false,
       })
     }
-  }, [])
+  }, [vadEnabled, stopRecording])
 
   const handleStop = useCallback(() => {
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-      mediaRecorder.stop()
-    }
-    setMediaRecorder(null)
-    setIsRecording(false)
-  }, [mediaRecorder])
+    stopRecording()
+  }, [stopRecording])
 
   return (
     <section className="p-4 bg-neutral-900 rounded-xl space-y-4 border border-blue-500/30">
@@ -205,6 +285,33 @@ function GoogleSTTDirectTester() {
       <p className="text-xs text-neutral-500">
         Bypasses tier selection. Sends audio directly to /api/voice-search/transcribe
       </p>
+
+      <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={vadEnabled}
+          onChange={e => setVadEnabled(e.target.checked)}
+          className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-blue-500 focus:ring-blue-500"
+        />
+        VAD Auto-stop (stops after {VAD_CONFIG.silenceToFinalizeMs / 1000}s silence)
+      </label>
+
+      {isRecording && vadEnabled && (
+        <div className="p-3 bg-cyan-900/20 border border-cyan-500/30 rounded-lg space-y-2">
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                isSilent ? "bg-cyan-500" : "bg-green-500 animate-pulse"
+              }`}
+            />
+            <span className="text-cyan-400 text-sm font-medium">VAD Active</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge active={hasSpeechBeenDetected} label="Speech Detected" />
+            <StatusBadge active={isSilent} label="Silent" />
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3">
         {!isRecording ? (
@@ -266,9 +373,15 @@ function WebSpeechDirectTester() {
   })
   const [isRecording, setIsRecording] = useState(false)
   const [partialTranscript, setPartialTranscript] = useState("")
+  const [isBraveDesktop, setIsBraveDesktop] = useState(false)
+
+  useEffect(() => {
+    detectBraveInfo().then(info => setIsBraveDesktop(info.isBraveDesktop))
+  }, [])
 
   const isSupported =
     typeof window !== "undefined" && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition)
+  const isDisabled = !isSupported || isBraveDesktop
 
   const handleStart = useCallback(() => {
     setState({ transcript: null, error: null, isLoading: false })
@@ -349,11 +462,14 @@ function WebSpeechDirectTester() {
 
       <div className="flex items-center gap-4">
         <StatusBadge active={isSupported} label="Supported" />
+        {isBraveDesktop && <StatusBadge active={false} label="Brave Blocked" />}
       </div>
 
-      {!isSupported ? (
+      {isDisabled ? (
         <div className="p-2 bg-amber-900/20 border border-amber-500/30 rounded text-amber-300 text-sm">
-          Web Speech API is not supported in this browser. Try Chrome, Edge, or Safari.
+          {isBraveDesktop
+            ? "Brave desktop blocks Web Speech API. Use Google Cloud STT instead."
+            : "Web Speech API is not supported in this browser. Try Chrome, Edge, or Safari."}
         </div>
       ) : (
         <>
@@ -404,6 +520,197 @@ function WebSpeechDirectTester() {
               {state.error}
             </div>
           )}
+        </>
+      )}
+    </section>
+  )
+}
+
+const SAMPLE_RATE = 16000
+
+function StreamingSTTDirectTester() {
+  const streamState = useSttStreamState()
+  const { connect, sendAudioFrame, close, reset, isStreamingAvailable } = useSttStreamControls()
+  const [isRecording, setIsRecording] = useState(false)
+  const [connectionTime, setConnectionTime] = useState<number | null>(null)
+  const [firstTranscriptTime, setFirstTranscriptTime] = useState<number | null>(null)
+  const startTimeRef = useRef<number | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+
+  const handleStart = useCallback(async () => {
+    setConnectionTime(null)
+    setFirstTranscriptTime(null)
+    startTimeRef.current = Date.now()
+    reset()
+
+    try {
+      const connectStart = Date.now()
+      await Effect.runPromise(
+        connect({
+          languageCode: "en-US",
+          alternativeLanguageCodes: ["iw-IL", "ru-RU"],
+        }),
+      )
+      setConnectionTime(Date.now() - connectStart)
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: SAMPLE_RATE,
+        },
+      })
+      mediaStreamRef.current = stream
+
+      audioContextRef.current = new AudioContext({ sampleRate: SAMPLE_RATE })
+      await audioContextRef.current.audioWorklet.addModule("/pcm-worklet.js")
+
+      workletNodeRef.current = new AudioWorkletNode(audioContextRef.current, "pcm-processor")
+      const source = audioContextRef.current.createMediaStreamSource(stream)
+      source.connect(workletNodeRef.current)
+
+      workletNodeRef.current.port.onmessage = event => {
+        const pcmData = event.data as ArrayBuffer
+        sendAudioFrame(pcmData)
+      }
+
+      setIsRecording(true)
+    } catch (e) {
+      console.error("Streaming STT start failed:", e)
+    }
+  }, [connect, sendAudioFrame, reset])
+
+  const handleStop = useCallback(() => {
+    if (workletNodeRef.current) {
+      workletNodeRef.current.disconnect()
+      workletNodeRef.current = null
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    if (mediaStreamRef.current) {
+      for (const track of mediaStreamRef.current.getTracks()) {
+        track.stop()
+      }
+      mediaStreamRef.current = null
+    }
+    close()
+    setIsRecording(false)
+  }, [close])
+
+  useEffect(() => {
+    if (streamState.partialText && firstTranscriptTime === null && startTimeRef.current) {
+      setFirstTranscriptTime(Date.now() - startTimeRef.current)
+    }
+  }, [streamState.partialText, firstTranscriptTime])
+
+  useEffect(() => {
+    if (streamState.status === "ended" || streamState.status === "error") {
+      handleStop()
+    }
+  }, [streamState.status, handleStop])
+
+  return (
+    <section className="p-4 bg-neutral-900 rounded-xl space-y-4 border border-cyan-500/30">
+      <div className="flex items-center gap-3">
+        <Broadcast size={24} weight="bold" className="text-cyan-400" />
+        <h2 className="text-sm font-medium text-cyan-400 uppercase tracking-wider">
+          Streaming STT (WebSocket Bridge)
+        </h2>
+      </div>
+      <p className="text-xs text-neutral-500">
+        Real-time streaming via WebSocket to Google Speech V2 API. Uses Google&apos;s server-side
+        VAD for end-of-utterance detection.
+      </p>
+
+      <div className="flex items-center gap-4">
+        <StatusBadge active={isStreamingAvailable} label="WS Configured" />
+        <StatusBadge active={streamState.status === "ready"} label="Ready" />
+        <StatusBadge active={streamState.status === "streaming"} label="Streaming" />
+      </div>
+
+      {!isStreamingAvailable ? (
+        <div className="p-2 bg-cyan-900/20 border border-cyan-500/30 rounded text-cyan-300 text-sm">
+          Streaming STT not configured. Set NEXT_PUBLIC_STT_WS_URL environment variable.
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-3">
+            {!isRecording ? (
+              <button
+                type="button"
+                onClick={handleStart}
+                disabled={
+                  streamState.status === "connecting" || streamState.status === "fetching_token"
+                }
+                className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-neutral-700 disabled:text-neutral-500 rounded-lg transition-colors"
+              >
+                {streamState.status === "connecting" || streamState.status === "fetching_token" ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Microphone size={20} />
+                )}
+                <span>
+                  {streamState.status === "fetching_token"
+                    ? "Getting token..."
+                    : streamState.status === "connecting"
+                      ? "Connecting..."
+                      : "Start Streaming"}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStop}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-colors"
+              >
+                <Stop size={20} />
+                <span>Stop</span>
+              </button>
+            )}
+          </div>
+
+          {connectionTime !== null && (
+            <div className="text-xs text-neutral-500">
+              Connection time: {connectionTime}ms
+              {firstTranscriptTime !== null && ` • First transcript: ${firstTranscriptTime}ms`}
+            </div>
+          )}
+
+          {streamState.partialText && (
+            <div className="space-y-1">
+              <span className="text-neutral-500 text-xs">Partial:</span>
+              <p className="text-neutral-300 font-mono text-sm bg-neutral-800 rounded px-2 py-1 italic">
+                {streamState.partialText}
+              </p>
+            </div>
+          )}
+
+          {streamState.finalText && (
+            <div className="space-y-1">
+              <span className="text-neutral-500 text-xs">Final Transcript:</span>
+              <p className="text-white font-mono text-sm bg-neutral-800 rounded px-2 py-1">
+                {streamState.finalText}
+              </p>
+              {streamState.detectedLanguageCode && (
+                <span className="text-neutral-500 text-xs">
+                  Language: {streamState.detectedLanguageCode}
+                </span>
+              )}
+            </div>
+          )}
+
+          {streamState.error && (
+            <div className="p-2 bg-red-900/20 border border-red-500/30 rounded text-red-300 text-sm">
+              {streamState.error}
+            </div>
+          )}
+
+          <div className="text-xs text-neutral-600">Status: {streamState.status}</div>
         </>
       )}
     </section>
@@ -687,6 +994,7 @@ const VoiceSearchTester = memo(function VoiceSearchTester() {
         <p className="text-sm text-neutral-400">
           Test each tier independently, bypassing the automatic tier selection
         </p>
+        <StreamingSTTDirectTester />
         <GoogleSTTDirectTester />
         <WebSpeechDirectTester />
       </div>

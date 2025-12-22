@@ -23,11 +23,22 @@ export interface RecognitionResult {
 }
 
 function normalizePrivateKey(raw: string): string {
-  const unescaped = raw.replace(/\\n/g, "\n").trim()
+  // Strip surrounding quotes if present (common env file issue)
+  const stripped = raw.replace(/^["']|["']$/g, "")
+  const unescaped = stripped.replace(/\\n/g, "\n").trim()
   const hasNewlines = unescaped.includes("\n")
   if (hasNewlines) return unescaped
 
-  // Add PEM line breaks if the key was pasted as a single line
+  // Key is a single line - need to extract and format properly
+  const headerMatch = unescaped.match(/^-----BEGIN PRIVATE KEY-----(.*?)-----END PRIVATE KEY-----$/)
+  if (headerMatch) {
+    const base64Body = headerMatch[1]?.trim() ?? ""
+    // Insert line breaks every 64 characters (PEM format requirement)
+    const formattedBody = base64Body.replace(/(.{64})/g, "$1\n").trim()
+    return `-----BEGIN PRIVATE KEY-----\n${formattedBody}\n-----END PRIVATE KEY-----\n`
+  }
+
+  // Fallback: just add header/footer newlines
   const withHeader = unescaped.replace(
     /^-----BEGIN PRIVATE KEY-----/,
     "-----BEGIN PRIVATE KEY-----\n",

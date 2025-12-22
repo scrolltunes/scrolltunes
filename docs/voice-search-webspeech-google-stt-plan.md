@@ -21,9 +21,14 @@ Deliverables: client-side recording + STT orchestration, backend STT endpoint, s
 - Confidence evaluation: min length (2 chars), garbage ratio (<30%)
 - Google STT fallback only when confidence is low AND quota available
 - `tierUsed` state tracks which tier produced the final transcript
-- Test page at `/test/voice-search`
 - **Brave desktop detection** — skips Web Speech and uses Google STT directly
 - **VAD-based end-of-utterance** for Google STT mode using VoiceActivityStore
+- **Private key normalization** — strips surrounding quotes, handles single-line PEM keys
+
+**Test Page (`/test/voice-search`):**
+- **Google Cloud STT Direct Tester** — with VAD auto-stop toggle
+- **Web Speech API Direct Tester** — with Brave desktop detection (disables test when Brave detected)
+- **Streaming STT Direct Tester** — for real-time transcription testing
 
 **Brave Desktop Handling:**
 - Brave desktop blocks Web Speech API connections to Google's speech servers
