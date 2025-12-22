@@ -19,7 +19,7 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
   },
   {
     question: "Is it free?",
-    answer:
+    answer: (
       <>
         Yes, ScrollTunes is free to use. We use third-party services to fetch lyrics, tempo, and
         other song data. Due to rate limiting and content availability from these sources, not every
@@ -28,7 +28,8 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
           let us know
         </a>{" "}
         if something is missing!
-      </>,
+      </>
+    ),
   },
   {
     question: "Is there a mobile app for iPhone or Android?",

@@ -241,9 +241,9 @@ export default function TermsOfService() {
             </ul>
             <p className="mt-4 leading-relaxed text-neutral-300">
               ScrollTunes is not affiliated with, endorsed by, or partnered with LRCLIB, GetSongBPM,
-              Songsterr, or any other third-party service. We are not responsible for the availability,
-              accuracy, or data practices of these external services. Your use of third-party
-              services accessed through ScrollTunes is at your own risk.
+              Songsterr, or any other third-party service. We are not responsible for the
+              availability, accuracy, or data practices of these external services. Your use of
+              third-party services accessed through ScrollTunes is at your own risk.
             </p>
           </section>
 

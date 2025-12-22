@@ -16,9 +16,7 @@ const nowFeatures: Array<string | { title: string; beta?: boolean }> = [
   { title: "Guitar chords", beta: true },
 ]
 
-const nextFeatures = [
-  { title: "Auto tempo", description: "Match scroll speed to your playing" },
-]
+const nextFeatures = [{ title: "Auto tempo", description: "Match scroll speed to your playing" }]
 
 const laterFeatures = [
   { title: "Karaoke mode", description: "Large text, word-by-word highlight" },

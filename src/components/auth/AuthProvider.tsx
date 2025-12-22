@@ -11,6 +11,7 @@ import { fetchFavorites, fetchHistory } from "@/lib/sync-service"
 import type { Session } from "next-auth"
 import { SessionProvider } from "next-auth/react"
 import { type ReactNode, useEffect } from "react"
+import { AnalyticsProvider } from "./AnalyticsProvider"
 
 interface AuthProviderProps {
   readonly children: ReactNode
@@ -86,5 +87,10 @@ export function AuthProvider({ children, session }: AuthProviderProps) {
     initAndSync()
   }, [session])
 
-  return <SessionProvider>{children}</SessionProvider>
+  return (
+    <SessionProvider>
+      <AnalyticsProvider />
+      {children}
+    </SessionProvider>
+  )
 }
