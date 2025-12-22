@@ -227,10 +227,21 @@ export default function TermsOfService() {
                 </a>{" "}
                 — Song tempo and metadata
               </li>
+              <li>
+                <a
+                  href="https://www.songsterr.com/a/wa/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 underline hover:text-blue-300"
+                >
+                  Songsterr
+                </a>{" "}
+                — Guitar chords and tabs
+              </li>
             </ul>
             <p className="mt-4 leading-relaxed text-neutral-300">
               ScrollTunes is not affiliated with, endorsed by, or partnered with LRCLIB, GetSongBPM,
-              or any other third-party service. We are not responsible for the availability,
+              Songsterr, or any other third-party service. We are not responsible for the availability,
               accuracy, or data practices of these external services. Your use of third-party
               services accessed through ScrollTunes is at your own risk.
             </p>

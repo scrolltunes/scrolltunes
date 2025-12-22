@@ -5,30 +5,23 @@ import { motion } from "motion/react"
 
 import { BackButton } from "@/components/ui"
 
-const nowFeatures = [
+const nowFeatures: Array<string | { title: string; beta?: boolean }> = [
   "Voice-activated scrolling",
-  "Adjustable tempo",
-  "Click any line to jump",
-  "Keyboard shortcuts",
-  "Screen wake lock",
-  "Double-tap pause",
-  "Shake to restart",
-  "Recent songs",
   "Song search",
-  "Shareable links",
   "Metronome",
   "User accounts",
+  "Favorites and setlists",
+  "Cross-device sync",
+  "Voice search",
+  { title: "Guitar chords", beta: true },
 ]
 
-const nextFeatures = [{ title: "Auto tempo", description: "Scroll speed based on song BPM" }]
+const nextFeatures = [
+  { title: "Auto tempo", description: "Match scroll speed to your playing" },
+]
 
 const laterFeatures = [
-  { title: "Chord charts", description: "See chords alongside lyrics" },
   { title: "Karaoke mode", description: "Large text, word-by-word highlight" },
-  { title: "Voice search", description: "Find songs by speaking" },
-]
-
-const futureFeatures = [
   { title: "Spotify integration", description: "Search your library" },
   { title: "Jam sessions", description: "Play together in real-time" },
 ]
@@ -55,16 +48,22 @@ export default function RoadmapPage() {
             <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
               Now
             </h2>
-            <div className="flex flex-wrap gap-2">
-              {nowFeatures.map(feature => (
-                <span
-                  key={feature}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 rounded-full text-sm"
-                >
-                  <Check size={14} weight="bold" className="text-green-500" />
-                  {feature}
-                </span>
-              ))}
+            <div className="p-4 bg-neutral-900 rounded-xl space-y-3">
+              {nowFeatures.map(feature => {
+                const title = typeof feature === "string" ? feature : feature.title
+                const isBeta = typeof feature === "object" && feature.beta
+                return (
+                  <div key={title} className="flex items-center gap-3">
+                    <Check size={16} weight="bold" className="text-green-500 shrink-0" />
+                    <span className="text-neutral-300">{title}</span>
+                    {isBeta && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-amber-500/20 text-amber-400 rounded">
+                        Beta
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </section>
 
@@ -88,33 +87,13 @@ export default function RoadmapPage() {
             </div>
           </section>
 
-          {/* Later - V2 features */}
+          {/* Later */}
           <section>
             <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
               Later
             </h2>
             <div className="space-y-3">
               {laterFeatures.map(feature => (
-                <div key={feature.title} className="p-4 bg-neutral-900 rounded-xl">
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 rounded-full bg-neutral-600 mt-2 shrink-0" />
-                    <div>
-                      <div className="font-medium text-white">{feature.title}</div>
-                      <div className="text-sm text-neutral-400 mt-1">{feature.description}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Future - V3 features */}
-          <section>
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
-              Future
-            </h2>
-            <div className="space-y-3">
-              {futureFeatures.map(feature => (
                 <div key={feature.title} className="p-4 bg-neutral-900 rounded-xl">
                   <div className="flex items-start gap-3">
                     <div className="w-2 h-2 rounded-full bg-neutral-600 mt-2 shrink-0" />
@@ -145,12 +124,12 @@ export default function RoadmapPage() {
               </div>
             </a>
             <a
-              href="mailto:hello@scrolltunes.com"
+              href="mailto:contact@scrolltunes.com"
               className="block p-4 bg-neutral-900 rounded-xl hover:bg-neutral-800 transition-colors mt-3"
             >
               <div className="font-medium text-white flex items-center gap-2">
                 <EnvelopeSimple size={18} />
-                hello@scrolltunes.com
+                contact@scrolltunes.com
               </div>
             </a>
           </section>

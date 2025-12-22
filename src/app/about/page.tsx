@@ -3,6 +3,7 @@
 import { BackButton } from "@/components/ui"
 import { ArrowRight, EnvelopeSimple, XLogo } from "@phosphor-icons/react"
 import { motion } from "motion/react"
+import Image from "next/image"
 import Link from "next/link"
 
 export default function AboutPage() {
@@ -22,6 +23,17 @@ export default function AboutPage() {
           transition={{ duration: 0.3 }}
           className="space-y-8"
         >
+          {/* Logo */}
+          <div className="flex justify-center">
+            <Image
+              src="/scrolltunes-logo.png"
+              alt="ScrollTunes logo"
+              width={120}
+              height={120}
+              priority
+            />
+          </div>
+
           {/* What is ScrollTunes */}
           <section>
             <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
@@ -87,51 +99,32 @@ export default function AboutPage() {
             <div className="p-4 bg-neutral-900 rounded-xl space-y-3">
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">
-                  Detect voice activity to start scrolling automatically
-                </p>
+                <p className="text-neutral-300">Voice-activated scrolling</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">
-                  Adjust scroll speed with tempo controls or keyboard
-                </p>
+                <p className="text-neutral-300">Song search and voice search</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Tap any line to jump to that position</p>
+                <p className="text-neutral-300">Visual and audio metronome</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Double-tap anywhere to pause or resume</p>
+                <p className="text-neutral-300">Favorites and setlists</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Visual and audio metronome synced to song tempo</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Keep screen awake during performance</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Quickly reopen recently played songs</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">
-                  Voice search to find songs hands-free (sign in required)
-                </p>
+                <p className="text-neutral-300">Cross-device sync with a free account</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-amber-500 mt-2 shrink-0" />
                 <p className="text-neutral-300">
-                  Guitar chords positioned above lyrics with look-ahead highlighting
+                  Guitar chords with transpose
+                  <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-amber-500/20 text-amber-400 rounded">
+                    Beta
+                  </span>
                 </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-amber-500 mt-2 shrink-0" />
-                <p className="text-neutral-300">Transpose chords up or down by semitones</p>
               </div>
             </div>
           </section>
@@ -277,12 +270,12 @@ export default function AboutPage() {
               </div>
             </a>
             <a
-              href="mailto:hello@scrolltunes.com"
+              href="mailto:contact@scrolltunes.com"
               className="block p-4 bg-neutral-900 rounded-xl hover:bg-neutral-800 transition-colors mt-3"
             >
               <div className="font-medium text-white flex items-center gap-2">
                 <EnvelopeSimple size={18} />
-                hello@scrolltunes.com
+                contact@scrolltunes.com
               </div>
             </a>
           </section>

@@ -13,14 +13,22 @@ const linkClass = "text-indigo-400 hover:text-indigo-300"
 
 const faqItems: { question: string; answer: React.ReactNode }[] = [
   {
-    question: "What is this?",
+    question: "What is ScrollTunes?",
     answer:
-      "ScrollTunes is a live lyrics teleprompter for musicians. It grew out of playing guitar with friends and getting tired of scrolling through lyrics on a phone balanced on your knee. Now you can just sing, and the lyrics follow along.",
+      "A live lyrics teleprompter for musicians. There's nothing more annoying than reading lyrics off a phone balanced on your knee while playing guitar. So we built this. Now you just sing, and the lyrics follow along.",
   },
   {
     question: "Is it free?",
     answer:
-      "Yes, ScrollTunes is free to use. We use third-party services to fetch lyrics, tempo, and other song data. Due to rate limiting and content availability from these sources, not every song may be available, but we are always looking to expand coverage.",
+      <>
+        Yes, ScrollTunes is free to use. We use third-party services to fetch lyrics, tempo, and
+        other song data. Due to rate limiting and content availability from these sources, not every
+        song may be available -{" "}
+        <a href="mailto:contact@scrolltunes.com" className="text-indigo-400 hover:text-indigo-300">
+          let us know
+        </a>{" "}
+        if something is missing!
+      </>,
   },
   {
     question: "Is there a mobile app for iPhone or Android?",
@@ -30,7 +38,7 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
   {
     question: "How is this different from karaoke apps?",
     answer:
-      "Unlike karaoke apps, ScrollTunes does not require playing the original track - it syncs to your live performance. You can use ScrollTunes without creating an account, and when you do, we do not use analytics, tracking cookies, or server-side storage for your activity. Your preferences and recent songs stay in your browser. Just open the site and start playing.",
+      "Karaoke apps play the original track and sync lyrics to it. ScrollTunes doesn't need the track - just the song metadata and tempo, which we fetch from third-party services. You play the music - we scroll the lyrics.",
   },
   {
     question: "Why am I being asked to sign in with Google/Spotify?",
@@ -86,8 +94,8 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
           @ScrollTunes
         </a>{" "}
         or by email at{" "}
-        <a href="mailto:hello@scrolltunes.com" className={linkClass}>
-          hello@scrolltunes.com
+        <a href="mailto:contact@scrolltunes.com" className={linkClass}>
+          contact@scrolltunes.com
         </a>
         .
       </>

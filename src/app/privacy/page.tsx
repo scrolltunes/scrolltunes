@@ -217,10 +217,10 @@ export default function PrivacyPage() {
                 You can export your data and delete your account from the app&apos;s settings, or by
                 contacting us at{" "}
                 <a
-                  href="mailto:hello@scrolltunes.com"
+                  href="mailto:contact@scrolltunes.com"
                   className="text-indigo-400 hover:text-indigo-300 underline"
                 >
-                  hello@scrolltunes.com
+                  contact@scrolltunes.com
                 </a>
                 .
               </p>
@@ -267,6 +267,17 @@ export default function PrivacyPage() {
                     GetSongBPM
                   </a>{" "}
                   (tempo data)
+                </li>
+                <li>
+                  <a
+                    href="https://www.songsterr.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 underline"
+                  >
+                    Songsterr
+                  </a>{" "}
+                  (guitar chords)
                 </li>
               </ul>
               <p className="text-neutral-400 mt-3 mb-2 text-sm font-medium">
@@ -436,10 +447,10 @@ export default function PrivacyPage() {
               &quot;Accounts and Synced Data&quot; above. For privacy-related requests, contact us
               at{" "}
               <a
-                href="mailto:hello@scrolltunes.com"
+                href="mailto:contact@scrolltunes.com"
                 className="text-indigo-400 hover:text-indigo-300 underline"
               >
-                hello@scrolltunes.com
+                contact@scrolltunes.com
               </a>{" "}
               or{" "}
               <a
@@ -463,10 +474,10 @@ export default function PrivacyPage() {
               third-party services where possible. If you believe a child has used our service,
               please contact us at{" "}
               <a
-                href="mailto:hello@scrolltunes.com"
+                href="mailto:contact@scrolltunes.com"
                 className="text-indigo-400 hover:text-indigo-300 underline"
               >
-                hello@scrolltunes.com
+                contact@scrolltunes.com
               </a>
               .
             </p>
@@ -485,10 +496,10 @@ export default function PrivacyPage() {
             <p className="text-neutral-300 leading-relaxed">
               If you have questions about this privacy policy, you can reach us at{" "}
               <a
-                href="mailto:hello@scrolltunes.com"
+                href="mailto:contact@scrolltunes.com"
                 className="text-indigo-400 hover:text-indigo-300 underline"
               >
-                hello@scrolltunes.com
+                contact@scrolltunes.com
               </a>{" "}
               or{" "}
               <a
