@@ -42,7 +42,7 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
       "Karaoke apps play the original track and sync lyrics to it. ScrollTunes doesn't need the track - just the song metadata and tempo, which we fetch from third-party services. You play the music - we scroll the lyrics.",
   },
   {
-    question: "Why am I being asked to sign in with Google/Spotify?",
+    question: "Why am I being asked to sign in with Google?",
     answer: (
       <>
         Some features require an account, including voice search, favorites, setlists, and syncing

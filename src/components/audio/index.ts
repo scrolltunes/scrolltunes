@@ -10,3 +10,4 @@ export { StatusIndicators, type StatusIndicatorsProps } from "./StatusIndicators
 export { VoiceIndicator, type VoiceIndicatorProps } from "./VoiceIndicator"
 export { VoiceSearchButton, type VoiceSearchButtonProps } from "./VoiceSearchButton"
 export { ListeningWaveform, type ListeningWaveformProps } from "./ListeningWaveform"
+export { StreamingText } from "./StreamingText"

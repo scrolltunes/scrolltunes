@@ -87,6 +87,8 @@ export class SttStreamClient {
   private listeners = new Set<() => void>()
   private ws: WebSocket | null = null
   private token: string | null = null
+  private tokenExpiresAt: number | null = null
+  private isPrewarming = false
 
   private state: SttStreamState = {
     status: "idle",
@@ -123,6 +125,42 @@ export class SttStreamClient {
     return Option.isSome(publicConfig.sttWsUrl)
   }
 
+  /**
+   * Pre-warm the STT client by fetching a session token.
+   * This reduces latency when actually starting voice search.
+   */
+  readonly prewarm = (): Effect.Effect<void, never> =>
+    Effect.gen(this, function* () {
+      if (!this.isStreamingAvailable) return
+      if (this.isPrewarming) return
+      if (this.token && this.tokenExpiresAt && Date.now() < this.tokenExpiresAt - 60000) {
+        sttLog("PREWARM", "Token still valid, skipping prewarm")
+        return
+      }
+
+      this.isPrewarming = true
+      sttLog("PREWARM", "Pre-fetching session token")
+
+      const result = yield* Effect.either(this.fetchTokenEffect)
+      this.isPrewarming = false
+
+      if (result._tag === "Right") {
+        this.token = result.right.token
+        this.tokenExpiresAt = result.right.expiresAt
+        sttLog("PREWARM", "Token pre-fetched successfully")
+      } else {
+        sttLog("PREWARM", "Failed to pre-fetch token", { error: result.left.message })
+      }
+    })
+
+  async prewarmAsync(): Promise<void> {
+    return Effect.runPromise(this.prewarm())
+  }
+
+  private hasValidToken(): boolean {
+    return !!(this.token && this.tokenExpiresAt && Date.now() < this.tokenExpiresAt - 10000)
+  }
+
   readonly connect = (config: SttStreamConfig = {}): Effect.Effect<void, SttStreamError> =>
     Effect.gen(this, function* () {
       if (Option.isNone(publicConfig.sttWsUrl)) {
@@ -138,9 +176,14 @@ export class SttStreamClient {
 
       this.setState({ status: "fetching_token", error: null, partialText: "", finalText: null })
 
-      // Fetch token
-      const tokenResult = yield* this.fetchTokenEffect
-      this.token = tokenResult.token
+      // Use cached token if valid, otherwise fetch new one
+      if (!this.hasValidToken()) {
+        const tokenResult = yield* this.fetchTokenEffect
+        this.token = tokenResult.token
+        this.tokenExpiresAt = tokenResult.expiresAt
+      } else {
+        sttLog("TOKEN", "Using pre-warmed token")
+      }
 
       this.setState({ status: "connecting" })
 
@@ -421,6 +464,7 @@ export class SttStreamService extends Context.Tag("SttStreamService")<
     readonly getState: Effect.Effect<SttStreamState, never>
     readonly subscribe: (listener: () => void) => Effect.Effect<() => void, never>
     readonly isStreamingAvailable: Effect.Effect<boolean, never>
+    readonly prewarm: Effect.Effect<void, never>
   }
 >() {}
 
@@ -438,6 +482,7 @@ export const SttStreamLive = Layer.succeed(SttStreamService, {
   getState: Effect.sync(() => sttStreamClient.getSnapshot()),
   subscribe: (listener: () => void) => Effect.sync(() => sttStreamClient.subscribe(listener)),
   isStreamingAvailable: Effect.sync(() => sttStreamClient.isStreamingAvailable),
+  prewarm: sttStreamClient.prewarm(),
 })
 
 // --- React Hooks ---

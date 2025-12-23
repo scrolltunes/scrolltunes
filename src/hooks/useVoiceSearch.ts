@@ -6,10 +6,11 @@ import { useEffect, useRef, useState } from "react"
 
 export function useVoiceSearch() {
   const speechState = useSpeechState()
-  const { start, stop, checkQuota, clearTranscript, clearError } = useSpeechControls()
+  const { start, stop, checkQuota, clearTranscript, clearError, prewarm } = useSpeechControls()
   const isAuthenticated = useIsAuthenticated()
   const isQuotaAvailable = useIsQuotaAvailable()
   const hasPrefetchedQuotaRef = useRef(false)
+  const hasPrewarmedRef = useRef(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const wasRecordingRef = useRef(false)
   const receivedFinalTranscriptRef = useRef(false)
@@ -18,12 +19,21 @@ export function useVoiceSearch() {
   useEffect(() => {
     if (!isAuthenticated) {
       hasPrefetchedQuotaRef.current = false
+      hasPrewarmedRef.current = false
       return
     }
     if (hasPrefetchedQuotaRef.current) return
     hasPrefetchedQuotaRef.current = true
     void checkQuota()
   }, [checkQuota, isAuthenticated])
+
+  // Pre-warm speech recognition after quota check succeeds
+  useEffect(() => {
+    if (!isAuthenticated || !isQuotaAvailable) return
+    if (hasPrewarmedRef.current) return
+    hasPrewarmedRef.current = true
+    void prewarm()
+  }, [isAuthenticated, isQuotaAvailable, prewarm])
 
   // Track processing state: after recording stops, before final transcript arrives
   useEffect(() => {

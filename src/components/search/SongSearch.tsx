@@ -1,7 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
-import { ListeningWaveform, VoiceSearchButton } from "@/components/audio"
+import { ListeningWaveform, StreamingText, VoiceSearchButton } from "@/components/audio"
 import { INPUT_LIMITS } from "@/constants/limits"
 import { useIsAuthenticated } from "@/core"
 import { useLocalSongCache, useVoiceSearch } from "@/hooks"
@@ -108,6 +108,9 @@ export const SongSearch = memo(function SongSearch({
   const cacheRef = useRef(new Map<string, NormalizedSearchResult[]>())
   const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastFinalTranscriptRef = useRef<string | null>(null)
+  const queryRef = useRef(query)
+  const [streamingText, setStreamingText] = useState<string | null>(null)
+  const streamingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const localMatches = useMemo((): Array<NormalizedSearchResult & { score: number }> => {
     const trimmed = query.trim()
@@ -337,6 +340,62 @@ export const SongSearch = memo(function SongSearch({
     }
   }, [voiceSearch])
 
+  // Keep queryRef in sync with query state
+  useEffect(() => {
+    queryRef.current = query
+  }, [query])
+
+  // Track streaming text for visual feedback using a ref to avoid batching issues
+  // The ref accumulates partials immediately, state is updated for rendering
+  const streamingTextAccumulatorRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (voiceSearch.partialTranscript) {
+      // Immediately capture the partial in the ref
+      streamingTextAccumulatorRef.current = voiceSearch.partialTranscript
+      // Clear any pending clear timeout
+      if (streamingTimeoutRef.current) {
+        clearTimeout(streamingTimeoutRef.current)
+        streamingTimeoutRef.current = null
+      }
+      // Update state for rendering
+      setStreamingText(voiceSearch.partialTranscript)
+    }
+  }, [voiceSearch.partialTranscript])
+
+  // Track previous isRecording state to detect transitions
+  const wasRecordingRef = useRef(false)
+
+  // When recording stops, show the last captured partial briefly
+  useEffect(() => {
+    const wasRecording = wasRecordingRef.current
+    wasRecordingRef.current = voiceSearch.isRecording
+
+    // Only trigger on transition from recording to not recording
+    if (wasRecording && !voiceSearch.isRecording && streamingTextAccumulatorRef.current) {
+      // Use the final transcript if available, otherwise use the last partial
+      const textToShow = voiceSearch.finalTranscript || streamingTextAccumulatorRef.current
+      // Ensure the text is shown with animation
+      setStreamingText(textToShow)
+      // Clear after a delay
+      streamingTimeoutRef.current = setTimeout(() => {
+        setStreamingText(null)
+        streamingTextAccumulatorRef.current = null
+        streamingTimeoutRef.current = null
+      }, 600)
+    }
+
+    // Clear streaming text when recording starts fresh
+    if (!wasRecording && voiceSearch.isRecording) {
+      streamingTextAccumulatorRef.current = null
+      setStreamingText(null)
+      if (streamingTimeoutRef.current) {
+        clearTimeout(streamingTimeoutRef.current)
+        streamingTimeoutRef.current = null
+      }
+    }
+  }, [voiceSearch.isRecording, voiceSearch.finalTranscript])
+
   useEffect(() => {
     if (
       voiceSearch.finalTranscript &&
@@ -344,12 +403,24 @@ export const SongSearch = memo(function SongSearch({
     ) {
       lastFinalTranscriptRef.current = voiceSearch.finalTranscript
       const transcript = voiceSearch.finalTranscript
+      const currentQuery = queryRef.current.trim().toLowerCase()
+      const newQuery = transcript.trim().toLowerCase()
+
       setQuery(transcript)
+      voiceSearch.clearTranscript()
+
+      // Don't clear streaming text here - let the isRecording effect handle it
+      // This ensures the last partial is visible briefly before showing results
+
+      // Skip search if final transcript matches current query (from partial results)
+      if (currentQuery === newQuery) {
+        return
+      }
+
       setIsPending(true)
       setHasSearched(false)
       setError(null)
       searchTracks(transcript)
-      voiceSearch.clearTranscript()
     }
   }, [voiceSearch.finalTranscript, voiceSearch.clearTranscript, searchTracks])
 
@@ -369,7 +440,7 @@ export const SongSearch = memo(function SongSearch({
         {/* Search input */}
         <div className="relative z-10">
           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
-            {voiceSearch.isRecording || voiceSearch.isProcessing ? (
+            {voiceSearch.isRecording || voiceSearch.isProcessing || streamingText ? (
               <ListeningWaveform variant={voiceSearch.isProcessing ? "processing" : "listening"} />
             ) : isLoading ? (
               <CircleNotch size={20} weight="bold" className="text-indigo-500 animate-spin" />
@@ -378,18 +449,19 @@ export const SongSearch = memo(function SongSearch({
             )}
           </div>
 
-          {/* Status overlay when recording or processing */}
-          {(voiceSearch.isRecording || voiceSearch.isProcessing) && (
-            <div className="absolute left-12 top-1/2 -translate-y-1/2 right-20 pointer-events-none overflow-hidden">
-              <span
-                className={`truncate block ${voiceSearch.isProcessing ? "text-emerald-400" : "text-indigo-400"}`}
-              >
-                {voiceSearch.isProcessing
-                  ? "Processing..."
-                  : voiceSearch.isSpeechDetected
-                    ? voiceSearch.partialTranscript
-                    : "Listening..."}
-              </span>
+          {/* Status overlay when recording, processing, or showing streaming text */}
+          {(voiceSearch.isRecording || voiceSearch.isProcessing || streamingText) && (
+            <div className="absolute left-12 top-1/2 -translate-y-1/2 right-20 pointer-events-none overflow-hidden z-20 bg-neutral-900">
+              {voiceSearch.isProcessing ? (
+                <span className="truncate block text-emerald-400">Processing...</span>
+              ) : streamingText ? (
+                <StreamingText
+                  text={streamingText}
+                  className="truncate block text-indigo-400"
+                />
+              ) : (
+                <span className="truncate block text-indigo-400">Listening...</span>
+              )}
             </div>
           )}
 
@@ -398,7 +470,7 @@ export const SongSearch = memo(function SongSearch({
             value={query}
             onChange={handleInputChange}
             placeholder={
-              voiceSearch.isRecording || voiceSearch.isProcessing
+              voiceSearch.isRecording || voiceSearch.isProcessing || streamingText
                 ? ""
                 : "Search by song title or artist name"
             }
@@ -406,7 +478,7 @@ export const SongSearch = memo(function SongSearch({
             className={`w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 border transition-colors ${
               voiceSearch.isProcessing
                 ? "border-emerald-500 ring-2 ring-emerald-500/20 text-transparent caret-transparent"
-                : voiceSearch.isRecording
+                : voiceSearch.isRecording || streamingText
                   ? "border-indigo-500 ring-2 ring-indigo-500/20 text-transparent caret-transparent"
                   : "border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             } ${isAuthenticated ? (query ? "pr-20" : "pr-12") : "pr-10"}`}
