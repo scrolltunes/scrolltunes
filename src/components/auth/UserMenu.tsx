@@ -1,7 +1,7 @@
 "use client"
 
-import { useAccount, useIsAdmin } from "@/core"
-import { ShieldCheck, SignOut, UserCircle } from "@phosphor-icons/react"
+import { useAccount } from "@/core"
+import { SignOut, UserCircle } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { signOut } from "next-auth/react"
 import Image from "next/image"
@@ -17,7 +17,6 @@ function getInitials(name: string | null, email: string): string {
 
 export const UserMenu = memo(function UserMenu() {
   const { isAuthenticated, isLoading, user } = useAccount()
-  const isAdmin = useIsAdmin()
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -118,16 +117,6 @@ export const UserMenu = memo(function UserMenu() {
             </div>
 
             <div className="py-2">
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  onClick={() => setIsOpen(false)}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-amber-400 hover:bg-neutral-800 transition-colors"
-                >
-                  <ShieldCheck size={20} />
-                  <span>Admin</span>
-                </Link>
-              )}
               <button
                 type="button"
                 onClick={handleSignOut}

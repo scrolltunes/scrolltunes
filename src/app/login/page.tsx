@@ -70,8 +70,8 @@ export default function LoginPage() {
             <ul className="space-y-3">
               {benefits.map(benefit => (
                 <li key={benefit} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center mt-0.5">
-                    <Check size={12} weight="bold" className="text-emerald-400" />
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/30 flex items-center justify-center mt-0.5">
+                    <Check size={12} weight="bold" className="text-emerald-300" />
                   </span>
                   <span className="text-neutral-300 text-sm">{benefit}</span>
                 </li>
