@@ -120,6 +120,9 @@ export default function SongPage() {
 
   const lrclibId = parseTrackSlugWithId(params.trackSlugWithId)
 
+  // Track if user manually enabled the microphone
+  const userEnabledMic = useRef(false)
+
   useKeyboardShortcuts({ enabled: loadState._tag === "Loaded" })
 
   useTempoPreference({
@@ -169,9 +172,8 @@ export default function SongPage() {
 
   const handleReset = useCallback(async () => {
     reset()
-    // Restart voice detection if permission was granted
-    const status = await voiceActivityStore.checkPermission()
-    if (status === "granted") {
+    // Restart voice detection only if user had manually enabled it
+    if (userEnabledMic.current) {
       await startListening()
     }
   }, [reset, startListening])
@@ -343,30 +345,17 @@ export default function SongPage() {
     }
   }, [lrclibId, playerState._tag])
 
-  // Request mic permission on first song load, auto-start listening if already granted
-  const hasRequestedPermission = useRef(false)
+  // Preload audio components when song loads for low latency mic activation
+  const hasPreloaded = useRef(false)
   useEffect(() => {
-    if (loadState._tag !== "Loaded" || hasRequestedPermission.current) return
-    hasRequestedPermission.current = true
+    if (loadState._tag !== "Loaded" || hasPreloaded.current) return
+    hasPreloaded.current = true
 
-    async function handleMicPermission() {
-      const status = await voiceActivityStore.checkPermission()
-
-      if (status === "granted") {
-        // Permission already granted - auto-start listening
-        await startListening()
-      } else if (status === "prompt") {
-        // First time - request permission
-        const granted = await voiceActivityStore.requestPermission()
-        if (granted) {
-          await startListening()
-        }
-      }
-      // If denied, do nothing - user can manually enable via button
-    }
-
-    handleMicPermission()
-  }, [loadState._tag, startListening])
+    // Pre-check permission status (doesn't prompt user)
+    voiceActivityStore.checkPermission()
+    // Preload sound system in background (requires user gesture, but sets up deferred init)
+    soundSystem.initialize()
+  }, [loadState._tag])
 
   useEffect(() => {
     if (!showChords) {
@@ -380,8 +369,10 @@ export default function SongPage() {
   const handleToggleListening = useCallback(async () => {
     if (isListening) {
       stopListening()
+      userEnabledMic.current = false
     } else {
       await startListening()
+      userEnabledMic.current = true
     }
   }, [isListening, startListening, stopListening])
 
