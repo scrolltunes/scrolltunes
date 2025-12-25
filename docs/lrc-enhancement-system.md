@@ -1,6 +1,6 @@
 # Design Doc: LRC Enhancement System (Web App)
 
-> **Status:** Proposed
+> **Status:** Implemented ✅
 
 This document describes the **web-based LRC enhancement system** for ScrollTunes:
 - Global song catalog with metadata (LRCLIB ID, Spotify ID, etc.)
@@ -1198,78 +1198,107 @@ export const maxDuration = 10    // seconds, default is fine
 
 ## 14) Design Review Notes
 
-Based on Oracle review, key recommendations incorporated or to address:
+Based on Oracle review, key recommendations incorporated:
 
 ### Schema Improvements
 - ✅ Unique constraint on normalized `(artist_lower, title_lower)` for songs deduplication
 - ✅ Separate `song_lrclib_ids` table for 1:many LRCLIB mapping
-- ⚠️ Add `has_enhancement` boolean on `songs` table for fast admin filtering
-- ⚠️ Add partial unique index on `(lrclib_id, lrc_hash)` for enhancements
+- ✅ Add `has_enhancement` boolean on `songs` table for fast admin filtering
+- ✅ Add unique index on `(source_lrclib_id, lrc_hash)` for enhancements
+- ✅ Add `coverage` percentage column for quality tracking
 - ⚠️ Consider `status` column for future crowdsourcing (`active`, `candidate`, `superseded`)
-- ⚠️ Add `coverage` percentage column for quality tracking
 
 ### API Simplifications
-- ⚠️ Unify enhancement lookup to always use `lrclibId + lrcHash` (drop `songId` variant)
-- ⚠️ Server re-computes `lrcHash` from submitted `baseLrc` (don't trust client hash)
+- ✅ Enhancement lookup uses `sourceLrclibId` (stored in enhancement table)
+- ✅ Server re-computes `lrcHash` from submitted `baseLrc` (don't trust client hash)
 - ⚠️ Optionally verify `baseLrc` matches current LRCLIB content, reject if stale
 
 ### Security & Privacy
 - ✅ Anonymous lookup is read-only, no catalog writes
-- ⚠️ `/api/songs/upsert` must reject unauthenticated requests
-- ⚠️ Consider log rotation/anonymization for enhancement API access logs
+- ✅ Admin endpoints require `isAdmin` check
 - ⚠️ Rate-limit admin endpoints
+- ⚠️ Consider log rotation/anonymization for enhancement API access logs
 
 ### alphaTab Integration
+- ✅ Admin pages use client-side GP parsing
+- ✅ PPQ verified from alphaTab (uses 960)
 - ⚠️ Dynamic import to reduce bundle size (admin pages only)
-- ⚠️ Ensure admin pages are client-side only for GP parsing
-- ⚠️ Verify PPQ from alphaTab rather than hardcoding 960
 - ⚠️ Show clear error for `.gp3` files (no lyrics support)
 
 ### Hash Parity
-- ⚠️ Define single canonicalization function, share between client and server
+- ✅ Single `computeLrcHash` function in `src/lib/lrc-hash.ts`
 - ⚠️ Unit test client/server hash parity to avoid silent mismatches
 
 ### Future Crowdsourcing Ready
 - ✅ `source_lrclib_id` tracks which LRCLIB entry was aligned against
-- ⚠️ Add `source` column (`admin`, `user`, `import`)
-- ⚠️ Add `created_by` FK to users table
-- ⚠️ Partial unique index for one active enhancement per `(lrclib_id, lrc_hash)`
+- ✅ Add `source` enum column (`admin`, `user`, `import`)
+- ✅ Add `created_by` FK to users table
+- ✅ Unique index for one active enhancement per `(source_lrclib_id, lrc_hash)`
 
 ---
 
 ## 14) Implementation Phases
 
-### Phase 1: Database & Songs Catalog
-- [ ] Add `songs` table (Drizzle migration)
-- [ ] Add `lrc_word_enhancements` table
-- [ ] Add `song_id` FK to `user_song_items`
-- [ ] Create songs upsert API (auto-populate on play)
-- [ ] Create admin songs list API
+### Phase 1: Database & Songs Catalog ✅
+- [x] Add `songs` table (Drizzle migration)
+- [x] Add `song_lrclib_ids` table for 1:many LRCLIB mapping
+- [x] Add `lrc_word_enhancements` table
+- [x] Add `hasEnhancement` flag to songs table
+- [x] Create songs upsert API (`/api/songs/upsert`)
+- [x] Create admin songs list API (`/api/admin/songs`)
 
-### Phase 2: alphaTab Integration
-- [ ] Add `@coderline/alphatab` dependency
-- [ ] Create GP parsing service (browser-side)
-- [ ] Implement word timing extraction
-- [ ] Implement LRC parsing and hashing utilities
-- [ ] Build word alignment algorithm
+### Phase 2: alphaTab Integration ✅
+- [x] Add `@coderline/alphatab` dependency
+- [x] Create GP parsing service (`src/lib/gp/extract-lyrics.ts`)
+- [x] Implement word timing extraction with tempo support
+- [x] Implement syllable → word joining (`src/lib/gp/build-words.ts`)
+- [x] Implement tick-to-millisecond conversion (`src/lib/gp/timing.ts`)
+- [x] Implement LRC parsing utilities (`src/lib/gp/align-words.ts`)
+- [x] Implement LRC hash computation (`src/lib/lrc-hash.ts`)
 
-### Phase 3: Admin Panel
-- [ ] Songs catalog table view with filters
-- [ ] Enhancement page for specific song
-- [ ] GP file uploader with preview
-- [ ] Alignment preview UI (side-by-side)
-- [ ] Submit enhancement API
+### Phase 3: Admin Panel ✅
+- [x] Songs catalog table view with filters (`/admin/songs`)
+- [x] Enhancement page by LRCLIB ID (`/admin/enhance/[slug]`)
+- [x] GP file uploader with preview (`GpUploader.tsx`)
+- [x] Alignment preview UI with editable timings (`AlignmentPreview.tsx`)
+- [x] Submit enhancement API (`POST /api/admin/lrc/enhance`)
+- [x] Delete enhancement API (`DELETE /api/admin/lrc/enhance`)
+- [x] Remove enhancement action on songs list
+- [x] Enhanced LRC preview with copy-to-clipboard
 
-### Phase 4: Runtime Integration
-- [ ] Update LRC parser to support enhanced format with word-level `<mm:ss.cc>` timestamps
-- [ ] Adjust word-by-word painting algorithm to use real timings instead of linear interpolation
-- [ ] Enhancement fetch API (by lrclibId + lrcHash)
-- [ ] LyricsPlayer patch application
-- [ ] Word-level highlight rendering
+### Phase 4: Runtime Integration ✅
+- [x] Add `enhancement` field to `LyricsApiSuccessResponse`
+- [x] Fetch enhancement payload in `/api/lyrics/[id]`
+- [x] Apply enhancement via `applyEnhancement()` on song page load
+- [x] Cache enhancement in localStorage with lyrics
+- [x] Word-level highlight rendering with time sync
+- [x] `WordOverlay` component with initial progress calculation
+- [x] Handle seek (calculate clip-path from elapsed time)
 
 ### Phase 5: Polish & Metrics
-- [ ] Error handling and validation
-- [ ] Loading states and progress
-- [ ] IndexedDB caching for enhancements
-- [ ] Play count aggregation
+- [x] Error handling for GP parsing and alignment
+- [x] Coverage percentage display
+- [x] Low coverage warning (< 80%)
+- [ ] IndexedDB caching for enhancements (using localStorage currently)
+- [ ] Play count aggregation in admin dashboard
 - [ ] Admin analytics/stats dashboard
+
+### Key Implementation Details
+
+**Alignment Algorithm (`src/lib/gp/align-words.ts`):**
+- Word offsets are calculated relative to the **first GP word in each line**, not the LRCLIB line start time
+- This preserves the actual relative timing between words from the Guitar Pro file
+- Handles cases where GP and LRCLIB timelines don't align
+
+**Word Painting (`src/components/display/LyricLine.tsx`):**
+- `elapsedInLine` is passed from `LyricsDisplay` to sync animation with player time
+- `WordOverlay` component handles three states:
+  - Word not started: animate from 0% with remaining delay
+  - Word in progress: calculate initial clip-path percentage
+  - Word complete: render fully painted (no animation)
+
+**Enhanced LRC Preview Format:**
+```
+[00:20.18] <00:00.00> You <00:00.43> take <00:00.86> a <00:01.07> mortal <00:01.64> man
+```
+Where `<mm:ss.xx>` is the word's start time relative to line start.

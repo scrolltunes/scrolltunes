@@ -4,6 +4,7 @@
  */
 
 import type { Lyrics } from "@/core"
+import type { EnhancementPayload } from "@/lib/db/schema"
 
 export interface AttributionSource {
   readonly name: string
@@ -22,6 +23,8 @@ export interface LyricsApiSuccessResponse {
   readonly albumArt?: string | null
   readonly spotifyId?: string | null
   readonly attribution: LyricsApiAttribution
+  readonly hasEnhancement?: boolean
+  readonly enhancement?: EnhancementPayload | null
 }
 
 export interface LyricsApiErrorResponse {

@@ -32,7 +32,7 @@ import {
   useVoiceTrigger,
   useWakeLock,
 } from "@/hooks"
-import { type LyricsApiResponse, isLyricsApiSuccess } from "@/lib"
+import { type LyricsApiResponse, applyEnhancement, isLyricsApiSuccess } from "@/lib"
 import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { parseTrackSlugWithId } from "@/lib/slug"
@@ -44,6 +44,7 @@ import {
   MusicNote,
   Pause,
   Play,
+  Sparkle,
   SpinnerGap,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
@@ -70,6 +71,7 @@ type LoadState =
       readonly spotifyId: string | null
       readonly bpmSource: AttributionSource | null
       readonly lyricsSource: AttributionSource | null
+      readonly hasEnhancement: boolean
     }
 
 const errorMessages: Record<ErrorType, { title: string; description: string }> = {
@@ -220,16 +222,21 @@ export default function SongPage() {
 
       // Use cache if it has BPM data, otherwise refetch to get BPM
       if (cached && cached.bpm !== null) {
-        load(cached.lyrics)
+        // Apply enhancement if available
+        const enhancedLyrics = cached.enhancement
+          ? applyEnhancement(cached.lyrics, cached.enhancement)
+          : cached.lyrics
+        load(enhancedLyrics)
         setLoadState({
           _tag: "Loaded",
-          lyrics: cached.lyrics,
+          lyrics: enhancedLyrics,
           bpm: cached.bpm,
           key: cached.key ?? null,
           albumArt: cached.albumArt ?? null,
           spotifyId: cached.spotifyId ?? null,
           bpmSource: cached.bpmSource ?? null,
           lyricsSource: cached.lyricsSource ?? null,
+          hasEnhancement: cached.hasEnhancement ?? false,
         })
 
         recentSongsStore.updateMetadata({
@@ -270,16 +277,21 @@ export default function SongPage() {
           return
         }
 
-        load(data.lyrics)
+        // Apply enhancement if available
+        const enhancedLyrics = data.enhancement
+          ? applyEnhancement(data.lyrics, data.enhancement)
+          : data.lyrics
+        load(enhancedLyrics)
         setLoadState({
           _tag: "Loaded",
-          lyrics: data.lyrics,
+          lyrics: enhancedLyrics,
           bpm: data.bpm,
           key: data.key,
           albumArt: data.albumArt ?? null,
           spotifyId: data.spotifyId ?? spotifyId ?? null,
           bpmSource: data.attribution?.bpm ?? null,
           lyricsSource: data.attribution?.lyrics ?? null,
+          hasEnhancement: data.hasEnhancement ?? false,
         })
 
         // Cache lyrics with spotifyId from API response (or URL param as fallback)
@@ -291,6 +303,8 @@ export default function SongPage() {
           spotifyId: data.spotifyId ?? spotifyId ?? undefined,
           bpmSource: data.attribution?.bpm ?? undefined,
           lyricsSource: data.attribution?.lyrics ?? undefined,
+          hasEnhancement: data.hasEnhancement ?? undefined,
+          enhancement: data.enhancement ?? undefined,
         })
 
         // Add to recents (without changing order)
@@ -549,6 +563,18 @@ export default function SongPage() {
       </AnimatePresence>
 
       <main className="pt-16 h-[calc(100vh-4rem)] flex flex-col min-h-0">
+        {/* Enhanced lyrics banner */}
+        {loadState._tag === "Loaded" && loadState.hasEnhancement && (
+          <div className="bg-gradient-to-r from-indigo-600/20 to-purple-600/20 border-b border-indigo-500/30 px-4 py-1.5">
+            <div className="max-w-4xl mx-auto flex items-center justify-center gap-2">
+              <Sparkle size={14} weight="fill" className="text-indigo-400" />
+              <span className="text-xs font-medium text-indigo-300">
+                Enhanced word-level timing
+              </span>
+            </div>
+          </div>
+        )}
+
         {lrclibId !== null && (
           <AnimatePresence initial={false}>
             {(!isLoaded || isHeaderVisible) && (

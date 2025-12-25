@@ -436,6 +436,18 @@ export function useCurrentLineIndex(): number {
 }
 
 /**
+ * Hook to get current playback time (in seconds)
+ * Returns 0 if not playing/paused
+ */
+export function useCurrentTime(): number {
+  const state = usePlayerState()
+  if (state._tag === "Playing" || state._tag === "Paused") {
+    return state.currentTime
+  }
+  return 0
+}
+
+/**
  * Hook to get reset count - increments each time reset is called
  */
 export function useResetCount(): number {

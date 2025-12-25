@@ -1,6 +1,7 @@
 "use client"
 
 import { ChordBadge, InlineChord } from "@/components/chords"
+import type { LyricWord } from "@/core"
 import type { LyricChordPosition } from "@/lib/chords"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useMemo } from "react"
@@ -15,6 +16,9 @@ export interface LyricLineProps {
   readonly fontSize?: number
   readonly innerRef?: (el: HTMLButtonElement | null) => void
   readonly duration?: number | undefined
+  readonly lineStartTime?: number | undefined
+  readonly wordTimings?: readonly LyricWord[] | undefined
+  readonly elapsedInLine?: number | undefined
   readonly isRTL?: boolean
   readonly isPlaying?: boolean
   readonly chords?: readonly string[] | undefined
@@ -73,9 +77,44 @@ function calculateWordTimings(
   totalDuration: number,
   chordPositions: readonly LyricChordPosition[] | undefined,
   variableSpeed: boolean,
+  providedWordTimings?: readonly LyricWord[] | undefined,
+  lineStartTime?: number | undefined,
 ): WordTimingWithPosition[] {
   const words = text.split(/(\s+)/)
 
+  // If we have enhancement-provided word timings, use them
+  if (providedWordTimings && providedWordTimings.length > 0 && lineStartTime !== undefined) {
+    let position = 0
+    let wordIndex = 0
+    const result: WordTimingWithPosition[] = []
+
+    for (const word of words) {
+      const startIndex = position
+      const endIndex = position + word.length
+      position = endIndex
+
+      if (word.trim() === "") {
+        result.push({ word, delay: 0, wordDuration: 0, startIndex, endIndex })
+      } else {
+        const timing = providedWordTimings[wordIndex]
+        wordIndex++
+
+        if (timing) {
+          // Convert absolute times to relative delay/duration
+          const delay = timing.startTime - lineStartTime
+          const wordDuration = timing.endTime - timing.startTime
+          result.push({ word, delay, wordDuration, startIndex, endIndex })
+        } else {
+          // Fallback: no timing for this word
+          result.push({ word, delay: 0, wordDuration: 0, startIndex, endIndex })
+        }
+      }
+    }
+
+    return result
+  }
+
+  // Fallback: estimate timings using syllable-based interpolation
   const chordSet = new Set<number>()
   if (chordPositions) {
     for (const ch of chordPositions) {
@@ -218,6 +257,72 @@ function renderWordWithChordAnchors(
   return parts
 }
 
+interface WordOverlayProps {
+  readonly word: string
+  readonly delay: number
+  readonly wordDuration: number
+  readonly elapsedInLine: number
+  readonly isRTL: boolean
+}
+
+/**
+ * Animated word overlay that syncs with player time.
+ * Calculates initial progress based on elapsed time to handle seeks and late renders.
+ */
+function WordOverlay({ word, delay, wordDuration, elapsedInLine, isRTL }: WordOverlayProps) {
+  // Calculate timing relative to current playback position
+  const wordEndTime = delay + wordDuration
+  const timeIntoWord = elapsedInLine - delay
+
+  // Word hasn't started yet
+  if (elapsedInLine < delay) {
+    const remainingDelay = delay - elapsedInLine
+    return (
+      <motion.span
+        className="absolute inset-0 text-white overflow-hidden pointer-events-none"
+        initial={{ clipPath: isRTL ? "inset(0 0 0 100%)" : "inset(0 100% 0 0)" }}
+        animate={{ clipPath: "inset(0 0% 0 0)" }}
+        transition={{
+          duration: wordDuration,
+          delay: remainingDelay,
+          ease: "linear",
+        }}
+      >
+        {word}
+      </motion.span>
+    )
+  }
+
+  // Word is already complete
+  if (elapsedInLine >= wordEndTime) {
+    return <span className="absolute inset-0 text-white pointer-events-none">{word}</span>
+  }
+
+  // Word is in progress - calculate initial clip percentage
+  const progress = wordDuration > 0 ? timeIntoWord / wordDuration : 1
+  const initialClipPercent = Math.min(100, Math.max(0, progress * 100))
+  const remainingDuration = Math.max(0, wordDuration - timeIntoWord)
+
+  // Start from current progress and animate to complete
+  const initialClip = isRTL
+    ? `inset(0 0 0 ${100 - initialClipPercent}%)`
+    : `inset(0 ${100 - initialClipPercent}% 0 0)`
+
+  return (
+    <motion.span
+      className="absolute inset-0 text-white overflow-hidden pointer-events-none"
+      initial={{ clipPath: initialClip }}
+      animate={{ clipPath: "inset(0 0% 0 0)" }}
+      transition={{
+        duration: remainingDuration,
+        ease: "linear",
+      }}
+    >
+      {word}
+    </motion.span>
+  )
+}
+
 /**
  * Single lyric line with active highlighting and positioned chords
  *
@@ -235,6 +340,9 @@ export const LyricLine = memo(function LyricLine({
   fontSize,
   innerRef,
   duration,
+  lineStartTime,
+  wordTimings: providedWordTimings,
+  elapsedInLine = 0,
   isRTL = false,
   isPlaying = true,
   chords,
@@ -242,8 +350,16 @@ export const LyricLine = memo(function LyricLine({
   variableSpeed = true,
 }: LyricLineProps) {
   const wordTimings = useMemo(
-    () => calculateWordTimings(text, duration ?? 0, chordPositions, variableSpeed),
-    [text, duration, chordPositions, variableSpeed],
+    () =>
+      calculateWordTimings(
+        text,
+        duration ?? 0,
+        chordPositions,
+        variableSpeed,
+        providedWordTimings,
+        lineStartTime,
+      ),
+    [text, duration, chordPositions, variableSpeed, providedWordTimings, lineStartTime],
   )
 
   const chordsPerWord = useMemo(
@@ -309,18 +425,13 @@ export const LyricLine = memo(function LyricLine({
 
               {/* Overlay layer: white text (animated or static based on state) */}
               {shouldAnimate ? (
-                <motion.span
-                  className="absolute inset-0 text-white overflow-hidden pointer-events-none"
-                  initial={{ clipPath: isRTL ? "inset(0 0 0 100%)" : "inset(0 100% 0 0)" }}
-                  animate={{ clipPath: "inset(0 0% 0 0)" }}
-                  transition={{
-                    duration: timing.wordDuration,
-                    delay: timing.delay,
-                    ease: "linear",
-                  }}
-                >
-                  {word}
-                </motion.span>
+                <WordOverlay
+                  word={word}
+                  delay={timing.delay}
+                  wordDuration={timing.wordDuration}
+                  elapsedInLine={elapsedInLine}
+                  isRTL={isRTL}
+                />
               ) : isActive ? (
                 <span className="absolute inset-0 text-white pointer-events-none">{word}</span>
               ) : null}

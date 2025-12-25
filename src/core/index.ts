@@ -3,6 +3,7 @@ export {
   lyricsPlayer,
   usePlayerState,
   useCurrentLineIndex,
+  useCurrentTime,
   usePlayerControls,
   useResetCount,
   type Lyrics,

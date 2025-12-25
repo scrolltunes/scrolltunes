@@ -3,6 +3,7 @@
  */
 
 import type { Lyrics } from "@/core"
+import type { EnhancementPayload } from "@/lib/db/schema"
 
 /**
  * A recently played song entry stored in localStorage
@@ -39,6 +40,8 @@ export interface CachedLyrics {
   readonly spotifyId?: string | undefined
   readonly bpmSource?: AttributionSource | undefined
   readonly lyricsSource?: AttributionSource | undefined
+  readonly hasEnhancement?: boolean | undefined
+  readonly enhancement?: EnhancementPayload | undefined
   readonly cachedAt: number // timestamp (ms since epoch)
 }
 

@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { normalizeSongInput } from "@/lib/db/normalize"
-import { userSongItems } from "@/lib/db/schema"
+import { songLrclibIds, songs, userSongItems } from "@/lib/db/schema"
+import { prepareCatalogSong } from "@/lib/song-catalog"
 import { DbLayer, DbService } from "@/services/db"
 import { and, desc, eq, sql } from "drizzle-orm"
 import { Data, Effect } from "effect"
@@ -67,6 +68,67 @@ const syncHistory = (request: Request) =>
       const lastPlayedAt = new Date(song.lastPlayedAt)
       const playCount = song.playCount ?? 1
 
+      // Parse lrclib ID from songId if provider is lrclib
+      const lrclibId =
+        song.songProvider === "lrclib"
+          ? Number.parseInt(song.songId.replace("lrclib:", ""), 10)
+          : null
+
+      // Upsert into global songs catalog
+      if (lrclibId && !Number.isNaN(lrclibId)) {
+        const prepared = prepareCatalogSong({
+          title: song.title,
+          artist: song.artist,
+          album: song.album,
+          durationMs: song.durationMs,
+          lrclibId,
+          hasSyncedLyrics: true,
+        })
+
+        const [catalogSong] = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .insert(songs)
+              .values({
+                title: prepared.title,
+                artist: prepared.artist,
+                album: prepared.album,
+                durationMs: prepared.durationMs,
+                artistLower: prepared.artistLower,
+                titleLower: prepared.titleLower,
+                hasSyncedLyrics: prepared.hasSyncedLyrics,
+                totalPlayCount: playCount,
+              })
+              .onConflictDoUpdate({
+                target: [songs.artistLower, songs.titleLower],
+                set: {
+                  ...(prepared.album && { album: prepared.album }),
+                  ...(prepared.durationMs && { durationMs: prepared.durationMs }),
+                  updatedAt: now,
+                },
+              })
+              .returning({ id: songs.id }),
+          catch: cause => new SyncError({ cause }),
+        })
+
+        // Link lrclibId to the song
+        if (catalogSong) {
+          yield* Effect.tryPromise({
+            try: () =>
+              db
+                .insert(songLrclibIds)
+                .values({
+                  songId: catalogSong.id,
+                  lrclibId,
+                  isPrimary: true,
+                })
+                .onConflictDoNothing(),
+            catch: cause => new SyncError({ cause }),
+          })
+        }
+      }
+
+      // Sync to user history
       yield* Effect.tryPromise({
         try: () =>
           db

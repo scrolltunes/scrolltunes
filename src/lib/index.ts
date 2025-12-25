@@ -113,3 +113,15 @@ export {
 } from "./silero-vad-config"
 
 export { containsRTL, detectLyricsDirection } from "./text-direction"
+
+export { applyEnhancement, hasWordTimings, getLineWordTimings } from "./enhancement"
+
+export { computeLrcHash, computeLrcHashSync, canonicalizeLrc } from "./lrc-hash"
+
+export {
+  prepareCatalogSong,
+  normalizeTitle,
+  normalizeArtist,
+  normalizeSongKey,
+  type CatalogSongInput,
+} from "./song-catalog"

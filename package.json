@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
+    "@coderline/alphatab": "^1.7.1",
     "@google-cloud/speech": "^7.2.1",
     "@neondatabase/serverless": "^1.0.2",
     "@phosphor-icons/react": "^2",

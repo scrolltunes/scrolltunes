@@ -1,4 +1,6 @@
 import { type BPMResult, getBpmRace, getBpmWithFallback } from "@/lib/bpm"
+import { db } from "@/lib/db"
+import { lrcWordEnhancements } from "@/lib/db/schema"
 import { getAlbumArt } from "@/lib/deezer-client"
 import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
 import {
@@ -18,6 +20,7 @@ import {
 } from "@/lib/spotify-client"
 import { BpmProviders } from "@/services/bpm-providers"
 import { ServerLayer } from "@/services/server-layer"
+import { eq } from "drizzle-orm"
 import { Effect } from "effect"
 import { NextResponse } from "next/server"
 
@@ -222,6 +225,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const albumArt = spotifyAlbumArt ?? (await getAlbumArt(lyrics.artist, lyrics.title, "medium"))
 
+  // Fetch enhancement payload if it exists for this LRCLIB ID
+  const [enhancement] = await db
+    .select({ id: lrcWordEnhancements.id, payload: lrcWordEnhancements.payload })
+    .from(lrcWordEnhancements)
+    .where(eq(lrcWordEnhancements.sourceLrclibId, id))
+    .limit(1)
+
   const normalizedLyrics = {
     ...lyrics,
     title: spotifyTrackName ?? normalizeTrackName(lyrics.title),
@@ -239,6 +249,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       lyrics: { name: "LRCLIB", url: "https://lrclib.net" },
       bpm: bpmResult ? getBpmAttribution(bpmResult.source) : null,
     },
+    hasEnhancement: !!enhancement,
+    enhancement: enhancement?.payload ?? null,
   }
   return NextResponse.json(body, {
     headers: {

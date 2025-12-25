@@ -4,9 +4,11 @@ import { springs } from "@/animations"
 import { useAccount, useIsAdmin } from "@/core"
 import {
   ArrowLeft,
+  ArrowSquareOut,
   ChartBar,
   Heart,
   ListChecks,
+  MusicNote,
   ShieldWarning,
   Textbox,
   Users,
@@ -239,6 +241,13 @@ function MobileTabs({
             <span>{section.label}</span>
           </button>
         ))}
+        <Link
+          href="/admin/songs"
+          className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors bg-neutral-900 text-neutral-400 hover:text-white"
+        >
+          <MusicNote size={20} />
+          <span>Songs</span>
+        </Link>
       </div>
     </nav>
   )
@@ -271,6 +280,19 @@ function Sidebar({
           </li>
         ))}
       </ul>
+      <div className="mt-6 pt-6 border-t border-neutral-800">
+        <p className="px-4 mb-2 text-xs font-medium text-neutral-500 uppercase tracking-wider">
+          Tools
+        </p>
+        <Link
+          href="/admin/songs"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors text-neutral-400 hover:bg-neutral-900 hover:text-white"
+        >
+          <MusicNote size={20} />
+          <span className="flex-1">Songs Catalog</span>
+          <ArrowSquareOut size={16} className="text-neutral-600" />
+        </Link>
+      </div>
     </nav>
   )
 }

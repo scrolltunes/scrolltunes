@@ -2,14 +2,7 @@
 
 import { Logo } from "@/components/ui"
 import { useAccount, useIsAdmin } from "@/core"
-import {
-  CaretDown,
-  GearSix,
-  Heart,
-  Info,
-  MusicNotes,
-  ShieldCheck,
-} from "@phosphor-icons/react"
+import { CaretDown, GearSix, Heart, Info, MusicNotes, ShieldCheck } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
 import { memo, useCallback, useEffect, useRef, useState } from "react"

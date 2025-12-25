@@ -160,7 +160,40 @@ await setlistsStore.create("My Setlist") // Create new setlist
 await setlistsStore.addSong(setlistId, song) // Add song to setlist
 ```
 
-### 8. SongListItem Component
+### 8. LRC Enhancement System
+
+Word-level timing for karaoke-style highlighting, sourced from Guitar Pro files.
+
+**Data flow:**
+1. Admin uploads Guitar Pro file at `/admin/enhance/[lrclibId]`
+2. GP syllables are joined into words with tick-based timing
+3. Words are aligned to LRCLIB lyrics using fuzzy matching
+4. Enhancement payload is stored in `lrc_word_enhancements` table
+5. `/api/lyrics/[id]` returns enhancement payload when available
+6. Song page applies enhancement via `applyEnhancement()` before loading
+
+**Enhancement payload format:**
+```typescript
+interface EnhancementPayload {
+  version: number
+  algoVersion: number
+  lines: Array<{
+    idx: number  // line index
+    words: Array<{
+      idx: number   // word index
+      start: number // offset from line start in ms
+      dur: number   // duration in ms
+    }>
+  }>
+}
+```
+
+**Key files:**
+- `src/lib/gp/align-words.ts` - Alignment algorithm
+- `src/lib/enhancement.ts` - Apply enhancement to lyrics
+- `src/app/admin/enhance/[slug]/page.tsx` - Admin UI
+
+### 9. SongListItem Component
 
 **Always use `SongListItem` when displaying a song in a list.** This component handles:
 - Loading and displaying cached normalized titles from Spotify

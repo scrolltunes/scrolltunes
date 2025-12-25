@@ -4,6 +4,7 @@ import { springs } from "@/animations"
 import {
   useChordsData,
   useCurrentLineIndex,
+  useCurrentTime,
   usePlayerControls,
   usePlayerState,
   usePreferences,
@@ -53,6 +54,7 @@ export interface LyricsDisplayProps {
 export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const state = usePlayerState()
   const currentLineIndex = useCurrentLineIndex()
+  const currentTime = useCurrentTime()
   const resetCount = useResetCount()
   const { jumpToLine } = usePlayerControls()
   const { fontSize } = usePreferences()
@@ -637,6 +639,8 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
             ? (lyrics.lines[index + 1]?.startTime ?? lyrics.duration) - line.startTime
             : undefined
           const chordData = lineChordData.get(index)
+          // Calculate elapsed time within the current line for word-level sync
+          const elapsedInLine = isActive ? Math.max(0, currentTime - line.startTime) : undefined
 
           return (
             <LyricLine
@@ -656,6 +660,9 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
               chords={chordData?.chords}
               chordPositions={chordData?.chordPositions}
               variableSpeed={variableSpeed}
+              lineStartTime={line.startTime}
+              wordTimings={line.words}
+              elapsedInLine={elapsedInLine}
               {...(duration !== undefined && { duration })}
             />
           )

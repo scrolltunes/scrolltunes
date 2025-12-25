@@ -419,22 +419,21 @@ export class SpeechRecognitionStore {
    * This pre-initializes Tone.js/AudioContext and pre-fetches STT session token.
    * Should be called after quota check succeeds.
    */
-  private readonly prewarmEffect: Effect.Effect<
-    void,
-    never,
-    SttStreamService
-  > = Effect.gen(this, function* () {
-    speechLog("PREWARM", "Pre-warming speech recognition...")
+  private readonly prewarmEffect: Effect.Effect<void, never, SttStreamService> = Effect.gen(
+    this,
+    function* () {
+      speechLog("PREWARM", "Pre-warming speech recognition...")
 
-    // Note: Tone.js/AudioContext requires user gesture, so we can't pre-initialize it here.
-    // It will be initialized on the first mic button click.
+      // Note: Tone.js/AudioContext requires user gesture, so we can't pre-initialize it here.
+      // It will be initialized on the first mic button click.
 
-    // Pre-fetch STT session token (this doesn't require user gesture)
-    const stt = yield* SttStreamService
-    yield* stt.prewarm
+      // Pre-fetch STT session token (this doesn't require user gesture)
+      const stt = yield* SttStreamService
+      yield* stt.prewarm
 
-    speechLog("PREWARM", "Pre-warming complete")
-  })
+      speechLog("PREWARM", "Pre-warming complete")
+    },
+  )
 
   async prewarm(): Promise<void> {
     await this.runPromiseWithClientLayer(this.prewarmEffect)

@@ -426,11 +426,101 @@
 
 ---
 
+## Phase 10: LRC Enhancement System ✅
+
+> Word-level timing from Guitar Pro files for precise karaoke-style highlighting
+
+### Database Schema
+- [x] Create `songs` table (global song catalog with normalized artist/title)
+- [x] Create `song_lrclib_ids` table (maps songs to LRCLIB IDs, 1:many)
+- [x] Create `lrc_word_enhancements` table (stores word-level timing payload)
+- [x] Add `hasEnhancement` flag to songs table
+
+### Enhancement Payload Format
+```typescript
+interface EnhancementPayload {
+  version: number
+  algoVersion: number
+  lines: Array<{
+    idx: number  // line index in LRC
+    words: Array<{
+      idx: number   // word index in line
+      start: number // offset from line start in ms
+      dur: number   // duration in ms
+    }>
+  }>
+}
+```
+
+### Admin Panel
+- [x] Create `/admin/songs` page with search, filters, pagination
+- [x] Show enhancement status (checkmark for enhanced songs)
+- [x] Filter by: all, synced, enhanced, unenhanced
+- [x] Create `/admin/enhance/[slug]` page (slug = LRCLIB ID)
+- [x] Add "Remove Enhancement" action on songs list
+
+### Guitar Pro Integration
+- [x] Create `GpUploader` component for .gp file upload
+- [x] Parse Guitar Pro files using `alphatab` library
+- [x] Extract lyric syllables with tick-based timing
+- [x] Convert ticks to milliseconds using tempo events
+- [x] Join syllables into words (handle hyphenated continuations)
+
+### Alignment Algorithm (`src/lib/gp/align-words.ts`)
+- [x] Parse LRC content into lines with words
+- [x] Match GP words to LRC words using normalized comparison
+- [x] Handle split syllables (e.g., "con" + "trol" → "control")
+- [x] Use sliding window (MAX_LOOKAHEAD=10) for fuzzy matching
+- [x] Calculate word offsets relative to first GP word in line (not LRCLIB line start)
+- [x] Generate coverage statistics (% of words matched)
+
+### API Routes
+- [x] `POST /api/admin/lrc/enhance` - Save enhancement payload
+  - Upserts on conflict (sourceLrclibId + lrcHash)
+  - Updates song's `hasEnhancement` flag
+- [x] `DELETE /api/admin/lrc/enhance` - Remove enhancement
+- [x] `GET /api/admin/lrc/[id]` - Fetch LRCLIB lyrics by ID
+- [x] `GET /api/admin/songs` - List songs with filters
+
+### Client Integration
+- [x] Add `enhancement` field to `LyricsApiSuccessResponse` type
+- [x] Add `enhancement` field to `CachedLyrics` type
+- [x] Update `/api/lyrics/[id]` to fetch and return enhancement payload
+- [x] Create `applyEnhancement()` function (`src/lib/enhancement.ts`)
+- [x] Apply enhancement to lyrics on song page load
+- [x] Bump lyrics cache version to invalidate old cached data
+
+### Word-Level Display
+- [x] Pass `elapsedInLine` to `LyricLine` component
+- [x] Create `WordOverlay` component with time-synced animation
+- [x] Calculate initial clip-path based on elapsed time (handles seek)
+- [x] Three states: word not started, word in progress, word complete
+
+### Enhanced LRC Preview
+- [x] Show word-level timing in preview format: `[mm:ss.xx] <mm:ss.xx> word ...`
+- [x] Copy to clipboard functionality
+- [x] Display after alignment, before save
+
+### Files
+- `src/lib/gp/` - Guitar Pro parsing and alignment
+  - `align-words.ts` - Word alignment algorithm
+  - `build-words.ts` - Syllable → word joining
+  - `timing.ts` - Tick to millisecond conversion
+  - `types.ts` - Shared types
+- `src/lib/enhancement.ts` - Apply enhancement to lyrics
+- `src/components/admin/` - Admin UI components
+  - `GpUploader.tsx` - File upload
+  - `AlignmentPreview.tsx` - Word timing editor
+- `src/app/admin/songs/page.tsx` - Songs catalog
+- `src/app/admin/enhance/[slug]/page.tsx` - Enhancement workflow
+
+---
+
 ## Current Focus
 
 > Update this section with what you're currently working on
 
-**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs), Phase 9 (mostly complete)
+**Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs), Phase 9 (mostly complete), Phase 10 (LRC Enhancement)
 
 **Active:** Phase 9 remaining items:
 - API: `/api/user/song-settings` GET/POST

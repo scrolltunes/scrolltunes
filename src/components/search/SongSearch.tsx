@@ -455,10 +455,7 @@ export const SongSearch = memo(function SongSearch({
               {voiceSearch.isProcessing ? (
                 <span className="truncate block text-emerald-400">Processing...</span>
               ) : streamingText ? (
-                <StreamingText
-                  text={streamingText}
-                  className="truncate block text-indigo-400"
-                />
+                <StreamingText text={streamingText} className="truncate block text-indigo-400" />
               ) : (
                 <span className="truncate block text-indigo-400">Listening...</span>
               )}
