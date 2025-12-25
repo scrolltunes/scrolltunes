@@ -164,13 +164,24 @@ await setlistsStore.addSong(setlistId, song) // Add song to setlist
 
 Word-level timing for karaoke-style highlighting, sourced from Guitar Pro files.
 
+**Display modes:**
+- **Default (Word timing OFF)**: Entire line highlights white instantly when active
+- **Word timing ON**: Word-by-word animation (uses enhanced timing if available, otherwise estimates based on syllables)
+
+The `wordTimingEnabled` preference (stored in `PreferencesStore`) controls this behavior. The toggle appears in `SongActionBar` with a Timer icon. When enhanced timing is available, a sparkle indicator appears.
+
+**Admin features:**
+- Admins see a dropdown on the Word timing button to toggle between "Enhanced" and "Estimated" modes on the fly for comparison
+
 **Data flow:**
 1. Admin uploads Guitar Pro file at `/admin/enhance/[lrclibId]`
 2. GP syllables are joined into words with tick-based timing
 3. Words are aligned to LRCLIB lyrics using fuzzy matching
 4. Enhancement payload is stored in `lrc_word_enhancements` table
 5. `/api/lyrics/[id]` returns enhancement payload when available
-6. Song page applies enhancement via `applyEnhancement()` before loading
+6. Song page stores original lyrics + enhancement payload separately
+7. Enhancement is applied on load if available (provides better timing data)
+8. `LyricLine` component renders word-by-word or whole-line based on `wordTimingEnabled` preference
 
 **Enhancement payload format:**
 ```typescript
@@ -190,8 +201,11 @@ interface EnhancementPayload {
 
 **Key files:**
 - `src/lib/gp/align-words.ts` - Alignment algorithm
+- `src/lib/gp/enhance-lrc.ts` - Enhancement pipeline (enhanceLrc, generateEnhancedLrc)
 - `src/lib/enhancement.ts` - Apply enhancement to lyrics
 - `src/app/admin/enhance/[slug]/page.tsx` - Admin UI
+- `src/core/PreferencesStore.ts` - `wordTimingEnabled` preference
+- `src/components/display/LyricLine.tsx` - Renders word timing animation
 
 ### 9. SongListItem Component
 

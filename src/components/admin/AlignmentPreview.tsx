@@ -1,5 +1,6 @@
 "use client"
 
+import { springs } from "@/animations"
 import type { EnhancementPayload } from "@/lib/db/schema"
 import {
   type LrcLine,
@@ -9,7 +10,8 @@ import {
   parseLrcToLines,
   patchesToPayload,
 } from "@/lib/gp"
-import { CheckCircle, Pencil, Warning, X } from "@phosphor-icons/react"
+import { Check, PencilSimple, Warning, X } from "@phosphor-icons/react"
+import { motion } from "motion/react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 interface AlignmentPreviewProps {
@@ -23,15 +25,6 @@ interface AlignmentPreviewProps {
   readonly disabled?: boolean
 }
 
-interface EditableWordTiming {
-  lineIndex: number
-  wordIndex: number
-  lrcWord: string
-  startMs: number | null
-  durationMs: number | null
-  matched: boolean
-}
-
 function formatTime(ms: number): string {
   const totalSeconds = ms / 1000
   const minutes = Math.floor(totalSeconds / 60)
@@ -39,167 +32,208 @@ function formatTime(ms: number): string {
   return `${minutes}:${seconds.toFixed(2).padStart(5, "0")}`
 }
 
-function parseTime(str: string): number | null {
-  const match = str.match(/^(\d+):(\d+(?:\.\d+)?)$/)
-  if (!match || !match[1] || !match[2]) return null
-  const minutes = Number.parseInt(match[1], 10)
-  const seconds = Number.parseFloat(match[2])
+function parseTime(timeStr: string): number | null {
+  const match = timeStr.match(/^(\d+):(\d{1,2}(?:\.\d{1,3})?)$/)
+  if (!match) return null
+  const [, minStr, secStr] = match
+  const minutes = Number.parseInt(minStr ?? "0", 10)
+  const seconds = Number.parseFloat(secStr ?? "0")
   if (Number.isNaN(minutes) || Number.isNaN(seconds)) return null
   return Math.round((minutes * 60 + seconds) * 1000)
 }
 
-function WordTimingRow({
-  word,
-  onUpdate,
-  lineStartMs,
-}: {
-  word: EditableWordTiming
-  onUpdate: (updates: Partial<EditableWordTiming>) => void
-  lineStartMs: number
-}) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editStartMs, setEditStartMs] = useState("")
-  const [editDurationMs, setEditDurationMs] = useState("")
+function normalizeForComparison(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[''`]/g, "") // Remove apostrophes
+    .replace(/[^\p{L}\p{N}]/gu, "") // Remove all non-letter/number chars
+}
 
-  const handleStartEdit = () => {
-    setEditStartMs(word.startMs !== null ? formatTime(word.startMs) : "")
-    setEditDurationMs(word.durationMs !== null ? word.durationMs.toString() : "")
-    setIsEditing(true)
-  }
+function areWordsSimilar(lrcWord: string, gpWord: string): boolean {
+  return normalizeForComparison(lrcWord) === normalizeForComparison(gpWord)
+}
+
+interface EditableWord {
+  lineIndex: number
+  wordIndex: number
+  word: string
+  startMs: number | null
+  durationMs: number | null
+  matched: boolean
+  gpText: string | null // Original GP word that matched
+}
+
+interface WordEditorProps {
+  readonly word: EditableWord
+  readonly lineStartMs: number
+  readonly onSave: (startMs: number, durationMs: number) => void
+  readonly onCancel: () => void
+  readonly gpWords: readonly WordTiming[]
+}
+
+function WordEditor({ word, lineStartMs, onSave, onCancel, gpWords }: WordEditorProps) {
+  const [startInput, setStartInput] = useState(
+    word.startMs !== null ? formatTime(word.startMs) : formatTime(lineStartMs),
+  )
+  const [durationInput, setDurationInput] = useState(
+    word.durationMs !== null ? word.durationMs.toString() : "500",
+  )
 
   const handleSave = () => {
-    const newStartMs = parseTime(editStartMs)
-    const newDurationMs = editDurationMs ? Number.parseInt(editDurationMs, 10) : null
-
-    onUpdate({
-      startMs: newStartMs,
-      durationMs: newDurationMs && !Number.isNaN(newDurationMs) ? newDurationMs : null,
-      matched: newStartMs !== null,
-    })
-    setIsEditing(false)
+    const startMs = parseTime(startInput)
+    const durationMs = Number.parseInt(durationInput, 10)
+    if (startMs !== null && !Number.isNaN(durationMs) && durationMs > 0) {
+      onSave(startMs, durationMs)
+    }
   }
 
-  const handleCancel = () => {
-    setIsEditing(false)
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSave()
+    } else if (e.key === "Escape") {
+      onCancel()
+    }
   }
 
-  const relativeStart = word.startMs !== null ? word.startMs - lineStartMs : null
+  const nearbyGpWords = useMemo(() => {
+    return gpWords
+      .filter(gp => Math.abs(gp.startMs - lineStartMs) < 10000)
+      .slice(0, 8)
+  }, [gpWords, lineStartMs])
 
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-2 py-1.5 px-2 rounded bg-neutral-800 border border-indigo-500">
-        <span className="text-white font-medium min-w-[80px]">{word.lrcWord}</span>
-        <input
-          type="text"
-          value={editStartMs}
-          onChange={e => setEditStartMs(e.target.value)}
-          placeholder="0:00.00"
-          className="w-20 px-2 py-1 text-xs bg-neutral-900 border border-neutral-700 rounded text-white font-mono"
-        />
-        <input
-          type="text"
-          value={editDurationMs}
-          onChange={e => setEditDurationMs(e.target.value)}
-          placeholder="ms"
-          className="w-16 px-2 py-1 text-xs bg-neutral-900 border border-neutral-700 rounded text-white font-mono"
-        />
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -5 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -5 }}
+      transition={springs.default}
+      className="absolute left-0 top-full mt-1 z-50 bg-neutral-800 border border-neutral-700 rounded-lg p-3 shadow-xl min-w-64"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-white">"{word.word}"</span>
         <button
           type="button"
-          onClick={handleSave}
-          className="p-1 text-emerald-400 hover:text-emerald-300"
-        >
-          <CheckCircle size={16} weight="fill" />
-        </button>
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="p-1 text-neutral-400 hover:text-neutral-300"
+          onClick={onCancel}
+          className="text-neutral-400 hover:text-white"
         >
           <X size={16} />
         </button>
       </div>
-    )
-  }
 
-  return (
-    <div
-      className={`flex items-center gap-2 py-1.5 px-2 rounded group cursor-pointer hover:bg-neutral-800 ${
-        word.matched ? "bg-emerald-900/20" : "bg-orange-900/20"
-      }`}
-      onClick={handleStartEdit}
-      onKeyDown={e => e.key === "Enter" && handleStartEdit()}
-      tabIndex={0}
-      role="button"
-    >
-      <span
-        className={`font-medium min-w-[80px] ${word.matched ? "text-emerald-400" : "text-orange-400"}`}
-      >
-        {word.lrcWord}
-      </span>
-      {word.startMs !== null ? (
-        <>
-          <span className="text-xs font-mono text-neutral-400" title="Absolute start time">
-            {formatTime(word.startMs)}
-          </span>
-          <span className="text-xs text-neutral-600">|</span>
-          <span className="text-xs font-mono text-neutral-500" title="Relative to line start">
-            +{relativeStart !== null ? relativeStart : 0}ms
-          </span>
-          <span className="text-xs text-neutral-600">|</span>
-          <span className="text-xs font-mono text-neutral-500" title="Duration">
-            {word.durationMs}ms
-          </span>
-        </>
-      ) : (
-        <span className="text-xs text-neutral-500 italic">No timing</span>
-      )}
-      <Pencil
-        size={12}
-        className="ml-auto text-neutral-600 opacity-0 group-hover:opacity-100 transition-opacity"
-      />
-    </div>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-neutral-400 w-14">Start</label>
+          <input
+            type="text"
+            value={startInput}
+            onChange={e => setStartInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="0:00.00"
+            className="flex-1 px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
+            autoFocus
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-neutral-400 w-14">Duration</label>
+          <input
+            type="text"
+            value={durationInput}
+            onChange={e => setDurationInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="500"
+            className="flex-1 px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
+          />
+          <span className="text-xs text-neutral-500">ms</span>
+        </div>
+
+        {nearbyGpWords.length > 0 && (
+          <div className="pt-2 border-t border-neutral-700">
+            <p className="text-xs text-neutral-500 mb-1">Nearby GP words:</p>
+            <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+              {nearbyGpWords.map((gp, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setStartInput(formatTime(gp.startMs))}
+                  className="px-1.5 py-0.5 bg-neutral-900 border border-neutral-700 rounded text-xs text-neutral-300 hover:border-indigo-500 hover:text-white transition-colors"
+                >
+                  {gp.text} <span className="text-neutral-500">{formatTime(gp.startMs)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-2">
+          <button
+            type="button"
+            onClick={handleSave}
+            className="flex-1 px-3 py-1.5 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-500 transition-colors"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1.5 bg-neutral-700 text-neutral-300 text-sm rounded hover:bg-neutral-600 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
-function LineTimingSection({
-  lineIndex,
-  line,
-  words,
-  onUpdateWord,
-}: {
+interface EditableLineData {
   lineIndex: number
-  line: LrcLine
-  words: EditableWordTiming[]
-  onUpdateWord: (lineIndex: number, wordIndex: number, updates: Partial<EditableWordTiming>) => void
-}) {
-  const matchedCount = words.filter(w => w.matched).length
+  lineStartMs: number
+  words: EditableWord[]
+}
 
-  return (
-    <div className="rounded-lg bg-neutral-900/50 p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded">
-            {String(lineIndex + 1).padStart(2, "0")}
-          </span>
-          <span className="text-xs font-mono text-indigo-400">{formatTime(line.startMs)}</span>
-        </div>
-        <span className="text-xs text-neutral-500">
-          {matchedCount}/{words.length} matched
-        </span>
-      </div>
-      <div className="text-sm text-neutral-300 mb-2">{line.text}</div>
-      <div className="space-y-1">
-        {words.map(word => (
-          <WordTimingRow
-            key={`${word.lineIndex}-${word.wordIndex}`}
-            word={word}
-            lineStartMs={line.startMs}
-            onUpdate={updates => onUpdateWord(lineIndex, word.wordIndex, updates)}
-          />
-        ))}
-      </div>
-    </div>
-  )
+function buildEditableData(
+  lrcLines: readonly LrcLine[],
+  patches: readonly WordPatch[],
+): EditableLineData[] {
+  const patchMap = new Map<string, WordPatch>()
+  for (const patch of patches) {
+    patchMap.set(`${patch.lineIndex}-${patch.wordIndex}`, patch)
+  }
+
+  return lrcLines.map((line, lineIdx) => ({
+    lineIndex: lineIdx,
+    lineStartMs: line.startMs,
+    words: line.words.map((word, wordIdx) => {
+      const patch = patchMap.get(`${lineIdx}-${wordIdx}`)
+      return {
+        lineIndex: lineIdx,
+        wordIndex: wordIdx,
+        word,
+        startMs: patch?.startMs ?? null,
+        durationMs: patch?.durationMs ?? null,
+        matched: patch !== undefined,
+        gpText: patch?.gpText ?? null,
+      }
+    }),
+  }))
+}
+
+function editableDataToPatches(data: readonly EditableLineData[]): WordPatch[] {
+  const patches: WordPatch[] = []
+  for (const line of data) {
+    for (const word of line.words) {
+      if (word.startMs !== null && word.durationMs !== null) {
+        patches.push({
+          lineIndex: word.lineIndex,
+          wordIndex: word.wordIndex,
+          startMs: word.startMs,
+          durationMs: word.durationMs,
+        })
+      }
+    }
+  }
+  return patches
 }
 
 export function AlignmentPreview({
@@ -209,197 +243,197 @@ export function AlignmentPreview({
   disabled = false,
 }: AlignmentPreviewProps) {
   const lrcLines = useMemo(() => parseLrcToLines(lrcContent), [lrcContent])
-
   const initialAlignment = useMemo(() => alignWords(lrcLines, gpWords), [lrcLines, gpWords])
 
-  // Convert patches to editable word timings
-  const [wordTimings, setWordTimings] = useState<EditableWordTiming[]>(() => {
-    const timings: EditableWordTiming[] = []
-    const patchMap = new Map<string, WordPatch>()
+  const [editableData, setEditableData] = useState<EditableLineData[]>(() =>
+    buildEditableData(lrcLines, initialAlignment.patches),
+  )
+  const [editingWord, setEditingWord] = useState<{ lineIndex: number; wordIndex: number } | null>(
+    null,
+  )
 
-    for (const patch of initialAlignment.patches) {
-      patchMap.set(`${patch.lineIndex}-${patch.wordIndex}`, patch)
-    }
+  useEffect(() => {
+    setEditableData(buildEditableData(lrcLines, initialAlignment.patches))
+    setEditingWord(null)
+  }, [lrcLines, initialAlignment.patches])
 
-    for (let lineIdx = 0; lineIdx < lrcLines.length; lineIdx++) {
-      const line = lrcLines[lineIdx]
-      if (!line) continue
-
-      for (let wordIdx = 0; wordIdx < line.words.length; wordIdx++) {
-        const lrcWord = line.words[wordIdx]
-        if (!lrcWord) continue
-
-        const patch = patchMap.get(`${lineIdx}-${wordIdx}`)
-
-        timings.push({
-          lineIndex: lineIdx,
-          wordIndex: wordIdx,
-          lrcWord,
-          startMs: patch?.startMs ?? null,
-          durationMs: patch?.durationMs ?? null,
-          matched: !!patch,
-        })
+  const stats = useMemo(() => {
+    let totalWords = 0
+    let matchedWords = 0
+    for (const line of editableData) {
+      for (const word of line.words) {
+        totalWords++
+        if (word.matched) matchedWords++
       }
     }
+    const coverage = totalWords > 0 ? (matchedWords / totalWords) * 100 : 0
+    return { totalWords, matchedWords, coverage }
+  }, [editableData])
 
-    return timings
-  })
+  const handleWordClick = useCallback(
+    (lineIndex: number, wordIndex: number) => {
+      if (disabled) return
+      setEditingWord({ lineIndex, wordIndex })
+    },
+    [disabled],
+  )
 
-  const handleUpdateWord = useCallback(
-    (lineIndex: number, wordIndex: number, updates: Partial<EditableWordTiming>) => {
-      setWordTimings(prev =>
-        prev.map(w =>
-          w.lineIndex === lineIndex && w.wordIndex === wordIndex ? { ...w, ...updates } : w,
+  const handleWordSave = useCallback(
+    (lineIndex: number, wordIndex: number, startMs: number, durationMs: number) => {
+      setEditableData(prev =>
+        prev.map(line =>
+          line.lineIndex === lineIndex
+            ? {
+                ...line,
+                words: line.words.map(w =>
+                  w.wordIndex === wordIndex
+                    ? { ...w, startMs, durationMs, matched: true }
+                    : w,
+                ),
+              }
+            : line,
         ),
       )
+      setEditingWord(null)
     },
     [],
   )
 
-  // Group words by line
-  const lineGroups = useMemo(() => {
-    const groups: Map<number, EditableWordTiming[]> = new Map()
+  const handleCancelEdit = useCallback(() => {
+    setEditingWord(null)
+  }, [])
 
-    for (const word of wordTimings) {
-      const existing = groups.get(word.lineIndex)
-      if (existing) {
-        existing.push(word)
-      } else {
-        groups.set(word.lineIndex, [word])
-      }
-    }
-
-    return groups
-  }, [wordTimings])
-
-  // Calculate stats
-  const stats = useMemo(() => {
-    const total = wordTimings.length
-    const matched = wordTimings.filter(w => w.matched).length
-    const coverage = total > 0 ? (matched / total) * 100 : 0
-    return { total, matched, coverage }
-  }, [wordTimings])
-
-  const isLowCoverage = stats.coverage < 80
-
-  // Auto-call onAlignmentComplete when wordTimings change
   useEffect(() => {
-    const patches: WordPatch[] = wordTimings.flatMap(w =>
-      w.startMs !== null && w.durationMs !== null
-        ? [
-            {
-              lineIndex: w.lineIndex,
-              wordIndex: w.wordIndex,
-              startMs: w.startMs,
-              durationMs: w.durationMs,
-            },
-          ]
-        : [],
-    )
-
+    const patches = editableDataToPatches(editableData)
     const payload = patchesToPayload(patches, lrcLines)
     onAlignmentComplete({
       patches,
       payload,
       coverage: stats.coverage,
     })
-  }, [wordTimings, lrcLines, onAlignmentComplete, stats.coverage])
+  }, [editableData, lrcLines, stats.coverage, onAlignmentComplete])
+
+  const coveragePercent = Math.round(stats.coverage)
+  const coverageColor =
+    coveragePercent >= 90
+      ? "text-emerald-400"
+      : coveragePercent >= 70
+        ? "text-amber-400"
+        : "text-red-400"
 
   return (
-    <div className="space-y-6">
-      {/* Coverage Stats */}
-      <div className="rounded-xl bg-neutral-800/50 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-medium text-white">Alignment Results</h3>
-          {isLowCoverage ? (
-            <div className="flex items-center gap-1.5 text-amber-400">
-              <Warning size={20} weight="fill" />
-              <span className="text-sm font-medium">Low coverage</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-emerald-400">
-              <CheckCircle size={20} weight="fill" />
-              <span className="text-sm font-medium">Good coverage</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-baseline gap-2 mb-4">
-          <span
-            className={`text-4xl font-bold ${isLowCoverage ? "text-amber-400" : "text-emerald-400"}`}
-          >
-            {stats.coverage.toFixed(1)}%
+    <div className="rounded-xl bg-neutral-900 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-medium">Alignment Preview</h3>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-neutral-400">
+            {stats.matchedWords} / {stats.totalWords} words matched
           </span>
-          <span className="text-neutral-400">word coverage</span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="rounded-lg bg-neutral-900/50 p-3">
-            <div className="text-2xl font-semibold text-white">{stats.total}</div>
-            <div className="text-xs text-neutral-400">Total words</div>
-          </div>
-          <div className="rounded-lg bg-neutral-900/50 p-3">
-            <div className="text-2xl font-semibold text-emerald-400">{stats.matched}</div>
-            <div className="text-xs text-neutral-400">Matched</div>
-          </div>
-          <div className="rounded-lg bg-neutral-900/50 p-3">
-            <div className="text-2xl font-semibold text-red-400">{stats.total - stats.matched}</div>
-            <div className="text-xs text-neutral-400">Unmatched</div>
-          </div>
-        </div>
-
-        {isLowCoverage && (
-          <div className="mt-4 rounded-lg bg-amber-900/30 border border-amber-700/50 p-3">
-            <p className="text-sm text-amber-200">
-              Coverage below 80%. Click on unmatched words to manually add timing.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Word Timings Editor */}
-      <div className="rounded-xl bg-neutral-800/50 p-4">
-        <h4 className="text-sm font-medium text-neutral-400 mb-3 uppercase tracking-wide">
-          Word Timings ({lrcLines.length} lines)
-        </h4>
-        <p className="text-xs text-neutral-500 mb-4">
-          Click any word to edit its timing. Format: minutes:seconds.hundredths (e.g., 1:23.45)
-        </p>
-        <div className="max-h-[500px] overflow-y-auto space-y-4 pr-2">
-          {lrcLines.map((line, lineIdx) => {
-            const lineWords = lineGroups.get(lineIdx) ?? []
-            return (
-              <LineTimingSection
-                key={lineIdx}
-                lineIndex={lineIdx}
-                line={line}
-                words={lineWords}
-                onUpdateWord={handleUpdateWord}
-              />
-            )
-          })}
+          <span className={`text-sm font-medium ${coverageColor}`}>{coveragePercent}% coverage</span>
         </div>
       </div>
 
-      {/* GP Words Reference */}
-      <details className="rounded-xl bg-neutral-800/50 p-4">
-        <summary className="text-sm font-medium text-neutral-400 cursor-pointer hover:text-neutral-300">
-          Guitar Pro Words Reference ({gpWords.length} words)
-        </summary>
-        <div className="mt-3 max-h-40 overflow-y-auto rounded-lg bg-neutral-900/50 p-3">
-          <div className="flex flex-wrap gap-1">
-            {gpWords.map((word, idx) => (
-              <span
-                key={idx}
-                className="text-xs font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded"
-                title={formatTime(word.startMs)}
-              >
-                {word.text}
+      {coveragePercent < 70 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={springs.default}
+          className="mb-4 rounded-lg bg-amber-900/30 border border-amber-700/50 p-3 flex items-start gap-2"
+        >
+          <Warning size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-200">
+            Low coverage. Click on unmatched (red) words to manually add timing.
+          </p>
+        </motion.div>
+      )}
+
+      <div className="space-y-1 max-h-96 overflow-y-auto font-mono text-sm">
+        {editableData.map(line => {
+          const matchCount = line.words.filter(w => w.matched).length
+          const totalWords = line.words.length
+
+          return (
+            <div
+              key={line.lineIndex}
+              className={`flex items-start gap-3 py-1.5 px-2 rounded ${
+                matchCount === totalWords
+                  ? "bg-emerald-900/20"
+                  : matchCount > 0
+                    ? "bg-amber-900/20"
+                    : "bg-red-900/20"
+              }`}
+            >
+              <span className="text-neutral-500 flex-shrink-0 w-16">
+                [{formatTime(line.lineStartMs)}]
               </span>
-            ))}
-          </div>
-        </div>
-      </details>
+              <div className="flex-1 flex flex-wrap gap-x-1">
+                {line.words.map(word => {
+                  const isEditing =
+                    editingWord?.lineIndex === word.lineIndex &&
+                    editingWord?.wordIndex === word.wordIndex
+
+                  return (
+                    <span key={word.wordIndex} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => handleWordClick(word.lineIndex, word.wordIndex)}
+                        disabled={disabled}
+                        className={`${
+                          word.matched
+                            ? "text-emerald-300 hover:text-emerald-200"
+                            : "text-red-400 hover:text-red-300"
+                        } hover:underline cursor-pointer disabled:cursor-not-allowed group inline-flex items-center gap-0.5`}
+                        title={
+                          word.matched
+                            ? `GP: "${word.gpText}" @ ${formatTime(word.startMs ?? 0)} (${word.durationMs}ms)`
+                            : "Click to add timing"
+                        }
+                      >
+                        {word.word}
+                        {word.matched && word.gpText && !areWordsSimilar(word.word, word.gpText) && (
+                          <span className="text-amber-400 text-xs ml-0.5">
+                            ({word.gpText})
+                          </span>
+                        )}
+                        {!word.matched && (
+                          <PencilSimple
+                            size={10}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          />
+                        )}
+                      </button>
+                      {isEditing && (
+                        <WordEditor
+                          word={word}
+                          lineStartMs={line.lineStartMs}
+                          onSave={(startMs, durationMs) =>
+                            handleWordSave(word.lineIndex, word.wordIndex, startMs, durationMs)
+                          }
+                          onCancel={handleCancelEdit}
+                          gpWords={gpWords}
+                        />
+                      )}
+                    </span>
+                  )
+                })}
+              </div>
+              <span className="flex-shrink-0 w-6">
+                {matchCount === totalWords ? (
+                  <Check size={16} className="text-emerald-400" />
+                ) : (
+                  <span className="text-xs text-neutral-500">
+                    {matchCount}/{totalWords}
+                  </span>
+                )}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {disabled && (
+        <div className="mt-4 text-center text-sm text-neutral-500">Processing...</div>
+      )}
     </div>
   )
 }

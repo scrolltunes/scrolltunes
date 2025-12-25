@@ -18,6 +18,7 @@ export interface WordPatch {
   readonly wordIndex: number
   readonly startMs: number
   readonly durationMs: number
+  readonly gpText?: string // Original GP word(s) that matched
 }
 
 export interface WordTiming {
@@ -34,12 +35,35 @@ export interface AlignmentResult {
 
 /**
  * Normalize a token for comparison.
- * Lowercases and strips leading/trailing punctuation.
+ * - Lowercases
+ * - Converts Cyrillic lookalikes to Latin (о→o, а→a, е→e, etc.)
+ * - Collapses repeated vowels (ooo→o, aaa→a)
+ * - Removes Guitar Pro prolongation markers like (o), (a), (u), (oo), etc.
+ * - Removes +word suffixes (e.g., "all+yeah" → "all")
+ * - Strips leading/trailing punctuation
  */
 function normalizeToken(s: string): string {
   return s
     .toLowerCase()
+    // Convert Cyrillic lookalikes to Latin equivalents
+    .replace(/а/g, "a") // Cyrillic а → Latin a
+    .replace(/е/g, "e") // Cyrillic е → Latin e
+    .replace(/о/g, "o") // Cyrillic о → Latin o
+    .replace(/р/g, "p") // Cyrillic р → Latin p
+    .replace(/с/g, "c") // Cyrillic с → Latin c
+    .replace(/у/g, "y") // Cyrillic у → Latin y
+    .replace(/х/g, "x") // Cyrillic х → Latin x
+    // Collapse repeated vowels (ooo→o, aaa→a, etc.)
+    .replace(/([aeiou])\1+/g, "$1")
+    // Normalize interjections: ooh/oh/ohh → o, aah/ah/ahh → a
+    .replace(/([ao])h+/g, "$1")
+    // Remove GP prolongation markers: (o), (a), (e), (u), (oo), etc.
+    .replace(/\([a-z]+\)/g, "")
+    // Remove +suffix patterns (e.g., "all+yeah" → "all")
+    .replace(/\+\w+/g, "")
+    // Strip leading punctuation
     .replace(/^[^\p{L}\p{N}]+/u, "")
+    // Strip trailing punctuation
     .replace(/[^\p{L}\p{N}]+$/u, "")
 }
 
@@ -84,14 +108,16 @@ function tryMatchWithJoin(
   gpWords: readonly WordTiming[],
   startIdx: number,
   maxLookahead = 3,
-): { matched: boolean; consumed: number; startMs: number; endMs: number } {
+): { matched: boolean; consumed: number; startMs: number; endMs: number; gpText: string } {
   let combined = ""
+  const originalParts: string[] = []
 
   for (let i = 0; i < maxLookahead && startIdx + i < gpWords.length; i++) {
     const gpWord = gpWords[startIdx + i]
     if (!gpWord) continue
 
     combined += normalizeToken(gpWord.text)
+    originalParts.push(gpWord.text)
 
     if (combined === normalizedLrc) {
       const firstWord = gpWords[startIdx]
@@ -102,6 +128,7 @@ function tryMatchWithJoin(
           consumed: i + 1,
           startMs: firstWord.startMs,
           endMs: lastWord.startMs + 500, // estimate end
+          gpText: originalParts.join(""),
         }
       }
     }
@@ -112,7 +139,7 @@ function tryMatchWithJoin(
     }
   }
 
-  return { matched: false, consumed: 0, startMs: 0, endMs: 0 }
+  return { matched: false, consumed: 0, startMs: 0, endMs: 0, gpText: "" }
 }
 
 /**
@@ -124,7 +151,7 @@ function findMatchInWindow(
   gpWords: readonly WordTiming[],
   startIdx: number,
   maxLookahead: number,
-): { gpIdx: number; consumed: number; startMs: number; endMs: number } | null {
+): { gpIdx: number; consumed: number; startMs: number; endMs: number; gpText: string } | null {
   for (let offset = 0; offset < maxLookahead && startIdx + offset < gpWords.length; offset++) {
     const gpWord = gpWords[startIdx + offset]
     if (!gpWord) continue
@@ -138,6 +165,7 @@ function findMatchInWindow(
         consumed: 1,
         startMs: gpWord.startMs,
         endMs: gpWord.startMs + 500,
+        gpText: gpWord.text,
       }
     }
 
@@ -150,6 +178,7 @@ function findMatchInWindow(
           consumed: joinResult.consumed,
           startMs: joinResult.startMs,
           endMs: joinResult.endMs,
+          gpText: joinResult.gpText,
         }
       }
     }
@@ -165,8 +194,9 @@ function findMatchInWindow(
  * Also handles split words (e.g., "con" + "trol" → "control") by trying to
  * join consecutive GP words when single words don't match.
  *
- * The algorithm continues searching even after mismatches, using a sliding
- * window to find the best match within a reasonable range.
+ * The algorithm re-syncs gpIdx at each line boundary using line timing,
+ * preventing drift from accumulating across the song. It continues searching
+ * even after mismatches, using a sliding window to find the best match.
  *
  * @param lrcLines - Parsed LRC lines with words
  * @param gpWords - Word timings from Guitar Pro
@@ -182,7 +212,7 @@ export function alignWords(
   let matchedWords = 0
 
   // Maximum words to look ahead when searching for a match
-  const MAX_LOOKAHEAD = 10
+  const MAX_LOOKAHEAD = 20
 
   for (let lineIdx = 0; lineIdx < lrcLines.length; lineIdx++) {
     const line = lrcLines[lineIdx]
@@ -217,6 +247,7 @@ export function alignWords(
           wordIndex: wordIdx,
           startMs: Math.round(match.startMs),
           durationMs: Math.max(50, Math.round(durationMs)),
+          gpText: match.gpText,
         })
 
         matchedWords++

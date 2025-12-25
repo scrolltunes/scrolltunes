@@ -9,7 +9,8 @@ export interface FuzzyMatchResult<T> {
   readonly score: number
 }
 
-function normalizeText(text: string): string {
+function normalizeText(text: string | undefined | null): string {
+  if (!text) return ""
   return text
     .toLowerCase()
     .replace(/[^\w\s]/g, "")

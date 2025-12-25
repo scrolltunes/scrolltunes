@@ -5,8 +5,11 @@ import { AlignmentPreview } from "@/components/admin/AlignmentPreview"
 import { GpUploader } from "@/components/admin/GpUploader"
 import { useAccount, useIsAdmin } from "@/core"
 import type { EnhancementPayload } from "@/lib/db/schema"
+import { generateEnhancedLrc } from "@/lib/gp"
+import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
+import { makeCanonicalPath } from "@/lib/slug"
 import type { LyricSyllable, WordPatch, WordTiming } from "@/lib/gp"
-import { ArrowLeft, Check, ClipboardText, ShieldWarning, Warning } from "@phosphor-icons/react"
+import { ArrowLeft, Check, ClipboardText, ShieldWarning, Trash, Warning } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import Link from "next/link"
 import { use, useCallback, useEffect, useMemo, useState } from "react"
@@ -32,83 +35,6 @@ interface AlignmentResult {
 
 type PageState = "loading" | "error" | "ready" | "submitting" | "success"
 
-/**
- * Format milliseconds as mm:ss.xx
- */
-function formatTimeMs(ms: number): string {
-  const totalSeconds = ms / 1000
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes.toString().padStart(2, "0")}:${seconds.toFixed(2).padStart(5, "0")}`
-}
-
-/**
- * Generate Enhanced LRC format with word-level timing
- * Format: [mm:ss.xx] <mm:ss.xx> word1 <mm:ss.xx> word2 ...
- * Where word timestamps are relative to line start
- */
-function generateEnhancedLrc(lrcContent: string, payload: EnhancementPayload): string {
-  const lines = lrcContent.split("\n")
-  const lineRegex = /^\[(\d{2}:\d{2}\.\d{2,3})\]\s*(.*)$/
-  const enhancedLines: string[] = []
-
-  // Build a map of line index -> word timings
-  const lineTimings = new Map<number, Map<number, { start: number; dur: number }>>()
-  for (const line of payload.lines) {
-    const wordMap = new Map<number, { start: number; dur: number }>()
-    for (const word of line.words) {
-      wordMap.set(word.idx, { start: word.start, dur: word.dur })
-    }
-    lineTimings.set(line.idx, wordMap)
-  }
-
-  let lineIndex = 0
-  for (const line of lines) {
-    const match = line.match(lineRegex)
-    if (!match) {
-      enhancedLines.push(line)
-      continue
-    }
-
-    const [, timestamp, text] = match
-    const trimmedText = text?.trim() ?? ""
-
-    if (!trimmedText) {
-      enhancedLines.push(line)
-      lineIndex++
-      continue
-    }
-
-    const wordTimingsForLine = lineTimings.get(lineIndex)
-    if (!wordTimingsForLine || wordTimingsForLine.size === 0) {
-      enhancedLines.push(line)
-      lineIndex++
-      continue
-    }
-
-    // Split text into words and build enhanced format
-    const words = trimmedText.split(/\s+/)
-    const enhancedWords: string[] = []
-
-    for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
-      const word = words[wordIdx]
-      const timing = wordTimingsForLine.get(wordIdx)
-
-      if (timing && word) {
-        // Format: <mm:ss.xx> word (time relative to line start)
-        enhancedWords.push(`<${formatTimeMs(timing.start)}> ${word}`)
-      } else if (word) {
-        enhancedWords.push(word)
-      }
-    }
-
-    enhancedLines.push(`[${timestamp}] ${enhancedWords.join(" ")}`)
-    lineIndex++
-  }
-
-  return enhancedLines.join("\n")
-}
-
 function EnhancedLrcView({
   lrcContent,
   payload,
@@ -117,13 +43,16 @@ function EnhancedLrcView({
   payload: EnhancementPayload
 }) {
   const [copied, setCopied] = useState(false)
+  const [showEnhanced, setShowEnhanced] = useState(true)
   const enhancedLrc = useMemo(() => generateEnhancedLrc(lrcContent, payload), [lrcContent, payload])
 
+  const displayContent = showEnhanced ? enhancedLrc : lrcContent
+
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(enhancedLrc)
+    await navigator.clipboard.writeText(displayContent)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }, [enhancedLrc])
+  }, [displayContent])
 
   return (
     <motion.div
@@ -133,22 +62,50 @@ function EnhancedLrcView({
       className="rounded-xl bg-neutral-900 p-5"
     >
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-medium">Enhanced LRC Preview</h2>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 text-neutral-300 text-sm rounded-lg hover:bg-neutral-700 transition-colors"
-        >
-          <ClipboardText size={14} />
-          <span>{copied ? "Copied!" : "Copy"}</span>
-        </button>
+        <h2 className="text-lg font-medium">LRC Preview</h2>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-neutral-800 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => setShowEnhanced(false)}
+              className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                !showEnhanced
+                  ? "bg-neutral-700 text-white"
+                  : "text-neutral-400 hover:text-neutral-300"
+              }`}
+            >
+              Plain
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowEnhanced(true)}
+              className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                showEnhanced
+                  ? "bg-neutral-700 text-white"
+                  : "text-neutral-400 hover:text-neutral-300"
+              }`}
+            >
+              Enhanced
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 text-neutral-300 text-sm rounded-lg hover:bg-neutral-700 transition-colors"
+          >
+            <ClipboardText size={14} />
+            <span>{copied ? "Copied!" : "Copy"}</span>
+          </button>
+        </div>
       </div>
       <pre className="text-xs text-neutral-400 bg-neutral-950 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto font-mono">
-        {enhancedLrc}
+        {displayContent}
       </pre>
-      <p className="text-xs text-neutral-500 mt-2">
-        Format: [line_time] &lt;word_offset&gt; word ... (offsets relative to line start)
-      </p>
+      {showEnhanced && (
+        <p className="text-xs text-neutral-500 mt-2">
+          Format: [line_time] &lt;absolute_time&gt;word ... (word times are absolute, not offsets)
+        </p>
+      )}
     </motion.div>
   )
 }
@@ -230,6 +187,30 @@ export default function EnhancePage({
   const [lrcContent, setLrcContent] = useState<string | null>(null)
   const [gpData, setGpData] = useState<GpExtractedData | null>(null)
   const [alignmentResult, setAlignmentResult] = useState<AlignmentResult | null>(null)
+  const [existingEnhancement, setExistingEnhancement] = useState<{
+    payload: EnhancementPayload
+    coverage: number
+  } | null>(null)
+  const [isRemoving, setIsRemoving] = useState(false)
+
+  const handleRemoveEnhancement = useCallback(async () => {
+    if (!songInfo?.songId || !confirm("Remove enhancement for this song?")) return
+
+    setIsRemoving(true)
+    try {
+      const response = await fetch("/api/admin/lrc/enhance", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ songId: songInfo.songId, lrclibId }),
+      })
+      if (response.ok) {
+        setExistingEnhancement(null)
+        setSongInfo(prev => (prev ? { ...prev, hasEnhancement: false } : null))
+      }
+    } finally {
+      setIsRemoving(false)
+    }
+  }, [songInfo?.songId, lrclibId])
 
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) return
@@ -286,6 +267,30 @@ export default function EnhancePage({
               artist: songData.artist,
               hasEnhancement: songData.hasEnhancement,
             })
+
+            // If song has enhancement, load it
+            if (songData.hasEnhancement) {
+              const enhanceResponse = await fetch(
+                `/api/admin/lrc/enhance?lrclibId=${lrclibId}`,
+              )
+              if (enhanceResponse.ok) {
+                const enhanceData = (await enhanceResponse.json()) as
+                  | { found: false }
+                  | {
+                      found: true
+                      enhancement: {
+                        payload: EnhancementPayload
+                        coverage: number
+                      }
+                    }
+                if (enhanceData.found) {
+                  setExistingEnhancement({
+                    payload: enhanceData.enhancement.payload,
+                    coverage: enhanceData.enhancement.coverage,
+                  })
+                }
+              }
+            }
           } else {
             // Song not in catalog yet - use LRC data
             setSongInfo({
@@ -346,6 +351,16 @@ export default function EnhancePage({
       if (!response.ok) {
         const data = (await response.json()) as { error: string }
         throw new Error(data.error || "Failed to save enhancement")
+      }
+
+      // Update localStorage cache with enhancement so song page shows it immediately
+      const cached = loadCachedLyrics(lrclibId)
+      if (cached) {
+        saveCachedLyrics(lrclibId, {
+          ...cached,
+          hasEnhancement: true,
+          enhancement: alignmentResult.payload,
+        })
       }
 
       setPageState("success")
@@ -427,7 +442,11 @@ export default function EnhancePage({
                   Back to Songs
                 </Link>
                 <Link
-                  href={`/s/${lrclibId}`}
+                  href={makeCanonicalPath({
+                    id: lrclibId,
+                    title: songInfo?.title ?? "",
+                    artist: songInfo?.artist ?? "",
+                  })}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
                 >
                   View Song
@@ -456,7 +475,14 @@ export default function EnhancePage({
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-neutral-400">LRCLIB ID</span>
-                    <span className="text-neutral-500 font-mono text-sm">{lrclibId}</span>
+                    <a
+                      href={`https://lrclib.net/api/get/${lrclibId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-400 hover:text-indigo-300 font-mono text-sm transition-colors"
+                    >
+                      {lrclibId}
+                    </a>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-neutral-400">Status</span>
@@ -472,12 +498,41 @@ export default function EnhancePage({
                 </div>
               </motion.div>
 
+              {existingEnhancement && lrcContent && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...springs.default, delay: 0.15 }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-medium">Current Enhancement</h2>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-neutral-400">
+                        Coverage: {Math.round(existingEnhancement.coverage * 100)}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleRemoveEnhancement}
+                        disabled={isRemoving}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
+                      >
+                        <Trash size={14} />
+                        <span>{isRemoving ? "Removing..." : "Remove"}</span>
+                      </button>
+                    </div>
+                  </div>
+                  <EnhancedLrcView lrcContent={lrcContent} payload={existingEnhancement.payload} />
+                </motion.div>
+              )}
+
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ ...springs.default, delay: 0.2 }}
               >
-                <h2 className="text-lg font-medium mb-3">Upload Guitar Pro File</h2>
+                <h2 className="text-lg font-medium mb-3">
+                  {existingEnhancement ? "Replace Enhancement" : "Upload Guitar Pro File"}
+                </h2>
                 <GpUploader onExtracted={handleGpExtracted} disabled={pageState === "submitting"} />
               </motion.div>
 

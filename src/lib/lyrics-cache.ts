@@ -8,7 +8,7 @@ import type { CachedLyrics } from "./recent-songs-types"
 import { LYRICS_CACHE_TTL_MS } from "./recent-songs-types"
 
 const LYRICS_KEY_PREFIX = "scrolltunes:lyrics:"
-const CACHE_VERSION = 6 // v6: Added enhancement payload for word-level timing
+const CACHE_VERSION = 7 // v7: Force refresh to pick up new enhancements
 
 function lyricsKey(id: number): string {
   return `${LYRICS_KEY_PREFIX}${id}`

@@ -24,6 +24,7 @@ export interface LyricLineProps {
   readonly chords?: readonly string[] | undefined
   readonly chordPositions?: readonly LyricChordPosition[] | undefined
   readonly variableSpeed?: boolean
+  readonly wordTimingEnabled?: boolean
 }
 
 interface WordTimingWithPosition {
@@ -348,6 +349,7 @@ export const LyricLine = memo(function LyricLine({
   chords,
   chordPositions,
   variableSpeed = true,
+  wordTimingEnabled = false,
 }: LyricLineProps) {
   const wordTimings = useMemo(
     () =>
@@ -384,8 +386,13 @@ export const LyricLine = memo(function LyricLine({
       ? "text-neutral-400"
       : "text-neutral-500"
   const textSizeClass = fontSize === undefined ? "text-2xl md:text-3xl lg:text-4xl" : ""
-  // Disable animation when chords are shown - musicians focus on chords, not lyrics
-  const shouldAnimate = isActive && isPlaying && duration !== undefined && !hasPositionedChords
+  // Word timing animation only when explicitly enabled and no positioned chords
+  const shouldAnimateWords =
+    isActive &&
+    isPlaying &&
+    duration !== undefined &&
+    wordTimingEnabled &&
+    !hasPositionedChords
 
   return (
     <button
@@ -423,8 +430,8 @@ export const LyricLine = memo(function LyricLine({
                 {renderWordWithChordAnchors(word, wordChords, isActive, isNext)}
               </span>
 
-              {/* Overlay layer: white text (animated or static based on state) */}
-              {shouldAnimate ? (
+              {/* Overlay layer: white text (word animation or whole-line highlight) */}
+              {shouldAnimateWords ? (
                 <WordOverlay
                   word={word}
                   delay={timing.delay}
@@ -433,6 +440,7 @@ export const LyricLine = memo(function LyricLine({
                   isRTL={isRTL}
                 />
               ) : isActive ? (
+                // Default: instant white highlight for the whole line
                 <span className="absolute inset-0 text-white pointer-events-none">{word}</span>
               ) : null}
             </span>

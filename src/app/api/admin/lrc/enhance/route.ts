@@ -206,6 +206,89 @@ const deleteEnhancement = (request: Request) =>
     return { success: true }
   })
 
+const getEnhancement = (lrclibId: number) =>
+  Effect.gen(function* () {
+    const session = yield* Effect.tryPromise({
+      try: () => auth(),
+      catch: cause => new AuthError({ cause }),
+    })
+
+    if (!session?.user?.id) {
+      return yield* Effect.fail(new UnauthorizedError({}))
+    }
+
+    const { db } = yield* DbService
+
+    const [profile] = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ isAdmin: appUserProfiles.isAdmin })
+          .from(appUserProfiles)
+          .where(eq(appUserProfiles.userId, session.user.id)),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    if (!profile?.isAdmin) {
+      return yield* Effect.fail(new ForbiddenError({}))
+    }
+
+    const [enhancement] = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({
+            id: lrcWordEnhancements.id,
+            payload: lrcWordEnhancements.payload,
+            coverage: lrcWordEnhancements.coverage,
+            createdAt: lrcWordEnhancements.createdAt,
+          })
+          .from(lrcWordEnhancements)
+          .where(eq(lrcWordEnhancements.sourceLrclibId, lrclibId)),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    return enhancement ?? null
+  })
+
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const lrclibIdParam = url.searchParams.get("lrclibId")
+
+  if (!lrclibIdParam) {
+    return NextResponse.json({ error: "lrclibId is required" }, { status: 400 })
+  }
+
+  const lrclibId = Number.parseInt(lrclibIdParam, 10)
+  if (Number.isNaN(lrclibId)) {
+    return NextResponse.json({ error: "Invalid lrclibId" }, { status: 400 })
+  }
+
+  const exit = await Effect.runPromiseExit(getEnhancement(lrclibId).pipe(Effect.provide(DbLayer)))
+
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      const error = cause.error
+      if (error._tag === "UnauthorizedError") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      if (error._tag === "ForbiddenError") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    }
+    console.error("Failed to get enhancement", exit.cause)
+    return NextResponse.json({ error: "Failed to get enhancement" }, { status: 500 })
+  }
+
+  if (!exit.value) {
+    return NextResponse.json({ found: false })
+  }
+
+  return NextResponse.json({
+    found: true,
+    enhancement: exit.value,
+  })
+}
+
 export async function DELETE(request: Request) {
   const exit = await Effect.runPromiseExit(deleteEnhancement(request).pipe(Effect.provide(DbLayer)))
 

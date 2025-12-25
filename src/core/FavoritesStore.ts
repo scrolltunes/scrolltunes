@@ -154,6 +154,29 @@ class FavoritesStore {
     }
   }
 
+  /**
+   * Update metadata for an existing favorite without changing addedAt.
+   * Only updates if the song is already a favorite.
+   * Does not sync to server (metadata updates are local-only).
+   */
+  updateMetadata(id: number, updates: { album?: string; albumArt?: string }): void {
+    if (!this.isFavorite(id)) return
+
+    this.setState(prev =>
+      prev.map(item => {
+        if (item.id !== id) return item
+        const updated: FavoriteItem = { ...item }
+        if (updates.album !== undefined) {
+          ;(updated as { album?: string }).album = updates.album
+        }
+        if (updates.albumArt !== undefined) {
+          ;(updated as { albumArt?: string }).albumArt = updates.albumArt
+        }
+        return updated
+      }),
+    )
+  }
+
   async syncAllToServer(): Promise<void> {
     if (!accountStore.isAuthenticated()) return
     if (this.state.length === 0) return

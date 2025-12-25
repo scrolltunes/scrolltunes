@@ -7,6 +7,7 @@ import {
   useCurrentTime,
   usePlayerControls,
   usePlayerState,
+  usePreference,
   usePreferences,
   useResetCount,
   useShowChords,
@@ -62,6 +63,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   const showChords = useShowChords()
   const transposeSemitones = useTranspose()
   const variableSpeed = useVariableSpeedPainting()
+  const wordTimingEnabled = usePreference("wordTimingEnabled")
 
   // Manual scroll override state
   const [isManualScrolling, setIsManualScrolling] = useState(false)
@@ -275,13 +277,14 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
     }
   }, [getLineScrollTarget, lyrics, setScrollYImmediate, state._tag])
 
-  // Reset state when lyrics change
+  // Reset state when song changes (not just lyrics timing updates)
+  const songId = lyrics?.songId
   useEffect(() => {
     hasInitialScroll.current = false
     setScrollYImmediate(0)
     setIsManualScrolling(false)
     setShowManualScrollIndicator(false)
-  }, [lyrics, setScrollYImmediate])
+  }, [songId, setScrollYImmediate])
 
   // Only auto-scroll when playing AND not manually overridden
   const isPlaying = state._tag === "Playing"
@@ -663,6 +666,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
               lineStartTime={line.startTime}
               wordTimings={line.words}
               elapsedInLine={elapsedInLine}
+              wordTimingEnabled={wordTimingEnabled}
               {...(duration !== undefined && { duration })}
             />
           )

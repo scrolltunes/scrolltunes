@@ -2,6 +2,8 @@ import { getAlbumArt } from "@/lib/deezer-client"
 import {
   LyricsAPIError,
   type LyricsError,
+  NON_STUDIO_PATTERNS,
+  scoreTrackCandidate,
   searchLRCLibBySpotifyMetadata,
 } from "@/lib/lyrics-client"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
@@ -16,27 +18,6 @@ import type { FetchService } from "@/services/fetch"
 import { ServerLayer } from "@/services/server-layer"
 import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
-
-const NON_STUDIO_PATTERNS = [
-  /\bremaster(ed)?\b/i,
-  /\bremix(ed)?\b/i,
-  /\blive\b/i,
-  /\bacoustic\b/i,
-  /\bradio edit\b/i,
-  /\bsingle version\b/i,
-  /\bdemo\b/i,
-  /\bbonus track\b/i,
-  /\bdeluxe\b/i,
-  /\banniversary\b/i,
-  /\bextended\b/i,
-  /\binstrumental\b/i,
-  /\bkaraoke\b/i,
-]
-
-function isStudioVersion(trackName: string, albumName: string | null): boolean {
-  const text = `${trackName} ${albumName ?? ""}`
-  return !NON_STUDIO_PATTERNS.some(pattern => pattern.test(text))
-}
 
 function normalizeForMatch(text: string): string {
   return text
@@ -56,6 +37,7 @@ interface SpotifyMatch {
   readonly artistName: string
   readonly albumArt: string | null
   readonly albumName: string | null
+  readonly durationMs: number
 }
 
 function findSpotifyMatch(
@@ -83,6 +65,7 @@ function findSpotifyMatch(
         artistName: normalizeArtistName(formatArtists(match.artists)),
         albumArt: getAlbumImageUrl(match.album, "medium"),
         albumName: match.album.name || null,
+        durationMs: match.duration_ms,
       }
     }),
     Effect.catchAll(() => Effect.succeed(null)),
@@ -128,22 +111,39 @@ function searchLRCLib(
   return Effect.gen(function* () {
     // Use Spotify-first flow for better accuracy
     const results = yield* searchLRCLibBySpotifyMetadata(query)
-    const synced = results.filter(r => r.hasSyncedLyrics)
 
-    // Sort studio versions first
-    const sorted = [...synced].sort((a, b) => {
-      const aIsStudio = isStudioVersion(a.trackName, a.albumName)
-      const bIsStudio = isStudioVersion(b.trackName, b.albumName)
-      if (aIsStudio && !bIsStudio) return -1
-      if (!aIsStudio && bIsStudio) return 1
-      return 0
-    })
+    // Filter to only valid synced lyrics
+    const synced = results.filter(r => r.hasValidSyncedLyrics)
+
+    // Detect if user wants non-studio version from query
+    const wantsNonStudio = NON_STUDIO_PATTERNS.some(p => p.test(query))
+
+    // Try to get canonical metadata from Spotify for the query
+    const spotifyMatch = yield* findSpotifyMatch(query, query, "").pipe(
+      Effect.catchAll(() => Effect.succeed(null)),
+    )
+
+    // Score and rank results
+    const scored = synced
+      .map(r => ({
+        result: r,
+        score: scoreTrackCandidate(r, {
+          targetDuration: spotifyMatch ? Math.round(spotifyMatch.durationMs / 1000) : null,
+          targetTrackName: spotifyMatch?.trackName ?? undefined,
+          targetArtistName: spotifyMatch?.artistName ?? undefined,
+          canonicalAlbumName: spotifyMatch?.albumName ?? undefined,
+          wantStudioVersion: !wantsNonStudio,
+        }),
+      }))
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(x => x.result)
 
     // Deduplicate by track name + artist (not just ID)
     const seenKeys = new Set<string>()
-    const uniqueTracks: typeof sorted = []
+    const uniqueTracks: typeof scored = []
 
-    for (const r of sorted) {
+    for (const r of scored) {
       const key = dedupeKey(r.trackName, r.artistName)
       if (seenKeys.has(key)) continue
       seenKeys.add(key)

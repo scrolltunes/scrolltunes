@@ -209,6 +209,7 @@ export interface LRCLibTrackResult {
   readonly albumName: string | null
   readonly duration: number
   readonly hasSyncedLyrics: boolean
+  readonly hasValidSyncedLyrics: boolean
 }
 
 /**
@@ -247,6 +248,7 @@ export const searchLRCLibTracks = (
       albumName: r.albumName,
       duration: r.duration,
       hasSyncedLyrics: r.syncedLyrics !== null && r.syncedLyrics.length > 0,
+      hasValidSyncedLyrics: hasValidLrcTimestamps(r.syncedLyrics),
     }))
   })
 }
@@ -384,12 +386,19 @@ export const getLyricsBySpotifyId = (
 const searchLRCLibByTrack = (
   trackName: string,
   artistName: string,
+  albumName?: string | null,
+  durationSeconds?: number,
 ): Effect.Effect<readonly LRCLibTrackResult[], never, LyricsClientEnv> => {
   return Effect.gen(function* () {
     const params = new URLSearchParams({
       track_name: trackName,
       artist_name: artistName,
     })
+    if (albumName) {
+      params.set("album_name", albumName)
+    }
+    // Note: don't add duration to search params as LRCLIB /search doesn't filter by it
+    void durationSeconds
 
     const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
       headers,
@@ -413,6 +422,7 @@ const searchLRCLibByTrack = (
       albumName: r.albumName,
       duration: r.duration,
       hasSyncedLyrics: r.syncedLyrics !== null && r.syncedLyrics.length > 0,
+      hasValidSyncedLyrics: hasValidLrcTimestamps(r.syncedLyrics),
     }))
   }).pipe(Effect.catchAll(() => Effect.succeed([] as readonly LRCLibTrackResult[])))
 }
@@ -439,6 +449,8 @@ export const searchLRCLibBySpotifyMetadata = (
       result.tracks.items.map(track => ({
         trackName: track.name,
         artistName: formatArtists(track.artists),
+        albumName: track.album.name || null,
+        durationSeconds: Math.round(track.duration_ms / 1000),
       })),
     ),
     Effect.catchAll(error => {
@@ -457,7 +469,14 @@ export const searchLRCLibBySpotifyMetadata = (
 
     // Search LRCLIB in parallel for each Spotify track
     const allResults = yield* Effect.all(
-      spotifyTracks.map(track => searchLRCLibByTrack(track.trackName, track.artistName)),
+      spotifyTracks.map(track =>
+        searchLRCLibByTrack(
+          track.trackName,
+          track.artistName,
+          track.albumName,
+          track.durationSeconds,
+        ),
+      ),
       { concurrency: 8 },
     )
 
@@ -491,6 +510,137 @@ export const searchLRCLibBySpotifyMetadata = (
 }
 
 // --- Fallback Search with Ranking ---
+
+/**
+ * Patterns that indicate a non-studio version (live, remix, etc.)
+ */
+export const NON_STUDIO_PATTERNS = [
+  /\bremaster(ed)?\b/i,
+  /\bremix(ed)?\b/i,
+  /\blive\b/i,
+  /\bacoustic\b/i,
+  /\bradio edit\b/i,
+  /\bsingle version\b/i,
+  /\bdemo\b/i,
+  /\bbonus track\b/i,
+  /\bdeluxe\b/i,
+  /\banniversary\b/i,
+  /\bextended\b/i,
+  /\binstrumental\b/i,
+  /\bkaraoke\b/i,
+]
+
+/**
+ * Check if a track/album name indicates a studio version
+ */
+export function isStudioVersion(trackName: string, albumName: string | null): boolean {
+  const text = `${trackName} ${albumName ?? ""}`
+  return !NON_STUDIO_PATTERNS.some(pattern => pattern.test(text))
+}
+
+/**
+ * Options for scoring a track candidate
+ */
+export interface ScoreTrackOptions {
+  readonly targetDuration: number | null
+  readonly targetTrackName?: string | undefined
+  readonly targetArtistName?: string | undefined
+  readonly canonicalAlbumName?: string | undefined
+  readonly wantStudioVersion?: boolean | undefined
+}
+
+/**
+ * Score a track candidate for search ranking (higher is better).
+ * Used to rank LRCLIB results against Spotify metadata.
+ */
+export function scoreTrackCandidate(track: LRCLibTrackResult, options: ScoreTrackOptions): number {
+  const {
+    targetDuration,
+    targetTrackName,
+    targetArtistName,
+    canonicalAlbumName,
+    wantStudioVersion = true,
+  } = options
+  let score = 0
+
+  if (!track.hasValidSyncedLyrics) {
+    return 0
+  }
+
+  score += 100
+
+  if (targetDuration !== null) {
+    const durationDiff = Math.abs(track.duration - targetDuration)
+    if (durationDiff <= 2) {
+      score += 50
+    } else if (durationDiff <= 5) {
+      score += 30
+    } else if (durationDiff <= 10) {
+      score += 10
+    }
+  }
+
+  const albumLower = (track.albumName ?? "").toLowerCase().trim()
+  if (albumLower && !LOW_QUALITY_ALBUMS.has(albumLower)) {
+    score += 20
+  }
+
+  if (canonicalAlbumName && albumLower) {
+    const canonicalLower = canonicalAlbumName.toLowerCase().trim()
+    if (
+      albumLower === canonicalLower ||
+      albumLower.includes(canonicalLower) ||
+      canonicalLower.includes(albumLower)
+    ) {
+      score += 30
+    }
+  }
+
+  const trackIsStudio = isStudioVersion(track.trackName, track.albumName)
+  if (wantStudioVersion && trackIsStudio) {
+    score += 25
+  } else if (!wantStudioVersion && !trackIsStudio) {
+    score += 25
+  }
+
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .trim()
+
+  // Strongly prefer matching artist (avoid covers)
+  if (targetArtistName) {
+    const normalizedTargetArtist = normalize(targetArtistName)
+    const normalizedArtist = normalize(track.artistName)
+    if (normalizedArtist === normalizedTargetArtist) {
+      score += 40
+    } else if (
+      normalizedArtist.includes(normalizedTargetArtist) ||
+      normalizedTargetArtist.includes(normalizedArtist)
+    ) {
+      score += 20
+    } else {
+      score -= 60 // likely cover: down-rank hard
+    }
+  }
+
+  // Prefer title match
+  if (targetTrackName) {
+    const normalizedTarget = normalize(targetTrackName)
+    const normalizedTrack = normalize(track.trackName)
+    if (normalizedTarget === normalizedTrack) {
+      score += 40
+    } else if (
+      normalizedTrack.includes(normalizedTarget) ||
+      normalizedTarget.includes(normalizedTrack)
+    ) {
+      score += 20
+    }
+  }
+
+  return score
+}
 
 /**
  * Album names that indicate low-quality or placeholder entries

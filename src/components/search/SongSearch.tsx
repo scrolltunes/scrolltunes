@@ -3,7 +3,7 @@
 import { springs } from "@/animations"
 import { ListeningWaveform, StreamingText, VoiceSearchButton } from "@/components/audio"
 import { INPUT_LIMITS } from "@/constants/limits"
-import { useIsAuthenticated } from "@/core"
+import { favoritesStore, recentSongsStore, useIsAuthenticated } from "@/core"
 import { useLocalSongCache, useVoiceSearch } from "@/hooks"
 import { normalizeTrackKey } from "@/lib/bpm"
 import { fuzzyMatchSongs } from "@/lib/fuzzy-search"
@@ -137,13 +137,53 @@ export const SongSearch = memo(function SongSearch({
   const results = useMemo((): NormalizedSearchResult[] => {
     if (localMatches.length === 0) return apiResults
 
-    const localIds = new Set(localMatches.map(m => m.id))
+    // Build a map of API results by ID for merging metadata
+    const apiResultsById = new Map(apiResults.map(r => [r.id, r]))
+
+    // Enrich local matches with album info from API results if missing
+    const enrichedLocalMatches = localMatches.map(local => {
+      const apiMatch = apiResultsById.get(local.id)
+      if (apiMatch && !local.album && apiMatch.album) {
+        return {
+          ...local,
+          album: apiMatch.album,
+          displayAlbum: apiMatch.displayAlbum,
+          albumArt: local.albumArt ?? apiMatch.albumArt,
+        }
+      }
+      return local
+    })
+
+    const localIds = new Set(enrichedLocalMatches.map(m => m.id))
     const filteredApiResults = apiResults.filter(r => !localIds.has(r.id))
 
-    const highConfidenceLocals = localMatches.filter(m => m.score >= 0.85)
-    const lowerConfidenceLocals = localMatches.filter(m => m.score < 0.85)
+    const highConfidenceLocals = enrichedLocalMatches.filter(m => m.score >= 0.85)
+    const lowerConfidenceLocals = enrichedLocalMatches.filter(m => m.score < 0.85)
 
     return [...highConfidenceLocals, ...filteredApiResults, ...lowerConfidenceLocals]
+  }, [localMatches, apiResults])
+
+  // Persist enriched album info to stores when API results provide missing data
+  useEffect(() => {
+    if (apiResults.length === 0) return
+
+    const apiResultsById = new Map(apiResults.map(r => [r.id, r]))
+
+    for (const local of localMatches) {
+      const apiMatch = apiResultsById.get(local.id)
+      if (apiMatch && !local.album && apiMatch.album && local.lrclibId) {
+        // Only include defined values to satisfy exactOptionalPropertyTypes
+        const updates: { album?: string; albumArt?: string } = {
+          album: apiMatch.album,
+        }
+        if (apiMatch.albumArt) {
+          updates.albumArt = apiMatch.albumArt
+        }
+        // Update both stores - they'll no-op if song isn't in that store
+        favoritesStore.updateMetadata(local.lrclibId, updates)
+        recentSongsStore.updateAlbumInfo(local.lrclibId, updates)
+      }
+    }
   }, [localMatches, apiResults])
 
   const searchTracks = useCallback(async (searchQuery: string) => {

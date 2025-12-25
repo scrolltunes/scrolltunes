@@ -193,6 +193,26 @@ class RecentSongsStore {
   }
 
   /**
+   * Update only album metadata for an existing recent song.
+   * Does not change position or add new songs.
+   */
+  updateAlbumInfo(id: number, updates: { album?: string; albumArt?: string }): void {
+    const exists = this.state.recents.some(s => s.id === id)
+    if (!exists) return
+
+    this.setRecents(prev =>
+      prev.map(song => {
+        if (song.id !== id) return song
+        return {
+          ...song,
+          album: updates.album ?? song.album,
+          albumArt: updates.albumArt ?? song.albumArt,
+        }
+      }),
+    )
+  }
+
+  /**
    * Move an existing song to the top of the list (mark as played)
    */
   markAsPlayed(id: number): void {

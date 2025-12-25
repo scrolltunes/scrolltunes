@@ -225,11 +225,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const albumArt = spotifyAlbumArt ?? (await getAlbumArt(lyrics.artist, lyrics.title, "medium"))
 
+  // Extract actual LRCLIB ID from lyrics (may differ from URL id if fallback occurred)
+  const actualLrclibId = lyrics.songId.startsWith("lrclib-")
+    ? Number.parseInt(lyrics.songId.slice(7), 10)
+    : id
+
   // Fetch enhancement payload if it exists for this LRCLIB ID
   const [enhancement] = await db
     .select({ id: lrcWordEnhancements.id, payload: lrcWordEnhancements.payload })
     .from(lrcWordEnhancements)
-    .where(eq(lrcWordEnhancements.sourceLrclibId, id))
+    .where(eq(lrcWordEnhancements.sourceLrclibId, actualLrclibId))
     .limit(1)
 
   const normalizedLyrics = {

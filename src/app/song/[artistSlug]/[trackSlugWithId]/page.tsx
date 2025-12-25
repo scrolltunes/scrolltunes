@@ -44,7 +44,6 @@ import {
   MusicNote,
   Pause,
   Play,
-  Sparkle,
   SpinnerGap,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
@@ -64,14 +63,14 @@ type LoadState =
   | { readonly _tag: "Error"; readonly errorType: ErrorType }
   | {
       readonly _tag: "Loaded"
-      readonly lyrics: Lyrics
+      readonly lyrics: Lyrics // Original lyrics (without enhancement applied)
+      readonly enhancement: import("@/lib/db/schema").EnhancementPayload | null
       readonly bpm: number | null
       readonly key: string | null
       readonly albumArt: string | null
       readonly spotifyId: string | null
       readonly bpmSource: AttributionSource | null
       readonly lyricsSource: AttributionSource | null
-      readonly hasEnhancement: boolean
     }
 
 const errorMessages: Record<ErrorType, { title: string; description: string }> = {
@@ -98,6 +97,7 @@ export default function SongPage() {
   const searchParams = useSearchParams()
   const spotifyId = searchParams.get("spotifyId")
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
+  const [useEnhancedTiming, setUseEnhancedTiming] = useState(true)
   const [showInfo, setShowInfo] = useState(false)
   const [showAddToSetlist, setShowAddToSetlist] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
@@ -224,21 +224,16 @@ export default function SongPage() {
 
       // Use cache if it has BPM data, otherwise refetch to get BPM
       if (cached && cached.bpm !== null) {
-        // Apply enhancement if available
-        const enhancedLyrics = cached.enhancement
-          ? applyEnhancement(cached.lyrics, cached.enhancement)
-          : cached.lyrics
-        load(enhancedLyrics)
         setLoadState({
           _tag: "Loaded",
-          lyrics: enhancedLyrics,
+          lyrics: cached.lyrics,
+          enhancement: cached.enhancement ?? null,
           bpm: cached.bpm,
           key: cached.key ?? null,
           albumArt: cached.albumArt ?? null,
           spotifyId: cached.spotifyId ?? null,
           bpmSource: cached.bpmSource ?? null,
           lyricsSource: cached.lyricsSource ?? null,
-          hasEnhancement: cached.hasEnhancement ?? false,
         })
 
         recentSongsStore.updateMetadata({
@@ -279,21 +274,16 @@ export default function SongPage() {
           return
         }
 
-        // Apply enhancement if available
-        const enhancedLyrics = data.enhancement
-          ? applyEnhancement(data.lyrics, data.enhancement)
-          : data.lyrics
-        load(enhancedLyrics)
         setLoadState({
           _tag: "Loaded",
-          lyrics: enhancedLyrics,
+          lyrics: data.lyrics,
+          enhancement: data.enhancement ?? null,
           bpm: data.bpm,
           key: data.key,
           albumArt: data.albumArt ?? null,
           spotifyId: data.spotifyId ?? spotifyId ?? null,
           bpmSource: data.attribution?.bpm ?? null,
           lyricsSource: data.attribution?.lyrics ?? null,
-          hasEnhancement: data.hasEnhancement ?? false,
         })
 
         // Cache lyrics with spotifyId from API response (or URL param as fallback)
@@ -305,8 +295,8 @@ export default function SongPage() {
           spotifyId: data.spotifyId ?? spotifyId ?? undefined,
           bpmSource: data.attribution?.bpm ?? undefined,
           lyricsSource: data.attribution?.lyrics ?? undefined,
-          hasEnhancement: data.hasEnhancement ?? undefined,
-          enhancement: data.enhancement ?? undefined,
+          hasEnhancement: data.hasEnhancement ?? false,
+          enhancement: data.enhancement,
         })
 
         // Add to recents (without changing order)
@@ -334,6 +324,19 @@ export default function SongPage() {
       controller.abort()
     }
   }, [lrclibId, spotifyId])
+
+  // Load lyrics into player when loadState or useEnhancedTiming changes
+  // Apply enhancement if available and enabled (provides better timing data for word-by-word mode)
+  useEffect(() => {
+    if (loadState._tag !== "Loaded") return
+
+    const lyricsToLoad =
+      loadState.enhancement && useEnhancedTiming
+        ? applyEnhancement(loadState.lyrics, loadState.enhancement)
+        : loadState.lyrics
+
+    load(lyricsToLoad)
+  }, [loadState, useEnhancedTiming, load])
 
   // Mark song as played when playback starts (moves to top of recents)
   const hasMarkedAsPlayed = useRef(false)
@@ -554,18 +557,6 @@ export default function SongPage() {
       </AnimatePresence>
 
       <main className="pt-16 h-[calc(100vh-4rem)] flex flex-col min-h-0">
-        {/* Enhanced lyrics banner */}
-        {loadState._tag === "Loaded" && loadState.hasEnhancement && (
-          <div className="bg-gradient-to-r from-indigo-600/20 to-purple-600/20 border-b border-indigo-500/30 px-4 py-1.5">
-            <div className="max-w-4xl mx-auto flex items-center justify-center gap-2">
-              <Sparkle size={14} weight="fill" className="text-indigo-400" />
-              <span className="text-xs font-medium text-indigo-300">
-                Enhanced word-level timing
-              </span>
-            </div>
-          </div>
-        )}
-
         {lrclibId !== null && (
           <AnimatePresence initial={false}>
             {(!isLoaded || isHeaderVisible) && (
@@ -585,6 +576,9 @@ export default function SongPage() {
                   onAddToSetlist={() => setShowAddToSetlist(true)}
                   onChordSettingsClick={() => setShowChordPanel(prev => !prev)}
                   isChordPanelOpen={showChordPanel}
+                  hasEnhancedTiming={loadState._tag === "Loaded" && loadState.enhancement !== null}
+                  useEnhancedTiming={useEnhancedTiming}
+                  onUseEnhancedTimingChange={setUseEnhancedTiming}
                 />
                 <ChordInfoPanel
                   isOpen={showChordPanel}

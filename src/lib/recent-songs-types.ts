@@ -41,7 +41,7 @@ export interface CachedLyrics {
   readonly bpmSource?: AttributionSource | undefined
   readonly lyricsSource?: AttributionSource | undefined
   readonly hasEnhancement?: boolean | undefined
-  readonly enhancement?: EnhancementPayload | undefined
+  readonly enhancement?: EnhancementPayload | null | undefined
   readonly cachedAt: number // timestamp (ms since epoch)
 }
 

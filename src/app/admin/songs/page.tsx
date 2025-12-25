@@ -2,6 +2,7 @@
 
 import { springs } from "@/animations"
 import { useAccount, useIsAdmin } from "@/core"
+import { makeCanonicalPath } from "@/lib/slug"
 import {
   ArrowLeft,
   CaretLeft,
@@ -10,6 +11,7 @@ import {
   FunnelSimple,
   MagnifyingGlass,
   MusicNote,
+  PencilSimple,
   ShieldWarning,
   Sparkle,
   Trash,
@@ -134,28 +136,29 @@ function EmptyState({ hasSearch }: { hasSearch: boolean }) {
 function SongRow({
   song,
   index,
-  onRemoveEnhancement,
+  onDeleteSong,
 }: {
   song: Song
   index: number
-  onRemoveEnhancement: (songId: string, lrclibId: number) => void
+  onDeleteSong: (songId: string) => void
 }) {
-  const [isRemoving, setIsRemoving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  const handleRemove = async () => {
-    if (!song.lrclibId || !confirm("Remove enhancement for this song?")) return
-    setIsRemoving(true)
+  const handleDelete = async () => {
+    if (!confirm(`Permanently delete "${song.title}" by ${song.artist}? This cannot be undone.`))
+      return
+    setIsDeleting(true)
     try {
-      const response = await fetch("/api/admin/lrc/enhance", {
+      const response = await fetch("/api/admin/songs", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ songId: song.id, lrclibId: song.lrclibId }),
+        body: JSON.stringify({ songId: song.id }),
       })
       if (response.ok) {
-        onRemoveEnhancement(song.id, song.lrclibId)
+        onDeleteSong(song.id)
       }
     } finally {
-      setIsRemoving(false)
+      setIsDeleting(false)
     }
   }
 
@@ -167,12 +170,20 @@ function SongRow({
       className="border-b border-neutral-800 hover:bg-neutral-900/50 transition-colors"
     >
       <td className="py-3 px-4 text-neutral-300">{song.artist}</td>
-      <td className="py-3 px-4 text-white">{song.title}</td>
-      <td className="py-3 px-4 text-center">
-        {song.hasSyncedLyrics ? (
-          <Check size={18} className="text-green-500 mx-auto" />
+      <td className="py-3 px-4">
+        {song.lrclibId ? (
+          <Link
+            href={makeCanonicalPath({
+              id: song.lrclibId,
+              title: song.title,
+              artist: song.artist,
+            })}
+            className="text-white hover:text-indigo-400 hover:underline transition-colors"
+          >
+            {song.title}
+          </Link>
         ) : (
-          <X size={18} className="text-neutral-600 mx-auto" />
+          <span className="text-white">{song.title}</span>
         )}
       </td>
       <td className="py-3 px-4 text-center">
@@ -182,31 +193,53 @@ function SongRow({
           <X size={18} className="text-neutral-600 mx-auto" />
         )}
       </td>
-      <td className="py-3 px-4 text-center text-neutral-400">{song.totalPlayCount}</td>
+      <td className="py-3 px-4 text-center">
+        {song.lrclibId ? (
+          <a
+            href={`https://lrclib.net/api/get/${song.lrclibId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-400 hover:text-indigo-300 hover:underline transition-colors"
+          >
+            {song.lrclibId}
+          </a>
+        ) : (
+          <span className="text-neutral-600">—</span>
+        )}
+      </td>
       <td className="py-3 px-4">
         <div className="flex items-center gap-2">
           {song.lrclibId ? (
-            <Link
-              href={`/admin/enhance/${song.lrclibId}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 transition-colors"
-            >
-              <Sparkle size={14} />
-              <span>Enhance</span>
-            </Link>
+            song.hasEnhancement ? (
+              <Link
+                href={`/admin/enhance/${song.lrclibId}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-500 transition-colors"
+              >
+                <PencilSimple size={14} />
+                <span>Edit</span>
+              </Link>
+            ) : (
+              <Link
+                href={`/admin/enhance/${song.lrclibId}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 transition-colors"
+              >
+                <Sparkle size={14} />
+                <span>Enhance</span>
+              </Link>
+            )
           ) : (
             <span className="text-neutral-600 text-sm">No LRCLIB ID</span>
           )}
-          {song.hasEnhancement && song.lrclibId && (
-            <button
-              type="button"
-              onClick={handleRemove}
-              disabled={isRemoving}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
-            >
-              <Trash size={14} />
-              <span>{isRemoving ? "..." : "Remove"}</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 text-neutral-400 text-sm rounded-lg hover:bg-red-600/20 hover:text-red-400 transition-colors disabled:opacity-50"
+            title="Delete song permanently"
+          >
+            <Trash size={14} />
+            <span>{isDeleting ? "..." : "Delete"}</span>
+          </button>
         </div>
       </td>
     </motion.tr>
@@ -219,9 +252,38 @@ export default function AdminSongsPage() {
   const [songs, setSongs] = useState<Song[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [isDeletingAll, setIsDeletingAll] = useState(false)
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterType>("all")
   const [offset, setOffset] = useState(0)
+
+  const handleDeleteAll = async () => {
+    const filterDesc =
+      filter === "all" && !search
+        ? "ALL songs"
+        : `${total} song${total !== 1 ? "s" : ""} matching current filter`
+    if (!confirm(`Permanently delete ${filterDesc}? This cannot be undone.`)) return
+
+    setIsDeletingAll(true)
+    try {
+      const response = await fetch("/api/admin/songs", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deleteAll: true,
+          search: search || undefined,
+          filter,
+        }),
+      })
+      if (response.ok) {
+        setSongs([])
+        setTotal(0)
+        setOffset(0)
+      }
+    } finally {
+      setIsDeletingAll(false)
+    }
+  }
 
   const fetchSongs = useCallback(async () => {
     setIsLoading(true)
@@ -317,6 +379,17 @@ export default function AdminSongsPage() {
                 <option value="unenhanced">Unenhanced</option>
               </select>
             </div>
+            {total > 0 && (
+              <button
+                type="button"
+                onClick={handleDeleteAll}
+                disabled={isDeletingAll}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
+              >
+                <Trash size={18} />
+                <span>{isDeletingAll ? "Deleting..." : "Delete all"}</span>
+              </button>
+            )}
           </motion.div>
 
           {isLoading ? (
@@ -336,22 +409,20 @@ export default function AdminSongsPage() {
                     <tr className="text-left text-sm text-neutral-400">
                       <th className="py-3 px-4 font-medium">Artist</th>
                       <th className="py-3 px-4 font-medium">Title</th>
-                      <th className="py-3 px-4 font-medium text-center">Synced</th>
                       <th className="py-3 px-4 font-medium text-center">Enhanced</th>
-                      <th className="py-3 px-4 font-medium text-center">Plays</th>
+                      <th className="py-3 px-4 font-medium text-center">LRCLIB ID</th>
                       <th className="py-3 px-4 font-medium">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {songs.map((song, index) => (
                       <SongRow
-                        key={song.id}
+                        key={`${song.id}-${index}`}
                         song={song}
                         index={index}
-                        onRemoveEnhancement={songId => {
-                          setSongs(prev =>
-                            prev.map(s => (s.id === songId ? { ...s, hasEnhancement: false } : s)),
-                          )
+                        onDeleteSong={songId => {
+                          setSongs(prev => prev.filter(s => s.id !== songId))
+                          setTotal(prev => prev - 1)
                         }}
                       />
                     ))}
