@@ -130,6 +130,13 @@ async function main() {
   const gpBuffer = await gpFile.arrayBuffer()
   const { syllables, tempoEvents, meta } = parseGpFile(gpBuffer)
   console.error(`  ✓ GP: "${meta.title}" by ${meta.artist}`)
+
+  if (syllables.length === 0) {
+    console.error("  ✗ No lyrics found in this GP file!")
+    console.error("    This file cannot be used for LRC enhancement.")
+    process.exit(1)
+  }
+
   console.error(`  ✓ Extracted ${syllables.length} syllables`)
 
   const wordTimings = buildWordTimings(syllables, tempoEvents)
@@ -137,7 +144,9 @@ async function main() {
 
   console.error("Running alignment...")
   const result = enhanceLrc(lrcContent, wordTimings)
-  console.error(`  ✓ Coverage: ${result.coverage.toFixed(1)}% (${result.matchedWords}/${result.totalWords} words)`)
+  console.error(
+    `  ✓ Coverage: ${result.coverage.toFixed(1)}% (${result.matchedWords}/${result.totalWords} words)`,
+  )
 
   console.error("")
   console.error("=== Enhanced LRC ===")

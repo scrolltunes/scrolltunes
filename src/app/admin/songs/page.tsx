@@ -27,6 +27,7 @@ interface Song {
   artist: string
   hasSyncedLyrics: boolean
   hasEnhancement: boolean
+  hasChordEnhancement: boolean
   totalPlayCount: number
   lrclibId: number | null
 }
@@ -188,6 +189,13 @@ function SongRow({
       </td>
       <td className="py-3 px-4 text-center">
         {song.hasEnhancement ? (
+          <Check size={18} className="text-green-500 mx-auto" />
+        ) : (
+          <X size={18} className="text-neutral-600 mx-auto" />
+        )}
+      </td>
+      <td className="py-3 px-4 text-center">
+        {song.hasChordEnhancement ? (
           <Check size={18} className="text-green-500 mx-auto" />
         ) : (
           <X size={18} className="text-neutral-600 mx-auto" />
@@ -410,6 +418,7 @@ export default function AdminSongsPage() {
                       <th className="py-3 px-4 font-medium">Artist</th>
                       <th className="py-3 px-4 font-medium">Title</th>
                       <th className="py-3 px-4 font-medium text-center">Enhanced</th>
+                      <th className="py-3 px-4 font-medium text-center">Chords</th>
                       <th className="py-3 px-4 font-medium text-center">LRCLIB ID</th>
                       <th className="py-3 px-4 font-medium">Actions</th>
                     </tr>

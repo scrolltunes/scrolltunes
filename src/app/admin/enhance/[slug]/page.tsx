@@ -2,14 +2,30 @@
 
 import { springs } from "@/animations"
 import { AlignmentPreview } from "@/components/admin/AlignmentPreview"
-import { GpUploader } from "@/components/admin/GpUploader"
+import { ChordPreview } from "@/components/admin/ChordPreview"
+import { ExistingChordPreview } from "@/components/admin/ExistingChordPreview"
+import { type GpExtractedData, GpUploader } from "@/components/admin/GpUploader"
 import { useAccount, useIsAdmin } from "@/core"
 import type { EnhancementPayload } from "@/lib/db/schema"
-import { generateEnhancedLrc } from "@/lib/gp"
-import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
+import {
+  type ChordEnhancementPayloadV1,
+  type EnhancedChordLine,
+  extractExplicitChords,
+  generateEnhancedLrc,
+} from "@/lib/gp"
+import type { WordPatch } from "@/lib/gp"
+import { removeCachedLyrics } from "@/lib/lyrics-cache"
 import { makeCanonicalPath } from "@/lib/slug"
-import type { LyricSyllable, WordPatch, WordTiming } from "@/lib/gp"
-import { ArrowLeft, Check, ClipboardText, ShieldWarning, Trash, Warning } from "@phosphor-icons/react"
+import {
+  ArrowLeft,
+  Check,
+  ClipboardText,
+  MusicNote,
+  ShieldWarning,
+  Timer,
+  Trash,
+  Warning,
+} from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import Link from "next/link"
 import { use, useCallback, useEffect, useMemo, useState } from "react"
@@ -19,12 +35,7 @@ interface SongInfo {
   title: string
   artist: string
   hasEnhancement: boolean
-}
-
-interface GpExtractedData {
-  meta: { title: string; artist: string; album?: string | undefined }
-  wordTimings: WordTiming[]
-  syllables: LyricSyllable[]
+  hasChordEnhancement: boolean
 }
 
 interface AlignmentResult {
@@ -185,16 +196,39 @@ export default function EnhancePage({
   const [error, setError] = useState<string | null>(null)
   const [songInfo, setSongInfo] = useState<SongInfo | null>(null)
   const [lrcContent, setLrcContent] = useState<string | null>(null)
+
+  // GP extracted data (unified)
   const [gpData, setGpData] = useState<GpExtractedData | null>(null)
+
+  // Alignment results
   const [alignmentResult, setAlignmentResult] = useState<AlignmentResult | null>(null)
+  const [chordAlignmentResult, setChordAlignmentResult] = useState<{
+    lines: EnhancedChordLine[]
+    payload: ChordEnhancementPayloadV1
+    coverage: number
+  } | null>(null)
+
+  // Chord-specific state
+  const [chordTimeOffset, setChordTimeOffset] = useState(0)
+
+  // Existing enhancements
   const [existingEnhancement, setExistingEnhancement] = useState<{
     payload: EnhancementPayload
     coverage: number
   } | null>(null)
+  const [existingChordEnhancement, setExistingChordEnhancement] = useState<{
+    payload: ChordEnhancementPayloadV1
+    coverage: number
+  } | null>(null)
+
   const [isRemoving, setIsRemoving] = useState(false)
+  const [isRemovingChords, setIsRemovingChords] = useState(false)
+
+  // Derived: does the GP file have chords?
+  const hasChords = gpData?.chords !== null && (gpData?.chords?.length ?? 0) > 0
 
   const handleRemoveEnhancement = useCallback(async () => {
-    if (!songInfo?.songId || !confirm("Remove enhancement for this song?")) return
+    if (!songInfo?.songId || !confirm("Remove word timing enhancement for this song?")) return
 
     setIsRemoving(true)
     try {
@@ -206,9 +240,30 @@ export default function EnhancePage({
       if (response.ok) {
         setExistingEnhancement(null)
         setSongInfo(prev => (prev ? { ...prev, hasEnhancement: false } : null))
+        removeCachedLyrics(lrclibId)
       }
     } finally {
       setIsRemoving(false)
+    }
+  }, [songInfo?.songId, lrclibId])
+
+  const handleRemoveChordEnhancement = useCallback(async () => {
+    if (!songInfo?.songId || !confirm("Remove chord enhancement for this song?")) return
+
+    setIsRemovingChords(true)
+    try {
+      const response = await fetch("/api/admin/chords/enhance", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ songId: songInfo.songId, lrclibId }),
+      })
+      if (response.ok) {
+        setExistingChordEnhancement(null)
+        setSongInfo(prev => (prev ? { ...prev, hasChordEnhancement: false } : null))
+        removeCachedLyrics(lrclibId)
+      }
+    } finally {
+      setIsRemovingChords(false)
     }
   }, [songInfo?.songId, lrclibId])
 
@@ -222,7 +277,6 @@ export default function EnhancePage({
 
     async function loadSongData() {
       try {
-        // Fetch LRC data first (this always works if the LRCLIB ID exists)
         const lrcResponse = await fetch(`/api/admin/lrc/${lrclibId}`)
 
         if (!lrcResponse.ok) {
@@ -247,7 +301,6 @@ export default function EnhancePage({
 
         setLrcContent(lrcData.syncedLyrics)
 
-        // Try to look up existing catalog entry
         const songResponse = await fetch(`/api/songs/upsert?lrclibId=${lrclibId}`)
         if (songResponse.ok) {
           const songData = (await songResponse.json()) as
@@ -258,6 +311,7 @@ export default function EnhancePage({
                 title: string
                 artist: string
                 hasEnhancement: boolean
+                hasChordEnhancement: boolean
               }
 
           if (songData.found) {
@@ -266,13 +320,11 @@ export default function EnhancePage({
               title: songData.title,
               artist: songData.artist,
               hasEnhancement: songData.hasEnhancement,
+              hasChordEnhancement: songData.hasChordEnhancement,
             })
 
-            // If song has enhancement, load it
             if (songData.hasEnhancement) {
-              const enhanceResponse = await fetch(
-                `/api/admin/lrc/enhance?lrclibId=${lrclibId}`,
-              )
+              const enhanceResponse = await fetch(`/api/admin/lrc/enhance?lrclibId=${lrclibId}`)
               if (enhanceResponse.ok) {
                 const enhanceData = (await enhanceResponse.json()) as
                   | { found: false }
@@ -291,22 +343,45 @@ export default function EnhancePage({
                 }
               }
             }
+
+            if (songData.hasChordEnhancement) {
+              const chordEnhanceResponse = await fetch(
+                `/api/admin/chords/enhance?lrclibId=${lrclibId}`,
+              )
+              if (chordEnhanceResponse.ok) {
+                const chordEnhanceData = (await chordEnhanceResponse.json()) as
+                  | { found: false }
+                  | {
+                      found: true
+                      enhancement: {
+                        payload: ChordEnhancementPayloadV1
+                        coverage: number
+                      }
+                    }
+                if (chordEnhanceData.found) {
+                  setExistingChordEnhancement({
+                    payload: chordEnhanceData.enhancement.payload,
+                    coverage: chordEnhanceData.enhancement.coverage,
+                  })
+                }
+              }
+            }
           } else {
-            // Song not in catalog yet - use LRC data
             setSongInfo({
-              songId: "", // Will be created on save
+              songId: "",
               title: lrcData.title,
               artist: lrcData.artist,
               hasEnhancement: false,
+              hasChordEnhancement: false,
             })
           }
         } else {
-          // Lookup failed - use LRC data
           setSongInfo({
-            songId: "", // Will be created on save
+            songId: "",
             title: lrcData.title,
             artist: lrcData.artist,
             hasEnhancement: false,
+            hasChordEnhancement: false,
           })
         }
 
@@ -323,11 +398,55 @@ export default function EnhancePage({
   const handleGpExtracted = useCallback((data: GpExtractedData) => {
     setGpData(data)
     setAlignmentResult(null)
+    setChordAlignmentResult(null)
+    setChordTimeOffset(0)
   }, [])
+
+  const handleChordTrackChange = useCallback(
+    (index: number) => {
+      if (!gpData) return
+
+      const newChords = extractExplicitChords(gpData.score, index, gpData.tempo)
+
+      setGpData(prev =>
+        prev
+          ? {
+              ...prev,
+              selectedTrackIndex: index,
+              chords: newChords.length > 0 ? newChords : prev.chords,
+            }
+          : null,
+      )
+    },
+    [gpData],
+  )
 
   const handleAlignmentComplete = useCallback((result: AlignmentResult) => {
     setAlignmentResult(result)
   }, [])
+
+  const gpMeta = useMemo(
+    () =>
+      gpData
+        ? {
+            bpm: gpData.bpm,
+            keySignature: gpData.keySignature,
+            tuning: gpData.tuning,
+          }
+        : undefined,
+    [gpData?.bpm, gpData?.keySignature, gpData?.tuning],
+  )
+
+  const handleChordAlignmentComplete = useCallback(
+    (result: {
+      lines: EnhancedChordLine[]
+      payload: ChordEnhancementPayloadV1
+      coverage: number
+    }) => {
+      setChordAlignmentResult(result)
+    },
+    [],
+  )
 
   const handleSubmit = useCallback(async () => {
     if (!songInfo || !lrcContent || !alignmentResult) return
@@ -336,7 +455,8 @@ export default function EnhancePage({
     setError(null)
 
     try {
-      const response = await fetch("/api/admin/lrc/enhance", {
+      // Save word timing enhancement
+      const lrcResponse = await fetch("/api/admin/lrc/enhance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -348,29 +468,40 @@ export default function EnhancePage({
         }),
       })
 
-      if (!response.ok) {
-        const data = (await response.json()) as { error: string }
-        throw new Error(data.error || "Failed to save enhancement")
+      if (!lrcResponse.ok) {
+        const data = (await lrcResponse.json()) as { error: string }
+        throw new Error(data.error || "Failed to save word timing enhancement")
       }
 
-      // Update localStorage cache with enhancement so song page shows it immediately
-      const cached = loadCachedLyrics(lrclibId)
-      if (cached) {
-        saveCachedLyrics(lrclibId, {
-          ...cached,
-          hasEnhancement: true,
-          enhancement: alignmentResult.payload,
+      // Save chord enhancement if available
+      if (hasChords && chordAlignmentResult) {
+        const chordResponse = await fetch("/api/admin/chords/enhance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            songId: songInfo.songId,
+            lrclibId,
+            baseLrc: lrcContent,
+            payload: chordAlignmentResult.payload,
+            coverage: chordAlignmentResult.coverage,
+          }),
         })
+
+        if (!chordResponse.ok) {
+          const data = (await chordResponse.json()) as { error: string }
+          throw new Error(data.error || "Failed to save chord enhancement")
+        }
       }
 
+      removeCachedLyrics(lrclibId)
       setPageState("success")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save enhancement")
       setPageState("ready")
     }
-  }, [songInfo, lrcContent, alignmentResult, lrclibId])
+  }, [songInfo, lrcContent, alignmentResult, hasChords, chordAlignmentResult, lrclibId])
 
-  if (isAuthLoading || (pageState === "loading" && isAuthenticated && isAdmin)) {
+  if (isAuthLoading || pageState === "loading") {
     return <LoadingScreen />
   }
 
@@ -390,7 +521,7 @@ export default function EnhancePage({
             className="mb-8"
           >
             <h1 className="text-2xl font-semibold mb-1">Enhance Lyrics</h1>
-            <p className="text-neutral-400">Add word-level timing from Guitar Pro</p>
+            <p className="text-neutral-400">Add word-level timing and chords from Guitar Pro</p>
           </motion.div>
 
           {pageState === "error" && (
@@ -429,7 +560,9 @@ export default function EnhancePage({
                 <div>
                   <h2 className="text-lg font-medium text-emerald-400">Enhancement Saved</h2>
                   <p className="text-emerald-200/70">
-                    Word timings for "{songInfo?.title}" have been saved
+                    {hasChords
+                      ? `Word timings + chords for "${songInfo?.title}" have been saved`
+                      : `Word timings for "${songInfo?.title}" have been saved`}
                   </p>
                 </div>
               </div>
@@ -457,6 +590,7 @@ export default function EnhancePage({
 
           {(pageState === "ready" || pageState === "submitting") && songInfo && (
             <div className="space-y-6">
+              {/* Song Info */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -485,7 +619,7 @@ export default function EnhancePage({
                     </a>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-neutral-400">Status</span>
+                    <span className="text-neutral-400">Word Timing</span>
                     {songInfo.hasEnhancement ? (
                       <span className="inline-flex items-center gap-1.5 text-emerald-400">
                         <Check size={16} weight="bold" />
@@ -495,17 +629,32 @@ export default function EnhancePage({
                       <span className="text-amber-400">No enhancement</span>
                     )}
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-400">Chords</span>
+                    {songInfo.hasChordEnhancement ? (
+                      <span className="inline-flex items-center gap-1.5 text-emerald-400">
+                        <Check size={16} weight="bold" />
+                        Has chords
+                      </span>
+                    ) : (
+                      <span className="text-amber-400">No chords</span>
+                    )}
+                  </div>
                 </div>
               </motion.div>
 
-              {existingEnhancement && lrcContent && (
+              {/* Existing Enhancements (hide when new GP file uploaded) */}
+              {existingEnhancement && lrcContent && !gpData && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ ...springs.default, delay: 0.15 }}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-lg font-medium">Current Enhancement</h2>
+                    <h2 className="text-lg font-medium flex items-center gap-2">
+                      <Timer size={20} className="text-indigo-400" />
+                      Current Word Timing
+                    </h2>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-neutral-400">
                         Coverage: {Math.round(existingEnhancement.coverage * 100)}%
@@ -525,58 +674,187 @@ export default function EnhancePage({
                 </motion.div>
               )}
 
+              {existingChordEnhancement && lrcContent && !gpData && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...springs.default, delay: 0.2 }}
+                  className="space-y-4"
+                >
+                  <div className="rounded-xl bg-neutral-900 p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-lg font-medium flex items-center gap-2">
+                        <MusicNote size={20} className="text-indigo-400" />
+                        Current Chords
+                      </h2>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-neutral-400">
+                          Coverage: {Math.round(existingChordEnhancement.coverage * 100)}%
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleRemoveChordEnhancement}
+                          disabled={isRemovingChords}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
+                        >
+                          <Trash size={14} />
+                          <span>{isRemovingChords ? "Removing..." : "Remove"}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-neutral-400">
+                      Track: {existingChordEnhancement.payload.track?.name ?? "Unknown"}
+                    </p>
+                  </div>
+                  <ExistingChordPreview
+                    lrcContent={lrcContent}
+                    payload={existingChordEnhancement.payload}
+                  />
+                </motion.div>
+              )}
+
+              {/* GP Uploader */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ ...springs.default, delay: 0.2 }}
+                transition={{ ...springs.default, delay: 0.25 }}
               >
                 <h2 className="text-lg font-medium mb-3">
-                  {existingEnhancement ? "Replace Enhancement" : "Upload Guitar Pro File"}
+                  {existingEnhancement || existingChordEnhancement
+                    ? "Replace Enhancement"
+                    : "Upload Guitar Pro File"}
                 </h2>
                 <GpUploader onExtracted={handleGpExtracted} disabled={pageState === "submitting"} />
               </motion.div>
 
+              {/* GP Metadata */}
+              {gpData && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={springs.default}
+                  className="rounded-xl bg-neutral-900 p-5"
+                >
+                  <h2 className="text-lg font-medium mb-3">GP File Metadata</h2>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-neutral-400 block">BPM</span>
+                      <span className="text-white font-medium">{gpData.bpm}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-400 block">Key</span>
+                      <span className="text-white font-medium">{gpData.keySignature ?? "Unknown"}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-400 block">Tuning</span>
+                      <span className="text-white font-medium">{gpData.tuning ?? "Unknown"}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Word Timing Alignment Preview */}
               {gpData && lrcContent && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={springs.default}
                 >
+                  <h2 className="text-lg font-medium mb-3 flex items-center gap-2">
+                    <Timer size={20} className="text-indigo-400" />
+                    Word Timing Alignment
+                  </h2>
                   <AlignmentPreview
                     gpWords={gpData.wordTimings}
                     lrcContent={lrcContent}
                     onAlignmentComplete={handleAlignmentComplete}
                     disabled={pageState === "submitting"}
+                    gpMeta={gpMeta}
                   />
                 </motion.div>
               )}
 
+              {/* LRC Preview (after alignment) */}
               {alignmentResult && lrcContent && (
-                <>
-                  <EnhancedLrcView lrcContent={lrcContent} payload={alignmentResult.payload} />
+                <EnhancedLrcView lrcContent={lrcContent} payload={alignmentResult.payload} />
+              )}
+
+              {/* Chord Alignment Preview (only if GP has chords) */}
+              {gpData &&
+                lrcContent &&
+                gpData.chords &&
+                gpData.chords.length > 0 &&
+                gpData.tracks &&
+                gpData.selectedTrackIndex !== null &&
+                alignmentResult && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={springs.default}
-                    className="flex flex-col gap-3"
                   >
-                    {error && (
-                      <div className="rounded-lg bg-red-900/30 border border-red-700/50 p-3">
-                        <p className="text-sm text-red-200">{error}</p>
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleSubmit}
+                    <h2 className="text-lg font-medium mb-3 flex items-center gap-2">
+                      <MusicNote size={20} className="text-indigo-400" />
+                      Chord Alignment (using word timing)
+                    </h2>
+                    <ChordPreview
+                      lrcContent={lrcContent}
+                      gpChords={gpData.chords}
+                      tracks={gpData.tracks}
+                      selectedTrackIndex={gpData.selectedTrackIndex}
+                      onTrackChange={handleChordTrackChange}
+                      timeOffset={chordTimeOffset}
+                      onTimeOffsetChange={setChordTimeOffset}
+                      onAlignmentComplete={handleChordAlignmentComplete}
                       disabled={pageState === "submitting"}
-                      className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {pageState === "submitting"
-                        ? "Saving..."
-                        : `Save Enhancement (${alignmentResult.coverage.toFixed(1)}% coverage)`}
-                    </button>
+                      wordPatches={alignmentResult.patches}
+                    />
                   </motion.div>
-                </>
+                )}
+
+              {/* No chords message */}
+              {gpData && !hasChords && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={springs.default}
+                  className="rounded-xl bg-neutral-900 p-5"
+                >
+                  <div className="flex items-center gap-3">
+                    <MusicNote size={24} className="text-neutral-500" />
+                    <div>
+                      <p className="text-neutral-300">No chord markers in this GP file</p>
+                      <p className="text-sm text-neutral-500">Only word timing will be saved</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Submit Button */}
+              {alignmentResult && lrcContent && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={springs.default}
+                  className="flex flex-col gap-3"
+                >
+                  {error && (
+                    <div className="rounded-lg bg-red-900/30 border border-red-700/50 p-3">
+                      <p className="text-sm text-red-200">{error}</p>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={pageState === "submitting"}
+                    className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {pageState === "submitting"
+                      ? "Saving..."
+                      : hasChords && chordAlignmentResult
+                        ? "Save Word Timing + Chords"
+                        : "Save Word Timing"}
+                  </button>
+                </motion.div>
               )}
             </div>
           )}

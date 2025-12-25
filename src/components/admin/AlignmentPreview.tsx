@@ -3,6 +3,7 @@
 import { springs } from "@/animations"
 import type { EnhancementPayload } from "@/lib/db/schema"
 import {
+  type GpMetadata,
   type LrcLine,
   type WordPatch,
   type WordTiming,
@@ -23,6 +24,7 @@ interface AlignmentPreviewProps {
     coverage: number
   }) => void
   readonly disabled?: boolean
+  readonly gpMeta?: GpMetadata | undefined
 }
 
 function formatTime(ms: number): string {
@@ -96,9 +98,7 @@ function WordEditor({ word, lineStartMs, onSave, onCancel, gpWords }: WordEditor
   }
 
   const nearbyGpWords = useMemo(() => {
-    return gpWords
-      .filter(gp => Math.abs(gp.startMs - lineStartMs) < 10000)
-      .slice(0, 8)
+    return gpWords.filter(gp => Math.abs(gp.startMs - lineStartMs) < 10000).slice(0, 8)
   }, [gpWords, lineStartMs])
 
   return (
@@ -111,32 +111,33 @@ function WordEditor({ word, lineStartMs, onSave, onCancel, gpWords }: WordEditor
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium text-white">"{word.word}"</span>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-neutral-400 hover:text-white"
-        >
+        <button type="button" onClick={onCancel} className="text-neutral-400 hover:text-white">
           <X size={16} />
         </button>
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <label className="text-xs text-neutral-400 w-14">Start</label>
+          <label htmlFor="word-start-input" className="text-xs text-neutral-400 w-14">
+            Start
+          </label>
           <input
+            id="word-start-input"
             type="text"
             value={startInput}
             onChange={e => setStartInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="0:00.00"
             className="flex-1 px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
-            autoFocus
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-xs text-neutral-400 w-14">Duration</label>
+          <label htmlFor="word-duration-input" className="text-xs text-neutral-400 w-14">
+            Duration
+          </label>
           <input
+            id="word-duration-input"
             type="text"
             value={durationInput}
             onChange={e => setDurationInput(e.target.value)}
@@ -241,6 +242,7 @@ export function AlignmentPreview({
   lrcContent,
   onAlignmentComplete,
   disabled = false,
+  gpMeta,
 }: AlignmentPreviewProps) {
   const lrcLines = useMemo(() => parseLrcToLines(lrcContent), [lrcContent])
   const initialAlignment = useMemo(() => alignWords(lrcLines, gpWords), [lrcLines, gpWords])
@@ -286,9 +288,7 @@ export function AlignmentPreview({
             ? {
                 ...line,
                 words: line.words.map(w =>
-                  w.wordIndex === wordIndex
-                    ? { ...w, startMs, durationMs, matched: true }
-                    : w,
+                  w.wordIndex === wordIndex ? { ...w, startMs, durationMs, matched: true } : w,
                 ),
               }
             : line,
@@ -305,13 +305,13 @@ export function AlignmentPreview({
 
   useEffect(() => {
     const patches = editableDataToPatches(editableData)
-    const payload = patchesToPayload(patches, lrcLines)
+    const payload = patchesToPayload(patches, lrcLines, 1, gpMeta)
     onAlignmentComplete({
       patches,
       payload,
       coverage: stats.coverage,
     })
-  }, [editableData, lrcLines, stats.coverage, onAlignmentComplete])
+  }, [editableData, lrcLines, stats.coverage, onAlignmentComplete, gpMeta])
 
   const coveragePercent = Math.round(stats.coverage)
   const coverageColor =
@@ -329,7 +329,9 @@ export function AlignmentPreview({
           <span className="text-sm text-neutral-400">
             {stats.matchedWords} / {stats.totalWords} words matched
           </span>
-          <span className={`text-sm font-medium ${coverageColor}`}>{coveragePercent}% coverage</span>
+          <span className={`text-sm font-medium ${coverageColor}`}>
+            {coveragePercent}% coverage
+          </span>
         </div>
       </div>
 
@@ -390,11 +392,11 @@ export function AlignmentPreview({
                         }
                       >
                         {word.word}
-                        {word.matched && word.gpText && !areWordsSimilar(word.word, word.gpText) && (
-                          <span className="text-amber-400 text-xs ml-0.5">
-                            ({word.gpText})
-                          </span>
-                        )}
+                        {word.matched &&
+                          word.gpText &&
+                          !areWordsSimilar(word.word, word.gpText) && (
+                            <span className="text-amber-400 text-xs ml-0.5">({word.gpText})</span>
+                          )}
                         {!word.matched && (
                           <PencilSimple
                             size={10}
@@ -431,9 +433,7 @@ export function AlignmentPreview({
         })}
       </div>
 
-      {disabled && (
-        <div className="mt-4 text-center text-sm text-neutral-500">Processing...</div>
-      )}
+      {disabled && <div className="mt-4 text-center text-sm text-neutral-500">Processing...</div>}
     </div>
   )
 }

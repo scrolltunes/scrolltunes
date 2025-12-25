@@ -1,6 +1,6 @@
 import { type BPMResult, getBpmRace, getBpmWithFallback } from "@/lib/bpm"
 import { db } from "@/lib/db"
-import { lrcWordEnhancements } from "@/lib/db/schema"
+import { chordEnhancements, lrcWordEnhancements } from "@/lib/db/schema"
 import { getAlbumArt } from "@/lib/deezer-client"
 import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
 import {
@@ -237,6 +237,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .where(eq(lrcWordEnhancements.sourceLrclibId, actualLrclibId))
     .limit(1)
 
+  // Fetch chord enhancement if it exists for this LRCLIB ID
+  const [chordEnhancement] = await db
+    .select({ payload: chordEnhancements.payload })
+    .from(chordEnhancements)
+    .where(eq(chordEnhancements.sourceLrclibId, actualLrclibId))
+    .limit(1)
+
   const normalizedLyrics = {
     ...lyrics,
     title: spotifyTrackName ?? normalizeTrackName(lyrics.title),
@@ -256,6 +263,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     },
     hasEnhancement: !!enhancement,
     enhancement: enhancement?.payload ?? null,
+    hasChordEnhancement: !!chordEnhancement,
+    chordEnhancement: chordEnhancement?.payload ?? null,
   }
   return NextResponse.json(body, {
     headers: {

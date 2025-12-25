@@ -43,28 +43,30 @@ export interface AlignmentResult {
  * - Strips leading/trailing punctuation
  */
 function normalizeToken(s: string): string {
-  return s
-    .toLowerCase()
-    // Convert Cyrillic lookalikes to Latin equivalents
-    .replace(/а/g, "a") // Cyrillic а → Latin a
-    .replace(/е/g, "e") // Cyrillic е → Latin e
-    .replace(/о/g, "o") // Cyrillic о → Latin o
-    .replace(/р/g, "p") // Cyrillic р → Latin p
-    .replace(/с/g, "c") // Cyrillic с → Latin c
-    .replace(/у/g, "y") // Cyrillic у → Latin y
-    .replace(/х/g, "x") // Cyrillic х → Latin x
-    // Collapse repeated vowels (ooo→o, aaa→a, etc.)
-    .replace(/([aeiou])\1+/g, "$1")
-    // Normalize interjections: ooh/oh/ohh → o, aah/ah/ahh → a
-    .replace(/([ao])h+/g, "$1")
-    // Remove GP prolongation markers: (o), (a), (e), (u), (oo), etc.
-    .replace(/\([a-z]+\)/g, "")
-    // Remove +suffix patterns (e.g., "all+yeah" → "all")
-    .replace(/\+\w+/g, "")
-    // Strip leading punctuation
-    .replace(/^[^\p{L}\p{N}]+/u, "")
-    // Strip trailing punctuation
-    .replace(/[^\p{L}\p{N}]+$/u, "")
+  return (
+    s
+      .toLowerCase()
+      // Convert Cyrillic lookalikes to Latin equivalents
+      .replace(/а/g, "a") // Cyrillic а → Latin a
+      .replace(/е/g, "e") // Cyrillic е → Latin e
+      .replace(/о/g, "o") // Cyrillic о → Latin o
+      .replace(/р/g, "p") // Cyrillic р → Latin p
+      .replace(/с/g, "c") // Cyrillic с → Latin c
+      .replace(/у/g, "y") // Cyrillic у → Latin y
+      .replace(/х/g, "x") // Cyrillic х → Latin x
+      // Collapse repeated vowels (ooo→o, aaa→a, etc.)
+      .replace(/([aeiou])\1+/g, "$1")
+      // Normalize interjections: ooh/oh/ohh → o, aah/ah/ahh → a
+      .replace(/([ao])h+/g, "$1")
+      // Remove GP prolongation markers: (o), (a), (e), (u), (oo), etc.
+      .replace(/\([a-z]+\)/g, "")
+      // Remove +suffix patterns (e.g., "all+yeah" → "all")
+      .replace(/\+\w+/g, "")
+      // Strip leading punctuation
+      .replace(/^[^\p{L}\p{N}]+/u, "")
+      // Strip trailing punctuation
+      .replace(/[^\p{L}\p{N}]+$/u, "")
+  )
 }
 
 /**
@@ -270,6 +272,12 @@ export function alignWords(
   }
 }
 
+export interface GpMetadata {
+  readonly bpm: number
+  readonly keySignature: string | null
+  readonly tuning: string | null
+}
+
 /**
  * Convert alignment patches to the enhancement payload format.
  *
@@ -279,6 +287,7 @@ export function patchesToPayload(
   patches: readonly WordPatch[],
   lrcLines: readonly LrcLine[],
   algoVersion = 1,
+  gpMeta?: GpMetadata,
 ): EnhancementPayload {
   // Group patches by line
   const lineMap = new Map<number, WordPatch[]>()
@@ -329,5 +338,6 @@ export function patchesToPayload(
     version: 1,
     algoVersion,
     lines,
+    ...(gpMeta && { gpMeta }),
   }
 }

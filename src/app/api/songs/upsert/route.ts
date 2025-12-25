@@ -157,6 +157,7 @@ const lookupByLrclibId = (lrclibId: number) =>
             title: songs.title,
             artist: songs.artist,
             hasEnhancement: songs.hasEnhancement,
+            hasChordEnhancement: songs.hasChordEnhancement,
           })
           .from(songLrclibIds)
           .innerJoin(songs, eq(songLrclibIds.songId, songs.id))
@@ -175,6 +176,7 @@ const lookupByLrclibId = (lrclibId: number) =>
       title: mapping.title,
       artist: mapping.artist,
       hasEnhancement: mapping.hasEnhancement,
+      hasChordEnhancement: mapping.hasChordEnhancement,
     }
   })
 

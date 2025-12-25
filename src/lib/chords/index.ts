@@ -47,3 +47,12 @@ export {
 
 // Transpose functions
 export { transposeChord, transposeChordLine } from "./transpose"
+
+// Merge functions
+export type { MergedChordResult } from "./merge-chords"
+
+export {
+  mergeChordSources,
+  findBaselineChordsForLine,
+  estimateChordTimeFromCharIndex,
+} from "./merge-chords"

@@ -252,6 +252,7 @@ export const songs = pgTable(
     // Lyrics status
     hasSyncedLyrics: boolean("has_synced_lyrics").notNull().default(false),
     hasEnhancement: boolean("has_enhancement").notNull().default(false),
+    hasChordEnhancement: boolean("has_chord_enhancement").notNull().default(false),
 
     // Aggregate metrics (updated periodically or via trigger)
     totalPlayCount: integer("total_play_count").notNull().default(0),
@@ -304,6 +305,11 @@ export interface EnhancementPayload {
       readonly dur: number // duration in ms
     }>
   }>
+  readonly gpMeta?: {
+    readonly bpm: number
+    readonly keySignature: string | null
+    readonly tuning: string | null
+  }
 }
 
 export const lrcWordEnhancements = pgTable(
@@ -335,6 +341,56 @@ export const lrcWordEnhancements = pgTable(
     // One active enhancement per LRCLIB ID + hash combo
     uniqueIndex("lrc_word_enhancements_lrclib_hash_idx").on(table.sourceLrclibId, table.lrcHash),
     index("lrc_word_enhancements_song_id_idx").on(table.songId),
+  ],
+)
+
+// ============================================================================
+// Chord Enhancement (linked to songs)
+// ============================================================================
+
+export interface ChordEnhancementPayloadV1 {
+  readonly patchFormatVersion: "chords-json-v1"
+  readonly algoVersion: string
+  readonly timeTransform?:
+    | { kind: "offset"; ms: number }
+    | { kind: "piecewise_linear"; anchors: Array<{ gpMs: number; lrcMs: number }> }
+  readonly track?: { index: number; name: string; score: number }
+  readonly lines: ReadonlyArray<{
+    readonly idx: number
+    readonly chords: ReadonlyArray<{
+      readonly start: number
+      readonly dur?: number
+      readonly chord: string
+    }>
+  }>
+}
+
+export const chordEnhancements = pgTable(
+  "chord_enhancements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    songId: uuid("song_id")
+      .notNull()
+      .references(() => songs.id, { onDelete: "cascade" }),
+    sourceLrclibId: integer("source_lrclib_id").notNull(),
+    lrcHash: text("lrc_hash").notNull(),
+    algoVersion: text("algo_version").notNull(),
+    patchFormatVersion: text("patch_format_version").notNull(),
+    payload: jsonb("payload").$type<ChordEnhancementPayloadV1>().notNull(),
+    source: enhancementSourceEnum("source").notNull().default("admin"),
+    coverage: real("coverage"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  table => [
+    uniqueIndex("chord_enhancements_song_hash_algo_fmt_idx").on(
+      table.songId,
+      table.lrcHash,
+      table.algoVersion,
+      table.patchFormatVersion,
+    ),
+    index("chord_enhancements_song_id_idx").on(table.songId),
+    index("chord_enhancements_lrclib_id_idx").on(table.sourceLrclibId),
   ],
 )
 
@@ -380,3 +436,6 @@ export type NewSongLrclibId = typeof songLrclibIds.$inferInsert
 
 export type LrcWordEnhancement = typeof lrcWordEnhancements.$inferSelect
 export type NewLrcWordEnhancement = typeof lrcWordEnhancements.$inferInsert
+
+export type ChordEnhancement = typeof chordEnhancements.$inferSelect
+export type NewChordEnhancement = typeof chordEnhancements.$inferInsert

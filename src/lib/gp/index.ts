@@ -8,11 +8,43 @@
  */
 
 export { extractLyrics, parseGuitarProFile } from "./extract-lyrics"
+export type { Score } from "./extract-lyrics"
 export { buildWordTimings } from "./build-words"
 export { alignWords, parseLrcToLines, patchesToPayload } from "./align-words"
-export type { AlignmentResult, LrcLine, WordPatch } from "./align-words"
+export type { AlignmentResult, GpMetadata, LrcLine, WordPatch } from "./align-words"
 export { enhanceLrc, generateEnhancedLrc, formatTimeMs, parseTimestamp } from "./enhance-lrc"
 export type { EnhanceLrcResult } from "./enhance-lrc"
 export { ticksToMsAtBpm, tickToMs } from "./timing"
 export type { ExtractedLyrics, LyricSyllable, TempoEvent, WordTiming } from "./types"
 export { PPQ } from "./types"
+export type {
+  ChordEnhancementPayloadV1,
+  ChordEvent,
+  EnhancedChordLine,
+  ExtractedChords,
+  LineChord,
+  MergedChordLine,
+  PayloadTrackInfo,
+  TimedChord,
+  TimeTransformOffset,
+  TimeTransformPiecewise,
+  TimeTransformV1,
+  TrackAnalysis,
+} from "./chord-types"
+export {
+  analyzeTracksForChords,
+  extractChordEvents,
+  extractExplicitChords,
+  formatExtractedChord,
+  selectBestTrack,
+} from "./extract-chords"
+export {
+  alignChordsToLrc,
+  alignChordsToWords,
+  applyTimeTransform,
+  calculateCoverage,
+  deduplicateChords,
+  generateChordPayload,
+  MAX_CHORDS_PER_LINE,
+  TOLERANCE_MS,
+} from "./align-chords"

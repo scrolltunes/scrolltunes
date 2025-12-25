@@ -4,6 +4,7 @@
 
 import type { Lyrics } from "@/core"
 import type { EnhancementPayload } from "@/lib/db/schema"
+import type { ChordEnhancementPayloadV1 } from "@/lib/gp/chord-types"
 
 /**
  * A recently played song entry stored in localStorage
@@ -42,6 +43,8 @@ export interface CachedLyrics {
   readonly lyricsSource?: AttributionSource | undefined
   readonly hasEnhancement?: boolean | undefined
   readonly enhancement?: EnhancementPayload | null | undefined
+  readonly hasChordEnhancement?: boolean | undefined
+  readonly chordEnhancement?: ChordEnhancementPayloadV1 | null | undefined
   readonly cachedAt: number // timestamp (ms since epoch)
 }
 

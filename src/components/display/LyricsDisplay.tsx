@@ -16,6 +16,8 @@ import {
 } from "@/core"
 import { detectLyricsDirection } from "@/lib"
 import { type LyricChordPosition, matchChordsToLyrics, transposeChordLine } from "@/lib/chords"
+import { mergeChordSources } from "@/lib/chords/merge-chords"
+import type { ChordEnhancementPayloadV1 } from "@/lib/gp/chord-types"
 import { animate, motion, useMotionValue, useTransform } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
@@ -44,6 +46,7 @@ const rubberbandDistance = (distance: number, dimension: number): number => {
 
 export interface LyricsDisplayProps {
   readonly className?: string
+  readonly chordEnhancement?: ChordEnhancementPayloadV1 | null | undefined
 }
 
 /**
@@ -52,7 +55,7 @@ export interface LyricsDisplayProps {
  * Uses Motion transforms for GPU-accelerated scrolling.
  * Detects manual scroll/touch and temporarily disables auto-scroll.
  */
-export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
+export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDisplayProps) {
   const state = usePlayerState()
   const currentLineIndex = useCurrentLineIndex()
   const currentTime = useCurrentTime()
@@ -153,8 +156,53 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
   )
 
   // Build map of line index → chord data (transposed if needed)
+  // Uses GP chord enhancement if available, otherwise falls back to Songsterr
   const lineChordData = useMemo(() => {
-    if (!showChords || !chordsData || !lyrics) {
+    if (!showChords || !lyrics) {
+      return new Map<number, { chords: string[]; chordPositions: LyricChordPosition[] }>()
+    }
+
+    // If we have a chord enhancement, use mergeChordSources to combine GP + Songsterr
+    if (chordEnhancement) {
+      const merged = mergeChordSources(lyrics.lines, chordsData, chordEnhancement)
+      const map = new Map<number, { chords: string[]; chordPositions: LyricChordPosition[] }>()
+
+      for (const line of merged.lines) {
+        if (line.chords.length > 0) {
+          // Extract chord names and transpose if needed
+          const chordNames = line.chords.map(c => c.chord)
+          const chords =
+            transposeSemitones !== 0
+              ? transposeChordLine(chordNames, transposeSemitones)
+              : chordNames
+
+          // For GP chords, we don't have char positions, so estimate from time
+          const lyricsLine = lyrics.lines[line.lineIndex]
+          const chordPositions: LyricChordPosition[] = line.chords.map((c, idx) => {
+            const lineStart = lyricsLine?.startTime ?? 0
+            const lineEnd = lyricsLine?.endTime ?? lineStart + 3000
+            const lineDuration = lineEnd - lineStart
+            const lineLength = lyricsLine?.text.length ?? 1
+            // Convert absolute time to char position
+            const timeOffset = c.absoluteMs - lineStart
+            const charIndex = Math.floor((timeOffset / lineDuration) * lineLength)
+            return {
+              name: chords[idx] ?? c.chord,
+              charIndex: Math.max(0, Math.min(lineLength - 1, charIndex)),
+            }
+          })
+
+          map.set(line.lineIndex, {
+            chords: chords.slice(0, 3),
+            chordPositions: chordPositions.slice(0, 3),
+          })
+        }
+      }
+      return map
+    }
+
+    // No GP enhancement - use Songsterr only
+    if (!chordsData) {
       return new Map<number, { chords: string[]; chordPositions: LyricChordPosition[] }>()
     }
 
@@ -181,7 +229,7 @@ export function LyricsDisplay({ className = "" }: LyricsDisplayProps) {
       }
     }
     return map
-  }, [showChords, chordsData, lyrics, transposeSemitones])
+  }, [showChords, chordsData, lyrics, transposeSemitones, chordEnhancement])
 
   // Scroll to position a line at target position
   const getLineScrollTarget = useCallback(

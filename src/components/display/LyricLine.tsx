@@ -388,11 +388,7 @@ export const LyricLine = memo(function LyricLine({
   const textSizeClass = fontSize === undefined ? "text-2xl md:text-3xl lg:text-4xl" : ""
   // Word timing animation only when explicitly enabled and no positioned chords
   const shouldAnimateWords =
-    isActive &&
-    isPlaying &&
-    duration !== undefined &&
-    wordTimingEnabled &&
-    !hasPositionedChords
+    isActive && isPlaying && duration !== undefined && wordTimingEnabled && !hasPositionedChords
 
   return (
     <button

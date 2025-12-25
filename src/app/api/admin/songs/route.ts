@@ -100,6 +100,7 @@ const getSongs = (request: Request) =>
               spotifyId: songs.spotifyId,
               hasSyncedLyrics: songs.hasSyncedLyrics,
               hasEnhancement: songs.hasEnhancement,
+              hasChordEnhancement: songs.hasChordEnhancement,
               totalPlayCount: songs.totalPlayCount,
               createdAt: songs.createdAt,
               updatedAt: songs.updatedAt,

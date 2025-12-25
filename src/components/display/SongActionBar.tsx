@@ -177,7 +177,9 @@ export const SongActionBar = memo(function SongActionBar({
                 weight="bold"
                 className={useEnhancedTiming ? "text-indigo-400" : "text-transparent"}
               />
-              <span className={useEnhancedTiming ? "text-white" : "text-neutral-300"}>Enhanced</span>
+              <span className={useEnhancedTiming ? "text-white" : "text-neutral-300"}>
+                Enhanced
+              </span>
               <Sparkle size={10} weight="fill" className="text-amber-400 ml-auto" />
             </button>
             <button

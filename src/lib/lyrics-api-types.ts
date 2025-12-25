@@ -4,7 +4,7 @@
  */
 
 import type { Lyrics } from "@/core"
-import type { EnhancementPayload } from "@/lib/db/schema"
+import type { ChordEnhancementPayloadV1, EnhancementPayload } from "@/lib/db/schema"
 
 export interface AttributionSource {
   readonly name: string
@@ -25,6 +25,8 @@ export interface LyricsApiSuccessResponse {
   readonly attribution: LyricsApiAttribution
   readonly hasEnhancement?: boolean
   readonly enhancement?: EnhancementPayload | null
+  readonly hasChordEnhancement?: boolean
+  readonly chordEnhancement?: ChordEnhancementPayloadV1 | null
 }
 
 export interface LyricsApiErrorResponse {

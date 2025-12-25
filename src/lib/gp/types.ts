@@ -33,6 +33,9 @@ export interface ExtractedLyrics {
   tempo: TempoEvent[]
   syllables: LyricSyllable[]
   durationMs: number
+  bpm: number
+  keySignature: string | null
+  tuning: string | null
 }
 
 /** Word with absolute timing in milliseconds */

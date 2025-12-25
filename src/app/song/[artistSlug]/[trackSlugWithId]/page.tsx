@@ -65,6 +65,7 @@ type LoadState =
       readonly _tag: "Loaded"
       readonly lyrics: Lyrics // Original lyrics (without enhancement applied)
       readonly enhancement: import("@/lib/db/schema").EnhancementPayload | null
+      readonly chordEnhancement: import("@/lib/gp/chord-types").ChordEnhancementPayloadV1 | null
       readonly bpm: number | null
       readonly key: string | null
       readonly albumArt: string | null
@@ -228,6 +229,7 @@ export default function SongPage() {
           _tag: "Loaded",
           lyrics: cached.lyrics,
           enhancement: cached.enhancement ?? null,
+          chordEnhancement: cached.chordEnhancement ?? null,
           bpm: cached.bpm,
           key: cached.key ?? null,
           albumArt: cached.albumArt ?? null,
@@ -278,6 +280,7 @@ export default function SongPage() {
           _tag: "Loaded",
           lyrics: data.lyrics,
           enhancement: data.enhancement ?? null,
+          chordEnhancement: data.chordEnhancement ?? null,
           bpm: data.bpm,
           key: data.key,
           albumArt: data.albumArt ?? null,
@@ -297,6 +300,8 @@ export default function SongPage() {
           lyricsSource: data.attribution?.lyrics ?? undefined,
           hasEnhancement: data.hasEnhancement ?? false,
           enhancement: data.enhancement,
+          hasChordEnhancement: data.hasChordEnhancement ?? false,
+          chordEnhancement: data.chordEnhancement,
         })
 
         // Add to recents (without changing order)
@@ -595,7 +600,10 @@ export default function SongPage() {
             )}
           </AnimatePresence>
         )}
-        <LyricsDisplay className="flex-1 pb-12" />
+        <LyricsDisplay
+          className="flex-1 pb-12"
+          chordEnhancement={loadState._tag === "Loaded" ? loadState.chordEnhancement : null}
+        />
 
         <FloatingActions
           songId={lrclibId ?? 0}

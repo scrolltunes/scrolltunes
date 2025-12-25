@@ -1,11 +1,18 @@
 "use client"
 
 import {
+  type ChordEvent,
   type LyricSyllable,
+  type Score,
+  type TempoEvent,
+  type TrackAnalysis,
   type WordTiming,
+  analyzeTracksForChords,
   buildWordTimings,
+  extractExplicitChords,
   extractLyrics,
   parseGuitarProFile,
+  selectBestTrack,
 } from "@/lib/gp"
 import { Check, FileArrowUp, Warning } from "@phosphor-icons/react"
 import { useCallback, useRef, useState } from "react"
@@ -13,12 +20,22 @@ import { useCallback, useRef, useState } from "react"
 const ACCEPTED_EXTENSIONS = [".gp", ".gp3", ".gp4", ".gp5", ".gpx"]
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
+export interface GpExtractedData {
+  meta: { title: string; artist: string; album?: string | undefined }
+  wordTimings: WordTiming[]
+  syllables: LyricSyllable[]
+  chords: ChordEvent[] | null
+  tracks: TrackAnalysis[] | null
+  selectedTrackIndex: number | null
+  tempo: TempoEvent[]
+  score: Score
+  bpm: number
+  keySignature: string | null
+  tuning: string | null
+}
+
 interface GpUploaderProps {
-  onExtracted: (data: {
-    meta: { title: string; artist: string; album?: string | undefined }
-    wordTimings: WordTiming[]
-    syllables: LyricSyllable[]
-  }) => void
+  onExtracted: (data: GpExtractedData) => void
   disabled?: boolean | undefined
 }
 
@@ -28,6 +45,7 @@ export function GpUploader({ onExtracted, disabled = false }: GpUploaderProps) {
   const [state, setState] = useState<UploadState>("idle")
   const [error, setError] = useState<string | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<string>("Lyrics extracted")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const processFile = useCallback(
@@ -60,11 +78,33 @@ export function GpUploader({ onExtracted, disabled = false }: GpUploaderProps) {
 
         const wordTimings = buildWordTimings(extracted.syllables, extracted.tempo)
 
+        const tracks = analyzeTracksForChords(score)
+        const selectedTrackIndex = selectBestTrack(tracks)
+
+        let chords: ChordEvent[] | null = null
+        if (selectedTrackIndex !== null) {
+          chords = extractExplicitChords(score, selectedTrackIndex, extracted.tempo)
+          if (chords.length === 0) {
+            chords = null
+          }
+        }
+
+        const hasChords = chords !== null && chords.length > 0
+        setSuccessMessage(hasChords ? "Lyrics + chords extracted" : "Lyrics extracted")
+
         setState("success")
         onExtracted({
           meta: extracted.meta,
           wordTimings,
           syllables: extracted.syllables,
+          chords,
+          tracks: hasChords ? tracks : null,
+          selectedTrackIndex: hasChords ? selectedTrackIndex : null,
+          tempo: extracted.tempo,
+          score,
+          bpm: extracted.bpm,
+          keySignature: extracted.keySignature,
+          tuning: extracted.tuning,
         })
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to parse file"
@@ -170,7 +210,7 @@ export function GpUploader({ onExtracted, disabled = false }: GpUploaderProps) {
       ) : state === "success" ? (
         <>
           <Check size={40} weight="bold" className="text-emerald-400" />
-          <p className="text-sm text-emerald-400">Lyrics extracted</p>
+          <p className="text-sm text-emerald-400">{successMessage}</p>
           <p className="text-xs text-neutral-500">Click to upload another file</p>
         </>
       ) : (

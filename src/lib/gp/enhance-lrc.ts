@@ -29,9 +29,7 @@ export function parseTimestamp(timestamp: string): number {
   const minutes = Number.parseInt(mins ?? "0", 10)
   const seconds = Number.parseInt(secs ?? "0", 10)
   const fraction =
-    centis?.length === 3
-      ? Number.parseInt(centis, 10)
-      : Number.parseInt(centis ?? "0", 10) * 10
+    centis?.length === 3 ? Number.parseInt(centis, 10) : Number.parseInt(centis ?? "0", 10) * 10
   return (minutes * 60 + seconds) * 1000 + fraction
 }
 
