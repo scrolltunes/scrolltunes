@@ -12,7 +12,7 @@ import {
   parseLrcToLines,
   patchesToPayload,
 } from "@/lib/gp"
-import { Check, PencilSimple, Warning, X } from "@phosphor-icons/react"
+import { Check, PencilSimple, Trash, Warning, X } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
@@ -48,8 +48,14 @@ interface WordTimingEditorProps {
   /** Callback when payload changes */
   readonly onPayloadChange: (
     payload: EnhancementPayload,
-    meta: { isDirty: boolean; coverage: number; syncOffsetMs: number },
+    meta: { isDirty: boolean; coverage: number; syncOffsetMs: number; patches: readonly WordPatch[] },
   ) => void
+  /** Edit mode: external dirty state (for header display) */
+  readonly isDirty?: boolean | undefined
+  /** Edit mode: callback to remove enhancement */
+  readonly onRemove?: (() => void) | undefined
+  /** Edit mode: is removal in progress */
+  readonly isRemoving?: boolean | undefined
 }
 
 // ============================================================================
@@ -372,6 +378,9 @@ export function WordTimingEditor({
   gpMeta,
   initialPayload,
   onPayloadChange,
+  isDirty,
+  onRemove,
+  isRemoving,
 }: WordTimingEditorProps) {
   const isImportMode = gpWords !== undefined && gpWords.length > 0
   const rawLrcLines = useMemo(() => parseLrcToLines(lrcContent), [lrcContent])
@@ -538,6 +547,7 @@ export function WordTimingEditor({
       isDirty,
       coverage: stats.coverage,
       syncOffsetMs,
+      patches,
     })
   }, [editableData, rawLrcLines, gpMeta, gpWords, onPayloadChange, stats.coverage, syncOffsetMs])
 
@@ -555,7 +565,10 @@ export function WordTimingEditor({
   return (
     <div className="rounded-xl bg-neutral-900 p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium">Word Timing Editor</h3>
+        <h3 className="text-lg font-medium flex items-center gap-2">
+          Word Alignment
+          {isDirty && <span className="text-xs text-amber-400 font-normal">(unsaved)</span>}
+        </h3>
         <div className="flex items-center gap-4">
           <span className="text-sm text-neutral-400">
             {stats.matchedWords} / {stats.totalWords} words timed
@@ -563,6 +576,17 @@ export function WordTimingEditor({
           <span className={`text-sm font-medium ${coverageColor}`}>
             {coveragePercent}% coverage
           </span>
+          {onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              disabled={isRemoving || disabled}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
+            >
+              <Trash size={14} />
+              <span>{isRemoving ? "Removing..." : "Remove"}</span>
+            </button>
+          )}
         </div>
       </div>
 

@@ -1,8 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
-import { ChordPreview } from "@/components/admin/ChordPreview"
-import { EditableChordPreview } from "@/components/admin/EditableChordPreview"
+import { ChordTimingEditor } from "@/components/admin/ChordTimingEditor"
 import { type GpExtractedData, GpUploader } from "@/components/admin/GpUploader"
 import { WordTimingEditor } from "@/components/admin/WordTimingEditor"
 import { useAccount, useIsAdmin } from "@/core"
@@ -22,8 +21,6 @@ import {
   ClipboardText,
   MusicNote,
   ShieldWarning,
-  Timer,
-  Trash,
   Warning,
 } from "@phosphor-icons/react"
 import { motion } from "motion/react"
@@ -200,6 +197,7 @@ export default function EnhancePage({
 
   // GP extracted data (unified)
   const [gpData, setGpData] = useState<GpExtractedData | null>(null)
+  const [pendingGpData, setPendingGpData] = useState<GpExtractedData | null>(null)
 
   // Alignment results
   const [alignmentResult, setAlignmentResult] = useState<AlignmentResult | null>(null)
@@ -209,8 +207,7 @@ export default function EnhancePage({
     coverage: number
   } | null>(null)
 
-  // Chord-specific state
-  const [chordTimeOffset, setChordTimeOffset] = useState(0)
+
 
   // Existing enhancements
   const [existingEnhancement, setExistingEnhancement] = useState<{
@@ -291,9 +288,9 @@ export default function EnhancePage({
   )
 
   const handleChordPayloadChange = useCallback(
-    (payload: ChordEnhancementPayloadV1, isDirty: boolean) => {
+    (payload: ChordEnhancementPayloadV1, meta: { isDirty: boolean; coverage: number }) => {
       setEditedChordPayload(payload)
-      setIsChordDirty(isDirty)
+      setIsChordDirty(meta.isDirty)
     },
     [],
   )
@@ -501,11 +498,49 @@ export default function EnhancePage({
     loadSongData()
   }, [isAuthenticated, isAdmin, lrclibId])
 
-  const handleGpExtracted = useCallback((data: GpExtractedData) => {
-    setGpData(data)
-    setAlignmentResult(null)
-    setChordAlignmentResult(null)
-    setChordTimeOffset(0)
+  const normalizeForComparison = (str: string) =>
+    str.toLowerCase().replace(/[^\w\s]/g, "").trim()
+
+  const handleGpExtracted = useCallback(
+    (data: GpExtractedData) => {
+      if (!songInfo) {
+        setGpData(data)
+        setAlignmentResult(null)
+        setChordAlignmentResult(null)
+        return
+      }
+
+      const gpTitle = normalizeForComparison(data.meta.title)
+      const gpArtist = normalizeForComparison(data.meta.artist)
+      const pageTitle = normalizeForComparison(songInfo.title)
+      const pageArtist = normalizeForComparison(songInfo.artist)
+
+      const titleMatches = gpTitle.includes(pageTitle) || pageTitle.includes(gpTitle)
+      const artistMatches = gpArtist.includes(pageArtist) || pageArtist.includes(gpArtist)
+
+      if (!titleMatches || !artistMatches) {
+        setPendingGpData(data)
+        return
+      }
+
+      setGpData(data)
+      setAlignmentResult(null)
+      setChordAlignmentResult(null)
+    },
+    [songInfo],
+  )
+
+  const handleConfirmGpMismatch = useCallback(() => {
+    if (pendingGpData) {
+      setGpData(pendingGpData)
+      setAlignmentResult(null)
+      setChordAlignmentResult(null)
+      setPendingGpData(null)
+    }
+  }, [pendingGpData])
+
+  const handleCancelGpMismatch = useCallback(() => {
+    setPendingGpData(null)
   }, [])
 
   const handleChordTrackChange = useCallback(
@@ -530,10 +565,15 @@ export default function EnhancePage({
   const handleWordTimingChange = useCallback(
     (
       payload: EnhancementPayload,
-      meta: { isDirty: boolean; coverage: number; syncOffsetMs: number },
+      meta: {
+        isDirty: boolean
+        coverage: number
+        syncOffsetMs: number
+        patches: readonly WordPatch[]
+      },
     ) => {
       setAlignmentResult({
-        patches: [],
+        patches: [...meta.patches],
         payload,
         coverage: meta.coverage,
         syncOffsetMs: meta.syncOffsetMs,
@@ -555,15 +595,39 @@ export default function EnhancePage({
   )
 
   const handleChordAlignmentComplete = useCallback(
-    (result: {
-      lines: EnhancedChordLine[]
-      payload: ChordEnhancementPayloadV1
-      coverage: number
-    }) => {
-      setChordAlignmentResult(result)
+    (payload: ChordEnhancementPayloadV1, meta: { isDirty: boolean; coverage: number }) => {
+      setChordAlignmentResult({
+        lines: [...payload.lines],
+        payload,
+        coverage: meta.coverage,
+      })
     },
     [],
   )
+
+  const handleRemoveImportWordTiming = useCallback(() => {
+    setAlignmentResult(null)
+    setGpData(prev =>
+      prev
+        ? {
+            ...prev,
+            wordTimings: [],
+          }
+        : null,
+    )
+  }, [])
+
+  const handleRemoveImportChords = useCallback(() => {
+    setChordAlignmentResult(null)
+    setGpData(prev =>
+      prev
+        ? {
+            ...prev,
+            chords: [],
+          }
+        : null,
+    )
+  }, [])
 
   const handleSubmit = useCallback(async () => {
     if (!songInfo || !lrcContent || !alignmentResult) return
@@ -705,6 +769,54 @@ export default function EnhancePage({
             </motion.div>
           )}
 
+          {/* GP File Metadata Mismatch Confirmation */}
+          {pendingGpData && songInfo && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={springs.default}
+              className="rounded-xl bg-amber-900/30 border border-amber-700/50 p-6"
+            >
+              <div className="flex items-start gap-3 mb-4">
+                <Warning size={24} weight="fill" className="text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h2 className="text-lg font-medium text-amber-400">Metadata Mismatch</h2>
+                  <p className="text-amber-200/70 mt-1">
+                    The GP file metadata doesn't match this song. Are you sure you want to continue?
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                <div className="bg-neutral-900/50 rounded-lg p-3">
+                  <p className="text-neutral-400 text-xs mb-1">Page</p>
+                  <p className="text-white font-medium">{songInfo.title}</p>
+                  <p className="text-neutral-300">{songInfo.artist}</p>
+                </div>
+                <div className="bg-neutral-900/50 rounded-lg p-3">
+                  <p className="text-neutral-400 text-xs mb-1">GP File</p>
+                  <p className="text-white font-medium">{pendingGpData.meta.title}</p>
+                  <p className="text-neutral-300">{pendingGpData.meta.artist}</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleCancelGpMismatch}
+                  className="px-4 py-2 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmGpMismatch}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-500 transition-colors"
+                >
+                  Use Anyway
+                </button>
+              </div>
+            </motion.div>
+          )}
+
           {(pageState === "ready" || pageState === "submitting") && songInfo && (
             <div className="space-y-6">
               {/* Song Info */}
@@ -767,31 +879,14 @@ export default function EnhancePage({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ ...springs.default, delay: 0.15 }}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-lg font-medium flex items-center gap-2">
-                      <Timer size={20} className="text-indigo-400" />
-                      Word Timing Editor
-                      {isWordTimingDirty && (
-                        <span className="text-xs text-amber-400 font-normal">(unsaved)</span>
-                      )}
-                    </h2>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleRemoveEnhancement}
-                        disabled={isRemoving || isSavingExisting}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
-                      >
-                        <Trash size={14} />
-                        <span>{isRemoving ? "Removing..." : "Remove"}</span>
-                      </button>
-                    </div>
-                  </div>
                   <WordTimingEditor
                     lrcContent={lrcContent}
                     initialPayload={existingEnhancement.payload}
                     onPayloadChange={handleExistingWordTimingChange}
                     disabled={isSavingExisting}
+                    isDirty={isWordTimingDirty}
+                    onRemove={handleRemoveEnhancement}
+                    isRemoving={isRemoving}
                   />
                 </motion.div>
               )}
@@ -802,34 +897,14 @@ export default function EnhancePage({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ ...springs.default, delay: 0.2 }}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-lg font-medium flex items-center gap-2">
-                      <MusicNote size={20} className="text-indigo-400" />
-                      Chord Editor
-                      {isChordDirty && (
-                        <span className="text-xs text-amber-400 font-normal">(unsaved)</span>
-                      )}
-                    </h2>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-neutral-500">
-                        Track: {existingChordEnhancement.payload.track?.name ?? "Unknown"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleRemoveChordEnhancement}
-                        disabled={isRemovingChords || isSavingExisting}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
-                      >
-                        <Trash size={14} />
-                        <span>{isRemovingChords ? "Removing..." : "Remove"}</span>
-                      </button>
-                    </div>
-                  </div>
-                  <EditableChordPreview
+                  <ChordTimingEditor
                     lrcContent={lrcContent}
                     initialPayload={existingChordEnhancement.payload}
                     onPayloadChange={handleChordPayloadChange}
                     disabled={isSavingExisting}
+                    isDirty={isChordDirty}
+                    onRemove={handleRemoveChordEnhancement}
+                    isRemoving={isRemovingChords}
                   />
                 </motion.div>
               )}
@@ -907,22 +982,19 @@ export default function EnhancePage({
               )}
 
               {/* Word Timing Editor (import mode) */}
-              {gpData && lrcContent && (
+              {gpData && lrcContent && gpData.wordTimings.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={springs.default}
                 >
-                  <h2 className="text-lg font-medium mb-3 flex items-center gap-2">
-                    <Timer size={20} className="text-indigo-400" />
-                    Word Timing Editor
-                  </h2>
                   <WordTimingEditor
                     lrcContent={lrcContent}
                     gpWords={gpData.wordTimings}
                     gpMeta={gpMeta}
                     onPayloadChange={handleWordTimingChange}
                     disabled={pageState === "submitting"}
+                    onRemove={handleRemoveImportWordTiming}
                   />
                 </motion.div>
               )}
@@ -945,22 +1017,17 @@ export default function EnhancePage({
                     animate={{ opacity: 1, y: 0 }}
                     transition={springs.default}
                   >
-                    <h2 className="text-lg font-medium mb-3 flex items-center gap-2">
-                      <MusicNote size={20} className="text-indigo-400" />
-                      Chord Alignment (using word timing)
-                    </h2>
-                    <ChordPreview
+                    <ChordTimingEditor
                       lrcContent={lrcContent}
                       gpChords={gpData.chords}
                       tracks={gpData.tracks}
                       selectedTrackIndex={gpData.selectedTrackIndex}
                       onTrackChange={handleChordTrackChange}
-                      timeOffset={chordTimeOffset}
-                      onTimeOffsetChange={setChordTimeOffset}
-                      onAlignmentComplete={handleChordAlignmentComplete}
+                      onPayloadChange={handleChordAlignmentComplete}
                       disabled={pageState === "submitting"}
                       wordPatches={alignmentResult.patches}
                       syncOffsetMs={alignmentResult.syncOffsetMs}
+                      onRemove={handleRemoveImportChords}
                     />
                   </motion.div>
                 )}

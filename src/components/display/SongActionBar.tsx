@@ -22,12 +22,14 @@ import {
   ListPlus,
   Minus,
   MusicNote,
+  PencilSimple,
   Plus,
   SlidersHorizontal,
   Sparkle,
   TextAa,
   Timer,
 } from "@phosphor-icons/react"
+import Link from "next/link"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 
 export interface SongActionBarProps {
@@ -78,7 +80,9 @@ export const SongActionBar = memo(function SongActionBar({
   const fontSize = usePreference("fontSize")
   const wordTimingEnabled = usePreference("wordTimingEnabled")
   const [showTimingDropdown, setShowTimingDropdown] = useState(false)
+  const [showChordsDropdown, setShowChordsDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const chordsDropdownRef = useRef<HTMLDivElement>(null)
   const chordsState = useChordsState()
   const showChords = useShowChords()
   const chordsReady = chordsState.status === "ready"
@@ -102,19 +106,22 @@ export const SongActionBar = memo(function SongActionBar({
     preferencesStore.setWordTimingEnabled(!wordTimingEnabled)
   }, [wordTimingEnabled])
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
-    if (!showTimingDropdown) return
+    if (!showTimingDropdown && !showChordsDropdown) return
 
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowTimingDropdown(false)
       }
+      if (chordsDropdownRef.current && !chordsDropdownRef.current.contains(e.target as Node)) {
+        setShowChordsDropdown(false)
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [showTimingDropdown])
+  }, [showTimingDropdown, showChordsDropdown])
 
   return (
     <div className="flex items-center justify-center gap-3 py-4 px-4">
@@ -276,62 +283,127 @@ export const SongActionBar = memo(function SongActionBar({
 
       {/* Chords button - show different states based on availability */}
       {chordsNotFound ? (
-        <div className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800/50 rounded-full text-sm text-neutral-500">
-          <Guitar size={20} />
-          <span className="hidden sm:inline">No chords available</span>
+        <div className="relative" ref={chordsDropdownRef}>
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800/50 rounded-full text-sm text-neutral-500">
+            <Guitar size={20} />
+            <span className="hidden sm:inline">No chords available</span>
+            {isAdmin && (
+              <>
+                <div className="w-px h-4 bg-neutral-600/50 mx-1" />
+                <button
+                  type="button"
+                  onClick={() => setShowChordsDropdown(prev => !prev)}
+                  className="flex items-center justify-center text-neutral-400 hover:text-neutral-300 transition-colors"
+                  aria-label="Admin options"
+                >
+                  <CaretDown size={12} weight="bold" />
+                </button>
+              </>
+            )}
+          </div>
+          {showChordsDropdown && isAdmin && (
+            <div className="absolute top-full right-0 mt-1 z-50 bg-neutral-800 border border-neutral-700 rounded-lg shadow-lg py-1 min-w-[140px]">
+              <Link
+                href={`/admin/enhance/${songId}`}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-700 transition-colors text-neutral-300"
+                onClick={() => setShowChordsDropdown(false)}
+              >
+                <PencilSimple size={14} />
+                <span>Edit chords</span>
+              </Link>
+            </div>
+          )}
         </div>
       ) : (
-        <div
-          className={`flex items-center rounded-full overflow-hidden transition-colors ${
-            showChords && chordsReady ? "bg-indigo-600/20" : "bg-neutral-800/50"
-          }`}
-        >
-          {/* Main button - toggle chords on/off */}
-          <button
-            type="button"
-            onClick={() => chordsStore.toggleShowChords()}
-            disabled={chordsLoading}
-            className={`flex items-center gap-1.5 px-4 py-2 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
-              showChords && chordsReady
-                ? "text-indigo-400 hover:bg-indigo-600/30"
-                : "text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
-            }`}
-            aria-label={showChords ? "Hide chords" : "Show chords"}
-            aria-pressed={showChords && chordsReady}
-          >
-            <Guitar size={20} weight={showChords && chordsReady ? "fill" : "regular"} />
-            <span className="hidden sm:inline">Chords</span>
-            <span className="text-[10px] font-semibold bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded-full">
-              Beta
-            </span>
-          </button>
-
-          {/* Divider */}
+        <div className="relative" ref={chordsDropdownRef}>
           <div
-            className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`}
-          />
-
-          {/* Settings dropdown */}
-          <button
-            type="button"
-            onClick={onChordSettingsClick}
-            disabled={!showChords || !chordsReady}
-            className={`flex items-center justify-center w-10 h-9 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-              showChords && chordsReady
-                ? isChordPanelOpen
-                  ? "text-indigo-300 bg-indigo-600/30"
-                  : "text-indigo-400 hover:bg-indigo-600/30"
-                : "text-neutral-400"
+            className={`flex items-center rounded-full overflow-hidden transition-colors ${
+              showChords && chordsReady ? "bg-indigo-600/20" : "bg-neutral-800/50"
             }`}
-            aria-label={isChordPanelOpen ? "Close chord settings" : "Open chord settings"}
-            aria-expanded={isChordPanelOpen}
           >
-            {isChordPanelOpen ? (
-              <CaretUp size={14} weight="bold" />
-            ) : (
-              <SlidersHorizontal size={16} />
+            {/* Main button - toggle chords on/off */}
+            <button
+              type="button"
+              onClick={() => chordsStore.toggleShowChords()}
+              disabled={chordsLoading}
+              className={`flex items-center gap-1.5 px-4 py-2 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+                showChords && chordsReady
+                  ? "text-indigo-400 hover:bg-indigo-600/30"
+                  : "text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
+              }`}
+              aria-label={showChords ? "Hide chords" : "Show chords"}
+              aria-pressed={showChords && chordsReady}
+            >
+              <Guitar size={20} weight={showChords && chordsReady ? "fill" : "regular"} />
+              <span className="hidden sm:inline">Chords</span>
+              <span className="text-[10px] font-semibold bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded-full">
+                Beta
+              </span>
+            </button>
+
+            {/* Divider */}
+            <div
+              className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`}
+            />
+
+            {/* Settings dropdown */}
+            <button
+              type="button"
+              onClick={onChordSettingsClick}
+              disabled={!showChords || !chordsReady}
+              className={`flex items-center justify-center w-10 h-9 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                showChords && chordsReady
+                  ? isChordPanelOpen
+                    ? "text-indigo-300 bg-indigo-600/30"
+                    : "text-indigo-400 hover:bg-indigo-600/30"
+                  : "text-neutral-400"
+              }`}
+              aria-label={isChordPanelOpen ? "Close chord settings" : "Open chord settings"}
+              aria-expanded={isChordPanelOpen}
+            >
+              {isChordPanelOpen ? (
+                <CaretUp size={14} weight="bold" />
+              ) : (
+                <SlidersHorizontal size={16} />
+              )}
+            </button>
+
+            {/* Admin dropdown button */}
+            {isAdmin && (
+              <>
+                <div
+                  className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowChordsDropdown(prev => !prev)}
+                  className={`flex items-center justify-center w-8 h-9 transition-colors ${
+                    showChords && chordsReady
+                      ? "text-indigo-400 hover:bg-indigo-600/30"
+                      : "text-neutral-400 hover:bg-neutral-700/50"
+                  }`}
+                  aria-label="Admin options"
+                  aria-expanded={showChordsDropdown}
+                >
+                  <CaretDown size={12} weight="bold" />
+                </button>
+              </>
             )}
-          </button>
+          </div>
+
+          {/* Admin dropdown menu */}
+          {showChordsDropdown && isAdmin && (
+            <div className="absolute top-full right-0 mt-1 z-50 bg-neutral-800 border border-neutral-700 rounded-lg shadow-lg py-1 min-w-[140px]">
+              <Link
+                href={`/admin/enhance/${songId}`}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-700 transition-colors text-neutral-300"
+                onClick={() => setShowChordsDropdown(false)}
+              >
+                <PencilSimple size={14} />
+                <span>Edit chords</span>
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </div>
