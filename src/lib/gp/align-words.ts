@@ -67,6 +67,9 @@ function normalizeToken(s: string): string {
       .replace(/\([a-z]+\)/g, "")
       // Remove +suffix patterns (e.g., "all+yeah" → "all")
       .replace(/\+\w+/g, "")
+      // Remove internal hyphens (e.g., "self-destruction" → "selfdestruction")
+      // This allows matching hyphenated LRC words with split GP words
+      .replace(/-/g, "")
       // Strip leading punctuation
       .replace(/^[^\p{L}\p{N}]+/u, "")
       // Strip trailing punctuation
@@ -107,6 +110,53 @@ export function parseLrcToLines(lrc: string): LrcLine[] {
 }
 
 /**
+ * Try to split a concatenated GP word to match two consecutive LRC words.
+ * This handles cases where GP syllables were incorrectly joined (e.g., "pulseBefore" → "pulse" + "Before").
+ * Returns the split point and matched portions if successful.
+ */
+function trySplitGpWord(
+  normalizedLrc1: string,
+  normalizedLrc2: string,
+  gpWord: WordTiming,
+): { matched: boolean; gpText1: string; gpText2: string; splitMs: number } | null {
+  const normalizedGp = normalizeToken(gpWord.text)
+  const combined = normalizedLrc1 + normalizedLrc2
+
+  // GP word must equal the concatenation of both LRC words
+  if (normalizedGp !== combined) {
+    return null
+  }
+
+  // Find the split point in the original text
+  const originalLower = gpWord.text.toLowerCase()
+  let matchLen = 0
+  let normIdx = 0
+
+  for (let i = 0; i < originalLower.length && normIdx < normalizedLrc1.length; i++) {
+    const char = originalLower[i]
+    if (char && /^[\p{L}\p{N}]$/u.test(char)) {
+      normIdx++
+      matchLen = i + 1
+    }
+  }
+
+  if (normIdx === normalizedLrc1.length) {
+    // Estimate split timing - assume proportional to character count
+    const ratio = normalizedLrc1.length / combined.length
+    const splitMs = gpWord.startMs + 300 * ratio // ~300ms estimated word duration
+
+    return {
+      matched: true,
+      gpText1: gpWord.text.slice(0, matchLen),
+      gpText2: gpWord.text.slice(matchLen),
+      splitMs,
+    }
+  }
+
+  return null
+}
+
+/**
  * Try to match an LRC word by combining consecutive GP words.
  * Returns the number of GP words consumed (0 if no match).
  */
@@ -114,7 +164,7 @@ function tryMatchWithJoin(
   normalizedLrc: string,
   gpWords: readonly WordTiming[],
   startIdx: number,
-  maxLookahead = 3,
+  maxLookahead = 5, // Increased to handle compound words like "self-destruction" (4 syllables)
 ): { matched: boolean; consumed: number; startMs: number; endMs: number; gpText: string } {
   let combined = ""
   const originalParts: string[] = []
@@ -261,8 +311,57 @@ export function alignWords(
         // Advance past the matched word(s)
         gpIdx = match.gpIdx + match.consumed
       } else {
-        // No match found - skip this LRC word but DON'T advance gpIdx
-        // This allows the next LRC word to potentially match the current GP word
+        // No direct match - try splitting a concatenated GP word
+        // Look for GP word that equals this LRC word + next LRC word
+        const nextLrcWord = line.words[wordIdx + 1]
+        if (nextLrcWord) {
+          const normalizedNextLrc = normalizeToken(nextLrcWord)
+          if (normalizedNextLrc) {
+            // Search GP words for a concatenated match
+            for (
+              let offset = 0;
+              offset < MAX_LOOKAHEAD && gpIdx + offset < gpWords.length;
+              offset++
+            ) {
+              const gpWord = gpWords[gpIdx + offset]
+              if (!gpWord) continue
+
+              const splitResult = trySplitGpWord(normalizedLrc, normalizedNextLrc, gpWord)
+              if (splitResult?.matched) {
+                // Found a split! Add patches for both words
+                const estimatedDuration = 300 // Estimate for split words
+
+                // First word (current)
+                patches.push({
+                  lineIndex: lineIdx,
+                  wordIndex: wordIdx,
+                  startMs: Math.round(gpWord.startMs),
+                  durationMs: estimatedDuration,
+                  gpText: splitResult.gpText1,
+                })
+                matchedWords++
+
+                // Second word (next) - will be processed in next iteration but we add patch now
+                patches.push({
+                  lineIndex: lineIdx,
+                  wordIndex: wordIdx + 1,
+                  startMs: Math.round(splitResult.splitMs),
+                  durationMs: estimatedDuration,
+                  gpText: splitResult.gpText2,
+                })
+                matchedWords++
+                totalWords++ // Pre-count the next word since we're handling it now
+
+                // Skip the next word in the loop
+                wordIdx++
+
+                // Advance GP past this word
+                gpIdx = gpIdx + offset + 1
+                break
+              }
+            }
+          }
+        }
       }
     }
   }

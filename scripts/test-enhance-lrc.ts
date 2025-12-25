@@ -289,6 +289,41 @@ async function main() {
     `  ✓ Coverage: ${totalCoverage.toFixed(1)}% (${allPatches.length}/${alignment.totalWords} words)`,
   )
 
+  // Show unmatched words
+  const matchedSet = new Set(allPatches.map(p => `${p.lineIndex}-${p.wordIndex}`))
+  const unmatchedWords: Array<{
+    lineIdx: number
+    wordIdx: number
+    word: string
+    lineText: string
+  }> = []
+  for (let lineIdx = 0; lineIdx < lrcLines.length; lineIdx++) {
+    const line = lrcLines[lineIdx]
+    if (!line) continue
+    for (let wordIdx = 0; wordIdx < line.words.length; wordIdx++) {
+      const word = line.words[wordIdx]
+      if (!word) continue
+      if (!matchedSet.has(`${lineIdx}-${wordIdx}`)) {
+        unmatchedWords.push({ lineIdx, wordIdx, word, lineText: line.text })
+      }
+    }
+  }
+
+  if (unmatchedWords.length > 0) {
+    console.error("")
+    console.error(`=== Unmatched Words (${unmatchedWords.length}) ===`)
+    let prevLineIdx = -1
+    for (const { lineIdx, wordIdx, word, lineText } of unmatchedWords) {
+      if (lineIdx !== prevLineIdx) {
+        const line = lrcLines[lineIdx]
+        const lineTimeStr = line ? `[${(line.startMs / 1000).toFixed(2)}s]` : ""
+        console.error(`  Line ${lineIdx} ${lineTimeStr}: "${lineText}"`)
+        prevLineIdx = lineIdx
+      }
+      console.error(`    - word ${wordIdx}: "${word}"`)
+    }
+  }
+
   console.error("")
   console.error("=== Enhanced LRC ===")
   console.log(enhancedLrc)

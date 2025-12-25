@@ -222,9 +222,18 @@ function ticksToMsAtBpm(ticks: number, bpm: number): number {
 
 ### 2.4 Syllable Joining (Word Building)
 
-Guitar Pro stores lyrics as syllables with continuation markers:
-- `la-` = syllable continues to next
-- `+word` = shares beat with previous (handled by `sameBeat`)
+Guitar Pro stores lyrics as syllables with various continuation markers. The syllable joining algorithm handles multiple conventions found in GP files:
+
+#### Continuation Markers
+
+| Marker | Example | Meaning |
+|--------|---------|---------|
+| Trailing hyphen | `ma-` | Syllable continues to next |
+| Leading hyphen | `-tion` | Continues from previous syllable |
+| Bare hyphen | `-` | Previous syllable continues to next |
+| Uppercase after hyphen | `lse-` → `Be` | New word (not continuation) |
+
+#### Algorithm
 
 ```typescript
 interface WordTiming {
@@ -239,27 +248,62 @@ function buildWordTimings(
   const words: WordTiming[] = []
   let currentWord = ""
   let wordStartTick: number | null = null
+  let continueToNext = false  // Track continuation state
   
-  for (const syllable of syllables) {
-    const text = syllable.text.trim()
+  for (let i = 0; i < syllables.length; i++) {
+    const text = syllables[i].text.trim()
     if (!text) continue
     
-    if (wordStartTick === null) {
-      wordStartTick = syllable.tick
+    // Handle bare hyphen as continuation marker
+    if (text === "-") {
+      continueToNext = true
+      continue
     }
     
-    // Check for continuation marker
-    if (text.endsWith("-")) {
-      currentWord += text.slice(0, -1)
-    } else {
-      currentWord += text
-      
-      // Word complete
+    const hasLeadingHyphen = text.startsWith("-")
+    const hasTrailingHyphen = text.endsWith("-")
+    
+    // Determine if this syllable continues the previous word:
+    // - Explicit leading hyphen, OR
+    // - Previous syllable indicated continuation AND this looks like a continuation
+    //   (lowercase or has trailing hyphen - indicates mid-word)
+    const looksLikeContinuation = hasLeadingHyphen || hasTrailingHyphen || /^[a-z]/.test(text)
+    const continuesFromPrevious = hasLeadingHyphen || (continueToNext && looksLikeContinuation)
+    
+    // If new word starts and we have a word in progress, push it
+    if (!continuesFromPrevious && currentWord && wordStartTick !== null) {
       words.push({
         startMs: tickToMs(wordStartTick, tempoEvents),
         text: currentWord,
       })
-      
+      currentWord = ""
+      wordStartTick = null
+    }
+    
+    if (wordStartTick === null) {
+      wordStartTick = syllables[i].tick
+    }
+    
+    // Update continuation flag for next syllable
+    continueToNext = hasTrailingHyphen
+    
+    // Strip hyphens and add to current word
+    let content = text
+    if (hasLeadingHyphen) content = content.slice(1)
+    if (hasTrailingHyphen) content = content.slice(0, -1)
+    currentWord += content
+    
+    // Check if word is complete
+    const nextSyllable = syllables[i + 1]
+    const nextIsBareHyphen = nextSyllable?.text.trim() === "-"
+    
+    if (!hasTrailingHyphen && !nextIsBareHyphen) {
+      if (wordStartTick !== null) {
+        words.push({
+          startMs: tickToMs(wordStartTick, tempoEvents),
+          text: currentWord,
+        })
+      }
       currentWord = ""
       wordStartTick = null
     }
@@ -276,6 +320,15 @@ function buildWordTimings(
   return words
 }
 ```
+
+#### Edge Cases Handled
+
+| GP Syllables | Result | Notes |
+|--------------|--------|-------|
+| `ma-`, `ri-`, `o-`, `nettes` | `marionettes` | Standard trailing hyphens |
+| `pu`, `-`, `-lse-`, `Be`, `fore` | `pulse`, `Be`, `fore` | Bare hyphen + uppercase word boundary |
+| `Nev-`, `er-`, `end-`, `ing` | `Neverending` | Compound word |
+| `self`, `de`, `struc`, `tion` | `self`, `de`, `struc`, `tion` | No hyphens = separate words |
 
 ---
 
@@ -370,10 +423,17 @@ function normalizeToken(s: string): string {
     .replace(/([aeiou])\1+/g, "$1")
     // Normalize interjections: ooh/oh/ohh → o, aah/ah → a
     .replace(/([ao])h+/g, "$1")
+    // Normalize whoa/woah variants to o (sung "oh" sound)
+    .replace(/\bwh?o+a+h?\b/gi, "o")
+    // Collapse hyphenated interjections: oh-oh-oh → o, ah-ah → a
+    .replace(/(o+h?[-−])+o*h?/gi, "o")
+    .replace(/(a+h?[-−])+a*h?/gi, "a")
     // Remove GP prolongation markers: (o), (a), (oo), (u), etc.
     .replace(/\([a-z]+\)/g, "")
     // Remove +suffix patterns (e.g., "all+yeah" → "all")
     .replace(/\+\w+/g, "")
+    // Remove internal hyphens (for matching hyphenated LRC words)
+    .replace(/-/g, "")
     // Strip leading punctuation
     .replace(/^[^\p{L}\p{N}]+/u, "")
     // Strip trailing punctuation
@@ -392,6 +452,8 @@ function normalizeToken(s: string): string {
 | `ro(o)(o)(o)(o)ll.` | `roll` | `roll` |
 | `heave(e)n.` | `heaven` | `Heaven` |
 | `ооо` (Cyrillic) | `o` | `Ooh,` |
+| `self-destruction` | `selfdestruction` | `selfdestruction` (joined GP words) |
+| `Never-ending` | `neverending` | `Neverending` |
 
 #### Alignment Algorithm
 
@@ -449,15 +511,15 @@ function alignWords(
 
 #### Word Joining (Compound Words)
 
-When a single LRC word doesn't match any GP word, the algorithm tries joining consecutive GP words:
+When a single LRC word doesn't match any GP word, the algorithm tries joining consecutive GP words. This handles compound words and hyphenated words that are split across multiple GP syllables.
 
 ```typescript
-// Example: LRC has "control" but GP has "con" + "trol"
+// Example: LRC has "self-destruction" but GP has "self" + "de" + "struc" + "tion"
 function tryMatchWithJoin(
   normalizedLrc: string,
   gpWords: readonly WordTiming[],
   startIdx: number,
-  maxLookahead = 3
+  maxLookahead = 5  // Increased to handle compound words like "self-destruction"
 ): { matched: boolean; consumed: number; startMs: number; gpText: string } {
   let combined = ""
   const parts: string[] = []
@@ -482,6 +544,14 @@ function tryMatchWithJoin(
   return { matched: false, consumed: 0, startMs: 0, gpText: "" }
 }
 ```
+
+**Examples of word joining:**
+
+| LRC Word | GP Words | Joined | Match |
+|----------|----------|--------|-------|
+| `control` | `con` + `trol` | `control` | ✅ |
+| `self-destruction` | `self` + `de` + `struc` + `tion` | `selfdestruction` | ✅ |
+| `marionettes` | `ma` + `ri` + `o` + `net` + `tes` | `marionettes` | ✅ |
 
 #### Interjection Normalization
 
@@ -508,11 +578,13 @@ With the full normalization pipeline, typical coverage on well-aligned GP/LRC pa
 | Song | Coverage | Notes |
 |------|----------|-------|
 | Stairway to Heaven | 99.4% | 340/342 words (with BPM scaling) |
+| Master of Puppets | 97.1% | 330/340 words |
 | Symphony of Destruction | 91.2% | 156/171 words |
 | Most pop songs | 95-99% | Depends on GP quality |
 | Songs with ad-libs | 85-95% | GP may omit spoken parts |
 
 Unmatched words are typically:
+- Parenthetical echoes (e.g., `(faster)`, `(master)`) - backing vocals not in GP
 - Interjections with no GP equivalent
 - Spoken sections not transcribed in GP
 - Structural differences (different arrangements)
