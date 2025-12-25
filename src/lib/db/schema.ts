@@ -299,6 +299,7 @@ export interface EnhancementPayload {
   readonly algoVersion: number
   readonly lines: ReadonlyArray<{
     readonly idx: number
+    readonly startMs?: number // GP-derived absolute line start time in ms
     readonly words: ReadonlyArray<{
       readonly idx: number
       readonly start: number // offset from line start in ms
@@ -310,6 +311,12 @@ export interface EnhancementPayload {
     readonly keySignature: string | null
     readonly tuning: string | null
   }
+  /** Raw word timings from GP extraction (for compare/debug) */
+  readonly gpWords?: ReadonlyArray<{
+    readonly text: string
+    readonly startMs: number
+    readonly durationMs: number
+  }>
 }
 
 export const lrcWordEnhancements = pgTable(

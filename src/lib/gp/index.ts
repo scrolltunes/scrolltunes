@@ -10,7 +10,7 @@
 export { extractLyrics, parseGuitarProFile } from "./extract-lyrics"
 export type { Score } from "./extract-lyrics"
 export { buildWordTimings } from "./build-words"
-export { alignWords, parseLrcToLines, patchesToPayload } from "./align-words"
+export { alignWords, estimateGlobalOffset, parseLrcToLines, patchesToPayload } from "./align-words"
 export type { AlignmentResult, GpMetadata, LrcLine, WordPatch } from "./align-words"
 export { enhanceLrc, generateEnhancedLrc, formatTimeMs, parseTimestamp } from "./enhance-lrc"
 export type { EnhanceLrcResult } from "./enhance-lrc"

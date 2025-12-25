@@ -92,8 +92,7 @@ function extractKeySignature(score: Score): string | null {
 
 function extractTuning(score: Score): string | null {
   for (const track of score.tracks) {
-    const isGuitar =
-      track.playbackInfo.program >= 24 && track.playbackInfo.program <= 31
+    const isGuitar = track.playbackInfo.program >= 24 && track.playbackInfo.program <= 31
 
     if (!isGuitar) continue
 

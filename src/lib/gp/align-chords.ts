@@ -164,12 +164,17 @@ export function calculateCoverage(
 
 /**
  * Build a lookup from (lineIndex, wordIndex) → absolute word start time.
+ * Applies the same transform to word patches so chords and words are in the same time frame.
  */
-function buildWordTimingMap(wordPatches: readonly WordPatch[]): Map<string, number> {
+function buildWordTimingMap(
+  wordPatches: readonly WordPatch[],
+  transform?: TimeTransformV1,
+): Map<string, number> {
   const map = new Map<string, number>()
   for (const patch of wordPatches) {
     const key = `${patch.lineIndex}:${patch.wordIndex}`
-    map.set(key, patch.startMs)
+    const transformed = applyTimeTransform(patch.startMs, transform)
+    map.set(key, transformed)
   }
   return map
 }
@@ -192,7 +197,7 @@ export function alignChordsToWords(
   wordPatches: readonly WordPatch[],
   transform?: TimeTransformV1,
 ): EnhancedChordLine[] {
-  const wordTimingMap = buildWordTimingMap(wordPatches)
+  const wordTimingMap = buildWordTimingMap(wordPatches, transform)
 
   const transformedChords = chords.map(c => ({
     ...c,

@@ -16,9 +16,15 @@
  */
 
 import * as alphaTab from "@coderline/alphatab"
+import {
+  alignWords,
+  estimateGlobalOffset,
+  parseLrcToLines,
+  patchesToPayload,
+  recoverUnmatchedLrcLines,
+} from "../src/lib/gp/align-words"
 import { buildWordTimings } from "../src/lib/gp/build-words"
-import { enhanceLrc } from "../src/lib/gp/enhance-lrc"
-import { tickToMs } from "../src/lib/gp/timing"
+import { generateEnhancedLrc } from "../src/lib/gp/enhance-lrc"
 import type { LyricSyllable, TempoEvent } from "../src/lib/gp/types"
 
 async function fetchLrcContent(lrclibId: number): Promise<string> {
@@ -36,10 +42,54 @@ async function fetchLrcContent(lrclibId: number): Promise<string> {
   return data.syncedLyrics
 }
 
+function scanAllTracksForLyrics(buffer: ArrayBuffer): void {
+  const uint8Array = new Uint8Array(buffer)
+  const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(uint8Array)
+
+  console.error(`\n=== Scanning ${score.tracks.length} tracks for lyrics ===`)
+
+  for (let trackIdx = 0; trackIdx < score.tracks.length; trackIdx++) {
+    const track = score.tracks[trackIdx]
+    if (!track) continue
+
+    let syllableCount = 0
+    const firstFewSyllables: string[] = []
+
+    for (const staff of track.staves) {
+      for (let barIdx = 0; barIdx < staff.bars.length; barIdx++) {
+        const bar = staff.bars[barIdx]
+        if (!bar) continue
+
+        for (const voice of bar.voices) {
+          for (const beat of voice.beats) {
+            if (beat.lyrics && beat.lyrics.length > 0) {
+              for (const lyricText of beat.lyrics) {
+                if (lyricText.trim()) {
+                  syllableCount++
+                  if (firstFewSyllables.length < 10) {
+                    firstFewSyllables.push(lyricText.trim())
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const status = syllableCount > 0 ? `✓ ${syllableCount} syllables` : "✗ no lyrics"
+    console.error(`  Track ${trackIdx}: "${track.name}" - ${status}`)
+    if (firstFewSyllables.length > 0) {
+      console.error(`    Preview: ${firstFewSyllables.join(" ")}...`)
+    }
+  }
+  console.error("")
+}
+
 function parseGpFile(buffer: ArrayBuffer): {
   syllables: LyricSyllable[]
   tempoEvents: TempoEvent[]
-  meta: { title: string; artist: string }
+  meta: { title: string; artist: string; bpm: number }
 } {
   const uint8Array = new Uint8Array(buffer)
   const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(uint8Array)
@@ -94,6 +144,7 @@ function parseGpFile(buffer: ArrayBuffer): {
     meta: {
       title: score.title || "Unknown",
       artist: score.artist || "Unknown",
+      bpm: score.tempo,
     },
   }
 }
@@ -128,6 +179,12 @@ async function main() {
     process.exit(1)
   }
   const gpBuffer = await gpFile.arrayBuffer()
+
+  // Scan all tracks if SCAN_TRACKS is set
+  if (process.env.SCAN_TRACKS) {
+    scanAllTracksForLyrics(gpBuffer)
+  }
+
   const { syllables, tempoEvents, meta } = parseGpFile(gpBuffer)
   console.error(`  ✓ GP: "${meta.title}" by ${meta.artist}`)
 
@@ -142,15 +199,99 @@ async function main() {
   const wordTimings = buildWordTimings(syllables, tempoEvents)
   console.error(`  ✓ Built ${wordTimings.length} word timings`)
 
+  // Dump all extracted data if DUMP_ALL is set
+  if (process.env.DUMP_ALL) {
+    console.error(`\n=== ALL SYLLABLES (${syllables.length} total) ===`)
+    for (const syl of syllables) {
+      console.error(`  tick=${syl.tick} text="${syl.text}"`)
+    }
+    console.error(`\n=== ALL WORDS (${wordTimings.length} total) ===`)
+    for (const w of wordTimings) {
+      const sec = (w.startMs / 1000).toFixed(2)
+      console.error(`  [${sec}s] "${w.text}"`)
+    }
+    console.error("")
+  }
+
+  // Debug: show GP words in time range
+  const debugTimeRange = process.env.DEBUG_TIME
+  if (debugTimeRange) {
+    const [startSec, endSec] = debugTimeRange.split("-").map(Number)
+    const startMs = (startSec ?? 0) * 1000
+    const endMs = (endSec ?? 999) * 1000
+    console.error(`\n=== GP Words ${startSec}s - ${endSec}s ===`)
+    for (const w of wordTimings) {
+      if (w.startMs >= startMs && w.startMs <= endMs) {
+        const sec = (w.startMs / 1000).toFixed(2)
+        console.error(`  [${sec}] "${w.text}"`)
+      }
+    }
+    console.error("")
+  }
+
+  // Parse LRC and optionally scale to match GP tempo
+  const rawLrcLines = parseLrcToLines(lrcContent)
+
+  // BPM scaling: if GP tempo differs from recording, scale LRC times
+  const recordingBpm = process.env.RECORDING_BPM ? Number(process.env.RECORDING_BPM) : null
+  const gpBpm = meta.bpm
+  let bpmScale = 1.0
+  if (recordingBpm && recordingBpm !== gpBpm) {
+    bpmScale = recordingBpm / gpBpm
+    console.error(
+      `  ⚡ BPM scaling: recording=${recordingBpm} → GP=${gpBpm} (scale=${bpmScale.toFixed(3)})`,
+    )
+  }
+
+  const lrcLines = rawLrcLines.map(line => ({
+    ...line,
+    startMs: line.startMs * bpmScale,
+  }))
+  const baseAlignment = alignWords(lrcLines, wordTimings)
+  const suggestedOffset = estimateGlobalOffset(lrcLines, baseAlignment.patches)
+
+  let gpOffsetMs = 0
+  if (suggestedOffset !== null && Math.abs(suggestedOffset) >= 150) {
+    // Shift GP words by -offset to align with LRC/audio timing
+    gpOffsetMs = -suggestedOffset
+  }
+
   console.error("Running alignment...")
-  const result = enhanceLrc(lrcContent, wordTimings)
+  if (gpOffsetMs !== 0) {
+    console.error(
+      `  ⚡ Shifting GP timing by ${gpOffsetMs > 0 ? "+" : ""}${gpOffsetMs}ms to match audio`,
+    )
+  }
+
+  // Apply offset to GP words (GP is source of truth, shifted to match audio)
+  const shiftedWordTimings = wordTimings.map(w => ({
+    ...w,
+    startMs: w.startMs + gpOffsetMs,
+  }))
+
+  // Run alignment with shifted GP words
+  const alignment = alignWords(lrcLines, shiftedWordTimings)
+
+  // Recovery pass: find unmatched lines and search entire GP stream for matches
+  const recoveredPatches = recoverUnmatchedLrcLines(lrcLines, shiftedWordTimings, alignment.patches)
+  const allPatches = [...alignment.patches, ...recoveredPatches]
+
+  if (recoveredPatches.length > 0) {
+    const recoveredLines = new Set(recoveredPatches.map(p => p.lineIndex)).size
+    console.error(`  🔄 Recovered ${recoveredPatches.length} words across ${recoveredLines} lines`)
+  }
+
+  const payload = patchesToPayload(allPatches, lrcLines, 1, undefined, shiftedWordTimings)
+  const enhancedLrc = generateEnhancedLrc(lrcContent, payload)
+
+  const totalCoverage = (allPatches.length / alignment.totalWords) * 100
   console.error(
-    `  ✓ Coverage: ${result.coverage.toFixed(1)}% (${result.matchedWords}/${result.totalWords} words)`,
+    `  ✓ Coverage: ${totalCoverage.toFixed(1)}% (${allPatches.length}/${alignment.totalWords} words)`,
   )
 
   console.error("")
   console.error("=== Enhanced LRC ===")
-  console.log(result.enhancedLrc)
+  console.log(enhancedLrc)
 }
 
 main().catch(err => {

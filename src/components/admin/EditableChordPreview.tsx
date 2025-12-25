@@ -3,37 +3,20 @@
 import { springs } from "@/animations"
 import {
   type ChordEnhancementPayloadV1,
-  type ChordEvent,
   type EnhancedChordLine,
   type LineChord,
-  type TrackAnalysis,
-  type WordPatch,
-  alignChordsToLrc,
-  alignChordsToWords,
   calculateCoverage,
-  generateChordPayload,
   parseLrcToLines,
 } from "@/lib/gp"
-import { CaretDown, Check, MusicNotes, Warning } from "@phosphor-icons/react"
+import { Check, MusicNotes, Warning } from "@phosphor-icons/react"
 import { motion } from "motion/react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-interface ChordPreviewProps {
+interface EditableChordPreviewProps {
   readonly lrcContent: string
-  readonly gpChords: ChordEvent[]
-  readonly tracks: TrackAnalysis[]
-  readonly selectedTrackIndex: number
-  readonly onTrackChange: (index: number) => void
-  readonly timeOffset: number
-  readonly onTimeOffsetChange: (offset: number) => void
-  readonly onAlignmentComplete: (result: {
-    lines: EnhancedChordLine[]
-    payload: ChordEnhancementPayloadV1
-    coverage: number
-  }) => void
+  readonly initialPayload: ChordEnhancementPayloadV1
+  readonly onPayloadChange: (payload: ChordEnhancementPayloadV1, isDirty: boolean) => void
   readonly disabled?: boolean
-  readonly wordPatches?: readonly WordPatch[]
-  readonly syncOffsetMs?: number
 }
 
 function formatTime(ms: number): string {
@@ -41,11 +24,6 @@ function formatTime(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
   return `${minutes}:${seconds.toFixed(2).padStart(5, "0")}`
-}
-
-function formatOffset(ms: number): string {
-  const sign = ms >= 0 ? "+" : ""
-  return `${sign}${ms}ms`
 }
 
 interface SelectedChord {
@@ -191,7 +169,6 @@ function EditableWordLevelChordDisplay({
             onDragLeave={handleDragLeave}
             onDrop={e => handleDrop(e, wordIdx)}
           >
-            {/* Drop zone / chord area - always present during drag */}
             <div
               className={`flex gap-0.5 mb-0.5 min-h-[18px] min-w-[20px] rounded transition-colors ${
                 isDropTarget && (!wordChords || wordChords.length === 0)
@@ -276,65 +253,67 @@ function EditableWordLevelChordDisplay({
   )
 }
 
-export function ChordPreview({
+export function EditableChordPreview({
   lrcContent,
-  gpChords,
-  tracks,
-  selectedTrackIndex,
-  onTrackChange,
-  timeOffset,
-  onTimeOffsetChange,
-  onAlignmentComplete,
+  initialPayload,
+  onPayloadChange,
   disabled = false,
-  wordPatches,
-  syncOffsetMs = 0,
-}: ChordPreviewProps) {
+}: EditableChordPreviewProps) {
   const lrcLines = useMemo(() => parseLrcToLines(lrcContent), [lrcContent])
 
-  // Combine sync offset from word alignment with chord-specific fine-tuning
-  const effectiveOffsetMs = syncOffsetMs + timeOffset
+  const initialLinesRef = useRef(initialPayload.lines)
+  useEffect(() => {
+    initialLinesRef.current = initialPayload.lines
+  }, [initialPayload.lines])
 
-  const transform = useMemo(
-    () =>
-      effectiveOffsetMs !== 0 ? { kind: "offset" as const, ms: effectiveOffsetMs } : undefined,
-    [effectiveOffsetMs],
-  )
-
-  // Computed alignment (used as initial state)
-  const computedAlignedLines = useMemo(
-    () =>
-      wordPatches && wordPatches.length > 0
-        ? alignChordsToWords(gpChords, lrcLines, wordPatches, transform)
-        : alignChordsToLrc(gpChords, lrcLines, transform),
-    [gpChords, lrcLines, wordPatches, transform],
-  )
-
-  // Editable state - reset when computed alignment changes
-  const [editedLines, setEditedLines] = useState<EnhancedChordLine[]>(computedAlignedLines)
+  const [editedLines, setEditedLines] = useState<EnhancedChordLine[]>([...initialPayload.lines])
   const [selectedChord, setSelectedChord] = useState<SelectedChord | null>(null)
   const [dragState, setDragState] = useState<DragData | null>(null)
 
   useEffect(() => {
-    setEditedLines(computedAlignedLines)
+    setEditedLines([...initialPayload.lines])
     setSelectedChord(null)
     setDragState(null)
-  }, [computedAlignedLines])
+  }, [initialPayload])
 
   const coverage = useMemo(
     () => calculateCoverage(editedLines, lrcLines.length),
     [editedLines, lrcLines.length],
   )
 
-  const selectedTrack = tracks[selectedTrackIndex]
+  const isDirty = useMemo(() => {
+    const initial = initialLinesRef.current
+    if (editedLines.length !== initial.length) return true
+    for (let i = 0; i < editedLines.length; i++) {
+      const a = editedLines[i]
+      const b = initial[i]
+      if (!a || !b) return true
+      if (a.idx !== b.idx) return true
+      if (a.chords.length !== b.chords.length) return true
+      for (let j = 0; j < a.chords.length; j++) {
+        const ca = a.chords[j]
+        const cb = b.chords[j]
+        if (!ca || !cb) return true
+        if (
+          ca.start !== cb.start ||
+          ca.chord !== cb.chord ||
+          ca.wordIdx !== cb.wordIdx ||
+          ca.dur !== cb.dur
+        ) {
+          return true
+        }
+      }
+    }
+    return false
+  }, [editedLines])
 
   useEffect(() => {
-    const payload = generateChordPayload(editedLines, selectedTrack, transform)
-    onAlignmentComplete({
+    const payload: ChordEnhancementPayloadV1 = {
+      ...initialPayload,
       lines: editedLines,
-      payload,
-      coverage,
-    })
-  }, [editedLines, selectedTrack, transform, coverage, onAlignmentComplete])
+    }
+    onPayloadChange(payload, isDirty)
+  }, [editedLines, isDirty, initialPayload, onPayloadChange])
 
   const coveragePercent = Math.round(coverage * 100)
   const coverageColor =
@@ -352,7 +331,6 @@ export function ChordPreview({
     return map
   }, [editedLines])
 
-  // Handler: select/deselect chord
   const handleChordClick = useCallback(
     (lineIdx: number, chordIdx: number) => {
       if (disabled) return
@@ -365,7 +343,6 @@ export function ChordPreview({
     [disabled],
   )
 
-  // Handler: move chord to word (same line only) - used by click and drag
   const handleChordMove = useCallback(
     (lineIdx: number, chordIdx: number, newWordIdx: number) => {
       if (disabled) return
@@ -385,7 +362,6 @@ export function ChordPreview({
     [disabled],
   )
 
-  // Handler: move chord to word via click (same line only)
   const handleWordClick = useCallback(
     (lineIdx: number, wordIdx: number) => {
       if (disabled || !selectedChord) return
@@ -395,7 +371,6 @@ export function ChordPreview({
     [disabled, selectedChord, handleChordMove],
   )
 
-  // Drag handlers
   const handleDragStart = useCallback((data: DragData) => {
     setDragState(data)
     setSelectedChord(null)
@@ -405,7 +380,6 @@ export function ChordPreview({
     setDragState(null)
   }, [])
 
-  // Handler: delete selected chord via keyboard
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (!selectedChord) return
@@ -441,7 +415,7 @@ export function ChordPreview({
       onKeyDown={handleKeyDown}
     >
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium">Chord Alignment Preview</h3>
+        <h3 className="text-lg font-medium">Chord Editor</h3>
         <div className="flex items-center gap-4">
           <span className="text-sm text-neutral-400">
             {editedLines.length} / {lrcLines.length} lines with chords
@@ -452,68 +426,6 @@ export function ChordPreview({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4 mb-4">
-        <div className="flex-1 min-w-48">
-          <label htmlFor="chord-track-select" className="block text-xs text-neutral-400 mb-1">
-            Track
-          </label>
-          <div className="relative">
-            <select
-              id="chord-track-select"
-              value={selectedTrackIndex}
-              onChange={e => onTrackChange(Number(e.target.value))}
-              disabled={disabled}
-              className="w-full appearance-none px-3 py-2 pr-8 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {tracks.map((track, idx) => (
-                <option key={idx} value={idx}>
-                  {track.trackName} (score: {track.score}, chords: {track.chordEventCount})
-                </option>
-              ))}
-            </select>
-            <CaretDown
-              size={14}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none"
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 min-w-48">
-          <label htmlFor="chord-time-offset" className="block text-xs text-neutral-400 mb-1">
-            Fine-tune Offset: {formatOffset(timeOffset)}
-            {syncOffsetMs !== 0 && (
-              <span className="ml-1 text-[10px] text-neutral-500">
-                (total: {formatOffset(effectiveOffsetMs)})
-              </span>
-            )}
-          </label>
-          <input
-            id="chord-time-offset"
-            type="range"
-            min={-2000}
-            max={2000}
-            step={50}
-            value={timeOffset}
-            onChange={e => onTimeOffsetChange(Number(e.target.value))}
-            disabled={disabled}
-            className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-indigo-500"
-          />
-          <div className="flex justify-between text-xs text-neutral-500 mt-1">
-            <span>-2000ms</span>
-            <button
-              type="button"
-              onClick={() => onTimeOffsetChange(0)}
-              disabled={disabled || timeOffset === 0}
-              className="text-indigo-400 hover:text-indigo-300 disabled:text-neutral-600 disabled:cursor-not-allowed"
-            >
-              Reset
-            </button>
-            <span>+2000ms</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Edit instructions */}
       <p className="mb-4 text-xs text-neutral-500">
         Drag chords to move them between words. Or click a chord to select it, then click a word.
         Press Delete/Backspace to remove the selected chord.
@@ -527,10 +439,7 @@ export function ChordPreview({
           className="mb-4 rounded-lg bg-red-900/30 border border-red-700/50 p-3 flex items-start gap-2"
         >
           <Warning size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-200">
-            Very low coverage ({coveragePercent}%). Consider adjusting the time offset or selecting
-            a different track.
-          </p>
+          <p className="text-sm text-red-200">Very low coverage ({coveragePercent}%).</p>
         </motion.div>
       )}
 

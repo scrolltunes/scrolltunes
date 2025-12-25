@@ -1,10 +1,10 @@
 "use client"
 
 import { springs } from "@/animations"
-import { AlignmentPreview } from "@/components/admin/AlignmentPreview"
 import { ChordPreview } from "@/components/admin/ChordPreview"
-import { ExistingChordPreview } from "@/components/admin/ExistingChordPreview"
+import { EditableChordPreview } from "@/components/admin/EditableChordPreview"
 import { type GpExtractedData, GpUploader } from "@/components/admin/GpUploader"
+import { WordTimingEditor } from "@/components/admin/WordTimingEditor"
 import { useAccount, useIsAdmin } from "@/core"
 import type { EnhancementPayload } from "@/lib/db/schema"
 import {
@@ -42,6 +42,7 @@ interface AlignmentResult {
   patches: WordPatch[]
   payload: EnhancementPayload
   coverage: number
+  syncOffsetMs: number
 }
 
 type PageState = "loading" | "error" | "ready" | "submitting" | "success"
@@ -124,7 +125,7 @@ function EnhancedLrcView({
 function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
-      <div className="max-w-4xl mx-auto h-full px-4 flex items-center">
+      <div className="max-w-7xl mx-auto h-full px-4 flex items-center">
         <Link
           href="/admin/songs"
           className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
@@ -170,7 +171,7 @@ function LoadingScreen() {
     <div className="min-h-screen bg-neutral-950 text-white">
       <Header />
       <main className="pt-20 pb-8 px-4">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <div className="h-8 w-40 bg-neutral-800 rounded animate-pulse mb-2" />
             <div className="h-5 w-32 bg-neutral-800 rounded animate-pulse" />
@@ -224,6 +225,17 @@ export default function EnhancePage({
   const [isRemoving, setIsRemoving] = useState(false)
   const [isRemovingChords, setIsRemovingChords] = useState(false)
 
+  // Edited existing enhancement payloads
+  const [editedWordTimingPayload, setEditedWordTimingPayload] = useState<EnhancementPayload | null>(
+    null,
+  )
+  const [isWordTimingDirty, setIsWordTimingDirty] = useState(false)
+  const [editedChordPayload, setEditedChordPayload] = useState<ChordEnhancementPayloadV1 | null>(
+    null,
+  )
+  const [isChordDirty, setIsChordDirty] = useState(false)
+  const [isSavingExisting, setIsSavingExisting] = useState(false)
+
   // Derived: does the GP file have chords?
   const hasChords = gpData?.chords !== null && (gpData?.chords?.length ?? 0) > 0
 
@@ -266,6 +278,100 @@ export default function EnhancePage({
       setIsRemovingChords(false)
     }
   }, [songInfo?.songId, lrclibId])
+
+  const handleExistingWordTimingChange = useCallback(
+    (
+      payload: EnhancementPayload,
+      meta: { isDirty: boolean; coverage: number; syncOffsetMs: number },
+    ) => {
+      setEditedWordTimingPayload(payload)
+      setIsWordTimingDirty(meta.isDirty)
+    },
+    [],
+  )
+
+  const handleChordPayloadChange = useCallback(
+    (payload: ChordEnhancementPayloadV1, isDirty: boolean) => {
+      setEditedChordPayload(payload)
+      setIsChordDirty(isDirty)
+    },
+    [],
+  )
+
+  const handleSaveExistingEnhancements = useCallback(async () => {
+    if (!songInfo?.songId || !lrcContent) return
+
+    setIsSavingExisting(true)
+    setError(null)
+
+    try {
+      if (isWordTimingDirty && editedWordTimingPayload) {
+        const response = await fetch("/api/admin/lrc/enhance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            songId: songInfo.songId,
+            lrclibId,
+            baseLrc: lrcContent,
+            payload: editedWordTimingPayload,
+            coverage: existingEnhancement?.coverage ?? 0,
+          }),
+        })
+
+        if (!response.ok) {
+          const data = (await response.json()) as { error: string }
+          throw new Error(data.error || "Failed to save word timing enhancement")
+        }
+
+        setExistingEnhancement({
+          payload: editedWordTimingPayload,
+          coverage: existingEnhancement?.coverage ?? 0,
+        })
+        setIsWordTimingDirty(false)
+      }
+
+      if (isChordDirty && editedChordPayload) {
+        const response = await fetch("/api/admin/chords/enhance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            songId: songInfo.songId,
+            lrclibId,
+            baseLrc: lrcContent,
+            payload: editedChordPayload,
+            coverage: existingChordEnhancement?.coverage ?? 0,
+          }),
+        })
+
+        if (!response.ok) {
+          const data = (await response.json()) as { error: string }
+          throw new Error(data.error || "Failed to save chord enhancement")
+        }
+
+        setExistingChordEnhancement({
+          payload: editedChordPayload,
+          coverage: existingChordEnhancement?.coverage ?? 0,
+        })
+        setIsChordDirty(false)
+      }
+
+      removeCachedLyrics(lrclibId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save enhancement")
+    } finally {
+      setIsSavingExisting(false)
+    }
+  }, [
+    songInfo?.songId,
+    lrcContent,
+    lrclibId,
+    isWordTimingDirty,
+    editedWordTimingPayload,
+    isChordDirty,
+    editedChordPayload,
+    existingEnhancement?.coverage,
+    existingChordEnhancement?.coverage,
+  ])
 
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) return
@@ -421,9 +527,20 @@ export default function EnhancePage({
     [gpData],
   )
 
-  const handleAlignmentComplete = useCallback((result: AlignmentResult) => {
-    setAlignmentResult(result)
-  }, [])
+  const handleWordTimingChange = useCallback(
+    (
+      payload: EnhancementPayload,
+      meta: { isDirty: boolean; coverage: number; syncOffsetMs: number },
+    ) => {
+      setAlignmentResult({
+        patches: [],
+        payload,
+        coverage: meta.coverage,
+        syncOffsetMs: meta.syncOffsetMs,
+      })
+    },
+    [],
+  )
 
   const gpMeta = useMemo(
     () =>
@@ -513,7 +630,7 @@ export default function EnhancePage({
     <div className="min-h-screen bg-neutral-950 text-white">
       <Header />
       <main className="pt-20 pb-8 px-4">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -653,16 +770,16 @@ export default function EnhancePage({
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-lg font-medium flex items-center gap-2">
                       <Timer size={20} className="text-indigo-400" />
-                      Current Word Timing
+                      Word Timing Editor
+                      {isWordTimingDirty && (
+                        <span className="text-xs text-amber-400 font-normal">(unsaved)</span>
+                      )}
                     </h2>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm text-neutral-400">
-                        Coverage: {Math.round(existingEnhancement.coverage * 100)}%
-                      </span>
                       <button
                         type="button"
                         onClick={handleRemoveEnhancement}
-                        disabled={isRemoving}
+                        disabled={isRemoving || isSavingExisting}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
                       >
                         <Trash size={14} />
@@ -670,7 +787,12 @@ export default function EnhancePage({
                       </button>
                     </div>
                   </div>
-                  <EnhancedLrcView lrcContent={lrcContent} payload={existingEnhancement.payload} />
+                  <WordTimingEditor
+                    lrcContent={lrcContent}
+                    initialPayload={existingEnhancement.payload}
+                    onPayloadChange={handleExistingWordTimingChange}
+                    disabled={isSavingExisting}
+                  />
                 </motion.div>
               )}
 
@@ -679,37 +801,66 @@ export default function EnhancePage({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ ...springs.default, delay: 0.2 }}
-                  className="space-y-4"
                 >
-                  <div className="rounded-xl bg-neutral-900 p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-lg font-medium flex items-center gap-2">
-                        <MusicNote size={20} className="text-indigo-400" />
-                        Current Chords
-                      </h2>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-neutral-400">
-                          Coverage: {Math.round(existingChordEnhancement.coverage * 100)}%
-                        </span>
-                        <button
-                          type="button"
-                          onClick={handleRemoveChordEnhancement}
-                          disabled={isRemovingChords}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
-                        >
-                          <Trash size={14} />
-                          <span>{isRemovingChords ? "Removing..." : "Remove"}</span>
-                        </button>
-                      </div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-medium flex items-center gap-2">
+                      <MusicNote size={20} className="text-indigo-400" />
+                      Chord Editor
+                      {isChordDirty && (
+                        <span className="text-xs text-amber-400 font-normal">(unsaved)</span>
+                      )}
+                    </h2>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-neutral-500">
+                        Track: {existingChordEnhancement.payload.track?.name ?? "Unknown"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleRemoveChordEnhancement}
+                        disabled={isRemovingChords || isSavingExisting}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
+                      >
+                        <Trash size={14} />
+                        <span>{isRemovingChords ? "Removing..." : "Remove"}</span>
+                      </button>
                     </div>
-                    <p className="text-sm text-neutral-400">
-                      Track: {existingChordEnhancement.payload.track?.name ?? "Unknown"}
-                    </p>
                   </div>
-                  <ExistingChordPreview
+                  <EditableChordPreview
                     lrcContent={lrcContent}
-                    payload={existingChordEnhancement.payload}
+                    initialPayload={existingChordEnhancement.payload}
+                    onPayloadChange={handleChordPayloadChange}
+                    disabled={isSavingExisting}
                   />
+                </motion.div>
+              )}
+
+              {/* Save button for edited existing enhancements */}
+              {(isWordTimingDirty || isChordDirty) && !gpData && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={springs.default}
+                  className="flex flex-col gap-3"
+                >
+                  {error && (
+                    <div className="rounded-lg bg-red-900/30 border border-red-700/50 p-3">
+                      <p className="text-sm text-red-200">{error}</p>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSaveExistingEnhancements}
+                    disabled={isSavingExisting}
+                    className="w-full px-4 py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSavingExisting
+                      ? "Saving..."
+                      : isWordTimingDirty && isChordDirty
+                        ? "Save Word Timing + Chords"
+                        : isWordTimingDirty
+                          ? "Save Word Timing"
+                          : "Save Chords"}
+                  </button>
                 </motion.div>
               )}
 
@@ -743,7 +894,9 @@ export default function EnhancePage({
                     </div>
                     <div>
                       <span className="text-neutral-400 block">Key</span>
-                      <span className="text-white font-medium">{gpData.keySignature ?? "Unknown"}</span>
+                      <span className="text-white font-medium">
+                        {gpData.keySignature ?? "Unknown"}
+                      </span>
                     </div>
                     <div>
                       <span className="text-neutral-400 block">Tuning</span>
@@ -753,7 +906,7 @@ export default function EnhancePage({
                 </motion.div>
               )}
 
-              {/* Word Timing Alignment Preview */}
+              {/* Word Timing Editor (import mode) */}
               {gpData && lrcContent && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -762,14 +915,14 @@ export default function EnhancePage({
                 >
                   <h2 className="text-lg font-medium mb-3 flex items-center gap-2">
                     <Timer size={20} className="text-indigo-400" />
-                    Word Timing Alignment
+                    Word Timing Editor
                   </h2>
-                  <AlignmentPreview
-                    gpWords={gpData.wordTimings}
+                  <WordTimingEditor
                     lrcContent={lrcContent}
-                    onAlignmentComplete={handleAlignmentComplete}
-                    disabled={pageState === "submitting"}
+                    gpWords={gpData.wordTimings}
                     gpMeta={gpMeta}
+                    onPayloadChange={handleWordTimingChange}
+                    disabled={pageState === "submitting"}
                   />
                 </motion.div>
               )}
@@ -807,6 +960,7 @@ export default function EnhancePage({
                       onAlignmentComplete={handleChordAlignmentComplete}
                       disabled={pageState === "submitting"}
                       wordPatches={alignmentResult.patches}
+                      syncOffsetMs={alignmentResult.syncOffsetMs}
                     />
                   </motion.div>
                 )}

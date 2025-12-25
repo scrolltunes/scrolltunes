@@ -58,6 +58,11 @@ function normalizeToken(s: string): string {
       .replace(/([aeiou])\1+/g, "$1")
       // Normalize interjections: ooh/oh/ohh → o, aah/ah/ahh → a
       .replace(/([ao])h+/g, "$1")
+      // Normalize whoa/woah variants to o (sung "oh" sound)
+      .replace(/\bwh?o+a+h?\b/gi, "o")
+      // Collapse hyphenated interjections: oh-oh-oh → o, ah-ah → a
+      .replace(/(o+h?[-−])+o*h?/gi, "o")
+      .replace(/(a+h?[-−])+a*h?/gi, "a")
       // Remove GP prolongation markers: (o), (a), (e), (u), (oo), etc.
       .replace(/\([a-z]+\)/g, "")
       // Remove +suffix patterns (e.g., "all+yeah" → "all")
@@ -288,6 +293,7 @@ export function patchesToPayload(
   lrcLines: readonly LrcLine[],
   algoVersion = 1,
   gpMeta?: GpMetadata,
+  gpWords?: readonly WordTiming[],
 ): EnhancementPayload {
   // Group patches by line
   const lineMap = new Map<number, WordPatch[]>()
@@ -304,6 +310,7 @@ export function patchesToPayload(
   // Build payload lines
   const lines: Array<{
     readonly idx: number
+    readonly startMs?: number
     readonly words: ReadonlyArray<{
       readonly idx: number
       readonly start: number
@@ -330,6 +337,7 @@ export function patchesToPayload(
 
     lines.push({
       idx: lineIdx,
+      startMs: firstWordStartMs,
       words,
     })
   }
@@ -339,5 +347,263 @@ export function patchesToPayload(
     algoVersion,
     lines,
     ...(gpMeta && { gpMeta }),
+    ...(gpWords && {
+      gpWords: gpWords.map((w, i) => {
+        const nextWord = gpWords[i + 1]
+        const durationMs = nextWord ? nextWord.startMs - w.startMs : 500
+        return {
+          text: w.text,
+          startMs: w.startMs,
+          durationMs: Math.max(50, durationMs),
+        }
+      }),
+    }),
   }
+}
+
+/**
+ * Estimate global offset between GP and LRC timing.
+ *
+ * Compares the first few matched words' GP startMs with their LRC line startMs
+ * and returns the median offset (GP - LRC). Positive means GP is ahead of LRC.
+ *
+ * @param lrcLines - Parsed LRC lines
+ * @param patches - Word alignment patches from alignWords()
+ * @param sampleCount - Number of early patches to sample (default 8)
+ * @returns Median offset in ms, or null if insufficient data
+ */
+export function estimateGlobalOffset(
+  lrcLines: readonly LrcLine[],
+  patches: readonly WordPatch[],
+  sampleCount = 8,
+): number | null {
+  if (patches.length === 0 || lrcLines.length === 0) return null
+
+  // Take earliest patches by time
+  const sorted = [...patches].sort((a, b) => a.startMs - b.startMs)
+  const sample = sorted.slice(0, sampleCount)
+
+  const deltas: number[] = []
+  for (const p of sample) {
+    const line = lrcLines[p.lineIndex]
+    if (!line) continue
+    // GP time - LRC line start time
+    deltas.push(p.startMs - line.startMs)
+  }
+  if (deltas.length === 0) return null
+
+  deltas.sort((a, b) => a - b)
+  const mid = Math.floor(deltas.length / 2)
+  const firstMid = deltas[mid - 1]
+  const secondMid = deltas[mid]
+  const median =
+    deltas.length % 2 === 1 || firstMid === undefined || secondMid === undefined
+      ? (secondMid ?? firstMid ?? 0)
+      : Math.round((firstMid + secondMid) / 2)
+
+  return median
+}
+
+// ============================================================================
+// Recovery Pass for Unmatched Lines
+// ============================================================================
+
+interface GpNormalized {
+  readonly index: number
+  readonly startMs: number
+  readonly norm: string
+  readonly text: string
+}
+
+interface BlockMatch {
+  readonly score: number
+  readonly scoreRatio: number
+  readonly firstGpIndex: number
+  readonly mapping: readonly number[] // gpIndex for each LRC token, -1 if unmatched
+}
+
+/**
+ * Find the best GP word sequence that matches a block of LRC tokens.
+ * Searches the entire GP word stream, allowing reuse of already-matched words.
+ */
+function findBestGpMatchForBlock(
+  lrcTokens: readonly string[],
+  gpNorm: readonly GpNormalized[],
+): BlockMatch | null {
+  const L = lrcTokens.length
+  const G = gpNorm.length
+  if (L === 0 || G === 0) return null
+
+  const MAX_EXTRA_GP = 10 // allow some extra GP tokens interspersed
+  let best: BlockMatch | null = null
+
+  for (let gStart = 0; gStart < G; gStart++) {
+    let l = 0
+    let g = gStart
+    let matched = 0
+    let firstMatchIdx = -1
+    const mapping: number[] = new Array(L).fill(-1)
+
+    const maxG = Math.min(G, gStart + L + MAX_EXTRA_GP)
+
+    while (l < L && g < maxG) {
+      const gpWord = gpNorm[g]
+      if (gpWord && gpWord.norm === lrcTokens[l]) {
+        if (firstMatchIdx === -1) firstMatchIdx = gpWord.index
+        mapping[l] = gpWord.index
+        matched++
+        l++
+        g++
+      } else {
+        g++
+      }
+    }
+
+    const scoreRatio = matched / L
+    if (
+      matched >= 2 &&
+      scoreRatio >= 0.7 &&
+      (!best ||
+        scoreRatio > best.scoreRatio ||
+        (scoreRatio === best.scoreRatio && matched > best.score))
+    ) {
+      best = {
+        score: matched,
+        scoreRatio,
+        firstGpIndex: firstMatchIdx,
+        mapping,
+      }
+    }
+  }
+
+  return best
+}
+
+/**
+ * Recover word timing for unmatched LRC lines by searching the entire GP word stream.
+ *
+ * This handles cases where GP and LRC have different song structures (e.g., different
+ * solo lengths) causing the sequential alignment to miss later sections.
+ *
+ * @param lrcLines - Parsed LRC lines
+ * @param gpWords - All GP word timings
+ * @param basePatches - Patches from the primary alignment pass
+ * @returns Additional patches for recovered words
+ */
+export function recoverUnmatchedLrcLines(
+  lrcLines: readonly LrcLine[],
+  gpWords: readonly WordTiming[],
+  basePatches: readonly WordPatch[],
+): WordPatch[] {
+  // Build set of lines that have patches
+  const linesWithPatches = new Set<number>()
+  for (const patch of basePatches) {
+    linesWithPatches.add(patch.lineIndex)
+  }
+
+  // Find consecutive blocks of unmatched lines
+  const unmatchedBlocks: Array<{ start: number; end: number }> = []
+  let blockStart: number | null = null
+
+  for (let i = 0; i < lrcLines.length; i++) {
+    const line = lrcLines[i]
+    const hasContent = line && line.words.length > 0
+    const isUnmatched = hasContent && !linesWithPatches.has(i)
+
+    if (isUnmatched) {
+      if (blockStart === null) blockStart = i
+    } else {
+      if (blockStart !== null) {
+        unmatchedBlocks.push({ start: blockStart, end: i - 1 })
+        blockStart = null
+      }
+    }
+  }
+  if (blockStart !== null) {
+    unmatchedBlocks.push({ start: blockStart, end: lrcLines.length - 1 })
+  }
+
+  if (unmatchedBlocks.length === 0) return []
+
+  // Precompute normalized GP tokens
+  const gpNorm: GpNormalized[] = gpWords.map((w, i) => ({
+    index: i,
+    startMs: w.startMs,
+    norm: normalizeToken(w.text),
+    text: w.text,
+  }))
+
+  const recoveredPatches: WordPatch[] = []
+
+  for (const block of unmatchedBlocks) {
+    // Collect LRC tokens and their locations for this block
+    const lrcTokens: string[] = []
+    const tokenLoc: Array<{ lineIndex: number; wordIndex: number }> = []
+
+    for (let li = block.start; li <= block.end; li++) {
+      const line = lrcLines[li]
+      if (!line) continue
+      for (let wi = 0; wi < line.words.length; wi++) {
+        const word = line.words[wi]
+        if (!word) continue
+        const norm = normalizeToken(word)
+        if (!norm) continue
+        lrcTokens.push(norm)
+        tokenLoc.push({ lineIndex: li, wordIndex: wi })
+      }
+    }
+
+    if (lrcTokens.length < 2) continue // Skip single-word blocks
+
+    // Find best matching GP segment
+    const match = findBestGpMatchForBlock(lrcTokens, gpNorm)
+    if (!match) continue
+
+    // Group matched tokens by line to compute per-line offset
+    const lineFirstGpMs = new Map<number, number>()
+    for (let i = 0; i < tokenLoc.length; i++) {
+      const loc = tokenLoc[i]
+      const gpIdx = match.mapping[i]
+      if (!loc || gpIdx === undefined || gpIdx === -1) continue
+      const gpWord = gpWords[gpIdx]
+      if (!gpWord) continue
+
+      const existing = lineFirstGpMs.get(loc.lineIndex)
+      if (existing === undefined || gpWord.startMs < existing) {
+        lineFirstGpMs.set(loc.lineIndex, gpWord.startMs)
+      }
+    }
+
+    // Create patches with timing offset to fit LRC line windows
+    for (let i = 0; i < tokenLoc.length; i++) {
+      const loc = tokenLoc[i]
+      const gpIdx = match.mapping[i]
+      if (!loc || gpIdx === undefined || gpIdx === -1) continue
+      const gpWord = gpWords[gpIdx]
+      const lrcLine = lrcLines[loc.lineIndex]
+      if (!gpWord || !lrcLine) continue
+
+      const lineGpFirst = lineFirstGpMs.get(loc.lineIndex)
+      if (lineGpFirst === undefined) continue
+
+      // Offset: shift GP timing so first word of line aligns with LRC line start
+      const delta = lrcLine.startMs - lineGpFirst
+      const adjustedStartMs = gpWord.startMs + delta
+
+      // Compute duration
+      const nextGpWord = gpWords[gpIdx + 1]
+      let durationMs = nextGpWord ? nextGpWord.startMs - gpWord.startMs : 500
+      durationMs = Math.max(50, Math.min(durationMs, 2000))
+
+      recoveredPatches.push({
+        lineIndex: loc.lineIndex,
+        wordIndex: loc.wordIndex,
+        startMs: Math.round(adjustedStartMs),
+        durationMs: Math.round(durationMs),
+        gpText: gpWord.text,
+      })
+    }
+  }
+
+  return recoveredPatches
 }

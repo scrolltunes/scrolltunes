@@ -15,7 +15,8 @@
       "a11y": {
         "noSvgWithoutTitle": "off",
         "useKeyWithClickEvents": "off",
-        "useSemanticElements": "off"
+        "useSemanticElements": "off",
+        "noNoninteractiveTabindex": "off"
       }
     }
   },

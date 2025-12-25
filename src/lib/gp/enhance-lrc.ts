@@ -58,6 +58,15 @@ export function generateEnhancedLrc(lrcContent: string, payload: EnhancementPayl
     lineTimings.set(line.idx, wordMap)
   }
 
+  // Build line start map from payload (GP-derived timestamps)
+  const lineStartByIdx = new Map<number, number>()
+  for (const line of payload.lines) {
+    if (line.startMs !== undefined) {
+      lineStartByIdx.set(line.idx, line.startMs)
+    }
+  }
+
+  let lastGpTimestampMs = 0 // Track last GP-derived timestamp separately
   let lineIndex = 0
   for (const line of lines) {
     const match = line.match(lineRegex)
@@ -68,17 +77,28 @@ export function generateEnhancedLrc(lrcContent: string, payload: EnhancementPayl
 
     const [, timestamp, text] = match
     const trimmedText = text?.trim() ?? ""
-    const lineStartMs = parseTimestamp(timestamp ?? "00:00.00")
 
     if (!trimmedText) {
-      enhancedLines.push(line)
-      lineIndex++
+      // Empty line - preserve original timestamp, don't increment lineIndex
+      enhancedLines.push(`[${timestamp}]`)
       continue
+    }
+
+    // Determine line start time: prefer GP-derived (trusted), fall back to LRC
+    const gpStartMs = lineStartByIdx.get(lineIndex)
+    let lineStartMs: number
+    if (gpStartMs !== undefined) {
+      // Trust GP timing completely - only ensure monotonicity within GP-timed lines
+      lineStartMs = Math.max(gpStartMs, lastGpTimestampMs + 50)
+      lastGpTimestampMs = lineStartMs
+    } else {
+      // No GP timing - use original LRC timestamp (don't try to fit with GP timeline)
+      lineStartMs = parseTimestamp(timestamp ?? "00:00.00")
     }
 
     const wordTimingsForLine = lineTimings.get(lineIndex)
     if (!wordTimingsForLine || wordTimingsForLine.size === 0) {
-      enhancedLines.push(line)
+      enhancedLines.push(`[${formatTimeMs(lineStartMs)}] ${trimmedText}`)
       lineIndex++
       continue
     }
@@ -104,7 +124,7 @@ export function generateEnhancedLrc(lrcContent: string, payload: EnhancementPayl
       }
     }
 
-    enhancedLines.push(`[${timestamp}] ${enhancedWords.join(" ")}`)
+    enhancedLines.push(`[${formatTimeMs(lineStartMs)}] ${enhancedWords.join(" ")}`)
     lineIndex++
   }
 
@@ -135,7 +155,7 @@ export interface EnhanceLrcResult {
 export function enhanceLrc(lrcContent: string, gpWords: readonly WordTiming[]): EnhanceLrcResult {
   const lrcLines = parseLrcToLines(lrcContent)
   const alignment = alignWords(lrcLines, gpWords)
-  const payload = patchesToPayload(alignment.patches, lrcLines)
+  const payload = patchesToPayload(alignment.patches, lrcLines, 1, undefined, gpWords)
   const enhancedLrc = generateEnhancedLrc(lrcContent, payload)
 
   return {

@@ -483,20 +483,138 @@ function tryMatchWithJoin(
 }
 ```
 
+#### Interjection Normalization
+
+Sung vocalizations like "oh-oh-oh" and "ooooooh" represent the same sound but appear differently in GP vs LRC. The normalization handles these:
+
+```typescript
+// Normalize whoa/woah variants to o (sung "oh" sound)
+.replace(/\bwh?o+a+h?\b/gi, "o")
+// Collapse hyphenated interjections: oh-oh-oh → o, ah-ah → a
+.replace(/(o+h?[-−])+o*h?/gi, "o")
+.replace(/(a+h?[-−])+a*h?/gi, "a")
+```
+
+| GP Text | LRC Text | Both Normalize To |
+|---------|----------|-------------------|
+| `Oooooooo,` | `Oh-oh-oh-oh-whoa` | `o` |
+| `oooh,` | `Ohh, whoa` | `o`, `o` |
+| `Aaaaah` | `ah-ah-ah` | `a` |
+
 #### Typical Coverage Results
 
 With the full normalization pipeline, typical coverage on well-aligned GP/LRC pairs:
 
 | Song | Coverage | Notes |
 |------|----------|-------|
-| Stairway to Heaven | 98.5% | 337/342 words |
+| Stairway to Heaven | 99.4% | 340/342 words (with BPM scaling) |
+| Symphony of Destruction | 91.2% | 156/171 words |
 | Most pop songs | 95-99% | Depends on GP quality |
 | Songs with ad-libs | 85-95% | GP may omit spoken parts |
 
 Unmatched words are typically:
-- Interjections not in GP (`Oh-oh-oh-oh-whoa`)
+- Interjections with no GP equivalent
 - Spoken sections not transcribed in GP
-- Timing drift in long instrumental sections
+- Structural differences (different arrangements)
+
+### 3.3 BPM Scaling
+
+When a GP file was created at a different tempo than the actual recording, timestamps will drift. The enhancement system supports BPM scaling to align them.
+
+#### When to Use BPM Scaling
+
+| Scenario | GP BPM | Recording BPM | Scaling Needed? |
+|----------|--------|---------------|-----------------|
+| Different tempo version | 72 | 82 | ✅ Yes (ratio: 1.14) |
+| Half-time notation | 70 | 140 | ❌ No (notation style) |
+
+**Key insight:** Compare actual durations, not just BPM numbers. "Felt tempo" (double-time feel) vs notated tempo often differ by 2x but don't require scaling.
+
+```
+If GP_duration ≈ LRC_duration → no scaling needed
+If GP_duration ≠ LRC_duration → calculate ratio and test
+```
+
+#### Scaling Formula
+
+```typescript
+const bpmScale = recordingBpm / gpBpm
+
+// Scale LRC timestamps to match GP timeline
+const scaledLrcLines = lrcLines.map(line => ({
+  ...line,
+  startMs: line.startMs * bpmScale,
+}))
+```
+
+### 3.4 GP as Source of Truth
+
+The enhancement system treats GP timing as authoritative. Each matched line gets a GP-derived `startMs` that replaces the original LRC line timestamp.
+
+#### Enhanced Payload Format
+
+```typescript
+interface EnhancementPayload {
+  version: number
+  algoVersion: number
+  lines: Array<{
+    idx: number
+    startMs?: number  // GP-derived absolute line start time (new)
+    words: Array<{
+      idx: number
+      start: number   // offset from line start in ms
+      dur: number     // duration in ms
+    }>
+  }>
+}
+```
+
+When `startMs` is present, the player uses it instead of the original LRC line timestamp. This ensures word timing is consistent with line highlighting.
+
+### 3.5 Recovery Pass for Unmatched Lines
+
+When GP and LRC have different song structures (e.g., different solo lengths), the sequential alignment may miss later sections. The recovery pass handles this.
+
+#### How It Works
+
+1. After primary alignment, identify lines with **no patches**
+2. Group consecutive unmatched lines into blocks
+3. For each block, search the **entire** GP word stream (reusing already-matched words)
+4. Find the best text match using normalized comparison
+5. Offset GP timing to fit the LRC line's time window
+
+```typescript
+function recoverUnmatchedLrcLines(
+  lrcLines: readonly LrcLine[],
+  gpWords: readonly WordTiming[],
+  basePatches: readonly WordPatch[],
+): WordPatch[]
+```
+
+#### Example: Stairway to Heaven
+
+The GP file has a shorter guitar solo than the recording. The lyrics "And as we wind on down the road..." appear at:
+- GP: ~312-331 seconds
+- LRC: ~403-430 seconds
+
+The recovery pass finds these lyrics in the GP stream and remaps their timing to fit the LRC line positions.
+
+### 3.6 Test Script
+
+A CLI script is available for testing the enhancement pipeline:
+
+```bash
+# Basic usage
+bun run scripts/test-enhance-lrc.ts <lrclib-id> <path-to-gp-file>
+
+# With BPM scaling
+RECORDING_BPM=82 bun run scripts/test-enhance-lrc.ts 12489920 ./song.gp
+
+# Debug options
+SCAN_TRACKS=1    # Show all tracks and their lyric counts
+DUMP_ALL=1       # Dump all extracted syllables and words
+DEBUG_TIME=60-90 # Show GP words in time range (seconds)
+```
 
 ---
 
