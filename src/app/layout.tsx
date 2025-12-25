@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "ScrollTunes" }],
   creator: "ScrollTunes",
-  metadataBase: new URL("https://scrolltunes.com"),
+  metadataBase: new URL("https://www.scrolltunes.com"),
   alternates: {
     canonical: "/",
   },
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     siteName: "ScrollTunes",
     type: "website",
     locale: "en_US",
-    url: "https://scrolltunes.com",
+    url: "https://www.scrolltunes.com",
     images: [
       {
         url: "/og-image.png",
