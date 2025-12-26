@@ -32,7 +32,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   themeMode: "dark",
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,
-  wordTimingEnabled: false,
+  wordTimingEnabled: true,
 }
 
 export class PreferencesStore {
