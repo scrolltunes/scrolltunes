@@ -20,10 +20,18 @@ import {
 import { ClientLayer, type ClientLayerContext } from "@/services/client-layer"
 import { loadPublicConfig } from "@/services/public-config"
 import { SoundSystemService } from "@/services/sound-system"
-import type { AudioError } from "@/sounds"
+import { type AudioError, soundSystem } from "@/sounds"
 import { Context, Data, Effect, Layer } from "effect"
 import { useSyncExternalStore } from "react"
+import {
+  type AudioClassifierService,
+  type ClassifierDecision,
+  getAudioClassifier,
+  getAudioClassifierIfReady,
+} from "./AudioClassifierService"
 import { type SileroLoadError, SileroVADEngine } from "./SileroVADEngine"
+
+const publicConfig = loadPublicConfig()
 
 // --- Type Exports ---
 
@@ -80,93 +88,9 @@ export class VADError extends Data.TaggedClass("VADError")<{
   readonly cause: AudioError | SileroLoadError
 }> {}
 
-// --- Logging Configuration ---
+// --- Logging ---
 
-const publicConfig = loadPublicConfig()
-
-function isDevMode(): boolean {
-  if (typeof window === "undefined") return false
-  if (publicConfig.nodeEnv !== "production") return true
-  const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-  const isNotProduction = publicConfig.vercelEnv !== "production"
-  return isDev || isNotProduction
-}
-
-function vadLog(category: string, message: string, data?: Record<string, unknown>): void {
-  if (!isDevMode()) return
-  const timestamp = new Date().toISOString().substring(11, 23)
-  const dataStr = data ? ` ${JSON.stringify(data)}` : ""
-  console.log(`[VAD ${timestamp}] [${category}] ${message}${dataStr}`)
-
-  queueServerVADLog({
-    category,
-    message,
-    isoTime: new Date().toISOString(),
-    ...(data ? { data } : {}),
-  })
-}
-
-type ServerVADLogEntry = {
-  readonly category: string
-  readonly message: string
-  readonly data?: Record<string, unknown>
-  readonly isoTime: string
-}
-
-let serverLogQueue: ServerVADLogEntry[] = []
-let serverLogFlushTimer: number | null = null
-
-function queueServerVADLog(entry: ServerVADLogEntry): void {
-  if (typeof window === "undefined") return
-  if (!isDevMode()) return
-
-  if (serverLogQueue.length >= 200) {
-    serverLogQueue = serverLogQueue.slice(-100)
-  }
-  serverLogQueue.push(entry)
-
-  if (serverLogFlushTimer !== null) return
-  serverLogFlushTimer = window.setTimeout(() => {
-    serverLogFlushTimer = null
-    flushServerVADLogs()
-  }, 250)
-}
-
-function flushServerVADLogs(): void {
-  if (typeof window === "undefined") return
-  if (serverLogQueue.length === 0) return
-
-  const entries = serverLogQueue
-  serverLogQueue = []
-
-  const body = JSON.stringify({ entries })
-
-  if (navigator.sendBeacon) {
-    const ok = navigator.sendBeacon(
-      "/api/dev/vad-log",
-      new Blob([body], { type: "application/json" }),
-    )
-    if (ok) return
-  }
-
-  void fetch("/api/dev/vad-log", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body,
-    keepalive: true,
-  }).catch(() => {
-    serverLogQueue = entries.slice(-100).concat(serverLogQueue).slice(-200)
-  })
-}
-
-function formatErrorForLog(error: unknown): string {
-  if (error instanceof Error) return `${error.name}: ${error.message}`
-  try {
-    return JSON.stringify(error)
-  } catch {
-    return String(error)
-  }
-}
+import { formatErrorForLog, vadLog } from "@/lib/vad-log"
 
 // --- Singing-specific Service Interface ---
 
@@ -239,6 +163,19 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
   private sustainedEnergyStartAt: number | null = null
   private static readonly NOISY_THRESHOLD = 0.15 // Energy level to consider "high"
   private static readonly NOISY_SUSTAIN_MS = 3000 // Duration to consider "noisy room"
+
+  // Audio classifier for instrument vs vocal discrimination
+  // Note: audioClassifier is set in initializeClassifier() and used via getAudioClassifierIfReady()
+  // Audio is captured by SoundSystem's ring buffer, not stored here
+  private _audioClassifier: AudioClassifierService | null = null
+  private classifierEnabled = publicConfig.audioClassifierEnabled
+  private lastClassifierDecision: ClassifierDecision | null = null
+  private classifierRejectUntil = 0 // Timestamp until which classifier rejections are cached
+  private static readonly CLASSIFIER_REJECT_CACHE_MS = 500 // Cache rejections briefly (Silero override can clear early)
+
+  // Consecutive frames counter for sustained voice detection
+  private consecutiveHighFrames = 0
+  private static readonly MIN_CONSECUTIVE_FRAMES = 2 // Require ~200ms of sustained high probability (classifier handles false positives)
 
   private runPromiseWithClientLayer<T, E, R extends ClientLayerContext>(
     effect: Effect.Effect<T, E, R>,
@@ -469,10 +406,17 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
               return
             }
 
+            // Classifier gate: verify this is actually singing, not an instrument
+            if (this.classifierEnabled && !this.verifySingingWithClassifier()) {
+              vadLog("SILERO", "Speech start blocked by classifier (instrument detected)")
+              return
+            }
+
             vadLog("SILERO", "🎤 SPEECH START detected (all gates passed)", {
               threshold: this.sileroConfig.positiveSpeechThreshold,
               level: this.smoothedSileroLevel.toFixed(3),
               energySpeaking: this.isEnergySpeaking,
+              classifierEnabled: this.classifierEnabled,
             })
             void this.runPromiseWithClientLayer(
               Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void),
@@ -489,7 +433,8 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
           onFrameProcessed: ({ isSpeech }) => {
             if (!this.state.isListening) return
 
-            this.smoothedSileroLevel = smoothLevel(this.smoothedSileroLevel, isSpeech, 0.3)
+            // Use faster smoothing (0.5) for quicker response to singing onset
+            this.smoothedSileroLevel = smoothLevel(this.smoothedSileroLevel, isSpeech, 0.5)
 
             // Throttle level/log updates to ~20 FPS to avoid noisy spam
             const now = Date.now()
@@ -505,43 +450,51 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
               })
             }
 
+            // Track consecutive high-probability frames for sustained voice detection
+            if (this.smoothedSileroLevel >= this.sileroConfig.positiveSpeechThreshold) {
+              this.consecutiveHighFrames++
+            } else {
+              this.consecutiveHighFrames = 0
+            }
+
             // Release deferred start once energy gate catches up and probability stays high
             if (this.pendingSileroStartAt !== null) {
               const age = now - this.pendingSileroStartAt
+              const hasEnoughFrames =
+                this.consecutiveHighFrames >= SingingDetectionStore.MIN_CONSECUTIVE_FRAMES
               const shouldRelease =
                 this.isEnergySpeaking &&
                 !isInBurstWindow(this.runtime, now) &&
                 this.smoothedSileroLevel >= this.sileroConfig.positiveSpeechThreshold &&
-                age <= 600
-
-              // Preroll release: allow high raw probability with moderate smoothed to start immediately
-              const prerelease =
-                this.isEnergySpeaking &&
-                !isInBurstWindow(this.runtime, now) &&
-                isSpeech >= 0.95 &&
-                this.smoothedSileroLevel >= 0.75
+                hasEnoughFrames &&
+                age <= 1000
 
               if (shouldRelease) {
+                // Classifier gate: verify this is singing, not instrument
+                if (this.classifierEnabled && !this.verifySingingWithClassifier()) {
+                  vadLog("SILERO", "Deferred speech blocked by classifier (instrument detected)", {
+                    consecutiveHighFrames: this.consecutiveHighFrames,
+                    smoothedLevel: this.smoothedSileroLevel.toFixed(3),
+                  })
+                  // Don't reset pendingSileroStartAt or consecutiveHighFrames
+                  // Let them accumulate so Silero override can kick in
+                  return
+                }
+
                 this.pendingSileroStartAt = null
-                vadLog("SILERO", "Speech start released after energy gate opened", {
+                this.consecutiveHighFrames = 0
+                vadLog("SILERO", "Speech start released (sustained high probability)", {
                   level: this.smoothedSileroLevel.toFixed(3),
                   threshold: this.sileroConfig.positiveSpeechThreshold,
+                  consecutiveFrames: this.consecutiveHighFrames,
+                  classifierEnabled: this.classifierEnabled,
                 })
                 void this.runPromiseWithClientLayer(
                   Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void),
                 )
-              } else if (prerelease) {
+              } else if (age > 1000) {
                 this.pendingSileroStartAt = null
-                vadLog("SILERO", "Speech start preroll release (high raw prob)", {
-                  raw: isSpeech.toFixed(3),
-                  smoothed: this.smoothedSileroLevel.toFixed(3),
-                  threshold: this.sileroConfig.positiveSpeechThreshold,
-                })
-                void this.runPromiseWithClientLayer(
-                  Effect.catchAll(this.dispatch(new VoiceStart({})), () => Effect.void),
-                )
-              } else if (age > 600) {
-                this.pendingSileroStartAt = null
+                this.consecutiveHighFrames = 0
               }
             }
 
@@ -575,6 +528,11 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
           return Effect.void
         }),
       )
+
+      // Initialize classifier in background (non-blocking)
+      if (this.classifierEnabled) {
+        void this.initializeClassifier()
+      }
 
       return true
     })
@@ -646,6 +604,118 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
     this.animationFrameId = requestAnimationFrame(analyze)
   }
 
+  // --- Audio Classifier integration ---
+
+  private async initializeClassifier(): Promise<void> {
+    if (!this.classifierEnabled) {
+      vadLog("CLASSIFIER", "Audio classifier disabled via config")
+      return
+    }
+
+    try {
+      vadLog("CLASSIFIER", "Initializing audio classifier (lazy load)...")
+      this._audioClassifier = await getAudioClassifier()
+      vadLog("CLASSIFIER", "✅ Audio classifier initialized")
+    } catch (error) {
+      vadLog("CLASSIFIER", "⚠️ Failed to initialize classifier, continuing without", {
+        error: formatErrorForLog(error),
+      })
+      this._audioClassifier = null
+    }
+  }
+
+  /**
+   * Verify speech detection with audio classifier
+   * Returns true if singing is confirmed or classifier is unavailable
+   * Returns false if classifier explicitly rejects (instrument detected)
+   */
+  private verifySingingWithClassifier(): boolean {
+    const now = Date.now()
+
+    // Use cached rejection if still valid, BUT override if Silero is very confident
+    // This handles singing over guitar where YAMNet sees "Music" but Silero detects voice
+    if (this.classifierRejectUntil > now) {
+      if (this.smoothedSileroLevel >= 0.85 && this.consecutiveHighFrames >= 2) {
+        vadLog("CLASSIFIER", "Overriding cached rejection - Silero very confident", {
+          level: this.smoothedSileroLevel.toFixed(3),
+          consecutiveFrames: this.consecutiveHighFrames,
+        })
+        this.classifierRejectUntil = 0 // Clear the cache
+        // Continue to re-run the classifier with fresh audio
+      } else {
+        vadLog("CLASSIFIER", "Using cached rejection (instrument detected recently)")
+        return false
+      }
+    }
+
+    // Get classifier if ready (don't block on initialization)
+    const classifier = getAudioClassifierIfReady()
+    if (!classifier) {
+      vadLog("CLASSIFIER", "Classifier not ready, trusting Silero")
+      return true
+    }
+
+    // Get real audio from SoundSystem's ring buffer
+    const audioBuffer = soundSystem.getClassifierAudioBuffer()
+    if (!audioBuffer) {
+      vadLog("CLASSIFIER", "No audio buffer available, trusting Silero")
+      return true
+    }
+
+    const sampleRate = soundSystem.getClassifierSampleRate()
+
+    // Classify the audio buffer
+    const decision = classifier.classifySync(audioBuffer, sampleRate)
+    if (!decision) {
+      return true
+    }
+
+    this.lastClassifierDecision = decision
+
+    vadLog("CLASSIFIER", `Decision: ${decision._tag} - ${decision.reason}`, {
+      topClasses: decision.topClasses.slice(0, 5).map(c => `${c.category}: ${c.score.toFixed(2)}`),
+    })
+
+    if (decision._tag === "Reject") {
+      // Cache the rejection to avoid repeated classification
+      this.classifierRejectUntil = now + SingingDetectionStore.CLASSIFIER_REJECT_CACHE_MS
+      vadLog("CLASSIFIER", "🎸 Silero speech REJECTED by classifier - likely instrument")
+      return false
+    }
+
+    if (decision._tag === "Allow") {
+      vadLog("CLASSIFIER", "🎤 Singing CONFIRMED by classifier")
+    }
+
+    // Allow or Defer - trust Silero
+    return true
+  }
+
+  private resetClassifierState(): void {
+    this.lastClassifierDecision = null
+    this.classifierRejectUntil = 0
+  }
+
+  setClassifierEnabled(enabled: boolean): void {
+    this.classifierEnabled = enabled
+    vadLog("CONFIG", `Audio classifier ${enabled ? "enabled" : "disabled"}`)
+    if (!enabled) {
+      this.resetClassifierState()
+    }
+  }
+
+  isClassifierEnabled(): boolean {
+    return this.classifierEnabled
+  }
+
+  isClassifierReady(): boolean {
+    return this._audioClassifier?.isInitialized() ?? false
+  }
+
+  getLastClassifierDecision(): ClassifierDecision | null {
+    return this.lastClassifierDecision
+  }
+
   // --- Energy-based fallback ---
 
   private startEnergyFallback(): Effect.Effect<void, VADError, SoundSystemService> {
@@ -714,6 +784,10 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
     this.analyser = null
     this.dataArray = null
     this.isEnergySpeaking = false
+
+    // Reset classifier state
+    this.resetClassifierState()
+    this.consecutiveHighFrames = 0
 
     this.setState({
       isListening: false,
@@ -861,6 +935,7 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
     this.sileroConfig = DEFAULT_SILERO_VAD_CONFIG
     this.runtime = INITIAL_VAD_RUNTIME
     this.sustainedEnergyStartAt = null
+    this.resetClassifierState()
     this.state = {
       isListening: false,
       isSpeaking: false,
@@ -975,5 +1050,8 @@ export function useSingingControls() {
     getPermissionStatus: () => singingDetectionStore.getPermissionStatus(),
     setAndGateEnabled: (enabled: boolean) => singingDetectionStore.setAndGateEnabled(enabled),
     isAndGateEnabled: () => singingDetectionStore.isAndGateEnabled(),
+    setClassifierEnabled: (enabled: boolean) => singingDetectionStore.setClassifierEnabled(enabled),
+    isClassifierEnabled: () => singingDetectionStore.isClassifierEnabled(),
+    getLastClassifierDecision: () => singingDetectionStore.getLastClassifierDecision(),
   }
 }

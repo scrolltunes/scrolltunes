@@ -100,7 +100,12 @@ interface WordLevelChordDisplayProps {
   readonly lineIdx: number
   readonly selectedChord: SelectedChord | null
   readonly onChordClick: (lineIdx: number, chordIdx: number) => void
-  readonly onChordDoubleClick: (lineIdx: number, chordIdx: number, wordIdx: number | undefined, chordName: string) => void
+  readonly onChordDoubleClick: (
+    lineIdx: number,
+    chordIdx: number,
+    wordIdx: number | undefined,
+    chordName: string,
+  ) => void
   readonly onWordClick: (lineIdx: number, wordIdx: number) => void
   readonly onChordMove: (lineIdx: number, chordIdx: number, newWordIdx: number) => void
   readonly onAddChord: (lineIdx: number, wordIdx: number) => void
@@ -191,7 +196,9 @@ function WordLevelChordDisplay({
                   onDragStart={e => handleDragStart(e, chordIdx, chord.chord)}
                   onDragEnd={handleDragEnd}
                   onClick={() => onChordClick(lineIdx, chordIdx)}
-                  onDoubleClick={() => onChordDoubleClick(lineIdx, chordIdx, chord.wordIdx, chord.chord)}
+                  onDoubleClick={() =>
+                    onChordDoubleClick(lineIdx, chordIdx, chord.wordIdx, chord.chord)
+                  }
                   disabled={disabled}
                   className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
                     isDragging
@@ -253,7 +260,9 @@ function WordLevelChordDisplay({
                       onDragStart={e => handleDragStart(e, chordIdx, chord.chord)}
                       onDragEnd={handleDragEnd}
                       onClick={() => onChordClick(lineIdx, chordIdx)}
-                      onDoubleClick={() => onChordDoubleClick(lineIdx, chordIdx, chord.wordIdx, chord.chord)}
+                      onDoubleClick={() =>
+                        onChordDoubleClick(lineIdx, chordIdx, chord.wordIdx, chord.chord)
+                      }
                       disabled={disabled}
                       className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
                         isDragging
@@ -307,7 +316,9 @@ function WordLevelChordDisplay({
                 onDragStart={e => handleDragStart(e, chordIdx, chord.chord)}
                 onDragEnd={handleDragEnd}
                 onClick={() => onChordClick(lineIdx, chordIdx)}
-                onDoubleClick={() => onChordDoubleClick(lineIdx, chordIdx, chord.wordIdx, chord.chord)}
+                onDoubleClick={() =>
+                  onChordDoubleClick(lineIdx, chordIdx, chord.wordIdx, chord.chord)
+                }
                 disabled={disabled}
                 className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
                   isDragging
@@ -357,7 +368,8 @@ export function ChordTimingEditor({
   const effectiveOffsetMs = syncOffsetMs + timeOffset
 
   const transform = useMemo(
-    () => (effectiveOffsetMs !== 0 ? { kind: "offset" as const, ms: effectiveOffsetMs } : undefined),
+    () =>
+      effectiveOffsetMs !== 0 ? { kind: "offset" as const, ms: effectiveOffsetMs } : undefined,
     [effectiveOffsetMs],
   )
 
@@ -401,8 +413,7 @@ export function ChordTimingEditor({
   const hasInitializedRef = useRef(false)
   const prevTransformRef = useRef(transform)
   useEffect(() => {
-    const transformChanged =
-      JSON.stringify(prevTransformRef.current) !== JSON.stringify(transform)
+    const transformChanged = JSON.stringify(prevTransformRef.current) !== JSON.stringify(transform)
     prevTransformRef.current = transform
 
     // Initialize on first load with data, or reset when transform changes
@@ -563,9 +574,7 @@ export function ChordTimingEditor({
     setEditedLines(prev => {
       const existingLine = prev.find(l => l.idx === lineIdx)
       if (existingLine) {
-        return prev.map(l =>
-          l.idx === lineIdx ? { ...l, chords: [...l.chords, newChord] } : l,
-        )
+        return prev.map(l => (l.idx === lineIdx ? { ...l, chords: [...l.chords, newChord] } : l))
       }
       return [...prev, { idx: lineIdx, chords: [newChord] }].sort((a, b) => a.idx - b.idx)
     })

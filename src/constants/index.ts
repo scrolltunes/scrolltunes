@@ -16,6 +16,11 @@ export const VAD_THRESHOLD_OFF = 0.09
 export const VAD_HOLD_TIME_MS = 150
 export const VAD_SMOOTHING_FACTOR = 0.2
 
+// Audio classifier constants (thresholds only - enabled flag is in PublicConfig)
+export const CLASSIFIER_SINGING_THRESHOLD = 0.3
+export const CLASSIFIER_SPEECH_THRESHOLD = 0.5
+export const CLASSIFIER_INSTRUMENT_REJECT_THRESHOLD = 0.4
+
 // UI constants
 export const LYRICS_LINE_HEIGHT = 1.8
 export const LYRICS_FONT_SIZE_DEFAULT = 32

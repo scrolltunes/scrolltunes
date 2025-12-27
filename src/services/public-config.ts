@@ -7,6 +7,7 @@ export interface PublicConfigValues {
   readonly web3FormsAccessKey: string
   readonly gitSha: string
   readonly sttWsUrl: Option.Option<string>
+  readonly audioClassifierEnabled: boolean
 }
 
 export class PublicConfig extends Context.Tag("PublicConfig")<PublicConfig, PublicConfigValues>() {}
@@ -17,6 +18,10 @@ const publicConfig = Config.all({
   web3FormsAccessKey: Config.nonEmptyString("NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY"),
   gitSha: Config.string("NEXT_PUBLIC_GIT_SHA").pipe(Config.withDefault("dev")),
   sttWsUrl: Config.option(Config.string("NEXT_PUBLIC_STT_WS_URL")),
+  audioClassifierEnabled: Config.string("NEXT_PUBLIC_AUDIO_CLASSIFIER").pipe(
+    Config.withDefault("true"), // Enabled: uses SoundSystem ring buffer for audio capture
+    Config.map(v => v !== "false"),
+  ),
 })
 
 export const PublicConfigLive = Layer.effect(PublicConfig, publicConfig)

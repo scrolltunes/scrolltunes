@@ -75,8 +75,19 @@
 
 ### Testing
 - [ ] Test on mobile devices (iOS Safari, Android Chrome)
-- [ ] Verify VAD doesn't trigger on guitar/instruments
+- [x] Verify VAD doesn't trigger on guitar/instruments (YAMNet classifier gate)
 - [ ] Test with background noise
+
+### Audio Classification (Instrument vs Voice) ✅
+- [x] Implement YAMNet audio classifier via MediaPipe
+- [x] Create dedicated AudioContext for classifier capture (bypasses Tone.js)
+- [x] Add ring buffer for 1s audio at 16kHz in SoundSystem
+- [x] Integrate classifier as gate before speech release
+- [x] Add "Music without voice" rejection rule (guitar strumming)
+- [x] Add Silero override for sustained high confidence (singing over guitar)
+- [x] Reduce rejection cache to 500ms for faster recovery
+- [x] Extract vadLog to shared module for cross-file logging
+- [x] Suppress TensorFlow XNNPACK INFO message with warm-up classification
 
 ## Phase 4: Song Search & Lyrics API ✅
 
@@ -537,13 +548,15 @@ interface EnhancementPayload {
 
 ### Voice Detection Flow
 ```
-User clicks mic → VoiceActivityStore.startListening()
-  → SoundSystem.getMicrophoneAnalyser() (Tone.js AudioContext)
-  → requestAnimationFrame analysis loop
-  → computeRMSFromByteFrequency() → smoothLevel() → detectVoiceActivity()
-  → isSpeaking changes → VoiceStart/VoiceStop events
-  → useVoiceTrigger hook detects isSpeaking=true
-  → lyricsPlayer.play() called
+User clicks mic → SingingDetectionStore.startListening()
+  → Silero VAD (via @ricky0123/vad-web) + Energy monitoring (AND-gate)
+  → SoundSystem.getMicrophoneAnalyser() for energy + classifier capture
+  → Silero onFrameProcessed: smoothed speech probability > 0.75?
+    → Yes: Check YAMNet classifier gate (Music without voice? Instrument?)
+      → Classifier ALLOW/DEFER: Release speech, trigger VoiceStart
+      → Classifier REJECT: Block, but keep retrying (Silero override if sustained)
+    → No: Continue waiting
+  → VoiceStart event → lyricsPlayer.play()
   → LyricsPlayer starts animation loop, advances currentTime
   → useCurrentLineIndex() updates → LyricsDisplay scrolls
 ```
@@ -564,8 +577,10 @@ Short URL: /s/[id]
 ### Libraries
 | Purpose | Library | Notes |
 |---------|---------|-------|
-| Audio Context | Tone.js | Single AudioContext owner |
-| VAD | Custom RMS | Simple energy-based, sufficient for MVP |
+| Audio Context | Tone.js | Single AudioContext owner (+ dedicated context for classifier) |
+| VAD (Primary) | @ricky0123/vad-web | Silero VAD model, speech probability |
+| VAD (Energy) | Custom RMS | Energy-based AND-gate, burst detection |
+| Audio Classifier | MediaPipe YAMNet | Instrument vs voice discrimination |
 | Animation | Motion | Spring-based, GPU-accelerated |
 | State | Effect.ts | Tagged events, type-safe |
 | Lyrics Source | LRCLIB | Free, synced LRC format |

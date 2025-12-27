@@ -1,5 +1,6 @@
 "use client"
 
+import { vadLog } from "@/lib/vad-log"
 import { Data, Effect } from "effect"
 import type * as Tone from "tone"
 
@@ -41,6 +42,19 @@ class SoundSystem {
   private micStream: MediaStream | null = null
   private micSource: MediaStreamAudioSourceNode | null = null
   private analyser: AnalyserNode | null = null
+
+  // Ring buffer for classifier audio capture (16kHz, 1 second)
+  private static readonly CLASSIFIER_SAMPLE_RATE = 16000
+  private static readonly CLASSIFIER_BUFFER_SECONDS = 1.0
+  private classifierBuffer: Float32Array = new Float32Array(
+    SoundSystem.CLASSIFIER_SAMPLE_RATE * SoundSystem.CLASSIFIER_BUFFER_SECONDS,
+  )
+  private classifierBufferWriteIndex = 0
+  private classifierScriptProcessor: ScriptProcessorNode | null = null
+  private classifierSilentNode: GainNode | null = null
+  // Dedicated AudioContext for classifier (avoids Tone.js wrapper issues)
+  private classifierAudioContext: AudioContext | null = null
+  private classifierMicSource: MediaStreamAudioSourceNode | null = null
 
   private async getTone(): Promise<ToneModule> {
     if (this.Tone) return this.Tone
@@ -148,9 +162,168 @@ class SoundSystem {
       this.analyser.smoothingTimeConstant = 0.8
 
       this.micSource.connect(this.analyser)
+
+      // Set up classifier audio capture (parallel path)
+      this.setupClassifierCapture(context)
+
       return this.analyser
     },
   )
+
+  private setupClassifierCapture(_context: AudioContext): void {
+    if (!this.micStream) {
+      vadLog("AUDIO-CAPTURE", "setupClassifierCapture: no micStream, skipping")
+      return
+    }
+
+    // Clean up any existing capture
+    this.stopClassifierCapture()
+
+    // Create a dedicated native AudioContext for classifier capture
+    // This avoids any Tone.js wrapper issues with createScriptProcessor
+    try {
+      this.classifierAudioContext = new AudioContext({ sampleRate: 48000 })
+    } catch (e) {
+      vadLog("AUDIO-CAPTURE", "Failed to create AudioContext for classifier", {
+        error: String(e),
+      })
+      return
+    }
+
+    vadLog("AUDIO-CAPTURE", "Created dedicated AudioContext for classifier", {
+      sampleRate: this.classifierAudioContext.sampleRate,
+      state: this.classifierAudioContext.state,
+      hasCreateScriptProcessor:
+        typeof this.classifierAudioContext.createScriptProcessor === "function",
+    })
+
+    // Check if createScriptProcessor is available
+    if (typeof this.classifierAudioContext.createScriptProcessor !== "function") {
+      vadLog("AUDIO-CAPTURE", "ScriptProcessorNode not available, classifier capture disabled")
+      this.classifierAudioContext.close()
+      this.classifierAudioContext = null
+      return
+    }
+
+    // Create mic source on our dedicated context using the same stream
+    this.classifierMicSource = this.classifierAudioContext.createMediaStreamSource(this.micStream)
+
+    // Calculate downsample ratio
+    const downsampleRatio = Math.round(
+      this.classifierAudioContext.sampleRate / SoundSystem.CLASSIFIER_SAMPLE_RATE,
+    )
+    vadLog("AUDIO-CAPTURE", "Setting up classifier capture", {
+      sampleRate: this.classifierAudioContext.sampleRate,
+      downsampleRatio,
+      targetRate: SoundSystem.CLASSIFIER_SAMPLE_RATE,
+    })
+
+    // Create ScriptProcessor for capturing audio samples
+    const bufferSize = 4096
+    this.classifierScriptProcessor = this.classifierAudioContext.createScriptProcessor(
+      bufferSize,
+      1,
+      1,
+    )
+
+    let frameCount = 0
+    this.classifierScriptProcessor.onaudioprocess = (e: AudioProcessingEvent) => {
+      const input = e.inputBuffer.getChannelData(0)
+      frameCount++
+
+      // Log first few frames to verify audio is flowing
+      if (frameCount <= 3) {
+        const rms = Math.sqrt(input.reduce((sum, s) => sum + s * s, 0) / input.length)
+        vadLog("AUDIO-CAPTURE", `Frame ${frameCount} captured`, {
+          samples: input.length,
+          rms: rms.toFixed(4),
+          writeIdx: this.classifierBufferWriteIndex,
+        })
+      }
+
+      // Downsample and write to ring buffer
+      for (let i = 0; i < input.length; i += downsampleRatio) {
+        const sample = input[i]
+        if (sample !== undefined) {
+          this.classifierBuffer[this.classifierBufferWriteIndex] = sample
+          this.classifierBufferWriteIndex =
+            (this.classifierBufferWriteIndex + 1) % this.classifierBuffer.length
+        }
+      }
+    }
+
+    // Connect to a silent output (required for ScriptProcessor to work)
+    this.classifierSilentNode = this.classifierAudioContext.createGain()
+    this.classifierSilentNode.gain.value = 0
+
+    this.classifierMicSource.connect(this.classifierScriptProcessor)
+    this.classifierScriptProcessor.connect(this.classifierSilentNode)
+    this.classifierSilentNode.connect(this.classifierAudioContext.destination)
+
+    vadLog("AUDIO-CAPTURE", "✅ Classifier capture set up", {
+      scriptProcessor: !!this.classifierScriptProcessor,
+      silentNode: !!this.classifierSilentNode,
+    })
+  }
+
+  private stopClassifierCapture(): void {
+    if (this.classifierScriptProcessor) {
+      this.classifierScriptProcessor.disconnect()
+      this.classifierScriptProcessor = null
+    }
+    if (this.classifierSilentNode) {
+      this.classifierSilentNode.disconnect()
+      this.classifierSilentNode = null
+    }
+    if (this.classifierMicSource) {
+      this.classifierMicSource.disconnect()
+      this.classifierMicSource = null
+    }
+    if (this.classifierAudioContext) {
+      void this.classifierAudioContext.close()
+      this.classifierAudioContext = null
+    }
+    this.classifierBuffer.fill(0)
+    this.classifierBufferWriteIndex = 0
+  }
+
+  /**
+   * Get a contiguous copy of the classifier audio buffer (last 1 second at 16kHz)
+   * Returns null if mic is not active
+   */
+  getClassifierAudioBuffer(): Float32Array | null {
+    if (!this.classifierMicSource || !this.classifierScriptProcessor) {
+      vadLog("AUDIO-CAPTURE", "getClassifierAudioBuffer: returning null", {
+        classifierMicSource: !!this.classifierMicSource,
+        scriptProcessor: !!this.classifierScriptProcessor,
+      })
+      return null
+    }
+
+    const len = this.classifierBuffer.length
+    const writeIdx = this.classifierBufferWriteIndex
+    const out = new Float32Array(len)
+
+    // Copy from ring buffer as contiguous array (oldest to newest)
+    const start = writeIdx // writeIdx points to oldest sample
+    if (start === 0) {
+      out.set(this.classifierBuffer)
+    } else {
+      // First part: from writeIdx to end
+      out.set(this.classifierBuffer.subarray(start), 0)
+      // Second part: from 0 to writeIdx
+      out.set(this.classifierBuffer.subarray(0, start), len - start)
+    }
+
+    return out
+  }
+
+  /**
+   * Get the sample rate of the classifier buffer
+   */
+  getClassifierSampleRate(): number {
+    return SoundSystem.CLASSIFIER_SAMPLE_RATE
+  }
 
   async getMicrophoneAnalyser(): Promise<AnalyserNode | null> {
     return Effect.runPromise(
@@ -162,6 +335,9 @@ class SoundSystem {
   }
 
   readonly stopMicrophoneEffect: Effect.Effect<void, never> = Effect.sync(() => {
+    // Stop classifier capture first
+    this.stopClassifierCapture()
+
     if (this.micStream) {
       for (const track of this.micStream.getTracks()) {
         track.stop()

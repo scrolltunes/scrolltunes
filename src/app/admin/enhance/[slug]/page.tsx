@@ -207,8 +207,6 @@ export default function EnhancePage({
     coverage: number
   } | null>(null)
 
-
-
   // Existing enhancements
   const [existingEnhancement, setExistingEnhancement] = useState<{
     payload: EnhancementPayload
@@ -499,7 +497,10 @@ export default function EnhancePage({
   }, [isAuthenticated, isAdmin, lrclibId])
 
   const normalizeForComparison = (str: string) =>
-    str.toLowerCase().replace(/[^\w\s]/g, "").trim()
+    str
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .trim()
 
   const handleGpExtracted = useCallback(
     (data: GpExtractedData) => {

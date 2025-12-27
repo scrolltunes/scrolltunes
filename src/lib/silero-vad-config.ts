@@ -73,14 +73,14 @@ export const SILERO_PRESET_LOUD: SileroVADConfig = {
   redemptionMs: 400,
 }
 
-/** Preset for acoustic guitar + voice - very high threshold, longer sustain required */
+/** Preset for acoustic guitar + voice - classifier handles false positives */
 export const SILERO_PRESET_GUITAR: SileroVADConfig = {
   onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/",
   baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/",
-  positiveSpeechThreshold: 0.88, // Allow earlier singing onset
-  negativeSpeechThreshold: 0.7, // Higher hysteresis
-  minSpeechMs: 250, // Faster singing detection
-  redemptionMs: 500, // Wait longer before speech end
+  positiveSpeechThreshold: 0.75, // Moderate threshold - classifier is safety net
+  negativeSpeechThreshold: 0.45, // Hysteresis to avoid flapping
+  minSpeechMs: 200, // Fast detection
+  redemptionMs: 350, // Wait before speech end
 }
 
 /** Preset for voice search - sensitive to speech, quick end-of-utterance detection */

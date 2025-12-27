@@ -48,7 +48,12 @@ interface WordTimingEditorProps {
   /** Callback when payload changes */
   readonly onPayloadChange: (
     payload: EnhancementPayload,
-    meta: { isDirty: boolean; coverage: number; syncOffsetMs: number; patches: readonly WordPatch[] },
+    meta: {
+      isDirty: boolean
+      coverage: number
+      syncOffsetMs: number
+      patches: readonly WordPatch[]
+    },
   ) => void
   /** Edit mode: external dirty state (for header display) */
   readonly isDirty?: boolean | undefined

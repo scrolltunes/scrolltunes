@@ -47,6 +47,19 @@ export {
 } from "./SileroVADEngine"
 
 export {
+  AudioClassifierService,
+  getAudioClassifier,
+  getAudioClassifierIfReady,
+  destroyAudioClassifier,
+  type ClassifierDecision,
+  type ClassificationCategory,
+  type AudioClassifierConfig,
+  DEFAULT_CLASSIFIER_CONFIG,
+  ClassifierNotInitialized,
+  ClassifierLoadError,
+} from "./AudioClassifierService"
+
+export {
   PreferencesStore,
   preferencesStore,
   usePreferences,
