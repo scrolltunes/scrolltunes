@@ -4,11 +4,34 @@ Live lyrics teleprompter for musicians. Detects singing voice and syncs scrollin
 
 **Domain:** https://scrolltunes.com
 
-**In this house, we use bun.** All package management and script execution should use `bun` commands, not `npm` or `node`.
+## Hard Requirements (Non-Negotiable)
 
-**Do not commit unless explicitly asked.** Never run `git commit` or `git push` unless the user explicitly requests it. This is critical — no exceptions.
+These rules are **strictly enforced**. Code that violates them will be rejected.
+
+1. **Use bun exclusively** — All package management and script execution must use `bun`, not `npm` or `node`
+2. **Do not commit unless explicitly asked** — Never run `git commit` or `git push` unless the user explicitly requests it
+3. **Follow architectural patterns** — All new code must conform to the patterns in this document (Effect.ts, useSyncExternalStore, tagged events, etc.)
+4. **No external state libraries** — Use `useSyncExternalStore` with class-based stores; no Redux, Zustand, Jotai, or similar
+5. **Effect.ts for async** — All async operations, error handling, and side effects must use Effect.ts patterns
+6. **Type safety** — No `any` types, no `@ts-ignore`, no suppressing errors; fix them properly
 
 **Use subagents for TODO items.** When implementing TODO items (from TODO.md, Oracle plans, or any task list), always use the Task tool to spawn subagents for each independent task. This enables parallel execution and keeps the main thread focused on coordination.
+
+## Feature Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Core teleprompter | ✅ Live | LyricsPlayer, smooth scrolling, click-to-seek |
+| Voice detection | ✅ Live | Silero VAD + energy gate + YAMNet classifier |
+| Song search | ✅ Live | LRCLIB integration, Spotify metadata |
+| User accounts | ✅ Live | Google OAuth, history/favorites sync |
+| Setlists | ✅ Live | Create, edit, reorder songs |
+| Chords | ✅ Live | Songsterr integration, transpose, inline display |
+| Word timing | ✅ Live | Guitar Pro enhancement, karaoke-style highlighting |
+| Voice search | ✅ Live | Web Speech + Google STT fallback |
+| Metronome | ⚠️ Partial | BPM display exists, tap tempo not implemented |
+| Jam session | ❌ Planned | Multi-device sync for groups |
+| Karaoke mode | ❌ Planned | Full-screen with pitch detection |
 
 ## Commands
 
@@ -29,10 +52,14 @@ Vercel auto-deploys from git. Just commit and push — no manual deploy needed.
 
 ## Documentation
 
-- **docs/architecture.md** — Tech stack, project structure, design patterns, config files, API design
-- **docs/design.md** — Features backlog, TODOs, product requirements, open questions
-- **docs/figma-workflow.md** — Design-to-code process, token pipeline, asset management
-- **TODO.md** — Implementation progress tracking
+| Document | Purpose |
+|----------|---------|
+| **docs/architecture.md** | Tech stack, project structure, design patterns, API design |
+| **docs/design.md** | Features backlog, product requirements, open questions |
+| **docs/lrc-enhancement-system.md** | Word-level timing extraction from Guitar Pro files |
+| **docs/audio-classification-design.md** | YAMNet classifier for voice vs instrument detection |
+| **TODO.md** | Implementation progress tracking |
+| **docs/archive/** | Historical specs and plans (for reference only) |
 
 ## Code Style
 
@@ -50,6 +77,7 @@ Vercel auto-deploys from git. Just commit and push — no manual deploy needed.
 - Dependencies must be modeled as services and provided via `Layer` at the composition root.
 - Errors must be typed and handled through Effect error channels (no `try/catch` in domain logic).
 - All environment/config access must use `Effect.Config` + `ConfigProvider`; validate required config at startup.
+- External API access is always enabled; tests should mock or stub network calls as needed.
 
 ## Core Concepts
 
@@ -165,8 +193,8 @@ await setlistsStore.addSong(setlistId, song) // Add song to setlist
 Word-level timing for karaoke-style highlighting, sourced from Guitar Pro files.
 
 **Display modes:**
-- **Default (Word timing OFF)**: Entire line highlights white instantly when active
-- **Word timing ON**: Word-by-word animation (uses enhanced timing if available, otherwise estimates based on syllables)
+- **Default (Word timing ON)**: Word-by-word animation (uses enhanced timing if available, otherwise estimates based on syllables)
+- **Word timing OFF**: Entire line highlights white instantly when active
 
 The `wordTimingEnabled` preference (stored in `PreferencesStore`) controls this behavior. The toggle appears in `SongActionBar` with a Timer icon. When enhanced timing is available, a sparkle indicator appears.
 

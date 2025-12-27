@@ -220,10 +220,11 @@ See our [Privacy Policy](https://scrolltunes.com/privacy) for full details.
 - ✅ User accounts & cloud sync
 - ✅ Favorites & setlists
 
-### V1.1 (Beta)
+### V1.1
 - ✅ Guitar chord integration (Songsterr)
 - ✅ Transpose controls
 - ✅ Chord mode UX (static lyrics, look-ahead highlighting)
+- ✅ Word-by-word highlighting (enabled by default)
 - 🔲 Chord diagrams (tap to view fingering)
 - 🔲 Capo indicator
 
