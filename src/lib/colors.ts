@@ -289,6 +289,13 @@ function getBrightness(color: RGB): number {
   return (color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722) / 255
 }
 
+function getSaturation(color: RGB): number {
+  const max = Math.max(color.r, color.g, color.b)
+  const min = Math.min(color.r, color.g, color.b)
+  if (max === 0) return 0
+  return (max - min) / max
+}
+
 // Vibrant preset gradients for dark album art
 const VIBRANT_GRADIENTS: GradientOption[] = [
   {
@@ -323,17 +330,17 @@ const VIBRANT_GRADIENTS: GradientOption[] = [
   },
 ]
 
-// Dark preset gradients
+// Dark preset gradients - made more distinct from each other
 const DARK_GRADIENTS: GradientOption[] = [
   {
-    id: "slate-dark",
-    gradient: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-    previewColors: ["#1e293b", "#0f172a"],
+    id: "midnight-blue",
+    gradient: "linear-gradient(135deg, #1e3a5f 0%, #0a1628 100%)",
+    previewColors: ["#1e3a5f", "#0a1628"],
   },
   {
-    id: "neutral-dark",
-    gradient: "linear-gradient(135deg, #27272a 0%, #18181b 100%)",
-    previewColors: ["#27272a", "#18181b"],
+    id: "charcoal",
+    gradient: "linear-gradient(135deg, #374151 0%, #111827 100%)",
+    previewColors: ["#374151", "#111827"],
   },
 ]
 
@@ -350,7 +357,20 @@ export function buildGradientPalette(baseColor: string | null): GradientOption[]
   }
 
   const brightness = getBrightness(rgb)
+  const saturation = getSaturation(rgb)
   const isDark = brightness < 0.35
+  const isGrayish = saturation < 0.2
+
+  // For grayish album art, prioritize vibrant presets since album-derived colors
+  // will all look similar (gray on gray)
+  if (isGrayish) {
+    return [
+      // Vibrant presets first - these will provide the needed variety
+      ...VIBRANT_GRADIENTS,
+      // Dark presets last
+      ...DARK_GRADIENTS,
+    ]
+  }
 
   if (isDark) {
     // Dark album art: create lighter/more vibrant versions and prioritize vibrant presets
@@ -386,12 +406,11 @@ export function buildGradientPalette(baseColor: string | null): GradientOption[]
 
   // Normal/light album art: create darker versions
   const darkened = darkenRgb(rgb, 0.4)
-  const hueShifted = shiftHueRgb(rgb, 30)
+  const hueShifted = shiftHueRgb(rgb, 60) // Larger hue shift for more distinction
   const hueShiftedDark = darkenRgb(hueShifted, 0.3)
 
   const baseHex = rgbToHex(rgb)
   const darkHex = rgbToHex(darkened)
-  const shiftedHex = rgbToHex(hueShifted)
   const shiftedDarkHex = rgbToHex(hueShiftedDark)
 
   return [
@@ -406,13 +425,8 @@ export function buildGradientPalette(baseColor: string | null): GradientOption[]
       gradient: `linear-gradient(135deg, ${baseHex} 0%, ${shiftedDarkHex} 100%)`,
       previewColors: [baseHex, shiftedDarkHex],
     },
-    {
-      id: "album-reverse",
-      gradient: `linear-gradient(135deg, ${shiftedHex} 0%, ${darkHex} 100%)`,
-      previewColors: [shiftedHex, darkHex],
-    },
     // Vibrant presets
-    ...VIBRANT_GRADIENTS.slice(0, 2),
+    ...VIBRANT_GRADIENTS.slice(0, 3),
     // Dark presets
     ...DARK_GRADIENTS,
   ]

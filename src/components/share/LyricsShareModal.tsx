@@ -18,7 +18,7 @@ import {
 } from "@phosphor-icons/react"
 import * as htmlToImage from "html-to-image"
 import { AnimatePresence, motion } from "motion/react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 
 interface LyricLine {
   readonly id: string
@@ -152,6 +152,13 @@ export function LyricsShareModal({
   const cardRef = useRef<HTMLDivElement>(null)
   const previewContainerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [cardElement, setCardElement] = useState<HTMLDivElement | null>(null)
+
+  // Callback ref to detect when card is mounted
+  const cardCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    cardRef.current = node
+    setCardElement(node)
+  }, [])
   const colorInputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<Step>("select")
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set())
@@ -162,13 +169,14 @@ export function LyricsShareModal({
   const [showSpotifyCode, setShowSpotifyCode] = useState(false)
   const [showShadow, setShowShadow] = useState(true)
   const [expandedWidth, setExpandedWidth] = useState(true)
-  const [hasCheckedOverflow, setHasCheckedOverflow] = useState(false)
   const [layout, setLayout] = useState<LayoutVariant>("default")
   const [pattern, setPattern] = useState<PatternVariant>("none")
   const [patternSeed, setPatternSeed] = useState(() => Date.now())
   const [isGenerating, setIsGenerating] = useState(false)
   const [shareSupported, setShareSupported] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [previewScale, setPreviewScale] = useState(1)
+  const [scaledHeight, setScaledHeight] = useState<number | null>(null)
 
   const currentBackground = useMemo(() => {
     if (selectedGradientId === CUSTOM_COLOR_ID) {
@@ -197,22 +205,69 @@ export function LyricsShareModal({
       setShowSpotifyCode(false)
       setShowShadow(true)
       setExpandedWidth(true)
-      setHasCheckedOverflow(false)
       setLayout("default")
       setPattern("none")
     }
   }, [isOpen])
 
   useEffect(() => {
-    if (step === "preview" && !hasCheckedOverflow) {
-      const isMobile = window.innerWidth < 640
-      if (isMobile) {
-        setExpandedWidth(false)
-      }
-      setHasCheckedOverflow(true)
+    if (step === "preview") {
       scrollContainerRef.current?.scrollTo({ top: 0 })
     }
-  }, [step, hasCheckedOverflow])
+  }, [step])
+
+  // Calculate scale to fit card within preview container with small margins
+  const calculateScale = useCallback(() => {
+    const container = previewContainerRef.current
+    const card = cardRef.current
+    if (!container || !card) return
+
+    // 4% margin on each side = 92% of container width available
+    const availableWidth = container.clientWidth * 0.92
+    const cardWidth = card.scrollWidth
+    const cardHeight = card.scrollHeight
+
+    if (cardWidth > availableWidth) {
+      const scale = Math.max(0.5, availableWidth / cardWidth)
+      // Round to 3 decimal places to avoid sub-pixel jitter
+      const roundedScale = Math.round(scale * 1000) / 1000
+      setPreviewScale(roundedScale)
+      setScaledHeight(Math.round(cardHeight * roundedScale))
+    } else {
+      setPreviewScale(1)
+      setScaledHeight(cardHeight)
+    }
+  }, [expandedWidth])
+
+  // Use layout effect to calculate scale before paint
+  useLayoutEffect(() => {
+    if (step !== "preview" || !cardElement) {
+      setPreviewScale(1)
+      setScaledHeight(null)
+      return
+    }
+    calculateScale()
+  }, [step, calculateScale, selectedIndices.size, cardElement])
+
+  // Use ResizeObserver to recalculate when card size changes
+  useEffect(() => {
+    if (step !== "preview") return
+
+    const card = cardRef.current
+    if (!card) return
+
+    const observer = new ResizeObserver(() => {
+      calculateScale()
+    })
+    observer.observe(card)
+
+    window.addEventListener("resize", calculateScale)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener("resize", calculateScale)
+    }
+  }, [step, calculateScale])
 
   useEffect(() => {
     setShareSupported(
@@ -807,11 +862,19 @@ export function LyricsShareModal({
 
       default:
         return (
-          <div style={{ display: "flex", justifyContent: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              transform: previewScale < 1 ? `scale(${previewScale})` : undefined,
+              transformOrigin: "top center",
+              height: scaledHeight !== null ? `${scaledHeight}px` : undefined,
+            }}
+          >
             <div
-              ref={cardRef}
+              ref={cardCallbackRef}
               style={{
-                padding: showShadow ? "16px 16px 40px 16px" : "0",
+                padding: "16px 16px 40px 16px",
                 background: "transparent",
               }}
             >
@@ -1112,7 +1175,9 @@ export function LyricsShareModal({
                               style={{
                                 background: option.gradient,
                                 borderColor:
-                                  selectedGradientId === option.id ? "white" : "transparent",
+                                  selectedGradientId === option.id
+                                    ? "white"
+                                    : "rgba(255,255,255,0.2)",
                               }}
                               aria-label={`Select gradient ${option.id}`}
                             >
