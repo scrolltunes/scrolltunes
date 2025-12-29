@@ -3,6 +3,7 @@
 import { ChordBadge, InlineChord } from "@/components/chords"
 import type { LyricWord } from "@/core"
 import type { LyricChordPosition } from "@/lib/chords"
+
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useMemo } from "react"
 

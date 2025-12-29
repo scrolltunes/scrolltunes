@@ -7,6 +7,7 @@ import { FloatingActions, LyricsDisplay, SongActionBar, SongInfoModal } from "@/
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
+import { LyricsShareModal } from "@/components/share"
 import { FavoriteButton, StatusLabel } from "@/components/ui"
 
 import {
@@ -104,6 +105,9 @@ export default function SongPage() {
   const [showReportModal, setShowReportModal] = useState(false)
   const [showChordPanel, setShowChordPanel] = useState(false)
   const chordPanelWasOpen = useRef(showChordPanel)
+
+  // Share lyrics modal state
+  const [showShareModal, setShowShareModal] = useState(false)
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
@@ -584,6 +588,7 @@ export default function SongPage() {
                   hasEnhancedTiming={loadState._tag === "Loaded" && loadState.enhancement !== null}
                   useEnhancedTiming={useEnhancedTiming}
                   onUseEnhancedTimingChange={setUseEnhancedTiming}
+                  onShareClick={() => setShowShareModal(true)}
                 />
                 <ChordInfoPanel
                   isOpen={showChordPanel}
@@ -664,6 +669,17 @@ export default function SongPage() {
             artist: loadState.lyrics.artist,
             ...(loadState.lyrics.album !== undefined && { album: loadState.lyrics.album }),
           }}
+        />
+      )}
+
+      {loadState._tag === "Loaded" && (
+        <LyricsShareModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          title={loadState.lyrics.title}
+          artist={loadState.lyrics.artist}
+          albumArt={loadState.albumArt}
+          lines={loadState.lyrics.lines}
         />
       )}
     </div>

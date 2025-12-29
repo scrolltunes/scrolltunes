@@ -311,10 +311,7 @@ export class AudioClassifierService {
     }
 
     // REJECT: Strong instrument with very weak voice
-    if (
-      bestInstrument >= this.config.instrumentRejectThreshold &&
-      bestVoice < 0.15
-    ) {
+    if (bestInstrument >= this.config.instrumentRejectThreshold && bestVoice < 0.15) {
       return {
         _tag: "Reject",
         reason: `Instrument only: ${instrumentName} (${bestInstrument.toFixed(2)}, voice=${bestVoice.toFixed(2)})`,
