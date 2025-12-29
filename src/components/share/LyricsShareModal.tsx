@@ -372,6 +372,7 @@ export function LyricsShareModal({
         quality: 1,
         pixelRatio: 3,
         cacheBust: true,
+        backgroundColor: "transparent",
         style: {
           fontKerning: "none",
           letterSpacing: "0px",
