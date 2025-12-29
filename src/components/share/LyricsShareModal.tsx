@@ -903,7 +903,7 @@ export function LyricsShareModal({
               <div
                 ref={cardCallbackRef}
                 style={{
-                  padding: "16px 16px 40px 16px",
+                  padding: showShadow ? "16px 16px 50px 16px" : "0",
                   background: "transparent",
                 }}
               >
@@ -914,7 +914,7 @@ export function LyricsShareModal({
                   borderRadius: "24px",
                   padding: "24px",
                   maxWidth: expandedWidth ? "600px" : "384px",
-                  width: expandedWidth ? (isEditing ? "600px" : "max-content") : "100%",
+                  minWidth: expandedWidth ? (isEditing ? "600px" : undefined) : undefined,
                   boxShadow: showShadow ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "none",
                   position: "relative",
                   overflow: "hidden",
@@ -1016,6 +1016,7 @@ export function LyricsShareModal({
                         lineHeight: 1.5,
                         color: "white",
                         margin: "4px 0",
+                        whiteSpace: expandedWidth ? "nowrap" : "normal",
                       }}
                     >
                       {getLineText(line)}
