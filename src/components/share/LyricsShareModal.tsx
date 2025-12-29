@@ -5,9 +5,12 @@ import { buildGradientPalette, extractDominantColor, type GradientOption } from 
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowsIn,
+  ArrowsOut,
   Check,
   CopySimple,
   DownloadSimple,
+  Heart,
   MusicNote,
   Palette,
   ShareNetwork,
@@ -147,6 +150,8 @@ export function LyricsShareModal({
   lines,
 }: LyricsShareModalProps) {
   const cardRef = useRef<HTMLDivElement>(null)
+  const previewContainerRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const colorInputRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState<Step>("select")
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set())
@@ -155,6 +160,9 @@ export function LyricsShareModal({
   const [customColor, setCustomColor] = useState("#4f46e5")
   const [showBranding, setShowBranding] = useState(false)
   const [showSpotifyCode, setShowSpotifyCode] = useState(false)
+  const [showShadow, setShowShadow] = useState(true)
+  const [expandedWidth, setExpandedWidth] = useState(true)
+  const [hasCheckedOverflow, setHasCheckedOverflow] = useState(false)
   const [layout, setLayout] = useState<LayoutVariant>("default")
   const [pattern, setPattern] = useState<PatternVariant>("none")
   const [patternSeed, setPatternSeed] = useState(() => Date.now())
@@ -187,10 +195,24 @@ export function LyricsShareModal({
       setSelectedIndices(new Set())
       setShowBranding(false)
       setShowSpotifyCode(false)
+      setShowShadow(true)
+      setExpandedWidth(true)
+      setHasCheckedOverflow(false)
       setLayout("default")
       setPattern("none")
     }
   }, [isOpen])
+
+  useEffect(() => {
+    if (step === "preview" && !hasCheckedOverflow) {
+      const isMobile = window.innerWidth < 640
+      if (isMobile) {
+        setExpandedWidth(false)
+      }
+      setHasCheckedOverflow(true)
+      scrollContainerRef.current?.scrollTo({ top: 0 })
+    }
+  }, [step, hasCheckedOverflow])
 
   useEffect(() => {
     setShareSupported(
@@ -785,20 +807,27 @@ export function LyricsShareModal({
 
       default:
         return (
-          <div
-            ref={cardRef}
-            style={{
-              ...cardBaseStyles,
-              background: currentBackground,
-              borderRadius: "24px",
-              padding: "24px",
-              maxWidth: "384px",
-              margin: "0 auto",
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <div
+              ref={cardRef}
+              style={{
+                padding: showShadow ? "16px 16px 40px 16px" : "0",
+                background: "transparent",
+              }}
+            >
+              <div
+                style={{
+                  ...cardBaseStyles,
+                  background: currentBackground,
+                  borderRadius: "24px",
+                  padding: "24px",
+                  maxWidth: expandedWidth ? "600px" : "384px",
+                  width: expandedWidth ? "max-content" : "100%",
+                  boxShadow: showShadow ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "none",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
             {hasPattern && (
               <div
                 style={{
@@ -881,6 +910,8 @@ export function LyricsShareModal({
               {renderFooter()}
             </div>
           </div>
+          </div>
+        </div>
         )
     }
   }
@@ -930,7 +961,10 @@ export function LyricsShareModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center"
-          onClick={handleBackdropClick}
+          onClick={e => {
+            e.stopPropagation()
+            handleBackdropClick(e)
+          }}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -968,7 +1002,7 @@ export function LyricsShareModal({
             </div>
 
             {/* Content */}
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto">
               <AnimatePresence mode="wait">
                 {step === "select" ? (
                   <motion.div
@@ -1025,7 +1059,21 @@ export function LyricsShareModal({
                     className="p-4"
                   >
                     {/* Card preview */}
-                    {renderCardContent()}
+                    <div ref={previewContainerRef} className="relative overflow-hidden rounded-2xl bg-neutral-200 p-6">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedWidth(prev => !prev)}
+                        className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white/80 transition-colors hover:bg-black/60 hover:text-white"
+                        aria-label={expandedWidth ? "Shrink width" : "Expand width"}
+                      >
+                        {expandedWidth ? (
+                          <ArrowsIn size={18} weight="bold" />
+                        ) : (
+                          <ArrowsOut size={18} weight="bold" />
+                        )}
+                      </button>
+                      {renderCardContent()}
+                    </div>
 
                     {/* Options */}
                     <div className="mt-4 space-y-4">
@@ -1148,27 +1196,27 @@ export function LyricsShareModal({
 
                       {/* Toggles */}
                       <div className="space-y-3">
-                        {/* Branding toggle */}
+                        {/* Shadow toggle */}
                         <label className="flex cursor-pointer items-center gap-3">
                           <div className="relative">
                             <input
                               type="checkbox"
-                              checked={showBranding}
-                              onChange={e => setShowBranding(e.target.checked)}
+                              checked={showShadow}
+                              onChange={e => setShowShadow(e.target.checked)}
                               className="sr-only"
                             />
                             <div
                               className={`h-6 w-11 rounded-full transition-colors ${
-                                showBranding ? "bg-indigo-600" : "bg-neutral-700"
+                                showShadow ? "bg-indigo-600" : "bg-neutral-700"
                               }`}
                             />
                             <div
                               className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                                showBranding ? "translate-x-5" : ""
+                                showShadow ? "translate-x-5" : ""
                               }`}
                             />
                           </div>
-                          <span className="text-sm text-neutral-300">Show scrolltunes.com</span>
+                          <span className="text-sm text-neutral-300">Drop shadow</span>
                         </label>
 
                         {/* Spotify code toggle */}
@@ -1195,6 +1243,34 @@ export function LyricsShareModal({
                             <span className="text-sm text-neutral-300">Show Spotify Code</span>
                           </label>
                         )}
+
+                        {/* Branding toggle */}
+                        <label className="flex cursor-pointer items-center gap-3">
+                          <div className="relative">
+                            <input
+                              type="checkbox"
+                              checked={showBranding}
+                              onChange={e => setShowBranding(e.target.checked)}
+                              className="sr-only"
+                            />
+                            <div
+                              className={`h-6 w-11 rounded-full transition-colors ${
+                                showBranding ? "bg-indigo-600" : "bg-neutral-700"
+                              }`}
+                            />
+                            <div
+                              className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                                showBranding ? "translate-x-5" : ""
+                              }`}
+                            />
+                          </div>
+                          <span className="flex items-center gap-1.5 text-sm text-neutral-300">
+                            Show scrolltunes.com
+                            <span title="Thank you!">
+                              <Heart size={14} weight="fill" className="text-red-400" />
+                            </span>
+                          </span>
+                        </label>
                       </div>
                     </div>
                   </motion.div>
