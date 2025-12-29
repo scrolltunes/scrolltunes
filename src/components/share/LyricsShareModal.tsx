@@ -178,6 +178,7 @@ export function LyricsShareModal({
   const [isGenerating, setIsGenerating] = useState(false)
   const [shareSupported, setShareSupported] = useState(false)
   const [copied, setCopied] = useState(false)
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [previewScale, setPreviewScale] = useState(1)
   const [scaledHeight, setScaledHeight] = useState<number | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -254,7 +255,7 @@ export function LyricsShareModal({
       return
     }
     calculateScale()
-  }, [step, calculateScale, selectedIndices.size, cardElement, isEditing])
+  }, [step, calculateScale, selectedIndices.size, cardElement, isEditing, showShadow])
 
   // Use ResizeObserver to recalculate when card size changes
   useEffect(() => {
@@ -363,9 +364,9 @@ export function LyricsShareModal({
     colorInputRef.current?.click()
   }, [])
 
-  const generateImage = useCallback(async (): Promise<Blob | null> => {
+  const generateImage = useCallback(async (showLoading = true): Promise<Blob | null> => {
     if (!cardRef.current) return null
-    setIsGenerating(true)
+    if (showLoading) setIsGenerating(true)
 
     try {
       const dataUrl = await htmlToImage.toPng(cardRef.current, {
@@ -386,7 +387,7 @@ export function LyricsShareModal({
       console.error("Failed to generate image:", error)
       return null
     } finally {
-      setIsGenerating(false)
+      if (showLoading) setIsGenerating(false)
     }
   }, [])
 
@@ -405,8 +406,19 @@ export function LyricsShareModal({
   }, [generateImage, title, artist])
 
   const handleCopy = useCallback(async () => {
-    const blob = await generateImage()
-    if (!blob) return
+    // Clear any existing timeout
+    if (copiedTimeoutRef.current) {
+      clearTimeout(copiedTimeoutRef.current)
+    }
+    
+    // Set copied state early to prevent button flicker
+    setCopied(true)
+    
+    const blob = await generateImage(false) // Don't show loading state
+    if (!blob) {
+      setCopied(false)
+      return
+    }
 
     try {
       await navigator.clipboard.write([
@@ -414,10 +426,10 @@ export function LyricsShareModal({
           "image/png": blob,
         }),
       ])
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
     } catch (error) {
       console.error("Copy failed:", error)
+      setCopied(false)
     }
   }, [generateImage])
 
@@ -889,7 +901,7 @@ export function LyricsShareModal({
             style={{
               height: scaledHeight !== null ? `${scaledHeight}px` : undefined,
               overflow: "visible",
-              marginBottom: "-24px",
+              marginBottom: showShadow ? "-24px" : "0",
             }}
           >
             <div
