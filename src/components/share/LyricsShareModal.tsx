@@ -15,6 +15,7 @@ import {
   MusicNote,
   Palette,
   PencilSimple,
+  Question,
   ShareNetwork,
   X,
 } from "@phosphor-icons/react"
@@ -1385,7 +1386,19 @@ export function LyricsShareModal({
                                 }`}
                               />
                             </div>
-                            <span className="text-sm text-neutral-300">Show Spotify Code</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm text-neutral-300">Show Spotify Code</span>
+                              <a
+                                href="https://www.spotifycodes.com/"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex h-5 w-5 items-center justify-center rounded-full border border-neutral-600 text-neutral-400 transition-colors hover:border-neutral-400 hover:text-neutral-300"
+                                aria-label="Learn about Spotify Codes"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                <Question size={12} weight="bold" />
+                              </a>
+                            </div>
                           </label>
                         )}
 
