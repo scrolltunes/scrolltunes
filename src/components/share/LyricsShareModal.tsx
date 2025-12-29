@@ -1059,7 +1059,7 @@ export function LyricsShareModal({
                     className="p-4"
                   >
                     {/* Card preview */}
-                    <div ref={previewContainerRef} className="relative overflow-hidden rounded-2xl bg-neutral-200 p-6">
+                    <div ref={previewContainerRef} className="share-modal-preserve relative overflow-hidden rounded-2xl bg-neutral-200 p-6">
                       <button
                         type="button"
                         onClick={() => setExpandedWidth(prev => !prev)}
@@ -1102,7 +1102,7 @@ export function LyricsShareModal({
                       {/* Background color */}
                       <div>
                         <p className="mb-2 text-sm text-neutral-400">Background</p>
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="share-modal-preserve flex flex-wrap items-center gap-2">
                           {gradientPalette.map(option => (
                             <button
                               key={option.id}

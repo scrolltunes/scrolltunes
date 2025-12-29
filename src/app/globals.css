@@ -48,6 +48,15 @@ body {
   filter: invert(1) hue-rotate(180deg);
 }
 
+/* Prevent light mode inversion on share modal */
+:root.light .share-modal-preserve {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+:root.light .share-modal-preserve img {
+  filter: none;
+}
+
 /* Custom scrollbar styling using CSS variables */
 ::-webkit-scrollbar {
   width: 8px;
