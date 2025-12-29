@@ -2,6 +2,7 @@
 
 import { springs } from "@/animations"
 import { buildGradientPalette, extractDominantColor, type GradientOption } from "@/lib/colors"
+import { detectLyricsDirection } from "@/lib"
 import {
   ArrowCounterClockwise,
   ArrowLeft,
@@ -312,6 +313,9 @@ export function LyricsShareModal({
       .map(i => lines[i])
       .filter((line): line is LyricLine => line !== undefined)
   }, [selectedIndices, lines])
+
+  // Detect RTL direction from lyrics
+  const isRTL = useMemo(() => detectLyricsDirection(lines) === "rtl", [lines])
 
   // Get display text for a line (edited or original)
   const getLineText = useCallback(
@@ -943,7 +947,15 @@ export function LyricsShareModal({
               />
             )}
             <div style={{ position: "relative" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  marginBottom: "16px",
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                }}
+              >
                 <div
                   style={{
                     width: "48px",
@@ -968,7 +980,7 @@ export function LyricsShareModal({
                     <MusicNote size={24} weight="fill" style={{ color: "rgba(255,255,255,0.6)" }} />
                   )}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: 1, minWidth: 0, textAlign: isRTL ? "right" : "left" }}>
                   <p
                     style={{
                       ...textStyles,
@@ -994,12 +1006,19 @@ export function LyricsShareModal({
                   </p>
                 </div>
               </div>
-              <div style={{ marginBottom: showBranding || showSpotifyCode ? "16px" : 0 }}>
+              <div
+                style={{
+                  marginBottom: showBranding || showSpotifyCode ? "16px" : 0,
+                  textAlign: isRTL ? "right" : "left",
+                  direction: isRTL ? "rtl" : "ltr",
+                }}
+              >
                 {selectedLines.map(line =>
                   isEditing ? (
                     <input
                       key={line.id}
                       type="text"
+                      dir={isRTL ? "rtl" : "ltr"}
                       value={getLineText(line)}
                       onChange={e => updateLineText(line.id, e.target.value)}
                       style={{
@@ -1016,6 +1035,7 @@ export function LyricsShareModal({
                         width: "100%",
                         display: "block",
                         outline: "none",
+                        textAlign: isRTL ? "right" : "left",
                       }}
                     />
                   ) : (
@@ -1132,18 +1152,22 @@ export function LyricsShareModal({
             </div>
 
             {/* Content */}
-            <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div
+              ref={scrollContainerRef}
+              dir={isRTL ? "rtl" : undefined}
+              className="min-h-0 flex-1 overflow-y-scroll"
+            >
               <AnimatePresence mode="wait">
                 {step === "select" ? (
                   <motion.div
                     key="select"
-                    initial={{ opacity: 0, x: -20 }}
+                    initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
+                    exit={{ opacity: 0, x: isRTL ? 20 : -20 }}
                     transition={{ duration: 0.2 }}
                     className="p-4"
                   >
-                    <p className="mb-3 text-sm text-neutral-400">
+                    <p dir="ltr" className="mb-3 text-sm text-neutral-400">
                       Tap lines to include in your card
                     </p>
                     <div className="space-y-1">
@@ -1154,13 +1178,16 @@ export function LyricsShareModal({
                             key={line.id}
                             type="button"
                             onClick={() => toggleLine(index)}
-                            className={`relative w-full rounded-lg px-3 py-2 text-left transition-colors ${
+                            dir={isRTL ? "rtl" : undefined}
+                            className={`relative w-full rounded-lg px-3 py-2 transition-colors ${
+                              isRTL ? "text-right" : "text-left"
+                            } ${
                               isSelected
                                 ? "bg-indigo-600/20 text-white"
                                 : "text-neutral-300 hover:bg-neutral-800"
                             }`}
                           >
-                            <div className="flex items-start gap-3">
+                            <div className="flex w-full items-start gap-3">
                               <div
                                 className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition-colors ${
                                   isSelected
@@ -1182,6 +1209,7 @@ export function LyricsShareModal({
                 ) : (
                   <motion.div
                     key="preview"
+                    dir="ltr"
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
