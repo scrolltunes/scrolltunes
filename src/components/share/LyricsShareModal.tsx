@@ -254,7 +254,7 @@ export function LyricsShareModal({
       return
     }
     calculateScale()
-  }, [step, calculateScale, selectedIndices.size, cardElement])
+  }, [step, calculateScale, selectedIndices.size, cardElement, isEditing])
 
   // Use ResizeObserver to recalculate when card size changes
   useEffect(() => {
