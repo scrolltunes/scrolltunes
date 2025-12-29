@@ -462,6 +462,7 @@ export function LyricsShareModal({
               maxWidth: "384px",
               margin: "0 auto",
               position: "relative",
+              overflow: "hidden",
             }}
           >
             {hasPattern && (
@@ -471,7 +472,6 @@ export function LyricsShareModal({
                   inset: 0,
                   ...patternStyles,
                   pointerEvents: "none",
-                  borderRadius: "24px",
                 }}
               />
             )}
@@ -564,6 +564,7 @@ export function LyricsShareModal({
               margin: "0 auto",
               textAlign: "center",
               position: "relative",
+              overflow: "hidden",
             }}
           >
             {hasPattern && (
@@ -573,7 +574,6 @@ export function LyricsShareModal({
                   inset: 0,
                   ...patternStyles,
                   pointerEvents: "none",
-                  borderRadius: "24px",
                 }}
               />
             )}
@@ -654,6 +654,7 @@ export function LyricsShareModal({
               maxWidth: "384px",
               margin: "0 auto",
               position: "relative",
+              overflow: "hidden",
             }}
           >
             {hasPattern && (
@@ -663,7 +664,6 @@ export function LyricsShareModal({
                   inset: 0,
                   ...patternStyles,
                   pointerEvents: "none",
-                  borderRadius: "24px",
                 }}
               />
             )}
@@ -796,6 +796,7 @@ export function LyricsShareModal({
               margin: "0 auto",
               boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
               position: "relative",
+              overflow: "hidden",
             }}
           >
             {hasPattern && (
@@ -805,7 +806,6 @@ export function LyricsShareModal({
                   inset: 0,
                   ...patternStyles,
                   pointerEvents: "none",
-                  borderRadius: "24px",
                 }}
               />
             )}
