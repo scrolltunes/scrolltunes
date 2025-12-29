@@ -679,6 +679,7 @@ export default function SongPage() {
           title={loadState.lyrics.title}
           artist={loadState.lyrics.artist}
           albumArt={loadState.albumArt}
+          spotifyId={loadState.spotifyId}
           lines={loadState.lyrics.lines}
         />
       )}

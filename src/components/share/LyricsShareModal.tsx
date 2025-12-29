@@ -28,6 +28,7 @@ export interface LyricsShareModalProps {
   readonly title: string
   readonly artist: string
   readonly albumArt?: string | null
+  readonly spotifyId?: string | null
   readonly lines: readonly LyricLine[]
 }
 
@@ -35,12 +36,114 @@ type Step = "select" | "preview"
 
 const CUSTOM_COLOR_ID = "custom"
 
+type LayoutVariant = "default" | "large-art" | "minimal" | "centered" | "quote"
+
+interface LayoutOption {
+  readonly id: LayoutVariant
+  readonly label: string
+}
+
+// Hidden for now, may re-enable later
+const _LAYOUT_OPTIONS: readonly LayoutOption[] = [
+  { id: "default", label: "Default" },
+  { id: "large-art", label: "Large Art" },
+  { id: "minimal", label: "Minimal" },
+  { id: "centered", label: "Centered" },
+  { id: "quote", label: "Quote" },
+] as const
+void _LAYOUT_OPTIONS
+
+type PatternVariant = "none" | "dots" | "grid" | "waves" | "random"
+
+interface PatternOption {
+  readonly id: PatternVariant
+  readonly label: string
+}
+
+const PATTERN_OPTIONS: readonly PatternOption[] = [
+  { id: "none", label: "None" },
+  { id: "dots", label: "Dots" },
+  { id: "grid", label: "Grid" },
+  { id: "waves", label: "Waves" },
+  { id: "random", label: "Random" },
+] as const
+
+function generateSmokeWaves(seed: number): string {
+  const seededRandom = (offset: number) => {
+    const x = Math.sin(seed + offset) * 10000
+    return x - Math.floor(x)
+  }
+
+  const paths: string[] = []
+  const numWaves = 5 + Math.floor(seededRandom(0) * 4)
+
+  for (let i = 0; i < numWaves; i++) {
+    const startY = seededRandom(i * 10) * 100
+    const amplitude = 10 + seededRandom(i * 20) * 25
+    const frequency = 0.5 + seededRandom(i * 30) * 1.5
+    const phaseShift = seededRandom(i * 40) * Math.PI * 2
+    const opacity = 0.03 + seededRandom(i * 50) * 0.05
+
+    let d = `M 0 ${startY}`
+    for (let x = 0; x <= 100; x += 2) {
+      const y = startY + Math.sin((x * frequency * Math.PI) / 50 + phaseShift) * amplitude
+      d += ` L ${x} ${y}`
+    }
+
+    paths.push(
+      `<path d="${d}" fill="none" stroke="rgba(255,255,255,${opacity})" stroke-width="${0.5 + seededRandom(i * 60) * 1}"/>`
+    )
+  }
+
+  return paths.join("")
+}
+
+function getPatternStyle(pattern: PatternVariant): React.CSSProperties {
+  switch (pattern) {
+    case "dots":
+      return {
+        backgroundImage:
+          "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+        backgroundSize: "16px 16px",
+      }
+    case "grid":
+      return {
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)",
+        backgroundSize: "24px 24px",
+      }
+    case "waves":
+      return {
+        backgroundImage:
+          "repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.03) 8px, rgba(255,255,255,0.03) 16px)",
+      }
+    default:
+      return {}
+  }
+}
+
+const cardBaseStyles: React.CSSProperties = {
+  fontFamily: "Arial, Helvetica, sans-serif",
+  fontKerning: "none",
+  letterSpacing: "0px",
+  WebkitFontSmoothing: "antialiased",
+  MozOsxFontSmoothing: "grayscale",
+  textRendering: "geometricPrecision",
+}
+
+const textStyles: React.CSSProperties = {
+  fontKerning: "none",
+  letterSpacing: "0px",
+  wordSpacing: "0px",
+}
+
 export function LyricsShareModal({
   isOpen,
   onClose,
   title,
   artist,
   albumArt,
+  spotifyId,
   lines,
 }: LyricsShareModalProps) {
   const cardRef = useRef<HTMLDivElement>(null)
@@ -51,11 +154,14 @@ export function LyricsShareModal({
   const [selectedGradientId, setSelectedGradientId] = useState<string>("")
   const [customColor, setCustomColor] = useState("#4f46e5")
   const [showBranding, setShowBranding] = useState(false)
+  const [showSpotifyCode, setShowSpotifyCode] = useState(false)
+  const [layout, setLayout] = useState<LayoutVariant>("default")
+  const [pattern, setPattern] = useState<PatternVariant>("none")
+  const [patternSeed, setPatternSeed] = useState(() => Date.now())
   const [isGenerating, setIsGenerating] = useState(false)
   const [shareSupported, setShareSupported] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  // Get the current background style
   const currentBackground = useMemo(() => {
     if (selectedGradientId === CUSTOM_COLOR_ID) {
       return customColor
@@ -64,12 +170,25 @@ export function LyricsShareModal({
     return gradient?.gradient ?? gradientPalette[0]?.gradient ?? "#4f46e5"
   }, [selectedGradientId, gradientPalette, customColor])
 
-  // Reset state when modal opens/closes
+  const spotifyCodeUrl = useMemo(() => {
+    if (!spotifyId) return null
+    return `https://scannables.scdn.co/uri/plain/png/000000/white/280/spotify:track:${spotifyId}`
+  }, [spotifyId])
+
+  const smokeSvgDataUrl = useMemo(() => {
+    const paths = generateSmokeWaves(patternSeed)
+    const svg = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+  }, [patternSeed])
+
   useEffect(() => {
     if (isOpen) {
       setStep("select")
       setSelectedIndices(new Set())
       setShowBranding(false)
+      setShowSpotifyCode(false)
+      setLayout("default")
+      setPattern("none")
     }
   }, [isOpen])
 
@@ -152,8 +271,13 @@ export function LyricsShareModal({
     try {
       const dataUrl = await htmlToImage.toPng(cardRef.current, {
         quality: 1,
-        pixelRatio: 2,
+        pixelRatio: 3,
         cacheBust: true,
+        style: {
+          fontKerning: "none",
+          letterSpacing: "0px",
+        },
+        fontEmbedCSS: "",
       })
 
       const response = await fetch(dataUrl)
@@ -219,12 +343,583 @@ export function LyricsShareModal({
     }
   }, [generateImage, title, artist, shareSupported, handleDownload])
 
-  // Filter out empty lines for selection
   const selectableLines = useMemo(() => {
     return lines
       .map((line, index) => ({ line, index }))
       .filter(({ line }) => line.text.trim() !== "" && line.text.trim() !== "♪")
   }, [lines])
+
+  const renderCardContent = () => {
+    const patternStyles =
+      pattern === "random"
+        ? { backgroundImage: smokeSvgDataUrl, backgroundSize: "100% 100%" }
+        : getPatternStyle(pattern)
+    const hasPattern = pattern !== "none"
+
+    switch (layout) {
+      case "large-art":
+        return (
+          <div
+            ref={cardRef}
+            style={{
+              ...cardBaseStyles,
+              background: currentBackground,
+              borderRadius: "24px",
+              overflow: "hidden",
+              maxWidth: "384px",
+              margin: "0 auto",
+              position: "relative",
+            }}
+          >
+            {hasPattern && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  ...patternStyles,
+                  pointerEvents: "none",
+                }}
+              />
+            )}
+            {albumArt && (
+              <div style={{ width: "100%", aspectRatio: "1", position: "relative" }}>
+                <img
+                  src={albumArt}
+                  alt=""
+                  crossOrigin="anonymous"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.7) 100%)",
+                  }}
+                />
+              </div>
+            )}
+            <div style={{ padding: "24px", position: "relative" }}>
+              <div style={{ marginBottom: "12px" }}>
+                <p
+                  style={{
+                    ...textStyles,
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    color: "white",
+                    margin: 0,
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {title}
+                </p>
+                <p
+                  style={{
+                    ...textStyles,
+                    fontSize: "14px",
+                    color: "rgba(255,255,255,0.7)",
+                    margin: 0,
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {artist}
+                </p>
+              </div>
+              <div style={{ marginBottom: showBranding || showSpotifyCode ? "16px" : 0 }}>
+                {selectedLines.map(line => (
+                  <p
+                    key={line.id}
+                    style={{
+                      ...textStyles,
+                      fontSize: "18px",
+                      fontWeight: 600,
+                      lineHeight: 1.5,
+                      color: "white",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {line.text}
+                  </p>
+                ))}
+              </div>
+              {renderFooter()}
+            </div>
+          </div>
+        )
+
+      case "minimal":
+        return (
+          <div
+            ref={cardRef}
+            style={{
+              ...cardBaseStyles,
+              background: currentBackground,
+              borderRadius: "24px",
+              padding: "32px",
+              maxWidth: "384px",
+              margin: "0 auto",
+              position: "relative",
+            }}
+          >
+            {hasPattern && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  ...patternStyles,
+                  pointerEvents: "none",
+                  borderRadius: "24px",
+                }}
+              />
+            )}
+            <div style={{ position: "relative" }}>
+              <div style={{ marginBottom: showBranding || showSpotifyCode ? "24px" : 0 }}>
+                {selectedLines.map(line => (
+                  <p
+                    key={line.id}
+                    style={{
+                      ...textStyles,
+                      fontSize: "20px",
+                      fontWeight: 600,
+                      lineHeight: 1.6,
+                      color: "white",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {line.text}
+                  </p>
+                ))}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "16px",
+                }}
+              >
+                <div>
+                  <p
+                    style={{
+                      ...textStyles,
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.9)",
+                      margin: 0,
+                    }}
+                  >
+                    {title}
+                  </p>
+                  <p
+                    style={{
+                      ...textStyles,
+                      fontSize: "12px",
+                      color: "rgba(255,255,255,0.6)",
+                      margin: 0,
+                    }}
+                  >
+                    {artist}
+                  </p>
+                </div>
+                {showBranding && (
+                  <p
+                    style={{
+                      ...textStyles,
+                      fontSize: "10px",
+                      color: "rgba(255,255,255,0.4)",
+                      margin: 0,
+                    }}
+                  >
+                    scrolltunes.com
+                  </p>
+                )}
+              </div>
+              {showSpotifyCode && spotifyCodeUrl && (
+                <div style={{ marginTop: "16px" }}>
+                  <img
+                    src={spotifyCodeUrl}
+                    alt="Spotify Code"
+                    crossOrigin="anonymous"
+                    style={{ height: "24px", opacity: 0.7 }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )
+
+      case "centered":
+        return (
+          <div
+            ref={cardRef}
+            style={{
+              ...cardBaseStyles,
+              background: currentBackground,
+              borderRadius: "24px",
+              padding: "32px",
+              maxWidth: "384px",
+              margin: "0 auto",
+              textAlign: "center",
+              position: "relative",
+            }}
+          >
+            {hasPattern && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  ...patternStyles,
+                  pointerEvents: "none",
+                  borderRadius: "24px",
+                }}
+              />
+            )}
+            <div style={{ position: "relative" }}>
+              {albumArt && (
+                <div
+                  style={{
+                    width: "80px",
+                    height: "80px",
+                    borderRadius: "16px",
+                    overflow: "hidden",
+                    margin: "0 auto 16px",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+                  }}
+                >
+                  <img
+                    src={albumArt}
+                    alt=""
+                    crossOrigin="anonymous"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                </div>
+              )}
+              <div style={{ marginBottom: "16px" }}>
+                <p
+                  style={{
+                    ...textStyles,
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "white",
+                    margin: 0,
+                  }}
+                >
+                  {title}
+                </p>
+                <p
+                  style={{
+                    ...textStyles,
+                    fontSize: "12px",
+                    color: "rgba(255,255,255,0.7)",
+                    margin: 0,
+                  }}
+                >
+                  {artist}
+                </p>
+              </div>
+              <div style={{ marginBottom: showBranding || showSpotifyCode ? "20px" : 0 }}>
+                {selectedLines.map(line => (
+                  <p
+                    key={line.id}
+                    style={{
+                      ...textStyles,
+                      fontSize: "18px",
+                      fontWeight: 600,
+                      lineHeight: 1.5,
+                      color: "white",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {line.text}
+                  </p>
+                ))}
+              </div>
+              {renderFooter()}
+            </div>
+          </div>
+        )
+
+      case "quote":
+        return (
+          <div
+            ref={cardRef}
+            style={{
+              ...cardBaseStyles,
+              background: currentBackground,
+              borderRadius: "24px",
+              padding: "32px",
+              maxWidth: "384px",
+              margin: "0 auto",
+              position: "relative",
+            }}
+          >
+            {hasPattern && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  ...patternStyles,
+                  pointerEvents: "none",
+                  borderRadius: "24px",
+                }}
+              />
+            )}
+            <div style={{ position: "relative" }}>
+              <div
+                style={{
+                  fontSize: "64px",
+                  fontWeight: 700,
+                  color: "rgba(255,255,255,0.15)",
+                  lineHeight: 0.8,
+                  marginBottom: "8px",
+                  fontFamily: "Georgia, serif",
+                }}
+              >
+                "
+              </div>
+              <div
+                style={{
+                  borderLeft: "3px solid rgba(255,255,255,0.3)",
+                  paddingLeft: "16px",
+                  marginBottom: showBranding || showSpotifyCode ? "24px" : 0,
+                }}
+              >
+                {selectedLines.map(line => (
+                  <p
+                    key={line.id}
+                    style={{
+                      ...textStyles,
+                      fontSize: "18px",
+                      fontWeight: 500,
+                      fontStyle: "italic",
+                      lineHeight: 1.6,
+                      color: "white",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {line.text}
+                  </p>
+                ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "16px" }}>
+                {albumArt && (
+                  <div
+                    style={{
+                      width: "40px",
+                      height: "40px",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <img
+                      src={albumArt}
+                      alt=""
+                      crossOrigin="anonymous"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p
+                    style={{
+                      ...textStyles,
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "white",
+                      margin: 0,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {title}
+                  </p>
+                  <p
+                    style={{
+                      ...textStyles,
+                      fontSize: "12px",
+                      color: "rgba(255,255,255,0.6)",
+                      margin: 0,
+                    }}
+                  >
+                    {artist}
+                  </p>
+                </div>
+              </div>
+              {(showBranding || showSpotifyCode) && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginTop: "16px",
+                  }}
+                >
+                  {showBranding && (
+                    <p
+                      style={{
+                        ...textStyles,
+                        fontSize: "10px",
+                        color: "rgba(255,255,255,0.4)",
+                        margin: 0,
+                      }}
+                    >
+                      scrolltunes.com
+                    </p>
+                  )}
+                  {showSpotifyCode && spotifyCodeUrl && (
+                    <img
+                      src={spotifyCodeUrl}
+                      alt="Spotify Code"
+                      crossOrigin="anonymous"
+                      style={{ height: "20px", opacity: 0.7 }}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+
+      default:
+        return (
+          <div
+            ref={cardRef}
+            style={{
+              ...cardBaseStyles,
+              background: currentBackground,
+              borderRadius: "24px",
+              padding: "24px",
+              maxWidth: "384px",
+              margin: "0 auto",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              position: "relative",
+            }}
+          >
+            {hasPattern && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  ...patternStyles,
+                  pointerEvents: "none",
+                  borderRadius: "24px",
+                }}
+              />
+            )}
+            <div style={{ position: "relative" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "8px",
+                    overflow: "hidden",
+                    flexShrink: 0,
+                    backgroundColor: "rgba(0,0,0,0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {albumArt ? (
+                    <img
+                      src={albumArt}
+                      alt=""
+                      crossOrigin="anonymous"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <MusicNote size={24} weight="fill" style={{ color: "rgba(255,255,255,0.6)" }} />
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p
+                    style={{
+                      ...textStyles,
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "white",
+                      margin: 0,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {title}
+                  </p>
+                  <p
+                    style={{
+                      ...textStyles,
+                      fontSize: "14px",
+                      color: "rgba(255,255,255,0.7)",
+                      margin: 0,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {artist}
+                  </p>
+                </div>
+              </div>
+              <div style={{ marginBottom: showBranding || showSpotifyCode ? "16px" : 0 }}>
+                {selectedLines.map(line => (
+                  <p
+                    key={line.id}
+                    style={{
+                      ...textStyles,
+                      fontSize: "18px",
+                      fontWeight: 600,
+                      lineHeight: 1.5,
+                      color: "white",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {line.text}
+                  </p>
+                ))}
+              </div>
+              {renderFooter()}
+            </div>
+          </div>
+        )
+    }
+  }
+
+  const renderFooter = () => {
+    if (!showBranding && !showSpotifyCode) return null
+
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "8px",
+        }}
+      >
+        {showBranding && (
+          <p
+            style={{
+              ...textStyles,
+              fontSize: "12px",
+              color: "rgba(255,255,255,0.5)",
+              margin: 0,
+            }}
+          >
+            scrolltunes.com
+          </p>
+        )}
+        {showSpotifyCode && spotifyCodeUrl && (
+          <img
+            src={spotifyCodeUrl}
+            alt="Spotify Code"
+            crossOrigin="anonymous"
+            style={{ height: "24px", opacity: 0.8 }}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
     <AnimatePresence>
@@ -251,42 +946,28 @@ export function LyricsShareModal({
                   <button
                     type="button"
                     onClick={handleBack}
-                    className="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 transition-colors hover:bg-neutral-700"
                     aria-label="Back"
                   >
-                    <ArrowLeft size={20} weight="bold" />
+                    <ArrowLeft size={18} />
                   </button>
                 )}
-                <h2 className="text-lg font-semibold text-white">
-                  {step === "select" ? "Select lyrics" : "Share lyrics"}
+                <h2 className="text-lg font-semibold">
+                  {step === "select" ? "Select Lyrics" : "Customize Card"}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-neutral-800"
                 aria-label="Close"
               >
-                <X size={20} weight="bold" />
+                <X size={20} />
               </button>
             </div>
 
-            {/* Step indicator */}
-            <div className="flex items-center justify-center gap-2 border-b border-neutral-800 px-4 py-2">
-              <div
-                className={`h-1.5 w-12 rounded-full transition-colors ${
-                  step === "select" ? "bg-indigo-500" : "bg-neutral-700"
-                }`}
-              />
-              <div
-                className={`h-1.5 w-12 rounded-full transition-colors ${
-                  step === "preview" ? "bg-indigo-500" : "bg-neutral-700"
-                }`}
-              />
-            </div>
-
             {/* Content */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               <AnimatePresence mode="wait">
                 {step === "select" ? (
                   <motion.div
@@ -298,7 +979,7 @@ export function LyricsShareModal({
                     className="p-4"
                   >
                     <p className="mb-3 text-sm text-neutral-400">
-                      Tap the lyrics you want to share
+                      Tap lines to include in your card
                     </p>
                     <div className="space-y-1">
                       {selectableLines.map(({ line, index }) => {
@@ -343,51 +1024,32 @@ export function LyricsShareModal({
                     className="p-4"
                   >
                     {/* Card preview */}
-                    <div
-                      ref={cardRef}
-                      className="mx-auto max-w-sm rounded-3xl p-6 shadow-2xl"
-                      style={{ background: currentBackground }}
-                    >
-                      <div className="mb-4 flex items-center gap-3">
-                        <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-black/20">
-                          {albumArt ? (
-                            <img
-                              src={albumArt}
-                              alt=""
-                              className="h-full w-full object-cover"
-                              crossOrigin="anonymous"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center">
-                              <MusicNote size={24} weight="fill" className="text-white/60" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-white break-words">{title}</p>
-                          <p className="text-sm text-white/70 break-words">{artist}</p>
-                        </div>
-                      </div>
-
-                      <div
-                        className="space-y-1"
-                        style={{ marginBottom: showBranding ? "1rem" : 0 }}
-                      >
-                        {selectedLines.map(line => (
-                          <p
-                            key={line.id}
-                            className="text-lg font-semibold leading-relaxed text-white"
-                          >
-                            {line.text}
-                          </p>
-                        ))}
-                      </div>
-
-                      {showBranding && <p className="text-xs text-white/50">scrolltunes.com</p>}
-                    </div>
+                    {renderCardContent()}
 
                     {/* Options */}
                     <div className="mt-4 space-y-4">
+                      {/* Layout - hidden for now, may re-enable later
+                      <div>
+                        <p className="mb-2 text-sm text-neutral-400">Layout</p>
+                        <div className="flex flex-wrap gap-2">
+                          {LAYOUT_OPTIONS.map(option => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              onClick={() => setLayout(option.id)}
+                              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                                layout === option.id
+                                  ? "bg-indigo-600 text-white"
+                                  : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      */}
+
                       {/* Background color */}
                       <div>
                         <p className="mb-2 text-sm text-neutral-400">Background</p>
@@ -456,28 +1118,83 @@ export function LyricsShareModal({
                         </div>
                       </div>
 
-                      {/* Branding toggle */}
-                      <label className="flex cursor-pointer items-center gap-3">
-                        <div className="relative">
-                          <input
-                            type="checkbox"
-                            checked={showBranding}
-                            onChange={e => setShowBranding(e.target.checked)}
-                            className="sr-only"
-                          />
-                          <div
-                            className={`h-6 w-11 rounded-full transition-colors ${
-                              showBranding ? "bg-indigo-600" : "bg-neutral-700"
-                            }`}
-                          />
-                          <div
-                            className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                              showBranding ? "translate-x-5" : ""
-                            }`}
-                          />
+                      {/* Pattern */}
+                      <div>
+                        <p className="mb-2 text-sm text-neutral-400">Pattern</p>
+                        <div className="flex flex-wrap gap-2">
+                          {PATTERN_OPTIONS.map(option => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              onClick={() => {
+                                if (option.id === "random" && pattern === "random") {
+                                  setPatternSeed(Date.now())
+                                } else {
+                                  setPattern(option.id)
+                                }
+                              }}
+                              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                                pattern === option.id
+                                  ? "bg-indigo-600 text-white"
+                                  : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
                         </div>
-                        <span className="text-sm text-neutral-300">Show scrolltunes.com</span>
-                      </label>
+                      </div>
+
+                      {/* Toggles */}
+                      <div className="space-y-3">
+                        {/* Branding toggle */}
+                        <label className="flex cursor-pointer items-center gap-3">
+                          <div className="relative">
+                            <input
+                              type="checkbox"
+                              checked={showBranding}
+                              onChange={e => setShowBranding(e.target.checked)}
+                              className="sr-only"
+                            />
+                            <div
+                              className={`h-6 w-11 rounded-full transition-colors ${
+                                showBranding ? "bg-indigo-600" : "bg-neutral-700"
+                              }`}
+                            />
+                            <div
+                              className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                                showBranding ? "translate-x-5" : ""
+                              }`}
+                            />
+                          </div>
+                          <span className="text-sm text-neutral-300">Show scrolltunes.com</span>
+                        </label>
+
+                        {/* Spotify code toggle */}
+                        {spotifyId && (
+                          <label className="flex cursor-pointer items-center gap-3">
+                            <div className="relative">
+                              <input
+                                type="checkbox"
+                                checked={showSpotifyCode}
+                                onChange={e => setShowSpotifyCode(e.target.checked)}
+                                className="sr-only"
+                              />
+                              <div
+                                className={`h-6 w-11 rounded-full transition-colors ${
+                                  showSpotifyCode ? "bg-indigo-600" : "bg-neutral-700"
+                                }`}
+                              />
+                              <div
+                                className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                                  showSpotifyCode ? "translate-x-5" : ""
+                                }`}
+                              />
+                            </div>
+                            <span className="text-sm text-neutral-300">Show Spotify Code</span>
+                          </label>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 )}
