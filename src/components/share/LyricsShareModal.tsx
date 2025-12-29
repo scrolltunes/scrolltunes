@@ -184,6 +184,8 @@ export function LyricsShareModal({
   const [scaledHeight, setScaledHeight] = useState<number | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [editedLines, setEditedLines] = useState<Map<string, string>>(new Map())
+  const [editModeWidth, setEditModeWidth] = useState<number | null>(null)
+  const [isSharing, setIsSharing] = useState(false)
 
   const currentBackground = useMemo(() => {
     if (selectedGradientId === CUSTOM_COLOR_ID) {
@@ -216,6 +218,7 @@ export function LyricsShareModal({
       setPattern("none")
       setIsEditing(false)
       setEditedLines(new Map())
+      setEditModeWidth(null)
     }
   }, [isOpen])
 
@@ -396,7 +399,7 @@ export function LyricsShareModal({
   }, [])
 
   const handleDownload = useCallback(async () => {
-    const blob = await generateImage()
+    const blob = await generateImage(false)
     if (!blob) return
 
     const url = URL.createObjectURL(blob)
@@ -438,13 +441,16 @@ export function LyricsShareModal({
   }, [generateImage])
 
   const handleShare = useCallback(async () => {
-    const blob = await generateImage()
+    if (isSharing) return
+    
+    const blob = await generateImage(false)
     if (!blob) return
 
     const file = new File([blob], `${title} - ${artist} lyrics.png`, { type: "image/png" })
 
     if (shareSupported && navigator.canShare({ files: [file] })) {
       try {
+        setIsSharing(true)
         await navigator.share({
           files: [file],
           title: `${title} by ${artist}`,
@@ -453,11 +459,13 @@ export function LyricsShareModal({
         if ((error as Error).name !== "AbortError") {
           console.error("Share failed:", error)
         }
+      } finally {
+        setIsSharing(false)
       }
     } else {
       await handleDownload()
     }
-  }, [generateImage, title, artist, shareSupported, handleDownload])
+  }, [generateImage, title, artist, shareSupported, handleDownload, isSharing])
 
   const selectableLines = useMemo(() => {
     return lines
@@ -930,7 +938,7 @@ export function LyricsShareModal({
                   borderRadius: "24px",
                   padding: "24px",
                   maxWidth: expandedWidth ? "600px" : "384px",
-                  minWidth: expandedWidth ? (isEditing ? "600px" : undefined) : undefined,
+                  minWidth: isEditing && editModeWidth ? `${editModeWidth}px` : undefined,
                   boxShadow: showShadow ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "none",
                   position: "relative",
                   overflow: "hidden",
@@ -1031,8 +1039,9 @@ export function LyricsShareModal({
                         background: "rgba(255,255,255,0.1)",
                         border: "1px solid rgba(255,255,255,0.3)",
                         borderRadius: "4px",
-                        padding: "2px 6px",
+                        padding: "4px 8px",
                         width: "100%",
+                        boxSizing: "border-box",
                         display: "block",
                         outline: "none",
                         textAlign: isRTL ? "right" : "left",
@@ -1221,7 +1230,14 @@ export function LyricsShareModal({
                       <div className="absolute left-2 top-2 z-10 flex gap-1">
                         <button
                           type="button"
-                          onClick={() => setIsEditing(prev => !prev)}
+                          onClick={() => {
+                            if (!isEditing && cardRef.current) {
+                              setEditModeWidth(cardRef.current.offsetWidth)
+                            } else {
+                              setEditModeWidth(null)
+                            }
+                            setIsEditing(prev => !prev)
+                          }}
                           className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
                             isEditing
                               ? "bg-indigo-600 text-white"
@@ -1522,7 +1538,7 @@ export function LyricsShareModal({
                       className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-neutral-800 px-4 py-3 font-medium text-white transition-colors hover:bg-neutral-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50"
                     >
                       <DownloadSimple size={20} weight="bold" />
-                      {isGenerating ? "..." : "Save"}
+                      Save
                     </button>
                   </div>
                   <button
