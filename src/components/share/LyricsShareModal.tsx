@@ -3,6 +3,7 @@
 import { springs } from "@/animations"
 import { buildGradientPalette, extractDominantColor, type GradientOption } from "@/lib/colors"
 import {
+  ArrowCounterClockwise,
   ArrowLeft,
   ArrowRight,
   ArrowsIn,
@@ -13,6 +14,7 @@ import {
   Heart,
   MusicNote,
   Palette,
+  PencilSimple,
   ShareNetwork,
   X,
 } from "@phosphor-icons/react"
@@ -177,6 +179,8 @@ export function LyricsShareModal({
   const [copied, setCopied] = useState(false)
   const [previewScale, setPreviewScale] = useState(1)
   const [scaledHeight, setScaledHeight] = useState<number | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedLines, setEditedLines] = useState<Map<string, string>>(new Map())
 
   const currentBackground = useMemo(() => {
     if (selectedGradientId === CUSTOM_COLOR_ID) {
@@ -207,6 +211,8 @@ export function LyricsShareModal({
       setExpandedWidth(true)
       setLayout("default")
       setPattern("none")
+      setIsEditing(false)
+      setEditedLines(new Map())
     }
   }, [isOpen])
 
@@ -235,7 +241,7 @@ export function LyricsShareModal({
       setScaledHeight(Math.round(cardHeight * roundedScale))
     } else {
       setPreviewScale(1)
-      setScaledHeight(cardHeight)
+      setScaledHeight(null)
     }
   }, [expandedWidth])
 
@@ -304,6 +310,21 @@ export function LyricsShareModal({
       .map(i => lines[i])
       .filter((line): line is LyricLine => line !== undefined)
   }, [selectedIndices, lines])
+
+  // Get display text for a line (edited or original)
+  const getLineText = useCallback(
+    (line: LyricLine) => editedLines.get(line.id) ?? line.text,
+    [editedLines],
+  )
+
+  // Update edited text for a line
+  const updateLineText = useCallback((lineId: string, text: string) => {
+    setEditedLines(prev => {
+      const next = new Map(prev)
+      next.set(lineId, text)
+      return next
+    })
+  }, [])
 
   const toggleLine = useCallback((index: number) => {
     setSelectedIndices(prev => {
@@ -864,20 +885,26 @@ export function LyricsShareModal({
         return (
           <div
             style={{
-              display: "flex",
-              justifyContent: "center",
-              transform: previewScale < 1 ? `scale(${previewScale})` : undefined,
-              transformOrigin: "top center",
               height: scaledHeight !== null ? `${scaledHeight}px` : undefined,
+              overflow: "visible",
+              marginBottom: "-24px",
             }}
           >
             <div
-              ref={cardCallbackRef}
               style={{
-                padding: "16px 16px 40px 16px",
-                background: "transparent",
+                display: "flex",
+                justifyContent: "center",
+                transform: previewScale < 1 ? `scale(${previewScale})` : undefined,
+                transformOrigin: "top center",
               }}
             >
+              <div
+                ref={cardCallbackRef}
+                style={{
+                  padding: "16px 16px 40px 16px",
+                  background: "transparent",
+                }}
+              >
               <div
                 style={{
                   ...cardBaseStyles,
@@ -885,7 +912,7 @@ export function LyricsShareModal({
                   borderRadius: "24px",
                   padding: "24px",
                   maxWidth: expandedWidth ? "600px" : "384px",
-                  width: expandedWidth ? "max-content" : "100%",
+                  width: expandedWidth ? (isEditing ? "600px" : "max-content") : "100%",
                   boxShadow: showShadow ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "none",
                   position: "relative",
                   overflow: "hidden",
@@ -954,23 +981,48 @@ export function LyricsShareModal({
                 </div>
               </div>
               <div style={{ marginBottom: showBranding || showSpotifyCode ? "16px" : 0 }}>
-                {selectedLines.map(line => (
-                  <p
-                    key={line.id}
-                    style={{
-                      ...textStyles,
-                      fontSize: "18px",
-                      fontWeight: 600,
-                      lineHeight: 1.5,
-                      color: "white",
-                      margin: "4px 0",
-                    }}
-                  >
-                    {line.text}
-                  </p>
-                ))}
+                {selectedLines.map(line =>
+                  isEditing ? (
+                    <input
+                      key={line.id}
+                      type="text"
+                      value={getLineText(line)}
+                      onChange={e => updateLineText(line.id, e.target.value)}
+                      style={{
+                        ...textStyles,
+                        fontSize: "18px",
+                        fontWeight: 600,
+                        lineHeight: 1.5,
+                        color: "white",
+                        margin: "4px 0",
+                        background: "rgba(255,255,255,0.1)",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        borderRadius: "4px",
+                        padding: "2px 6px",
+                        width: "100%",
+                        display: "block",
+                        outline: "none",
+                      }}
+                    />
+                  ) : (
+                    <p
+                      key={line.id}
+                      style={{
+                        ...textStyles,
+                        fontSize: "18px",
+                        fontWeight: 600,
+                        lineHeight: 1.5,
+                        color: "white",
+                        margin: "4px 0",
+                      }}
+                    >
+                      {getLineText(line)}
+                    </p>
+                  ),
+                )}
               </div>
               {renderFooter()}
+            </div>
             </div>
           </div>
           </div>
@@ -1122,7 +1174,35 @@ export function LyricsShareModal({
                     className="p-4"
                   >
                     {/* Card preview */}
-                    <div ref={previewContainerRef} className="share-modal-preserve relative overflow-hidden rounded-2xl bg-neutral-200 p-6">
+                    <div ref={previewContainerRef} className="share-modal-preserve relative rounded-2xl bg-neutral-200 p-6">
+                      <div className="absolute left-2 top-2 z-10 flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditing(prev => !prev)}
+                          className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                            isEditing
+                              ? "bg-indigo-600 text-white"
+                              : "bg-black/40 text-white/80 hover:bg-black/60 hover:text-white"
+                          }`}
+                          aria-label={isEditing ? "Done editing" : "Edit text"}
+                        >
+                          {isEditing ? (
+                            <Check size={18} weight="bold" />
+                          ) : (
+                            <PencilSimple size={18} weight="bold" />
+                          )}
+                        </button>
+                        {isEditing && editedLines.size > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setEditedLines(new Map())}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white/80 transition-colors hover:bg-black/60 hover:text-white"
+                            aria-label="Reset text"
+                          >
+                            <ArrowCounterClockwise size={18} weight="bold" />
+                          </button>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => setExpandedWidth(prev => !prev)}
