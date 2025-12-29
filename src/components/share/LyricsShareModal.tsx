@@ -938,6 +938,7 @@ export function LyricsShareModal({
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={springs.default}
             className="relative mx-0 flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-neutral-900 shadow-xl sm:mx-4 sm:max-w-lg sm:rounded-2xl"
+            onClick={e => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
