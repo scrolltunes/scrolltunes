@@ -10,7 +10,6 @@ import {
   ListChecks,
   MusicNote,
   ShieldWarning,
-  Textbox,
   Users,
   UsersThree,
 } from "@phosphor-icons/react"
@@ -33,12 +32,11 @@ interface AdminStats {
   } | null
 }
 
-type AdminSection = "analytics" | "users" | "content"
+type AdminSection = "analytics" | "users"
 
 const sections: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
   { id: "analytics", label: "Analytics", icon: <ChartBar size={20} /> },
   { id: "users", label: "User Management", icon: <UsersThree size={20} /> },
-  { id: "content", label: "Content Updates", icon: <Textbox size={20} /> },
 ]
 
 function Header() {
@@ -354,8 +352,6 @@ export default function AdminPage() {
         return <AnalyticsSection stats={stats} isLoading={isLoading} />
       case "users":
         return <ComingSoonSection title="User Management" />
-      case "content":
-        return <ComingSoonSection title="Content Updates" />
     }
   }
 
