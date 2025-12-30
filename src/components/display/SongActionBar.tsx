@@ -8,21 +8,17 @@ import {
   chordsStore,
   preferencesStore,
   useChordsState,
-  useIsAdmin,
   useIsAuthenticated,
   usePreference,
   useSetlistsContainingSong,
   useShowChords,
 } from "@/core"
 import {
-  CaretDown,
   CaretUp,
-  Check,
   Guitar,
   ListPlus,
   Minus,
   MusicNote,
-  PencilSimple,
   Plus,
   ShareNetwork,
   SlidersHorizontal,
@@ -30,8 +26,7 @@ import {
   TextAa,
   Timer,
 } from "@phosphor-icons/react"
-import Link from "next/link"
-import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback } from "react"
 
 export interface SongActionBarProps {
   readonly songId: number
@@ -77,15 +72,10 @@ export const SongActionBar = memo(function SongActionBar({
   onShareClick,
 }: SongActionBarProps) {
   const isAuthenticated = useIsAuthenticated()
-  const isAdmin = useIsAdmin()
   const containingSetlists = useSetlistsContainingSong(songId)
   const isInSetlist = containingSetlists.length > 0
   const fontSize = usePreference("fontSize")
   const wordTimingEnabled = usePreference("wordTimingEnabled")
-  const [showTimingDropdown, setShowTimingDropdown] = useState(false)
-  const [showChordsDropdown, setShowChordsDropdown] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  const chordsDropdownRef = useRef<HTMLDivElement>(null)
   const chordsState = useChordsState()
   const showChords = useShowChords()
   const chordsReady = chordsState.status === "ready"
@@ -109,34 +99,15 @@ export const SongActionBar = memo(function SongActionBar({
     preferencesStore.setWordTimingEnabled(!wordTimingEnabled)
   }, [wordTimingEnabled])
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    if (!showTimingDropdown && !showChordsDropdown) return
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowTimingDropdown(false)
-      }
-      if (chordsDropdownRef.current && !chordsDropdownRef.current.contains(e.target as Node)) {
-        setShowChordsDropdown(false)
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [showTimingDropdown, showChordsDropdown])
-
   return (
     <div className="flex items-center justify-center gap-3 py-4 px-4">
-      {/* Word timing toggle with admin dropdown */}
-      <div className="relative" ref={dropdownRef}>
+      {/* Word timing toggle */}
+      <div className="relative">
         <div className="flex items-center">
           <button
             type="button"
             onClick={handleToggleWordTiming}
-            className={`flex items-center gap-1.5 px-3 py-2 transition-colors text-sm font-medium ${
-              isAdmin && hasEnhancedTiming ? "rounded-l-full" : "rounded-full"
-            } ${
+            className={`flex items-center gap-1.5 px-3 py-2 transition-colors text-sm font-medium rounded-full ${
               wordTimingEnabled
                 ? "bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30"
                 : "bg-neutral-800/50 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
@@ -154,63 +125,7 @@ export const SongActionBar = memo(function SongActionBar({
               />
             )}
           </button>
-          {isAdmin && hasEnhancedTiming && (
-            <button
-              type="button"
-              onClick={() => setShowTimingDropdown(prev => !prev)}
-              className={`flex items-center justify-center w-7 h-9 rounded-r-full transition-colors ${
-                wordTimingEnabled
-                  ? "bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border-l border-indigo-500/30"
-                  : "bg-neutral-800/50 text-neutral-400 hover:bg-neutral-700/50 border-l border-neutral-700"
-              }`}
-              aria-label="Timing options"
-              aria-expanded={showTimingDropdown}
-            >
-              <CaretDown size={12} weight="bold" />
-            </button>
-          )}
         </div>
-
-        {/* Admin dropdown */}
-        {showTimingDropdown && isAdmin && hasEnhancedTiming && (
-          <div className="absolute top-full left-0 mt-1 z-50 bg-neutral-800 border border-neutral-700 rounded-lg shadow-lg py-1 min-w-[140px]">
-            <button
-              type="button"
-              onClick={() => {
-                onUseEnhancedTimingChange?.(true)
-                setShowTimingDropdown(false)
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-700 transition-colors"
-            >
-              <Check
-                size={14}
-                weight="bold"
-                className={useEnhancedTiming ? "text-indigo-400" : "text-transparent"}
-              />
-              <span className={useEnhancedTiming ? "text-white" : "text-neutral-300"}>
-                Enhanced
-              </span>
-              <Sparkle size={10} weight="fill" className="text-amber-400 ml-auto" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onUseEnhancedTimingChange?.(false)
-                setShowTimingDropdown(false)
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-700 transition-colors"
-            >
-              <Check
-                size={14}
-                weight="bold"
-                className={!useEnhancedTiming ? "text-indigo-400" : "text-transparent"}
-              />
-              <span className={!useEnhancedTiming ? "text-white" : "text-neutral-300"}>
-                Estimated
-              </span>
-            </button>
-          </div>
-        )}
       </div>
       <div className="w-px h-6 bg-neutral-700" />
 
@@ -286,44 +201,16 @@ export const SongActionBar = memo(function SongActionBar({
 
       {/* Chords button - show different states based on availability */}
       {chordsNotFound ? (
-        <div className="relative" ref={chordsDropdownRef}>
-          <div className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800/50 rounded-full text-sm text-neutral-500">
-            <Guitar size={20} />
-            <span className="hidden sm:inline">No chords available</span>
-            {isAdmin && (
-              <>
-                <div className="w-px h-4 bg-neutral-600/50 mx-1" />
-                <button
-                  type="button"
-                  onClick={() => setShowChordsDropdown(prev => !prev)}
-                  className="flex items-center justify-center text-neutral-400 hover:text-neutral-300 transition-colors"
-                  aria-label="Admin options"
-                >
-                  <CaretDown size={12} weight="bold" />
-                </button>
-              </>
-            )}
-          </div>
-          {showChordsDropdown && isAdmin && (
-            <div className="absolute top-full right-0 mt-1 z-50 bg-neutral-800 border border-neutral-700 rounded-lg shadow-lg py-1 min-w-[140px]">
-              <Link
-                href={`/admin/enhance/${songId}`}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-700 transition-colors text-neutral-300"
-                onClick={() => setShowChordsDropdown(false)}
-              >
-                <PencilSimple size={14} />
-                <span>Edit chords</span>
-              </Link>
-            </div>
-          )}
+        <div className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800/50 rounded-full text-sm text-neutral-500">
+          <Guitar size={20} />
+          <span className="hidden sm:inline">No chords available</span>
         </div>
       ) : (
-        <div className="relative" ref={chordsDropdownRef}>
-          <div
-            className={`flex items-center rounded-full overflow-hidden transition-colors ${
-              showChords && chordsReady ? "bg-indigo-600/20" : "bg-neutral-800/50"
-            }`}
-          >
+        <div
+          className={`flex items-center rounded-full overflow-hidden transition-colors ${
+            showChords && chordsReady ? "bg-indigo-600/20" : "bg-neutral-800/50"
+          }`}
+        >
             {/* Main button - toggle chords on/off */}
             <button
               type="button"
@@ -370,43 +257,6 @@ export const SongActionBar = memo(function SongActionBar({
                 <SlidersHorizontal size={16} />
               )}
             </button>
-
-            {/* Admin dropdown button */}
-            {isAdmin && (
-              <>
-                <div
-                  className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowChordsDropdown(prev => !prev)}
-                  className={`flex items-center justify-center w-8 h-9 transition-colors ${
-                    showChords && chordsReady
-                      ? "text-indigo-400 hover:bg-indigo-600/30"
-                      : "text-neutral-400 hover:bg-neutral-700/50"
-                  }`}
-                  aria-label="Admin options"
-                  aria-expanded={showChordsDropdown}
-                >
-                  <CaretDown size={12} weight="bold" />
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Admin dropdown menu */}
-          {showChordsDropdown && isAdmin && (
-            <div className="absolute top-full right-0 mt-1 z-50 bg-neutral-800 border border-neutral-700 rounded-lg shadow-lg py-1 min-w-[140px]">
-              <Link
-                href={`/admin/enhance/${songId}`}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-700 transition-colors text-neutral-300"
-                onClick={() => setShowChordsDropdown(false)}
-              >
-                <PencilSimple size={14} />
-                <span>Edit chords</span>
-              </Link>
-            </div>
-          )}
         </div>
       )}
 
