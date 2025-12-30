@@ -241,7 +241,33 @@
 - [x] Normalize display names using `@web-scrobbler/metadata-filter` (strips remaster labels, radio edit, feat., etc.)
 - [x] Show normalized titles/artists/albums in all UI (search, recents, song page, modals)
 - [x] Keep original names for storage, caching, and API lookups
-- [ ] LRCLIB's `/api/get` can match by exact signature (title, artist, album, duration ±2s)
+
+### Search Flow Refactor (Planned)
+
+**Current issues:**
+- Album is optional (empty/missing for many cached songs)
+- Spotify metadata used for display names instead of LRCLIB canonical data
+- Only uses `/api/search` (fuzzy), never `/api/get` (exact match with album)
+
+**Proposed flow:**
+```
+User Query
+  → Spotify Search (top 1-3 results)
+  → Extract: artist, title, album, duration
+  → LRCLIB /api/get-cached (fast, local DB only)
+  → Fallback: LRCLIB /api/get (may fetch external sources)
+  → Return LRCLIB canonical data + Spotify ID + album art
+```
+
+**Implementation plan:**
+- [ ] Add `getLyricsWithSpotifyMetadata()` that calls LRCLIB with exact Spotify params
+- [ ] Spotify query: search top 1-3 results (not 8), use as precise query params
+- [ ] LRCLIB query: prefer `/api/get-cached` first (fast, no external fetch)
+- [ ] Fallback chain: `/api/get-cached` → `/api/get` → `/api/search` as last resort
+- [ ] Result metadata: use LRCLIB names as canonical (not Spotify)
+- [ ] Album: required from LRCLIB response (never null for valid entries)
+- [ ] Stored data: LRCLIB canonical + Spotify ID + album art for enrichment only
+- [ ] Update `SearchResultTrack` type: `album` should be required string (not optional)
 
 ### Chords Integration (Experimental)
 - [x] Research chord API options → Chose Songsterr API
