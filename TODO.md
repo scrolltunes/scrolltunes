@@ -424,6 +424,24 @@
 
 ---
 
+## Share Modal Visual Editor (Future)
+
+> Full WYSIWYG editor for lyrics share cards. See [docs/share-modal-editor.md](docs/share-modal-editor.md) for detailed plan.
+
+- [ ] State model (`ShareEditorStore`) with element positions, sizes, visibility
+- [ ] Drag-and-drop repositioning (`@dnd-kit/core`)
+- [ ] Resize handles for elements
+- [ ] Selection UI with delete/hide controls
+- [ ] Grid overlay with snap-to-grid
+- [ ] Symmetry guidelines with magnetic snapping
+- [ ] Smart spacing detection and guides
+- [ ] Element visibility toggles
+- [ ] Undo/redo history
+- [ ] Touch support (drag, pinch-to-resize)
+- [ ] Export compatibility with absolute positioning
+
+---
+
 ## V3 Features (Future)
 
 ### Spotify Integration
