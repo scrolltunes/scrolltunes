@@ -339,6 +339,22 @@ class RecentSongsStore {
     }
   }
 
+  /**
+   * Preload catalog songs to cache their album art.
+   * Does not add to recents list, only fetches and caches lyrics/album art.
+   */
+  preloadCatalogSongs(
+    songs: Array<{ lrclibId: number; title: string; artist: string; album: string | null }>,
+  ): void {
+    const idsToFetch = songs
+      .filter(s => !loadCachedLyrics(s.lrclibId))
+      .map(s => s.lrclibId)
+
+    if (idsToFetch.length > 0) {
+      this.fetchAlbumArtInBackground(idsToFetch)
+    }
+  }
+
   private async fetchAlbumArtInBackground(songIds: number[]): Promise<void> {
     const fetchPromises = songIds.map(async id => {
       try {

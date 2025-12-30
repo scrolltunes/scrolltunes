@@ -2,7 +2,7 @@
 
 import { springs } from "@/animations"
 import { useAccount, useIsAdmin } from "@/core"
-import { makeCanonicalPath } from "@/lib/slug"
+import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import {
   ArrowLeft,
   CaretLeft,
@@ -10,10 +10,12 @@ import {
   Check,
   FunnelSimple,
   MagnifyingGlass,
+  Metronome,
   MusicNote,
   PencilSimple,
   ShieldWarning,
   Sparkle,
+  Timer,
   Trash,
   X,
 } from "@phosphor-icons/react"
@@ -25,6 +27,12 @@ interface Song {
   id: string
   title: string
   artist: string
+  album: string | null
+  durationMs: number | null
+  bpm: number | null
+  musicalKey: string | null
+  bpmSource: string | null
+  bpmSourceUrl: string | null
   hasSyncedLyrics: boolean
   hasEnhancement: boolean
   hasChordEnhancement: boolean
@@ -42,6 +50,14 @@ interface SongsResponse {
 type FilterType = "all" | "synced" | "enhanced" | "unenhanced"
 
 const LIMIT = 20
+
+function formatDuration(ms: number | null): string {
+  if (!ms) return ""
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`
+}
 
 function Header() {
   return (
@@ -103,11 +119,11 @@ function LoadingScreen() {
   )
 }
 
-function LoadingTable() {
+function LoadingGrid() {
   return (
-    <div className="space-y-2">
-      {Array.from({ length: 10 }).map((_, i) => (
-        <div key={i} className="h-14 bg-neutral-900 rounded animate-pulse" />
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="h-48 bg-neutral-900 rounded-xl animate-pulse" />
       ))}
     </div>
   )
@@ -134,7 +150,28 @@ function EmptyState({ hasSearch }: { hasSearch: boolean }) {
   )
 }
 
-function SongRow({
+function StatusBadge({
+  label,
+  active,
+}: {
+  label: string
+  active: boolean
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
+        active
+          ? "bg-green-500/20 text-green-400"
+          : "bg-neutral-800 text-neutral-500"
+      }`}
+    >
+      {active ? <Check size={12} weight="bold" /> : <X size={12} />}
+      {label}
+    </span>
+  )
+}
+
+function SongCard({
   song,
   index,
   onDeleteSong,
@@ -144,6 +181,58 @@ function SongRow({
   onDeleteSong: (songId: string) => void
 }) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [albumArt, setAlbumArt] = useState<string | undefined>(undefined)
+  const [isLoadingArt, setIsLoadingArt] = useState(!!song.lrclibId)
+
+  useEffect(() => {
+    if (!song.lrclibId) {
+      setIsLoadingArt(false)
+      return
+    }
+
+    const cached = loadCachedLyrics(song.lrclibId)
+    if (cached?.albumArt) {
+      setAlbumArt(cached.albumArt)
+      setIsLoadingArt(false)
+      return
+    }
+
+    let cancelled = false
+
+    fetch(`/api/lyrics/${song.lrclibId}`)
+      .then(async response => {
+        if (!response.ok || cancelled) {
+          if (!cancelled) setIsLoadingArt(false)
+          return
+        }
+
+        const data = await response.json()
+        if (cancelled) return
+
+        const art = data.albumArt as string | undefined
+        if (data.lyrics) {
+          saveCachedLyrics(song.lrclibId as number, {
+            lyrics: data.lyrics,
+            bpm: data.bpm ?? null,
+            key: data.key ?? null,
+            albumArt: art,
+            spotifyId: data.spotifyId ?? undefined,
+            bpmSource: data.attribution?.bpm ?? undefined,
+            lyricsSource: data.attribution?.lyrics ?? undefined,
+          })
+        }
+
+        setAlbumArt(art)
+        setIsLoadingArt(false)
+      })
+      .catch(() => {
+        if (!cancelled) setIsLoadingArt(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [song.lrclibId])
 
   const handleDelete = async () => {
     if (!confirm(`Permanently delete "${song.title}" by ${song.artist}? This cannot be undone.`))
@@ -163,94 +252,102 @@ function SongRow({
     }
   }
 
+  const duration = formatDuration(song.durationMs)
+  const hasBpmInfo = song.bpm !== null || song.musicalKey !== null
+
   return (
-    <motion.tr
+    <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ ...springs.default, delay: index * 0.02 }}
-      className="border-b border-neutral-800 hover:bg-neutral-900/50 transition-colors"
+      transition={{ ...springs.default, delay: index * 0.03 }}
+      className="bg-neutral-900 rounded-xl border border-neutral-800 flex flex-col hover:border-neutral-700 transition-colors"
     >
-      <td className="py-3 px-4 text-neutral-300">{song.artist}</td>
-      <td className="py-3 px-4">
-        {song.lrclibId ? (
-          <Link
-            href={makeCanonicalPath({
-              id: song.lrclibId,
-              title: song.title,
-              artist: song.artist,
-            })}
-            className="text-white hover:text-indigo-400 hover:underline transition-colors"
-          >
-            {song.title}
-          </Link>
-        ) : (
-          <span className="text-white">{song.title}</span>
-        )}
-      </td>
-      <td className="py-3 px-4 text-center">
-        {song.hasEnhancement ? (
-          <Check size={18} className="text-green-500 mx-auto" />
-        ) : (
-          <X size={18} className="text-neutral-600 mx-auto" />
-        )}
-      </td>
-      <td className="py-3 px-4 text-center">
-        {song.hasChordEnhancement ? (
-          <Check size={18} className="text-green-500 mx-auto" />
-        ) : (
-          <X size={18} className="text-neutral-600 mx-auto" />
-        )}
-      </td>
-      <td className="py-3 px-4 text-center">
-        {song.lrclibId ? (
-          <a
-            href={`https://lrclib.net/api/get/${song.lrclibId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-400 hover:text-indigo-300 hover:underline transition-colors"
-          >
-            {song.lrclibId}
-          </a>
-        ) : (
-          <span className="text-neutral-600">—</span>
-        )}
-      </td>
-      <td className="py-3 px-4">
-        <div className="flex items-center gap-2">
-          {song.lrclibId ? (
-            song.hasEnhancement ? (
-              <Link
-                href={`/admin/enhance/${song.lrclibId}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-500 transition-colors"
-              >
-                <PencilSimple size={14} />
-                <span>Edit</span>
-              </Link>
-            ) : (
-              <Link
-                href={`/admin/enhance/${song.lrclibId}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 transition-colors"
-              >
-                <Sparkle size={14} />
-                <span>Enhance</span>
-              </Link>
-            )
+      <Link href={`/admin/songs/${song.id}`} className="p-4 flex gap-3">
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
+          {isLoadingArt ? (
+            <div className="w-full h-full bg-neutral-800 animate-pulse" />
+          ) : albumArt ? (
+            <img src={albumArt} alt="" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-neutral-600 text-sm">No LRCLIB ID</span>
+            <MusicNote size={20} weight="fill" className="text-neutral-600" />
           )}
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 text-neutral-400 text-sm rounded-lg hover:bg-red-600/20 hover:text-red-400 transition-colors disabled:opacity-50"
-            title="Delete song permanently"
-          >
-            <Trash size={14} />
-            <span>{isDeleting ? "..." : "Delete"}</span>
-          </button>
         </div>
-      </td>
-    </motion.tr>
+
+        <div className="flex-1 min-w-0">
+          <span className="text-white font-medium hover:text-indigo-400 transition-colors line-clamp-1">
+            {song.title}
+          </span>
+          <p className="text-neutral-400 text-sm line-clamp-1">{song.artist}</p>
+          {song.album && (
+            <p className="text-neutral-500 text-xs line-clamp-1 mt-0.5">{song.album}</p>
+          )}
+        </div>
+      </Link>
+
+      <div className="px-4 pb-4 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+          {duration && (
+            <span className="flex items-center gap-1">
+              <Timer size={12} />
+              {duration}
+            </span>
+          )}
+          {hasBpmInfo && (
+            <span
+              className="flex items-center gap-1 cursor-help"
+              title={
+                song.bpmSource
+                  ? `Source: ${song.bpmSource}${song.bpmSourceUrl ? ` (${song.bpmSourceUrl})` : ""}`
+                  : undefined
+              }
+            >
+              <Metronome size={12} />
+              {song.bpm !== null && `${song.bpm} BPM`}
+              {song.bpm !== null && song.musicalKey && " · "}
+              {song.musicalKey}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          <StatusBadge label="Synced" active={song.hasSyncedLyrics} />
+          <StatusBadge label="Words" active={song.hasEnhancement} />
+          <StatusBadge label="Chords" active={song.hasChordEnhancement} />
+        </div>
+
+        <div className="flex items-center gap-2 pt-2 border-t border-neutral-800">
+        {song.lrclibId ? (
+          song.hasEnhancement ? (
+            <Link
+              href={`/admin/enhance/${song.lrclibId}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-500 transition-colors"
+            >
+              <PencilSimple size={14} />
+              <span>Edit</span>
+            </Link>
+          ) : (
+            <Link
+              href={`/admin/enhance/${song.lrclibId}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 transition-colors"
+            >
+              <Sparkle size={14} />
+              <span>Enhance</span>
+            </Link>
+          )
+        ) : null}
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 text-neutral-400 text-sm rounded-lg hover:bg-red-600/20 hover:text-red-400 transition-colors disabled:opacity-50 ml-auto"
+          title="Delete song permanently"
+        >
+          <Trash size={14} />
+          <span>{isDeleting ? "..." : "Delete"}</span>
+        </button>
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
@@ -401,7 +498,7 @@ export default function AdminSongsPage() {
           </motion.div>
 
           {isLoading ? (
-            <LoadingTable />
+            <LoadingGrid />
           ) : songs.length === 0 ? (
             <EmptyState hasSearch={search.length > 0 || filter !== "all"} />
           ) : (
@@ -410,33 +507,19 @@ export default function AdminSongsPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ ...springs.default, delay: 0.2 }}
-                className="overflow-x-auto rounded-xl border border-neutral-800"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
               >
-                <table className="w-full">
-                  <thead className="bg-neutral-900">
-                    <tr className="text-left text-sm text-neutral-400">
-                      <th className="py-3 px-4 font-medium">Artist</th>
-                      <th className="py-3 px-4 font-medium">Title</th>
-                      <th className="py-3 px-4 font-medium text-center">Enhanced</th>
-                      <th className="py-3 px-4 font-medium text-center">Chords</th>
-                      <th className="py-3 px-4 font-medium text-center">LRCLIB ID</th>
-                      <th className="py-3 px-4 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {songs.map((song, index) => (
-                      <SongRow
-                        key={`${song.id}-${index}`}
-                        song={song}
-                        index={index}
-                        onDeleteSong={songId => {
-                          setSongs(prev => prev.filter(s => s.id !== songId))
-                          setTotal(prev => prev - 1)
-                        }}
-                      />
-                    ))}
-                  </tbody>
-                </table>
+                {songs.map((song, index) => (
+                  <SongCard
+                    key={`${song.id}-${index}`}
+                    song={song}
+                    index={index}
+                    onDeleteSong={songId => {
+                      setSongs(prev => prev.filter(s => s.id !== songId))
+                      setTotal(prev => prev - 1)
+                    }}
+                  />
+                ))}
               </motion.div>
 
               {totalPages > 1 && (

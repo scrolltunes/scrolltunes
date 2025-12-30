@@ -104,6 +104,10 @@ const getSongs = (request: Request) =>
               totalPlayCount: songs.totalPlayCount,
               createdAt: songs.createdAt,
               updatedAt: songs.updatedAt,
+              bpm: songs.bpm,
+              musicalKey: songs.musicalKey,
+              bpmSource: songs.bpmSource,
+              bpmSourceUrl: songs.bpmSourceUrl,
               lrclibId: songLrclibIds.lrclibId,
             })
             .from(songs)

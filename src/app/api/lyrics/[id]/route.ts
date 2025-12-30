@@ -288,6 +288,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     ? Number.parseInt(lyrics.songId.slice(7), 10)
     : id
 
+  // Update catalog with album name if we have Spotify data (fire and forget)
+  if (spotifyAlbumName) {
+    db.select({ songId: songLrclibIds.songId })
+      .from(songLrclibIds)
+      .where(eq(songLrclibIds.lrclibId, actualLrclibId))
+      .limit(1)
+      .then(([mapping]) => {
+        if (mapping) {
+          return db
+            .update(songs)
+            .set({ album: spotifyAlbumName, updatedAt: new Date() })
+            .where(eq(songs.id, mapping.songId))
+        }
+      })
+      .catch(() => {})
+  }
+
   // Fetch enhancement payload if it exists for this LRCLIB ID
   const [enhancement] = await db
     .select({ id: lrcWordEnhancements.id, payload: lrcWordEnhancements.payload })

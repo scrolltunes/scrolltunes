@@ -71,3 +71,21 @@ export async function fetchFavorites(): Promise<ServerFavorite[]> {
   const data = (await response.json()) as { favorites: ServerFavorite[] }
   return data.favorites
 }
+
+export interface TopCatalogSong {
+  readonly lrclibId: number
+  readonly title: string
+  readonly artist: string
+  readonly album: string | null
+}
+
+export async function fetchTopCatalogSongs(limit = 20): Promise<TopCatalogSong[]> {
+  const response = await fetch(`/api/songs/top?limit=${limit}`)
+
+  if (!response.ok) {
+    throw new Error(`Fetch top catalog songs failed: ${response.status}`)
+  }
+
+  const data = (await response.json()) as { songs: TopCatalogSong[] }
+  return data.songs
+}
