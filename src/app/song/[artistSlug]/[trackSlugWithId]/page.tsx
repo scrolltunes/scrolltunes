@@ -659,6 +659,7 @@ export default function SongPage() {
             lrclibId,
             chordsError: chordsState.status === "error" ? chordsState.error : null,
             chordsErrorUrl: chordsState.status === "error" ? chordsState.errorUrl : null,
+            hasEnhancedTiming: loadState.enhancement !== null,
           }}
         />
       )}

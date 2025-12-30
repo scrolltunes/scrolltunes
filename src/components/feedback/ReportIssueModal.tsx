@@ -20,6 +20,7 @@ export interface SongContext {
   readonly chordsError?: string | null
   readonly chordsErrorUrl?: string | null
   readonly lyricsError?: string | null
+  readonly hasEnhancedTiming?: boolean
 }
 
 export interface ReportIssueModalProps {
@@ -134,6 +135,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
         if (songContext.chordsErrorUrl) {
           formData.chords_error_url = songContext.chordsErrorUrl
         }
+        formData.enhanced_timing = songContext.hasEnhancedTiming ? "Yes" : "No"
       }
 
       try {
