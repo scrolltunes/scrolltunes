@@ -43,23 +43,6 @@ type Step = "select" | "preview"
 
 const CUSTOM_COLOR_ID = "custom"
 
-type LayoutVariant = "default" | "large-art" | "minimal" | "centered" | "quote"
-
-interface LayoutOption {
-  readonly id: LayoutVariant
-  readonly label: string
-}
-
-// Hidden for now, may re-enable later
-const _LAYOUT_OPTIONS: readonly LayoutOption[] = [
-  { id: "default", label: "Default" },
-  { id: "large-art", label: "Large Art" },
-  { id: "minimal", label: "Minimal" },
-  { id: "centered", label: "Centered" },
-  { id: "quote", label: "Quote" },
-] as const
-void _LAYOUT_OPTIONS
-
 type PatternVariant = "none" | "dots" | "grid" | "waves"
 
 interface PatternOption {
@@ -168,7 +151,6 @@ export function LyricsShareModal({
   const [showSpotifyCode, setShowSpotifyCode] = useState(false)
   const [showShadow, setShowShadow] = useState(true)
   const [expandedWidth, setExpandedWidth] = useState(true)
-  const [layout, setLayout] = useState<LayoutVariant>("default")
   const [pattern, setPattern] = useState<PatternVariant>("none")
   const [patternSeed, setPatternSeed] = useState(() => Date.now())
   const [isGenerating, setIsGenerating] = useState(false)
@@ -212,11 +194,12 @@ export function LyricsShareModal({
       setShowSpotifyCode(false)
       setShowShadow(true)
       setExpandedWidth(true)
-      setLayout("default")
       setPattern("none")
       setIsEditing(false)
       setEditedLines(new Map())
       setEditModeWidth(null)
+      setPreviewScale(1)
+      setScaledHeight(null)
     }
   }, [isOpen])
 
@@ -263,8 +246,6 @@ export function LyricsShareModal({
   // Use layout effect to calculate scale before paint
   useLayoutEffect(() => {
     if (step !== "preview" || !cardElement) {
-      setPreviewScale(1)
-      setScaledHeight(null)
       return
     }
     calculateScale()
@@ -489,435 +470,7 @@ export function LyricsShareModal({
         : getPatternStyle(pattern)
     const hasPattern = pattern !== "none"
 
-    switch (layout) {
-      case "large-art":
-        return (
-          <div
-            ref={cardRef}
-            style={{
-              ...cardBaseStyles,
-              background: currentBackground,
-              borderRadius: "24px",
-              overflow: "hidden",
-              maxWidth: "384px",
-              margin: "0 auto",
-              position: "relative",
-            }}
-          >
-            {hasPattern && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  ...patternStyles,
-                  pointerEvents: "none",
-                }}
-              />
-            )}
-            {albumArt && (
-              <div style={{ width: "100%", aspectRatio: "1", position: "relative" }}>
-                <img
-                  src={albumArt}
-                  alt=""
-                  crossOrigin="anonymous"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.7) 100%)",
-                  }}
-                />
-              </div>
-            )}
-            <div style={{ padding: "24px", position: "relative" }}>
-              <div style={{ marginBottom: "12px" }}>
-                <p
-                  style={{
-                    ...textStyles,
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "white",
-                    margin: 0,
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {title}
-                </p>
-                <p
-                  style={{
-                    ...textStyles,
-                    fontSize: "14px",
-                    color: "rgba(255,255,255,0.7)",
-                    margin: 0,
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {artist}
-                </p>
-              </div>
-              <div style={{ marginBottom: showBranding || showSpotifyCode ? "16px" : 0 }}>
-                {selectedLines.map(line => (
-                  <p
-                    key={line.id}
-                    style={{
-                      ...textStyles,
-                      fontSize: "18px",
-                      fontWeight: 600,
-                      lineHeight: 1.5,
-                      color: "white",
-                      margin: "4px 0",
-                    }}
-                  >
-                    {line.text}
-                  </p>
-                ))}
-              </div>
-              {renderFooter()}
-            </div>
-          </div>
-        )
-
-      case "minimal":
-        return (
-          <div
-            ref={cardRef}
-            style={{
-              ...cardBaseStyles,
-              background: currentBackground,
-              borderRadius: "24px",
-              padding: "32px",
-              maxWidth: "384px",
-              margin: "0 auto",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            {hasPattern && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  ...patternStyles,
-                  pointerEvents: "none",
-                }}
-              />
-            )}
-            <div style={{ position: "relative" }}>
-              <div style={{ marginBottom: showBranding || showSpotifyCode ? "24px" : 0 }}>
-                {selectedLines.map(line => (
-                  <p
-                    key={line.id}
-                    style={{
-                      ...textStyles,
-                      fontSize: "20px",
-                      fontWeight: 600,
-                      lineHeight: 1.6,
-                      color: "white",
-                      margin: "4px 0",
-                    }}
-                  >
-                    {line.text}
-                  </p>
-                ))}
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "16px",
-                }}
-              >
-                <div>
-                  <p
-                    style={{
-                      ...textStyles,
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      color: "rgba(255,255,255,0.9)",
-                      margin: 0,
-                    }}
-                  >
-                    {title}
-                  </p>
-                  <p
-                    style={{
-                      ...textStyles,
-                      fontSize: "12px",
-                      color: "rgba(255,255,255,0.6)",
-                      margin: 0,
-                    }}
-                  >
-                    {artist}
-                  </p>
-                </div>
-                {showBranding && (
-                   <p
-                     style={{
-                       ...textStyles,
-                       fontSize: "10px",
-                       color: "rgba(255,255,255,0.4)",
-                       margin: 0,
-                     }}
-                   >
-                     ❤️  ScrollTunes
-                   </p>
-                 )}
-              </div>
-              {showSpotifyCode && spotifyCodeUrl && (
-                <div style={{ marginTop: "16px" }}>
-                  <img
-                    src={spotifyCodeUrl}
-                    alt="Spotify Code"
-                    crossOrigin="anonymous"
-                    style={{ height: "24px", opacity: 0.7 }}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        )
-
-      case "centered":
-        return (
-          <div
-            ref={cardRef}
-            style={{
-              ...cardBaseStyles,
-              background: currentBackground,
-              borderRadius: "24px",
-              padding: "32px",
-              maxWidth: "384px",
-              margin: "0 auto",
-              textAlign: "center",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            {hasPattern && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  ...patternStyles,
-                  pointerEvents: "none",
-                }}
-              />
-            )}
-            <div style={{ position: "relative" }}>
-              {albumArt && (
-                <div
-                  style={{
-                    width: "80px",
-                    height: "80px",
-                    borderRadius: "16px",
-                    overflow: "hidden",
-                    margin: "0 auto 16px",
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-                  }}
-                >
-                  <img
-                    src={albumArt}
-                    alt=""
-                    crossOrigin="anonymous"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                </div>
-              )}
-              <div style={{ marginBottom: "16px" }}>
-                <p
-                  style={{
-                    ...textStyles,
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    color: "white",
-                    margin: 0,
-                  }}
-                >
-                  {title}
-                </p>
-                <p
-                  style={{
-                    ...textStyles,
-                    fontSize: "12px",
-                    color: "rgba(255,255,255,0.7)",
-                    margin: 0,
-                  }}
-                >
-                  {artist}
-                </p>
-              </div>
-              <div style={{ marginBottom: showBranding || showSpotifyCode ? "20px" : 0 }}>
-                {selectedLines.map(line => (
-                  <p
-                    key={line.id}
-                    style={{
-                      ...textStyles,
-                      fontSize: "18px",
-                      fontWeight: 600,
-                      lineHeight: 1.5,
-                      color: "white",
-                      margin: "4px 0",
-                    }}
-                  >
-                    {line.text}
-                  </p>
-                ))}
-              </div>
-              {renderFooter()}
-            </div>
-          </div>
-        )
-
-      case "quote":
-        return (
-          <div
-            ref={cardRef}
-            style={{
-              ...cardBaseStyles,
-              background: currentBackground,
-              borderRadius: "24px",
-              padding: "32px",
-              maxWidth: "384px",
-              margin: "0 auto",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            {hasPattern && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  ...patternStyles,
-                  pointerEvents: "none",
-                }}
-              />
-            )}
-            <div style={{ position: "relative" }}>
-              <div
-                style={{
-                  fontSize: "64px",
-                  fontWeight: 700,
-                  color: "rgba(255,255,255,0.15)",
-                  lineHeight: 0.8,
-                  marginBottom: "8px",
-                  fontFamily: "Georgia, serif",
-                }}
-              >
-                "
-              </div>
-              <div
-                style={{
-                  borderLeft: "3px solid rgba(255,255,255,0.3)",
-                  paddingLeft: "16px",
-                  marginBottom: showBranding || showSpotifyCode ? "24px" : 0,
-                }}
-              >
-                {selectedLines.map(line => (
-                  <p
-                    key={line.id}
-                    style={{
-                      ...textStyles,
-                      fontSize: "18px",
-                      fontWeight: 500,
-                      fontStyle: "italic",
-                      lineHeight: 1.6,
-                      color: "white",
-                      margin: "4px 0",
-                    }}
-                  >
-                    {line.text}
-                  </p>
-                ))}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "16px" }}>
-                {albumArt && (
-                  <div
-                    style={{
-                      width: "40px",
-                      height: "40px",
-                      borderRadius: "8px",
-                      overflow: "hidden",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <img
-                      src={albumArt}
-                      alt=""
-                      crossOrigin="anonymous"
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                  </div>
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p
-                    style={{
-                      ...textStyles,
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      color: "white",
-                      margin: 0,
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {title}
-                  </p>
-                  <p
-                    style={{
-                      ...textStyles,
-                      fontSize: "12px",
-                      color: "rgba(255,255,255,0.6)",
-                      margin: 0,
-                    }}
-                  >
-                    {artist}
-                  </p>
-                </div>
-              </div>
-              {(showBranding || showSpotifyCode) && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginTop: "16px",
-                  }}
-                >
-                  {showBranding && (
-                    <p
-                      style={{
-                        ...textStyles,
-                        fontSize: "10px",
-                        color: "rgba(255,255,255,0.4)",
-                        margin: 0,
-                      }}
-                    >
-                      ❤️  ScrollTunes
-                    </p>
-                  )}
-                  {showSpotifyCode && spotifyCodeUrl && (
-                    <img
-                      src={spotifyCodeUrl}
-                      alt="Spotify Code"
-                      crossOrigin="anonymous"
-                      style={{ height: "20px", opacity: 0.7 }}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )
-
-      default:
-        return (
+    return (
           <div
             style={{
               height: scaledHeight !== null ? `${scaledHeight}px` : undefined,
@@ -1085,12 +638,11 @@ export function LyricsShareModal({
               </div>
               {renderFooter()}
             </div>
-            </div>
-          </div>
           </div>
         </div>
-        )
-    }
+      </div>
+    </div>
+    )
   }
 
   const renderFooter = () => {
@@ -1182,9 +734,9 @@ export function LyricsShareModal({
             <div
               ref={scrollContainerRef}
               dir={isRTL ? "rtl" : undefined}
-              className="min-h-0 flex-1 overflow-y-scroll"
+              className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
             >
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="sync" initial={false}>
                 {step === "select" ? (
                   <motion.div
                     key="select"
@@ -1301,28 +853,6 @@ export function LyricsShareModal({
 
                     {/* Options */}
                     <div className="mt-4 space-y-4">
-                      {/* Layout - hidden for now, may re-enable later
-                      <div>
-                        <p className="mb-2 text-sm text-neutral-400">Layout</p>
-                        <div className="flex flex-wrap gap-2">
-                          {LAYOUT_OPTIONS.map(option => (
-                            <button
-                              key={option.id}
-                              type="button"
-                              onClick={() => setLayout(option.id)}
-                              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                                layout === option.id
-                                  ? "bg-indigo-600 text-white"
-                                  : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
-                              }`}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      */}
-
                       {/* Background color */}
                       <div>
                         <p className="mb-2 text-sm text-neutral-400">Background</p>

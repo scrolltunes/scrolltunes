@@ -201,6 +201,54 @@ src/components/share/
 | `@dnd-kit/core` | Drag and drop (lightweight, accessible) |
 | `@dnd-kit/modifiers` | Snap modifiers for grid alignment |
 
+## Layout Templates
+
+Predefined layout templates users can select as starting points:
+
+### Default
+- Album art thumbnail (48px) + title/artist in header row
+- Lyrics below, left-aligned
+- Branding/Spotify code in footer
+
+### Backdrop
+- Album art as full blurred background (low blur, ~2px, brightness 0.7)
+- Dark gradient overlay for text contrast
+- Sharp album art thumbnail + title/artist overlay
+- Lyrics with text shadows for readability
+
+### Large Art
+- Full-width album art at top (square aspect ratio)
+- Gradient fade at bottom
+- Title/artist below
+- Lyrics in card body
+
+### Minimal
+- No album art
+- Lyrics only with small title/artist attribution
+- Clean, text-focused design
+
+### Centered
+- Small centered album art (80px)
+- Centered title/artist
+- Centered lyrics
+- Symmetrical layout
+
+### Quote
+- Large decorative quote mark
+- Left border accent on lyrics (italic style)
+- Small album art + attribution at bottom
+
+### Vinyl
+- Vinyl record graphic with album art in center hole
+- Title/artist beside the record
+- Retro aesthetic
+
+### Polaroid
+- White frame with thick bottom border
+- Square album art
+- Handwriting-style font for lyrics
+- "— Title, Artist" attribution
+
 ## Open Questions
 
 - Should custom layouts be saved per-song or globally?
