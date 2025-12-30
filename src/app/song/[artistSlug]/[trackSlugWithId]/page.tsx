@@ -99,7 +99,6 @@ export default function SongPage() {
   const searchParams = useSearchParams()
   const spotifyId = searchParams.get("spotifyId")
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
-  const [useEnhancedTiming, setUseEnhancedTiming] = useState(true)
   const [showInfo, setShowInfo] = useState(false)
   const [showAddToSetlist, setShowAddToSetlist] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
@@ -152,11 +151,19 @@ export default function SongPage() {
     }
   }, [])
 
+  const hasEnhancedTiming = loadState._tag === "Loaded" && loadState.enhancement !== null
+
   // Status label for footer
   useEffect(() => {
-    setSlot(<StatusLabel playerState={playerState} detailedStatus={detailedStatus} />)
+    setSlot(
+      <StatusLabel
+        playerState={playerState}
+        detailedStatus={detailedStatus}
+        hasEnhancedTiming={hasEnhancedTiming}
+      />,
+    )
     return () => setSlot(null)
-  }, [playerState, detailedStatus, setSlot])
+  }, [playerState, detailedStatus, setSlot, hasEnhancedTiming])
 
   useWakeLock({ enabled: isLoaded && preferences.wakeLockEnabled })
 
@@ -334,18 +341,17 @@ export default function SongPage() {
     }
   }, [lrclibId, spotifyId])
 
-  // Load lyrics into player when loadState or useEnhancedTiming changes
-  // Apply enhancement if available and enabled (provides better timing data for word-by-word mode)
+  // Load lyrics into player when loadState changes
+  // Apply enhancement if available (provides better timing data for word-by-word mode)
   useEffect(() => {
     if (loadState._tag !== "Loaded") return
 
-    const lyricsToLoad =
-      loadState.enhancement && useEnhancedTiming
-        ? applyEnhancement(loadState.lyrics, loadState.enhancement)
-        : loadState.lyrics
+    const lyricsToLoad = loadState.enhancement
+      ? applyEnhancement(loadState.lyrics, loadState.enhancement)
+      : loadState.lyrics
 
     load(lyricsToLoad)
-  }, [loadState, useEnhancedTiming, load])
+  }, [loadState, load])
 
   // Mark song as played when playback starts (moves to top of recents)
   const hasMarkedAsPlayed = useRef(false)
@@ -585,9 +591,6 @@ export default function SongPage() {
                   onAddToSetlist={() => setShowAddToSetlist(true)}
                   onChordSettingsClick={() => setShowChordPanel(prev => !prev)}
                   isChordPanelOpen={showChordPanel}
-                  hasEnhancedTiming={loadState._tag === "Loaded" && loadState.enhancement !== null}
-                  useEnhancedTiming={useEnhancedTiming}
-                  onUseEnhancedTimingChange={setUseEnhancedTiming}
                   onShareClick={() => setShowShareModal(true)}
                 />
                 <ChordInfoPanel
@@ -637,6 +640,7 @@ export default function SongPage() {
           bpmSource={loadState.bpmSource}
           lyricsSource={loadState.lyricsSource}
           albumArt={loadState.albumArt}
+          hasEnhancedTiming={loadState.enhancement !== null}
         />
       )}
 

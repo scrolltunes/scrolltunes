@@ -22,9 +22,7 @@ import {
   Plus,
   ShareNetwork,
   SlidersHorizontal,
-  Sparkle,
   TextAa,
-  Timer,
 } from "@phosphor-icons/react"
 import { memo, useCallback } from "react"
 
@@ -36,9 +34,6 @@ export interface SongActionBarProps {
   readonly onAddToSetlist: () => void
   readonly onChordSettingsClick: () => void
   readonly isChordPanelOpen: boolean
-  readonly hasEnhancedTiming?: boolean
-  readonly useEnhancedTiming?: boolean
-  readonly onUseEnhancedTimingChange?: (value: boolean) => void
   readonly onShareClick?: () => void
 }
 
@@ -66,16 +61,12 @@ export const SongActionBar = memo(function SongActionBar({
   onAddToSetlist,
   onChordSettingsClick,
   isChordPanelOpen,
-  hasEnhancedTiming = false,
-  useEnhancedTiming = true,
-  onUseEnhancedTimingChange,
   onShareClick,
 }: SongActionBarProps) {
   const isAuthenticated = useIsAuthenticated()
   const containingSetlists = useSetlistsContainingSong(songId)
   const isInSetlist = containingSetlists.length > 0
   const fontSize = usePreference("fontSize")
-  const wordTimingEnabled = usePreference("wordTimingEnabled")
   const chordsState = useChordsState()
   const showChords = useShowChords()
   const chordsReady = chordsState.status === "ready"
@@ -95,40 +86,8 @@ export const SongActionBar = memo(function SongActionBar({
     preferencesStore.setFontSize(newSize)
   }, [fontSize])
 
-  const handleToggleWordTiming = useCallback(() => {
-    preferencesStore.setWordTimingEnabled(!wordTimingEnabled)
-  }, [wordTimingEnabled])
-
   return (
     <div className="flex items-center justify-center gap-3 py-4 px-4">
-      {/* Word timing toggle */}
-      <div className="relative">
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={handleToggleWordTiming}
-            className={`flex items-center gap-1.5 px-3 py-2 transition-colors text-sm font-medium rounded-full ${
-              wordTimingEnabled
-                ? "bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30"
-                : "bg-neutral-800/50 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
-            }`}
-            aria-label={wordTimingEnabled ? "Disable word timing" : "Enable word timing"}
-            aria-pressed={wordTimingEnabled}
-          >
-            <Timer size={16} weight={wordTimingEnabled ? "fill" : "regular"} />
-            <span className="hidden sm:inline">Word timing</span>
-            {hasEnhancedTiming && useEnhancedTiming && (
-              <Sparkle
-                size={12}
-                weight="fill"
-                className={wordTimingEnabled ? "text-indigo-300" : "text-amber-400"}
-              />
-            )}
-          </button>
-        </div>
-      </div>
-      <div className="w-px h-6 bg-neutral-700" />
-
       {/* Font size controls */}
       <div className="flex items-center gap-1 bg-neutral-800/50 rounded-full px-2 py-1.5">
         <TextAa size={18} weight="fill" className="text-neutral-400 mr-1" />
@@ -211,52 +170,52 @@ export const SongActionBar = memo(function SongActionBar({
             showChords && chordsReady ? "bg-indigo-600/20" : "bg-neutral-800/50"
           }`}
         >
-            {/* Main button - toggle chords on/off */}
-            <button
-              type="button"
-              onClick={() => chordsStore.toggleShowChords()}
-              disabled={chordsLoading}
-              className={`flex items-center gap-1.5 px-4 py-2 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
-                showChords && chordsReady
-                  ? "text-indigo-400 hover:bg-indigo-600/30"
-                  : "text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
-              }`}
-              aria-label={showChords ? "Hide chords" : "Show chords"}
-              aria-pressed={showChords && chordsReady}
-            >
-              <Guitar size={20} weight={showChords && chordsReady ? "fill" : "regular"} />
-              <span className="hidden sm:inline">Chords</span>
-              <span className="text-[10px] font-semibold bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded-full">
-                Beta
-              </span>
-            </button>
+          {/* Main button - toggle chords on/off */}
+          <button
+            type="button"
+            onClick={() => chordsStore.toggleShowChords()}
+            disabled={chordsLoading}
+            className={`flex items-center gap-1.5 px-4 py-2 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+              showChords && chordsReady
+                ? "text-indigo-400 hover:bg-indigo-600/30"
+                : "text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
+            }`}
+            aria-label={showChords ? "Hide chords" : "Show chords"}
+            aria-pressed={showChords && chordsReady}
+          >
+            <Guitar size={20} weight={showChords && chordsReady ? "fill" : "regular"} />
+            <span className="hidden sm:inline">Chords</span>
+            <span className="text-[10px] font-semibold bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded-full">
+              Beta
+            </span>
+          </button>
 
-            {/* Divider */}
-            <div
-              className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`}
-            />
+          {/* Divider */}
+          <div
+            className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`}
+          />
 
-            {/* Settings dropdown */}
-            <button
-              type="button"
-              onClick={onChordSettingsClick}
-              disabled={!showChords || !chordsReady}
-              className={`flex items-center justify-center w-10 h-9 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                showChords && chordsReady
-                  ? isChordPanelOpen
-                    ? "text-indigo-300 bg-indigo-600/30"
-                    : "text-indigo-400 hover:bg-indigo-600/30"
-                  : "text-neutral-400"
-              }`}
-              aria-label={isChordPanelOpen ? "Close chord settings" : "Open chord settings"}
-              aria-expanded={isChordPanelOpen}
-            >
-              {isChordPanelOpen ? (
-                <CaretUp size={14} weight="bold" />
-              ) : (
-                <SlidersHorizontal size={16} />
-              )}
-            </button>
+          {/* Settings dropdown */}
+          <button
+            type="button"
+            onClick={onChordSettingsClick}
+            disabled={!showChords || !chordsReady}
+            className={`flex items-center justify-center w-10 h-9 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+              showChords && chordsReady
+                ? isChordPanelOpen
+                  ? "text-indigo-300 bg-indigo-600/30"
+                  : "text-indigo-400 hover:bg-indigo-600/30"
+                : "text-neutral-400"
+            }`}
+            aria-label={isChordPanelOpen ? "Close chord settings" : "Open chord settings"}
+            aria-expanded={isChordPanelOpen}
+          >
+            {isChordPanelOpen ? (
+              <CaretUp size={14} weight="bold" />
+            ) : (
+              <SlidersHorizontal size={16} />
+            )}
+          </button>
         </div>
       )}
 

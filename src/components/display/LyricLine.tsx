@@ -25,7 +25,6 @@ export interface LyricLineProps {
   readonly chords?: readonly string[] | undefined
   readonly chordPositions?: readonly LyricChordPosition[] | undefined
   readonly variableSpeed?: boolean
-  readonly wordTimingEnabled?: boolean
 }
 
 interface WordTimingWithPosition {
@@ -350,7 +349,6 @@ export const LyricLine = memo(function LyricLine({
   chords,
   chordPositions,
   variableSpeed = true,
-  wordTimingEnabled = false,
 }: LyricLineProps) {
   const wordTimings = useMemo(
     () =>
@@ -387,9 +385,8 @@ export const LyricLine = memo(function LyricLine({
       ? "text-neutral-400"
       : "text-neutral-500"
   const textSizeClass = fontSize === undefined ? "text-2xl md:text-3xl lg:text-4xl" : ""
-  // Word timing animation only when explicitly enabled and no positioned chords
-  const shouldAnimateWords =
-    isActive && isPlaying && duration !== undefined && wordTimingEnabled && !hasPositionedChords
+  // Word timing animation when active, playing, has duration, and no positioned chords
+  const shouldAnimateWords = isActive && isPlaying && duration !== undefined && !hasPositionedChords
 
   return (
     <button

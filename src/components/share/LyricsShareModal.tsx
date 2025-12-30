@@ -1,8 +1,8 @@
 "use client"
 
 import { springs } from "@/animations"
-import { buildGradientPalette, extractDominantColor, type GradientOption } from "@/lib/colors"
 import { detectLyricsDirection } from "@/lib"
+import { type GradientOption, buildGradientPalette, extractDominantColor } from "@/lib/colors"
 import {
   ArrowCounterClockwise,
   ArrowLeft,
@@ -80,7 +80,7 @@ function generateSmokeWaves(seed: number): string {
     }
 
     paths.push(
-      `<path d="${d}" fill="none" stroke="rgba(255,255,255,${opacity})" stroke-width="${0.5 + seededRandom(i * 60) * 1}"/>`
+      `<path d="${d}" fill="none" stroke="rgba(255,255,255,${opacity})" stroke-width="${0.5 + seededRandom(i * 60) * 1}"/>`,
     )
   }
 
@@ -91,8 +91,7 @@ function getPatternStyle(pattern: PatternVariant): React.CSSProperties {
   switch (pattern) {
     case "dots":
       return {
-        backgroundImage:
-          "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+        backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
         backgroundSize: "16px 16px",
       }
     case "grid":
@@ -407,10 +406,10 @@ export function LyricsShareModal({
     if (copiedTimeoutRef.current) {
       clearTimeout(copiedTimeoutRef.current)
     }
-    
+
     // Set copied state early to prevent button flicker
     setCopied(true)
-    
+
     const blob = await generateImage(false) // Don't show loading state
     if (!blob) {
       setCopied(false)
@@ -432,7 +431,7 @@ export function LyricsShareModal({
 
   const handleShare = useCallback(async () => {
     if (isSharing) return
-    
+
     const blob = await generateImage(false)
     if (!blob) return
 
@@ -471,177 +470,181 @@ export function LyricsShareModal({
     const hasPattern = pattern !== "none"
 
     return (
+      <div
+        style={{
+          height: scaledHeight !== null ? `${scaledHeight}px` : undefined,
+          overflow: "visible",
+          marginBottom: showShadow ? "-24px" : "0",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            transform: previewScale < 1 ? `scale(${previewScale})` : undefined,
+            transformOrigin: "top center",
+          }}
+        >
           <div
+            ref={cardCallbackRef}
             style={{
-              height: scaledHeight !== null ? `${scaledHeight}px` : undefined,
-              overflow: "visible",
-              marginBottom: showShadow ? "-24px" : "0",
+              padding: showShadow ? "16px 16px 50px 16px" : "0",
+              background: "transparent",
             }}
           >
             <div
+              ref={innerCardRef}
               style={{
-                display: "flex",
-                justifyContent: "center",
-                transform: previewScale < 1 ? `scale(${previewScale})` : undefined,
-                transformOrigin: "top center",
+                ...cardBaseStyles,
+                background: currentBackground,
+                borderRadius: "24px",
+                padding: "24px",
+                maxWidth: expandedWidth ? "600px" : "384px",
+                width: isEditing && editModeWidth ? `${editModeWidth}px` : undefined,
+                boxShadow: showShadow ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "none",
+                position: "relative",
+                overflow: "hidden",
               }}
             >
-              <div
-                ref={cardCallbackRef}
-                style={{
-                  padding: showShadow ? "16px 16px 50px 16px" : "0",
-                  background: "transparent",
-                }}
-              >
-              <div
-                ref={innerCardRef}
-                style={{
-                  ...cardBaseStyles,
-                  background: currentBackground,
-                  borderRadius: "24px",
-                  padding: "24px",
-                  maxWidth: expandedWidth ? "600px" : "384px",
-                  width: isEditing && editModeWidth ? `${editModeWidth}px` : undefined,
-                  boxShadow: showShadow ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "none",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-            {hasPattern && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  ...patternStyles,
-                  pointerEvents: "none",
-                }}
-              />
-            )}
-            <div style={{ position: "relative" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  marginBottom: "16px",
-                  flexDirection: isRTL ? "row-reverse" : "row",
-                }}
-              >
+              {hasPattern && (
                 <div
                   style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "8px",
-                    overflow: "hidden",
-                    flexShrink: 0,
-                    backgroundColor: "rgba(0,0,0,0.2)",
+                    position: "absolute",
+                    inset: 0,
+                    ...patternStyles,
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+              <div style={{ position: "relative" }}>
+                <div
+                  style={{
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
+                    gap: "12px",
+                    marginBottom: "16px",
+                    flexDirection: isRTL ? "row-reverse" : "row",
                   }}
                 >
-                  {albumArt ? (
-                    <img
-                      src={albumArt}
-                      alt=""
-                      crossOrigin="anonymous"
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                  ) : (
-                    <MusicNote size={24} weight="fill" style={{ color: "rgba(255,255,255,0.6)" }} />
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: 0, textAlign: isRTL ? "right" : "left" }}>
-                  <p
+                  <div
                     style={{
-                      ...textStyles,
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      color: "white",
-                      margin: 0,
-                      wordBreak: "break-word",
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                      backgroundColor: "rgba(0,0,0,0.2)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
-                    {title}
-                  </p>
-                  <p
-                    style={{
-                      ...textStyles,
-                      fontSize: "14px",
-                      color: "rgba(255,255,255,0.7)",
-                      margin: 0,
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {artist}
-                  </p>
-                </div>
-              </div>
-              <div
-                style={{
-                  marginBottom: showBranding || showSpotifyCode ? "16px" : 0,
-                  textAlign: isRTL ? "right" : "left",
-                  direction: isRTL ? "rtl" : "ltr",
-                }}
-              >
-                {selectedLines.map((line, idx) =>
-                  isEditing ? (
-                    <input
-                      key={line.id}
-                      ref={el => {
-                        inputRefs.current[idx] = el
-                      }}
-                      type="text"
-                      dir={isRTL ? "rtl" : "ltr"}
-                      value={getLineText(line)}
-                      onChange={e => updateLineText(line.id, e.target.value)}
-                      onFocus={() => setLastFocusedIndex(idx)}
-                      style={{
-                        ...textStyles,
-                        fontSize: "18px",
-                        fontWeight: 600,
-                        lineHeight: 1.5,
-                        color: "white",
-                        margin: "4px 0",
-                        background:
-                          "repeating-linear-gradient(90deg, rgba(255,255,255,0.4) 0, rgba(255,255,255,0.4) 4px, transparent 4px, transparent 8px)",
-                        backgroundSize: "100% 1px",
-                        backgroundPosition: "0 100%",
-                        backgroundRepeat: "no-repeat",
-                        border: "none",
-                        borderRadius: 0,
-                        padding: 0,
-                        width: "100%",
-                        boxSizing: "border-box",
-                        display: "block",
-                        outline: "none",
-                        textAlign: isRTL ? "right" : "left",
-                      }}
-                    />
-                  ) : (
+                    {albumArt ? (
+                      <img
+                        src={albumArt}
+                        alt=""
+                        crossOrigin="anonymous"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : (
+                      <MusicNote
+                        size={24}
+                        weight="fill"
+                        style={{ color: "rgba(255,255,255,0.6)" }}
+                      />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, textAlign: isRTL ? "right" : "left" }}>
                     <p
-                      key={line.id}
                       style={{
                         ...textStyles,
-                        fontSize: "18px",
+                        fontSize: "14px",
                         fontWeight: 600,
-                        lineHeight: 1.5,
                         color: "white",
-                        margin: "4px 0",
-                        whiteSpace: expandedWidth ? "nowrap" : "normal",
+                        margin: 0,
+                        wordBreak: "break-word",
                       }}
                     >
-                      {getLineText(line)}
+                      {title}
                     </p>
-                  ),
-                )}
+                    <p
+                      style={{
+                        ...textStyles,
+                        fontSize: "14px",
+                        color: "rgba(255,255,255,0.7)",
+                        margin: 0,
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {artist}
+                    </p>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    marginBottom: showBranding || showSpotifyCode ? "16px" : 0,
+                    textAlign: isRTL ? "right" : "left",
+                    direction: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {selectedLines.map((line, idx) =>
+                    isEditing ? (
+                      <input
+                        key={line.id}
+                        ref={el => {
+                          inputRefs.current[idx] = el
+                        }}
+                        type="text"
+                        dir={isRTL ? "rtl" : "ltr"}
+                        value={getLineText(line)}
+                        onChange={e => updateLineText(line.id, e.target.value)}
+                        onFocus={() => setLastFocusedIndex(idx)}
+                        style={{
+                          ...textStyles,
+                          fontSize: "18px",
+                          fontWeight: 600,
+                          lineHeight: 1.5,
+                          color: "white",
+                          margin: "4px 0",
+                          background:
+                            "repeating-linear-gradient(90deg, rgba(255,255,255,0.4) 0, rgba(255,255,255,0.4) 4px, transparent 4px, transparent 8px)",
+                          backgroundSize: "100% 1px",
+                          backgroundPosition: "0 100%",
+                          backgroundRepeat: "no-repeat",
+                          border: "none",
+                          borderRadius: 0,
+                          padding: 0,
+                          width: "100%",
+                          boxSizing: "border-box",
+                          display: "block",
+                          outline: "none",
+                          textAlign: isRTL ? "right" : "left",
+                        }}
+                      />
+                    ) : (
+                      <p
+                        key={line.id}
+                        style={{
+                          ...textStyles,
+                          fontSize: "18px",
+                          fontWeight: 600,
+                          lineHeight: 1.5,
+                          color: "white",
+                          margin: "4px 0",
+                          whiteSpace: expandedWidth ? "nowrap" : "normal",
+                        }}
+                      >
+                        {getLineText(line)}
+                      </p>
+                    ),
+                  )}
+                </div>
+                {renderFooter()}
               </div>
-              {renderFooter()}
             </div>
           </div>
         </div>
       </div>
-    </div>
     )
   }
 
@@ -658,17 +661,17 @@ export function LyricsShareModal({
         }}
       >
         {showBranding && (
-            <p
-              style={{
-                ...textStyles,
-                fontSize: "12px",
-                color: "rgba(255,255,255,0.5)",
-                margin: 0,
-              }}
-            >
-              ❤️ ScrollTunes
-            </p>
-          )}
+          <p
+            style={{
+              ...textStyles,
+              fontSize: "12px",
+              color: "rgba(255,255,255,0.5)",
+              margin: 0,
+            }}
+          >
+            ❤️ ScrollTunes
+          </p>
+        )}
         {showSpotifyCode && spotifyCodeUrl && (
           <img
             src={spotifyCodeUrl}
@@ -796,7 +799,10 @@ export function LyricsShareModal({
                     className="p-4"
                   >
                     {/* Card preview */}
-                    <div ref={previewContainerRef} className="share-modal-preserve relative rounded-2xl bg-neutral-200 p-6">
+                    <div
+                      ref={previewContainerRef}
+                      className="share-modal-preserve relative rounded-2xl bg-neutral-200 p-6"
+                    >
                       <div className="absolute left-2 top-2 z-10 flex gap-1">
                         <button
                           type="button"

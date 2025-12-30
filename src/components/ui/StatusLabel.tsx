@@ -1,7 +1,7 @@
 "use client"
 
 import type { DetailedActivityStatus, PlayerState } from "@/core"
-import { Circle, Guitar, Microphone, Pause, Play, Warning } from "@phosphor-icons/react"
+import { Circle, Guitar, Microphone, Pause, Play, Sparkle, Warning } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useMemo } from "react"
 
@@ -81,12 +81,14 @@ export interface StatusLabelProps {
   readonly playerState: PlayerState
   readonly detailedStatus: DetailedActivityStatus
   readonly className?: string
+  readonly hasEnhancedTiming?: boolean
 }
 
 export const StatusLabel = memo(function StatusLabel({
   playerState,
   detailedStatus,
   className = "",
+  hasEnhancedTiming = false,
 }: StatusLabelProps) {
   const configs = useMemo(() => {
     const result: StatusConfig[] = []
@@ -104,8 +106,17 @@ export const StatusLabel = memo(function StatusLabel({
       }
     }
 
+    if (hasEnhancedTiming) {
+      result.push({
+        label: "Enhanced",
+        icon: <Sparkle size={ICON_SIZE} weight="fill" />,
+        colorClass: "text-amber-400",
+        bgClass: "bg-amber-500/10",
+      })
+    }
+
     return result
-  }, [playerState, detailedStatus])
+  }, [playerState, detailedStatus, hasEnhancedTiming])
 
   if (configs.length === 0) {
     return null

@@ -21,7 +21,6 @@ export interface Preferences {
   readonly themeMode: ThemeMode
   readonly metronomeEnabled: boolean
   readonly fontSize: number
-  readonly wordTimingEnabled: boolean
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -32,7 +31,6 @@ const DEFAULT_PREFERENCES: Preferences = {
   themeMode: "dark",
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,
-  wordTimingEnabled: true,
 }
 
 export class PreferencesStore {
@@ -188,14 +186,6 @@ export class PreferencesStore {
 
   setFontSize(value: number): void {
     this.setState({ fontSize: value })
-  }
-
-  getWordTimingEnabled(): boolean {
-    return this.state.wordTimingEnabled
-  }
-
-  setWordTimingEnabled(value: boolean): void {
-    this.setState({ wordTimingEnabled: value })
   }
 
   reset(): void {

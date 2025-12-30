@@ -3,7 +3,7 @@
 import { springs } from "@/animations"
 import { ReportIssueModal } from "@/components/feedback"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
-import { Bug, SpotifyLogo, X } from "@phosphor-icons/react"
+import { Bug, Sparkle, SpotifyLogo, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { useCallback, useMemo, useState } from "react"
 
@@ -24,6 +24,7 @@ export interface SongInfoModalProps {
   readonly bpmSource: AttributionSource | null
   readonly lyricsSource: AttributionSource | null
   readonly albumArt: string | null
+  readonly hasEnhancedTiming?: boolean
 }
 
 function formatDuration(seconds: number): string {
@@ -44,6 +45,7 @@ export function SongInfoModal({
   bpmSource,
   lyricsSource,
   albumArt,
+  hasEnhancedTiming = false,
 }: SongInfoModalProps) {
   const [showReportModal, setShowReportModal] = useState(false)
 
@@ -116,6 +118,16 @@ export function SongInfoModal({
                   <div className="flex items-center justify-between">
                     <span className="text-neutral-400">Key</span>
                     <span className="text-white">{musicalKey}</span>
+                  </div>
+                )}
+
+                {hasEnhancedTiming && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-400">Word timing</span>
+                    <span className="flex items-center gap-1.5 text-amber-400">
+                      <Sparkle size={16} weight="fill" />
+                      Enhanced
+                    </span>
                   </div>
                 )}
 

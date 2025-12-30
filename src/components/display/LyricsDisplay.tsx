@@ -7,7 +7,6 @@ import {
   useCurrentTime,
   usePlayerControls,
   usePlayerState,
-  usePreference,
   usePreferences,
   useResetCount,
   useShowChords,
@@ -66,7 +65,6 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
   const showChords = useShowChords()
   const transposeSemitones = useTranspose()
   const variableSpeed = useVariableSpeedPainting()
-  const wordTimingEnabled = usePreference("wordTimingEnabled")
 
   // Manual scroll override state
   const [isManualScrolling, setIsManualScrolling] = useState(false)
@@ -714,7 +712,6 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
               lineStartTime={line.startTime}
               wordTimings={line.words}
               elapsedInLine={elapsedInLine}
-              wordTimingEnabled={wordTimingEnabled}
               {...(duration !== undefined && { duration })}
             />
           )
