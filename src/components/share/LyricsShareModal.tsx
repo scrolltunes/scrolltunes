@@ -649,17 +649,17 @@ export function LyricsShareModal({
                   </p>
                 </div>
                 {showBranding && (
-                  <p
-                    style={{
-                      ...textStyles,
-                      fontSize: "10px",
-                      color: "rgba(255,255,255,0.4)",
-                      margin: 0,
-                    }}
-                  >
-                    scrolltunes.com
-                  </p>
-                )}
+                   <p
+                     style={{
+                       ...textStyles,
+                       fontSize: "10px",
+                       color: "rgba(255,255,255,0.4)",
+                       margin: 0,
+                     }}
+                   >
+                     ❤️  ScrollTunes
+                   </p>
+                 )}
               </div>
               {showSpotifyCode && spotifyCodeUrl && (
                 <div style={{ marginTop: "16px" }}>
@@ -890,7 +890,7 @@ export function LyricsShareModal({
                         margin: 0,
                       }}
                     >
-                      scrolltunes.com
+                      ❤️  ScrollTunes
                     </p>
                   )}
                   {showSpotifyCode && spotifyCodeUrl && (
@@ -1088,17 +1088,17 @@ export function LyricsShareModal({
         }}
       >
         {showBranding && (
-          <p
-            style={{
-              ...textStyles,
-              fontSize: "12px",
-              color: "rgba(255,255,255,0.5)",
-              margin: 0,
-            }}
-          >
-            scrolltunes.com
-          </p>
-        )}
+            <p
+              style={{
+                ...textStyles,
+                fontSize: "12px",
+                color: "rgba(255,255,255,0.5)",
+                margin: 0,
+              }}
+            >
+              ❤️ ScrollTunes
+            </p>
+          )}
         {showSpotifyCode && spotifyCodeUrl && (
           <img
             src={spotifyCodeUrl}
@@ -1481,10 +1481,8 @@ export function LyricsShareModal({
                             />
                           </div>
                           <span className="flex items-center gap-1.5 text-sm text-neutral-300">
-                            Show scrolltunes.com
-                            <span title="Thank you!">
-                              <Heart size={14} weight="fill" className="text-red-400" />
-                            </span>
+                            Support us
+                            <Heart size={14} weight="fill" className="text-red-400" />
                           </span>
                         </label>
                       </div>
