@@ -12,7 +12,8 @@
  * Response matches Spotify's audio features format:
  * { tempo, key, mode, danceability, energy, ... }
  *
- * Uses Vercel KV to enforce daily request cap (prevents billing overages).
+ * Rate limiting uses RapidAPI's response headers (x-ratelimit-requests-remaining)
+ * as the source of truth. Caches remaining count with TTL matching reset time.
  */
 
 import { PublicConfig } from "@/services/public-config"
@@ -20,10 +21,6 @@ import { ServerConfig } from "@/services/server-config"
 import { Redis } from "@upstash/redis"
 import { Effect } from "effect"
 
-const getRedisClient: Effect.Effect<Redis, never, ServerConfig> = Effect.gen(function* () {
-  const { kvRestApiUrl, kvRestApiToken } = yield* ServerConfig
-  return new Redis({ url: kvRestApiUrl, token: kvRestApiToken })
-})
 import { BPMAPIError, BPMNotFoundError } from "./bpm-errors"
 import type { BPMProvider } from "./bpm-provider"
 import type { BPMResult, BPMTrackQuery } from "./bpm-types"
@@ -34,24 +31,16 @@ const RAPIDAPI_BASE_URL =
 const RAPIDAPI_HOST = "spotify-audio-features-track-analysis.p.rapidapi.com"
 
 const DAILY_REQUEST_CAP = 20
-const KV_KEY_PREFIX = "rapidapi:usage:"
-const KV_WARNED_PREFIX = "rapidapi:warned:"
-const WARNING_THRESHOLDS = [0.75, 0.85, 0.95] as const
+const WARNING_THRESHOLDS = [5, 3, 1] as const
+const QUOTA_KEY = "rapidapi:remaining"
 
 let lastRequestTime = 0
 const RATE_LIMIT_MS = 1000
 
-function getToday(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function getTodayKey(): string {
-  return `${KV_KEY_PREFIX}${getToday()}`
-}
-
-function getWarnedKey(threshold: number): string {
-  return `${KV_WARNED_PREFIX}${getToday()}:${threshold}`
-}
+const getRedisClient: Effect.Effect<Redis, never, ServerConfig> = Effect.gen(function* () {
+  const { kvRestApiUrl, kvRestApiToken } = yield* ServerConfig
+  return new Redis({ url: kvRestApiUrl, token: kvRestApiToken })
+})
 
 interface SongContext {
   readonly title: string
@@ -59,15 +48,73 @@ interface SongContext {
   readonly spotifyId: string
 }
 
+interface RateLimitInfo {
+  readonly remaining: number
+  readonly limit: number
+  readonly resetSeconds: number
+}
+
+function parseRateLimitHeaders(response: Response): RateLimitInfo {
+  return {
+    remaining: Number.parseInt(response.headers.get("x-ratelimit-requests-remaining") ?? "0", 10),
+    limit: Number.parseInt(response.headers.get("x-ratelimit-requests-limit") ?? "20", 10),
+    resetSeconds: Number.parseInt(response.headers.get("x-ratelimit-requests-reset") ?? "0", 10),
+  }
+}
+
+function formatResetTime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  return `${hours}h ${minutes}m`
+}
+
+const checkQuotaAvailable = (): Effect.Effect<
+  { available: boolean; ttl: number },
+  never,
+  ServerConfig
+> =>
+  Effect.gen(function* () {
+    const redis = yield* getRedisClient
+
+    const [remaining, ttl] = yield* Effect.all([
+      Effect.tryPromise({
+        try: () => redis.get<number>(QUOTA_KEY),
+        catch: () => null,
+      }),
+      Effect.tryPromise({
+        try: () => redis.ttl(QUOTA_KEY),
+        catch: () => -1,
+      }),
+    ])
+
+    if (remaining === null) return { available: true, ttl: 0 }
+
+    if (remaining <= 0) {
+      console.log(`[RapidAPI] Quota exhausted, resets in ${formatResetTime(ttl)}`)
+      return { available: false, ttl }
+    }
+
+    return { available: true, ttl }
+  }).pipe(Effect.catchAll(() => Effect.succeed({ available: true, ttl: 0 })))
+
+const updateQuotaCache = (rateLimit: RateLimitInfo): Effect.Effect<void, never, ServerConfig> =>
+  Effect.gen(function* () {
+    const redis = yield* getRedisClient
+    yield* Effect.tryPromise({
+      try: () => redis.set(QUOTA_KEY, rateLimit.remaining, { ex: rateLimit.resetSeconds }),
+      catch: () => null,
+    })
+  }).pipe(Effect.catchAll(() => Effect.void))
+
 const sendUsageWarning = (
-  current: number,
-  threshold: number,
+  remaining: number,
   song: SongContext,
+  resetSeconds: number,
 ): Effect.Effect<void, never, PublicConfig> =>
   Effect.gen(function* () {
     const { web3FormsAccessKey } = yield* PublicConfig
     const accessKey = web3FormsAccessKey
-    const percentage = Math.round(threshold * 100)
+    const used = DAILY_REQUEST_CAP - remaining
     const spotifyUrl = `https://open.spotify.com/track/${song.spotifyId}`
 
     yield* Effect.tryPromise({
@@ -77,12 +124,13 @@ const sendUsageWarning = (
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             access_key: accessKey,
-            subject: `[ScrollTunes] RapidAPI usage at ${percentage}%`,
+            subject: `[ScrollTunes] RapidAPI: ${remaining} requests remaining`,
             from_name: "ScrollTunes Rate Limiter",
             message: `RapidAPI Spotify Audio Features usage warning:
 
-Current usage: ${current}/${DAILY_REQUEST_CAP} requests (${percentage}%)
-Date: ${getToday()}
+Used: ${used}/${DAILY_REQUEST_CAP} requests
+Remaining: ${remaining}
+Resets in: ${formatResetTime(resetSeconds)}
 
 Triggered by:
   Song: ${song.title}
@@ -97,56 +145,36 @@ The free tier allows 20 requests/day. Exceeding this will incur $0.50/request ch
     }).pipe(Effect.asVoid)
   }).pipe(Effect.catchAll(() => Effect.void))
 
+function getWarnedKey(remaining: number): string {
+  return `rapidapi:warned:${remaining}`
+}
+
 const checkAndSendWarnings = (
-  redis: Redis,
-  current: number,
+  rateLimit: RateLimitInfo,
   song: SongContext,
-): Effect.Effect<void, BPMAPIError, ServerConfig | PublicConfig> =>
+): Effect.Effect<void, never, ServerConfig | PublicConfig> =>
   Effect.gen(function* () {
     for (const threshold of WARNING_THRESHOLDS) {
-      const thresholdCount = Math.floor(DAILY_REQUEST_CAP * threshold)
-      if (current < thresholdCount) continue
+      if (rateLimit.remaining > threshold) continue
+
+      const redis = yield* getRedisClient
       const warnedKey = getWarnedKey(threshold)
+
       const alreadyWarned = yield* Effect.tryPromise({
         try: () => redis.get<boolean>(warnedKey),
-        catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
+        catch: () => false,
       })
+
       if (!alreadyWarned) {
         yield* Effect.tryPromise({
-          try: () => redis.set(warnedKey, true, { ex: 48 * 60 * 60 }),
-          catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
+          try: () => redis.set(warnedKey, true, { ex: rateLimit.resetSeconds }),
+          catch: () => null,
         })
-        yield* sendUsageWarning(current, threshold, song)
+        yield* sendUsageWarning(rateLimit.remaining, song, rateLimit.resetSeconds)
       }
+      break
     }
-  })
-
-const checkAndIncrementUsage = (
-  song: SongContext,
-): Effect.Effect<boolean, BPMAPIError, ServerConfig | PublicConfig> =>
-  Effect.gen(function* () {
-    const redis = yield* getRedisClient
-    const key = getTodayKey()
-    const current = yield* Effect.tryPromise({
-      try: () => redis.get<number>(key),
-      catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
-    })
-    if (current !== null && current >= DAILY_REQUEST_CAP) {
-      return false
-    }
-    const newCount = yield* Effect.tryPromise({
-      try: () => redis.incr(key),
-      catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
-    })
-    if (current === null) {
-      yield* Effect.tryPromise({
-        try: () => redis.expire(key, 48 * 60 * 60),
-        catch: () => new BPMAPIError({ status: 0, message: "KV storage error" }),
-      })
-    }
-    yield* checkAndSendWarnings(redis, newCount, song)
-    return true
-  })
+  }).pipe(Effect.catchAll(() => Effect.void))
 
 interface RapidAPIResponse {
   readonly result: "success" | "error"
@@ -181,7 +209,9 @@ const enforceRateLimit = (): Effect.Effect<void> =>
  * RapidAPI Spotify Audio Features provider implementation.
  *
  * Requires a spotifyId in the query and RAPIDAPI_KEY env var.
- * Silently returns BPMNotFoundError on quota exceeded (429) to allow fallback.
+ * Uses RapidAPI response headers to track remaining quota.
+ * Caches remaining count in Redis with TTL matching reset time.
+ * Silently returns BPMNotFoundError on quota exceeded to allow fallback.
  */
 export const rapidApiSpotifyProvider: BPMProvider<ServerConfig | PublicConfig> = {
   name: "RapidAPI",
@@ -206,8 +236,8 @@ export const rapidApiSpotifyProvider: BPMProvider<ServerConfig | PublicConfig> =
         spotifyId,
       }
 
-      const allowed = yield* checkAndIncrementUsage(songContext)
-      if (!allowed) {
+      const { available } = yield* checkQuotaAvailable()
+      if (!available) {
         return yield* Effect.fail(
           new BPMNotFoundError({ title: query.title, artist: query.artist }),
         )
@@ -227,6 +257,10 @@ export const rapidApiSpotifyProvider: BPMProvider<ServerConfig | PublicConfig> =
           }),
         catch: () => new BPMAPIError({ status: 0, message: "Network error" }),
       })
+
+      const rateLimit = parseRateLimitHeaders(response)
+      yield* updateQuotaCache(rateLimit)
+      yield* checkAndSendWarnings(rateLimit, songContext)
 
       if (!response.ok) {
         if (response.status === 404) {

@@ -1,12 +1,13 @@
 /**
  * RapidAPI Spotify provider tests
  *
- * Tests the daily request cap using real Vercel KV (Upstash Redis).
- * Mocks only the RapidAPI fetch calls, not Redis.
+ * Tests quota management using RapidAPI response headers.
+ * Uses real Vercel KV (Upstash Redis) for quota caching.
+ * Mocks RapidAPI fetch calls, not Redis.
  *
  * Requirements:
  * - KV_REST_API_URL and KV_REST_API_TOKEN env vars must be set
- * - Run with: bun run test src/lib/bpm/__tests__/rapidapi-spotify.test.ts
+ * - Run with: bun run test src/lib/bpm/__tests__/rapidapi.test.ts
  */
 
 import type { PublicConfig } from "@/services/public-config"
@@ -18,22 +19,65 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { rapidApiSpotifyProvider } from "../rapidapi-client"
 import type { ReccoBeatsQuery } from "../reccobeats-client"
 
+const QUOTA_KEY = "rapidapi:remaining"
+
 const createQuery = (spotifyId: string): ReccoBeatsQuery => ({
   title: "Test Song",
   artist: "Test Artist",
   spotifyId,
 })
 
-const mockRapidApiResponse = (data: { tempo: string; key: string; mode: string }) => ({
-  ok: true,
-  status: 200,
-  json: () =>
-    Promise.resolve({
-      result: "success",
-      message: "Data Retrieved.",
-      audio_features: data,
-    }),
-})
+interface MockResponseOptions {
+  tempo: string
+  key: string
+  mode: string
+  remaining?: number
+  limit?: number
+  resetSeconds?: number
+}
+
+const mockRapidApiResponse = (options: MockResponseOptions) => {
+  const headers = new Map([
+    ["x-ratelimit-requests-remaining", String(options.remaining ?? 10)],
+    ["x-ratelimit-requests-limit", String(options.limit ?? 20)],
+    ["x-ratelimit-requests-reset", String(options.resetSeconds ?? 3600)],
+  ])
+
+  return {
+    ok: true,
+    status: 200,
+    headers: {
+      get: (name: string) => headers.get(name) ?? null,
+    },
+    json: () =>
+      Promise.resolve({
+        result: "success",
+        message: "Data Retrieved.",
+        audio_features: {
+          tempo: options.tempo,
+          key: options.key,
+          mode: options.mode,
+        },
+      }),
+  }
+}
+
+const mockErrorResponse = (status: number, remaining = 10) => {
+  const headers = new Map([
+    ["x-ratelimit-requests-remaining", String(remaining)],
+    ["x-ratelimit-requests-limit", "20"],
+    ["x-ratelimit-requests-reset", "3600"],
+  ])
+
+  return {
+    ok: false,
+    status,
+    headers: {
+      get: (name: string) => headers.get(name) ?? null,
+    },
+    json: () => Promise.resolve({}),
+  }
+}
 
 const originalFetch = globalThis.fetch
 
@@ -54,17 +98,13 @@ function getRedis() {
 }
 
 function mockFetchForRapidApiOnly(response: ReturnType<typeof mockRapidApiResponse>) {
-  return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+  return vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString()
     if (url.includes("rapidapi.com") || url.includes("web3forms.com")) {
-      return Promise.resolve(response as Response)
+      return Promise.resolve(response as unknown as Response)
     }
-    return originalFetch(input, init)
+    return originalFetch(input, _init)
   }) as unknown as typeof fetch
-}
-
-function getTodayKey() {
-  return `rapidapi:usage:${new Date().toISOString().slice(0, 10)}`
 }
 
 describe("rapidApiSpotifyProvider unit tests", () => {
@@ -105,7 +145,10 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
 
     redis = getRedis()
     if (redis) {
-      await redis.del(getTodayKey())
+      await redis.del(QUOTA_KEY)
+      await redis.del("rapidapi:warned:5")
+      await redis.del("rapidapi:warned:3")
+      await redis.del("rapidapi:warned:1")
     }
   })
 
@@ -115,13 +158,16 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     Object.assign(process.env, originalEnv)
 
     if (redis) {
-      await redis.del(getTodayKey())
+      await redis.del(QUOTA_KEY)
+      await redis.del("rapidapi:warned:5")
+      await redis.del("rapidapi:warned:3")
+      await redis.del("rapidapi:warned:1")
     }
   })
 
   test.skipIf(!hasRealRedis)("returns BPM on successful lookup", async () => {
     globalThis.fetch = mockFetchForRapidApiOnly(
-      mockRapidApiResponse({ tempo: "120.5", key: "C", mode: "1" }),
+      mockRapidApiResponse({ tempo: "120.5", key: "C", mode: "1", remaining: 19 }),
     )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
@@ -134,7 +180,7 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
 
   test.skipIf(!hasRealRedis)("formats key correctly for minor", async () => {
     globalThis.fetch = mockFetchForRapidApiOnly(
-      mockRapidApiResponse({ tempo: "100", key: "C#", mode: "0" }),
+      mockRapidApiResponse({ tempo: "100", key: "C#", mode: "0", remaining: 18 }),
     )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
@@ -143,27 +189,38 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     expect(result.key).toBe("C# minor")
   })
 
-  test.skipIf(!hasRealRedis)("increments usage counter in Redis", async () => {
+  test.skipIf(!hasRealRedis)("caches remaining count from response headers", async () => {
     if (!redis) return
     globalThis.fetch = mockFetchForRapidApiOnly(
-      mockRapidApiResponse({ tempo: "120", key: "C", mode: "1" }),
+      mockRapidApiResponse({
+        tempo: "120",
+        key: "C",
+        mode: "1",
+        remaining: 15,
+        resetSeconds: 3600,
+      }),
     )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
     await runWithConfig(effect)
 
-    const count = await redis.get<number>(getTodayKey())
-    expect(count).toBeGreaterThanOrEqual(1)
+    const cached = await redis.get<number>(QUOTA_KEY)
+    expect(cached).toBe(15)
   })
 
-  test.skipIf(!hasRealRedis)("blocks requests when cap is reached", async () => {
+  test.skipIf(!hasRealRedis)("blocks requests when cached remaining is 0", async () => {
     if (!redis) return
 
-    await redis.set(getTodayKey(), 20, { ex: 60 })
+    await redis.set(QUOTA_KEY, 0, { ex: 3600 })
 
-    globalThis.fetch = mockFetchForRapidApiOnly(
-      mockRapidApiResponse({ tempo: "120", key: "C", mode: "1" }),
-    )
+    const rapidApiCalls: string[] = []
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString()
+      if (url.includes("rapidapi.com")) {
+        rapidApiCalls.push(url)
+      }
+      return originalFetch(input, init)
+    }) as unknown as typeof fetch
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
     const exit = await runWithConfigExit(effect)
@@ -172,15 +229,16 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
     if (exit._tag === "Failure" && exit.cause._tag === "Fail") {
       expect(exit.cause.error._tag).toBe("BPMNotFoundError")
     }
+    expect(rapidApiCalls).toHaveLength(0)
   })
 
-  test.skipIf(!hasRealRedis)("allows requests under cap", async () => {
+  test.skipIf(!hasRealRedis)("allows requests when cached remaining > 0", async () => {
     if (!redis) return
 
-    await redis.set(getTodayKey(), 19, { ex: 60 })
+    await redis.set(QUOTA_KEY, 5, { ex: 3600 })
 
     globalThis.fetch = mockFetchForRapidApiOnly(
-      mockRapidApiResponse({ tempo: "120", key: "C", mode: "1" }),
+      mockRapidApiResponse({ tempo: "120", key: "C", mode: "1", remaining: 4 }),
     )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
@@ -188,33 +246,27 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
 
     expect(result.bpm).toBe(120)
 
-    const newCount = await redis.get<number>(getTodayKey())
-    expect(newCount).toBe(20)
+    const newCached = await redis.get<number>(QUOTA_KEY)
+    expect(newCached).toBe(4)
   })
 
-  test.skipIf(!hasRealRedis)("multiple requests increment counter", async () => {
+  test.skipIf(!hasRealRedis)("allows requests when no cache exists", async () => {
     if (!redis) return
-    await redis.del(getTodayKey())
 
     globalThis.fetch = mockFetchForRapidApiOnly(
-      mockRapidApiResponse({ tempo: "120", key: "C", mode: "1" }),
+      mockRapidApiResponse({ tempo: "120", key: "C", mode: "1", remaining: 19 }),
     )
 
-    for (let i = 0; i < 3; i++) {
-      const effect = rapidApiSpotifyProvider.getBpm(createQuery(`spotify${i}`))
-      await runWithConfig(effect)
-    }
+    const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
+    const result = await runWithConfig(effect)
 
-    const count = await redis.get<number>(getTodayKey())
-    expect(count).toBeGreaterThanOrEqual(3)
+    expect(result.bpm).toBe(120)
   })
 
   test.skipIf(!hasRealRedis)("handles 404 as BPMNotFoundError", async () => {
-    globalThis.fetch = mockFetchForRapidApiOnly({
-      ok: false,
-      status: 404,
-      json: () => Promise.resolve({}),
-    } as ReturnType<typeof mockRapidApiResponse>)
+    globalThis.fetch = mockFetchForRapidApiOnly(
+      mockErrorResponse(404) as unknown as ReturnType<typeof mockRapidApiResponse>,
+    )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
     const exit = await runWithConfigExit(effect)
@@ -223,15 +275,27 @@ describe("rapidApiSpotifyProvider with real Redis", () => {
   })
 
   test.skipIf(!hasRealRedis)("handles 429 rate limit as BPMNotFoundError", async () => {
-    globalThis.fetch = mockFetchForRapidApiOnly({
-      ok: false,
-      status: 429,
-      json: () => Promise.resolve({}),
-    } as ReturnType<typeof mockRapidApiResponse>)
+    globalThis.fetch = mockFetchForRapidApiOnly(
+      mockErrorResponse(429, 0) as unknown as ReturnType<typeof mockRapidApiResponse>,
+    )
 
     const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
     const exit = await runWithConfigExit(effect)
 
     expect(exit._tag).toBe("Failure")
+  })
+
+  test.skipIf(!hasRealRedis)("updates cache even on 429 response", async () => {
+    if (!redis) return
+
+    globalThis.fetch = mockFetchForRapidApiOnly(
+      mockErrorResponse(429, 0) as unknown as ReturnType<typeof mockRapidApiResponse>,
+    )
+
+    const effect = rapidApiSpotifyProvider.getBpm(createQuery("spotify123"))
+    await runWithConfigExit(effect)
+
+    const cached = await redis.get<number>(QUOTA_KEY)
+    expect(cached).toBe(0)
   })
 })
