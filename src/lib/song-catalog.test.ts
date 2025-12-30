@@ -71,6 +71,10 @@ describe("prepareCatalogSong", () => {
       titleLower: "bohemian rhapsody",
       artistLower: "queen",
       hasSyncedLyrics: true,
+      bpm: null,
+      musicalKey: null,
+      bpmSource: null,
+      bpmSourceUrl: null,
     })
   })
 
@@ -89,6 +93,10 @@ describe("prepareCatalogSong", () => {
       titleLower: "hello",
       artistLower: "world",
       hasSyncedLyrics: false,
+      bpm: null,
+      musicalKey: null,
+      bpmSource: null,
+      bpmSourceUrl: null,
     })
   })
 })

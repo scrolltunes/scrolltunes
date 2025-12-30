@@ -325,6 +325,32 @@ export default function SongPage() {
           albumArt: data.albumArt ?? undefined,
         })
 
+        // Upsert to song catalog with BPM (fire-and-forget, only for authenticated users)
+        fetch("/api/songs/upsert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: data.lyrics.title,
+            artist: data.lyrics.artist,
+            album: data.lyrics.album,
+            durationMs: data.lyrics.duration ? data.lyrics.duration * 1000 : undefined,
+            spotifyId: data.spotifyId ?? spotifyId,
+            lrclibId: id,
+            hasSyncedLyrics: true,
+            bpmAttribution:
+              data.bpm && data.attribution?.bpm
+                ? {
+                    bpm: data.bpm,
+                    musicalKey: data.key,
+                    source: data.attribution.bpm.name,
+                    sourceUrl: data.attribution.bpm.url,
+                  }
+                : null,
+          }),
+        }).catch(() => {
+          // Silently ignore errors (user may not be authenticated)
+        })
+
         fetchChordsForSong(data.lyrics.artist, data.lyrics.title)
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {

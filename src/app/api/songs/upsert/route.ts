@@ -6,6 +6,13 @@ import { eq } from "drizzle-orm"
 import { Data, Effect } from "effect"
 import { NextResponse } from "next/server"
 
+interface BpmAttributionRequest {
+  bpm: number
+  musicalKey?: string | null
+  source: string
+  sourceUrl: string
+}
+
 interface UpsertSongRequest {
   title: string
   artist: string
@@ -14,6 +21,7 @@ interface UpsertSongRequest {
   spotifyId?: string
   lrclibId?: number
   hasSyncedLyrics?: boolean
+  bpmAttribution?: BpmAttributionRequest | null
 }
 
 class AuthError extends Data.TaggedClass("AuthError")<{
@@ -58,6 +66,7 @@ const upsertSong = (request: Request) =>
       spotifyId: body.spotifyId,
       lrclibId: body.lrclibId,
       hasSyncedLyrics: body.hasSyncedLyrics,
+      bpmAttribution: body.bpmAttribution ?? undefined,
     })
 
     const { db } = yield* DbService
@@ -75,6 +84,10 @@ const upsertSong = (request: Request) =>
             artistLower: prepared.artistLower,
             titleLower: prepared.titleLower,
             hasSyncedLyrics: prepared.hasSyncedLyrics,
+            bpm: prepared.bpm,
+            musicalKey: prepared.musicalKey,
+            bpmSource: prepared.bpmSource,
+            bpmSourceUrl: prepared.bpmSourceUrl,
           })
           .onConflictDoUpdate({
             target: [songs.artistLower, songs.titleLower],
@@ -83,6 +96,13 @@ const upsertSong = (request: Request) =>
               ...(prepared.durationMs && { durationMs: prepared.durationMs }),
               ...(prepared.spotifyId && { spotifyId: prepared.spotifyId }),
               ...(prepared.hasSyncedLyrics && { hasSyncedLyrics: prepared.hasSyncedLyrics }),
+              // Only update BPM if provided (don't overwrite existing with null)
+              ...(prepared.bpm && {
+                bpm: prepared.bpm,
+                musicalKey: prepared.musicalKey,
+                bpmSource: prepared.bpmSource,
+                bpmSourceUrl: prepared.bpmSourceUrl,
+              }),
               updatedAt: new Date(),
             },
           })
@@ -91,6 +111,10 @@ const upsertSong = (request: Request) =>
             title: songs.title,
             artist: songs.artist,
             hasEnhancement: songs.hasEnhancement,
+            bpm: songs.bpm,
+            musicalKey: songs.musicalKey,
+            bpmSource: songs.bpmSource,
+            bpmSourceUrl: songs.bpmSourceUrl,
           }),
       catch: cause => new DatabaseError({ cause }),
     })
@@ -121,6 +145,10 @@ const upsertSong = (request: Request) =>
       title: song.title,
       artist: song.artist,
       hasEnhancement: song.hasEnhancement,
+      bpm: song.bpm,
+      musicalKey: song.musicalKey,
+      bpmSource: song.bpmSource,
+      bpmSourceUrl: song.bpmSourceUrl,
     }
   })
 
@@ -158,6 +186,10 @@ const lookupByLrclibId = (lrclibId: number) =>
             artist: songs.artist,
             hasEnhancement: songs.hasEnhancement,
             hasChordEnhancement: songs.hasChordEnhancement,
+            bpm: songs.bpm,
+            musicalKey: songs.musicalKey,
+            bpmSource: songs.bpmSource,
+            bpmSourceUrl: songs.bpmSourceUrl,
           })
           .from(songLrclibIds)
           .innerJoin(songs, eq(songLrclibIds.songId, songs.id))
@@ -177,6 +209,10 @@ const lookupByLrclibId = (lrclibId: number) =>
       artist: mapping.artist,
       hasEnhancement: mapping.hasEnhancement,
       hasChordEnhancement: mapping.hasChordEnhancement,
+      bpm: mapping.bpm,
+      musicalKey: mapping.musicalKey,
+      bpmSource: mapping.bpmSource,
+      bpmSourceUrl: mapping.bpmSourceUrl,
     }
   })
 

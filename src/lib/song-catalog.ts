@@ -38,6 +38,16 @@ export function normalizeArtist(artist: string): string {
 }
 
 /**
+ * BPM attribution info for storage.
+ */
+export interface BpmAttribution {
+  readonly bpm: number
+  readonly musicalKey?: string | null | undefined
+  readonly source: string
+  readonly sourceUrl: string
+}
+
+/**
  * Input for creating/finding a song in the catalog.
  */
 export interface CatalogSongInput {
@@ -48,6 +58,7 @@ export interface CatalogSongInput {
   readonly spotifyId?: string | null | undefined
   readonly lrclibId?: number | null | undefined
   readonly hasSyncedLyrics?: boolean | undefined
+  readonly bpmAttribution?: BpmAttribution | null | undefined
 }
 
 /**
@@ -69,5 +80,11 @@ export function prepareCatalogSong(input: CatalogSongInput) {
 
     // Status
     hasSyncedLyrics: input.hasSyncedLyrics ?? false,
+
+    // BPM metadata
+    bpm: input.bpmAttribution?.bpm ?? null,
+    musicalKey: input.bpmAttribution?.musicalKey ?? null,
+    bpmSource: input.bpmAttribution?.source ?? null,
+    bpmSourceUrl: input.bpmAttribution?.sourceUrl ?? null,
   }
 }

@@ -249,6 +249,12 @@ export const songs = pgTable(
     // External IDs (Spotify is 1:1, LRCLIB is 1:many via separate table)
     spotifyId: text("spotify_id"),
 
+    // BPM and musical key (cached from providers or manually set)
+    bpm: integer("bpm"),
+    musicalKey: text("musical_key"),
+    bpmSource: text("bpm_source"),
+    bpmSourceUrl: text("bpm_source_url"),
+
     // Lyrics status
     hasSyncedLyrics: boolean("has_synced_lyrics").notNull().default(false),
     hasEnhancement: boolean("has_enhancement").notNull().default(false),
