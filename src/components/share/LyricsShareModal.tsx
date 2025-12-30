@@ -60,7 +60,7 @@ const _LAYOUT_OPTIONS: readonly LayoutOption[] = [
 ] as const
 void _LAYOUT_OPTIONS
 
-type PatternVariant = "none" | "dots" | "grid" | "waves" | "random"
+type PatternVariant = "none" | "dots" | "grid" | "waves"
 
 interface PatternOption {
   readonly id: PatternVariant
@@ -72,7 +72,6 @@ const PATTERN_OPTIONS: readonly PatternOption[] = [
   { id: "dots", label: "Dots" },
   { id: "grid", label: "Grid" },
   { id: "waves", label: "Waves" },
-  { id: "random", label: "Random" },
 ] as const
 
 function generateSmokeWaves(seed: number): string {
@@ -119,11 +118,6 @@ function getPatternStyle(pattern: PatternVariant): React.CSSProperties {
           "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)",
         backgroundSize: "24px 24px",
       }
-    case "waves":
-      return {
-        backgroundImage:
-          "repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.03) 8px, rgba(255,255,255,0.03) 16px)",
-      }
     default:
       return {}
   }
@@ -154,6 +148,7 @@ export function LyricsShareModal({
   lines,
 }: LyricsShareModalProps) {
   const cardRef = useRef<HTMLDivElement>(null)
+  const innerCardRef = useRef<HTMLDivElement>(null)
   const previewContainerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [cardElement, setCardElement] = useState<HTMLDivElement | null>(null)
@@ -185,6 +180,9 @@ export function LyricsShareModal({
   const [isEditing, setIsEditing] = useState(false)
   const [editedLines, setEditedLines] = useState<Map<string, string>>(new Map())
   const [editModeWidth, setEditModeWidth] = useState<number | null>(null)
+  const [lastFocusedIndex, setLastFocusedIndex] = useState(0)
+  const [lastCaretPosition, setLastCaretPosition] = useState<number | null>(null)
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
   const [isSharing, setIsSharing] = useState(false)
 
   const currentBackground = useMemo(() => {
@@ -227,6 +225,17 @@ export function LyricsShareModal({
       scrollContainerRef.current?.scrollTo({ top: 0 })
     }
   }, [step])
+
+  useEffect(() => {
+    if (isEditing) {
+      const input = inputRefs.current[lastFocusedIndex] ?? inputRefs.current[0]
+      if (input) {
+        input.focus()
+        const pos = lastCaretPosition ?? input.value.length
+        input.setSelectionRange(pos, pos)
+      }
+    }
+  }, [isEditing, lastFocusedIndex, lastCaretPosition])
 
   // Calculate scale to fit card within preview container with small margins
   const calculateScale = useCallback(() => {
@@ -475,7 +484,7 @@ export function LyricsShareModal({
 
   const renderCardContent = () => {
     const patternStyles =
-      pattern === "random"
+      pattern === "waves"
         ? { backgroundImage: smokeSvgDataUrl, backgroundSize: "100% 100%" }
         : getPatternStyle(pattern)
     const hasPattern = pattern !== "none"
@@ -932,13 +941,14 @@ export function LyricsShareModal({
                 }}
               >
               <div
+                ref={innerCardRef}
                 style={{
                   ...cardBaseStyles,
                   background: currentBackground,
                   borderRadius: "24px",
                   padding: "24px",
                   maxWidth: expandedWidth ? "600px" : "384px",
-                  minWidth: isEditing && editModeWidth ? `${editModeWidth}px` : undefined,
+                  width: isEditing && editModeWidth ? `${editModeWidth}px` : undefined,
                   boxShadow: showShadow ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "none",
                   position: "relative",
                   overflow: "hidden",
@@ -1021,14 +1031,18 @@ export function LyricsShareModal({
                   direction: isRTL ? "rtl" : "ltr",
                 }}
               >
-                {selectedLines.map(line =>
+                {selectedLines.map((line, idx) =>
                   isEditing ? (
                     <input
                       key={line.id}
+                      ref={el => {
+                        inputRefs.current[idx] = el
+                      }}
                       type="text"
                       dir={isRTL ? "rtl" : "ltr"}
                       value={getLineText(line)}
                       onChange={e => updateLineText(line.id, e.target.value)}
+                      onFocus={() => setLastFocusedIndex(idx)}
                       style={{
                         ...textStyles,
                         fontSize: "18px",
@@ -1036,10 +1050,14 @@ export function LyricsShareModal({
                         lineHeight: 1.5,
                         color: "white",
                         margin: "4px 0",
-                        background: "rgba(255,255,255,0.1)",
-                        border: "1px solid rgba(255,255,255,0.3)",
-                        borderRadius: "4px",
-                        padding: "4px 8px",
+                        background:
+                          "repeating-linear-gradient(90deg, rgba(255,255,255,0.4) 0, rgba(255,255,255,0.4) 4px, transparent 4px, transparent 8px)",
+                        backgroundSize: "100% 1px",
+                        backgroundPosition: "0 100%",
+                        backgroundRepeat: "no-repeat",
+                        border: "none",
+                        borderRadius: 0,
+                        padding: 0,
                         width: "100%",
                         boxSizing: "border-box",
                         display: "block",
@@ -1231,9 +1249,13 @@ export function LyricsShareModal({
                         <button
                           type="button"
                           onClick={() => {
-                            if (!isEditing && cardRef.current) {
-                              setEditModeWidth(cardRef.current.offsetWidth)
+                            if (!isEditing && innerCardRef.current) {
+                              setEditModeWidth(innerCardRef.current.offsetWidth)
                             } else {
+                              const activeInput = inputRefs.current[lastFocusedIndex]
+                              if (activeInput) {
+                                setLastCaretPosition(activeInput.selectionStart)
+                              }
                               setEditModeWidth(null)
                             }
                             setIsEditing(prev => !prev)
@@ -1380,7 +1402,7 @@ export function LyricsShareModal({
                               key={option.id}
                               type="button"
                               onClick={() => {
-                                if (option.id === "random" && pattern === "random") {
+                                if (option.id === "waves" && pattern === "waves") {
                                   setPatternSeed(Date.now())
                                 } else {
                                   setPattern(option.id)
