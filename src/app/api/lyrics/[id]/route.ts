@@ -288,18 +288,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     ? Number.parseInt(lyrics.songId.slice(7), 10)
     : id
 
-  // Update catalog with album name if we have Spotify data (fire and forget)
-  if (spotifyAlbumName) {
+  // Update catalog with album name and BPM if available (fire and forget)
+  const hasAlbumUpdate = !!spotifyAlbumName
+  const hasBpmUpdate = bpmResult && !cachedBpm // Only update if BPM was fetched fresh (not from cache)
+
+  if (hasAlbumUpdate || hasBpmUpdate) {
     db.select({ songId: songLrclibIds.songId })
       .from(songLrclibIds)
       .where(eq(songLrclibIds.lrclibId, actualLrclibId))
       .limit(1)
       .then(([mapping]) => {
         if (mapping) {
-          return db
-            .update(songs)
-            .set({ album: spotifyAlbumName, updatedAt: new Date() })
-            .where(eq(songs.id, mapping.songId))
+          const updates: Record<string, unknown> = { updatedAt: new Date() }
+          if (hasAlbumUpdate) {
+            updates.album = spotifyAlbumName
+          }
+          if (hasBpmUpdate && bpmResult) {
+            updates.bpm = bpmResult.bpm
+            updates.musicalKey = bpmResult.key ?? null
+            updates.bpmSource = bpmResult.source
+          }
+          return db.update(songs).set(updates).where(eq(songs.id, mapping.songId))
         }
       })
       .catch(() => {})
