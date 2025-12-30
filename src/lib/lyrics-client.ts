@@ -213,6 +213,86 @@ export interface LRCLibTrackResult {
 }
 
 /**
+ * Result from checking lyrics availability
+ */
+export interface LyricsAvailabilityResult {
+  readonly available: true
+  readonly lrclibId: number
+  readonly trackName: string
+  readonly artistName: string
+  readonly albumName: string | null
+  readonly duration: number
+}
+
+/**
+ * Check if lyrics are available for a track using LRCLIB get-cached, falling back to get.
+ * Returns metadata including LRCLIB ID if synced lyrics exist.
+ *
+ * This is optimized for search: it doesn't parse lyrics, just checks availability.
+ */
+export const checkLyricsAvailability = (
+  trackName: string,
+  artistName: string,
+  albumName: string,
+  durationSeconds: number,
+): Effect.Effect<LyricsAvailabilityResult | null, LyricsAPIError, LyricsClientEnv> => {
+  const params = new URLSearchParams({
+    track_name: trackName,
+    artist_name: artistName,
+    album_name: albumName,
+    duration: durationSeconds.toString(),
+  })
+
+  const tryEndpoint = (endpoint: "get-cached" | "get") =>
+    Effect.gen(function* () {
+      const response = yield* fetchResponse(
+        `${LRCLIB_BASE_URL}/${endpoint}?${params.toString()}`,
+        { headers, cache: "force-cache", next: { revalidate: 600 } },
+      )
+
+      if (response.status === 404) {
+        return null
+      }
+
+      if (!response.ok) {
+        return yield* Effect.fail(
+          new LyricsAPIError({ status: response.status, message: response.statusText }),
+        )
+      }
+
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<LRCLibResponse>,
+        catch: () => new LyricsAPIError({ status: 0, message: "Failed to parse response" }),
+      })
+
+      if (!data.syncedLyrics || !hasValidLrcTimestamps(data.syncedLyrics)) {
+        return null
+      }
+
+      return {
+        available: true as const,
+        lrclibId: data.id,
+        trackName: data.trackName,
+        artistName: data.artistName,
+        albumName: data.albumName,
+        duration: data.duration,
+      }
+    })
+
+  return Effect.gen(function* () {
+    // Try get-cached first (faster, local DB only)
+    const cached = yield* tryEndpoint("get-cached").pipe(
+      Effect.catchAll(() => Effect.succeed(null)),
+    )
+    if (cached) return cached
+
+    // Fall back to get (may fetch from external sources)
+    const full = yield* tryEndpoint("get").pipe(Effect.catchAll(() => Effect.succeed(null)))
+    return full
+  })
+}
+
+/**
  * Search LRCLIB for tracks matching the query.
  * Returns track metadata without fetching full lyrics.
  *

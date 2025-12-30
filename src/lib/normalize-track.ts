@@ -12,7 +12,7 @@ export function normalizeTrackName(name: string): string {
   // Second pass: remove common parenthetical suffixes the library misses
   title = title
     .replace(
-      /\s*[\(\[](?:radio edit|single version|deluxe(?: edition)?|explicit|clean|instrumental|extended|original mix)[\)\]]\s*$/gi,
+      /\s*[\(\[](?:radio edit|single version|deluxe(?: edition)?|explicit|clean|instrumental|extended|original mix|paused)[\)\]]\s*$/gi,
       "",
     )
     .trim()
@@ -37,7 +37,7 @@ export function normalizeAlbumName(name: string): string {
   // Second pass: remove common parenthetical suffixes the library misses
   album = album
     .replace(
-      /\s*[\(\[](?:remaster(?:ed)?(?:\s+\d{4})?|deluxe(?:\s+edition)?|expanded(?:\s+edition)?|anniversary(?:\s+edition)?|special(?:\s+edition)?|bonus\s+track(?:s)?|super\s+deluxe)[\)\]]\s*$/gi,
+      /\s*[\(\[](?:remaster(?:ed)?(?:\s+\d{4})?|deluxe(?:\s+edition)?|expanded(?:\s+edition)?|anniversary(?:\s+edition)?|special(?:\s+edition)?|bonus\s+(?:track(?:s)?|edition)|super\s+deluxe|explicit|clean)[\)\]]\s*$/gi,
       "",
     )
     .trim()

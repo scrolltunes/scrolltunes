@@ -37,7 +37,7 @@ export const FavoriteButton = memo(function FavoriteButton({
       id: songId,
       title,
       artist,
-      ...(album !== undefined && { album }),
+      album: album ?? "",
       ...(albumArt !== undefined && { albumArt }),
     })
   }, [songId, title, artist, album, albumArt])

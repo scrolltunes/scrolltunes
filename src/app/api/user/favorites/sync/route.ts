@@ -78,7 +78,7 @@ export async function POST(request: Request) {
           songProvider: fav.songProvider,
           songTitle: fav.title,
           songArtist: fav.artist,
-          songAlbum: fav.album,
+          songAlbum: fav.album ?? "",
           isFavorite: true,
         }),
       )

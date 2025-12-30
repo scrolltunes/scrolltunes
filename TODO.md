@@ -242,32 +242,28 @@
 - [x] Show normalized titles/artists/albums in all UI (search, recents, song page, modals)
 - [x] Keep original names for storage, caching, and API lookups
 
-### Search Flow Refactor (Planned)
+### Search Flow Refactor ✅
 
-**Current issues:**
-- Album is optional (empty/missing for many cached songs)
-- Spotify metadata used for display names instead of LRCLIB canonical data
-- Only uses `/api/search` (fuzzy), never `/api/get` (exact match with album)
-
-**Proposed flow:**
+**Implemented flow:**
 ```
 User Query
-  → Spotify Search (top 1-3 results)
-  → Extract: artist, title, album, duration
+  → Spotify Search (top 8 results)
+  → Extract: artist, title, album, duration (normalized)
   → LRCLIB /api/get-cached (fast, local DB only)
   → Fallback: LRCLIB /api/get (may fetch external sources)
-  → Return LRCLIB canonical data + Spotify ID + album art
+  → Return Spotify canonical data + LRCLIB ID + Spotify ID
+  → If Spotify fails: fallback to LRCLIB /api/search
 ```
 
-**Implementation plan:**
-- [ ] Add `getLyricsWithSpotifyMetadata()` that calls LRCLIB with exact Spotify params
-- [ ] Spotify query: search top 1-3 results (not 8), use as precise query params
-- [ ] LRCLIB query: prefer `/api/get-cached` first (fast, no external fetch)
-- [ ] Fallback chain: `/api/get-cached` → `/api/get` → `/api/search` as last resort
-- [ ] Result metadata: use LRCLIB names as canonical (not Spotify)
-- [ ] Album: required from LRCLIB response (never null for valid entries)
-- [ ] Stored data: LRCLIB canonical + Spotify ID + album art for enrichment only
-- [ ] Update `SearchResultTrack` type: `album` should be required string (not optional)
+**Completed:**
+- [x] Add `checkLyricsAvailability()` that calls LRCLIB get-cached → get
+- [x] Spotify query: search top 8 results, use normalized metadata for LRCLIB
+- [x] LRCLIB query: prefer `/api/get-cached` first (fast, no external fetch)
+- [x] Fallback chain: Spotify → `/api/get-cached` → `/api/get` → LRCLIB search
+- [x] Result metadata: use Spotify names as canonical (not LRCLIB)
+- [x] Album: required in DB schema (NOT NULL with default "")
+- [x] Stored data: Spotify canonical + LRCLIB ID + album art
+- [x] Update `SearchResultTrack` type: `album` is required string
 
 ### Chords Integration (Experimental)
 - [x] Research chord API options → Chose Songsterr API

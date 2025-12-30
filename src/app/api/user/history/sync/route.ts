@@ -92,7 +92,7 @@ const syncHistory = (request: Request) =>
               .values({
                 title: prepared.title,
                 artist: prepared.artist,
-                album: prepared.album,
+                album: prepared.album ?? "",
                 durationMs: prepared.durationMs,
                 artistLower: prepared.artistLower,
                 titleLower: prepared.titleLower,
@@ -140,7 +140,7 @@ const syncHistory = (request: Request) =>
                 songProvider: song.songProvider,
                 songTitle: song.title,
                 songArtist: song.artist,
-                songAlbum: song.album,
+                songAlbum: song.album ?? "",
                 songDurationMs: song.durationMs,
                 inHistory: true,
                 firstPlayedAt: lastPlayedAt,

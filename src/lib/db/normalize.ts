@@ -10,28 +10,25 @@ import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/l
 export interface SongInput {
   readonly songTitle: string
   readonly songArtist: string
-  readonly songAlbum?: string | null | undefined
+  readonly songAlbum: string
 }
 
 export interface NormalizedSongInput {
   readonly songTitle: string
   readonly songArtist: string
-  readonly songAlbum?: string
+  readonly songAlbum: string
 }
 
 /**
  * Normalize song title, artist, and album before database insert/update
  */
 export function normalizeSongInput<T extends SongInput>(input: T): T {
-  const result = {
+  return {
     ...input,
     songTitle: normalizeTrackName(input.songTitle),
     songArtist: normalizeArtistName(input.songArtist),
+    songAlbum: normalizeAlbumName(input.songAlbum),
   } as T
-  if (input.songAlbum != null) {
-    ;(result as T & { songAlbum: string }).songAlbum = normalizeAlbumName(input.songAlbum)
-  }
-  return result
 }
 
 /**

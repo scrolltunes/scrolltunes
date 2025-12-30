@@ -1,15 +1,15 @@
 import { getAlbumArt } from "@/lib/deezer-client"
 import {
-  LyricsAPIError,
-  type LyricsError,
-  NON_STUDIO_PATTERNS,
-  scoreTrackCandidate,
-  searchLRCLibBySpotifyMetadata,
+  type LRCLibTrackResult,
+  checkLyricsAvailability,
+  searchLRCLibTracks,
 } from "@/lib/lyrics-client"
-import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
+import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import type { SearchResultTrack } from "@/lib/search-api-types"
 import {
+  type SpotifyError,
   type SpotifyService,
+  type SpotifyTrack,
   formatArtists,
   getAlbumImageUrl,
   searchTracksEffect,
@@ -19,157 +19,147 @@ import { ServerLayer } from "@/services/server-layer"
 import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
 
-function normalizeForMatch(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
+/**
+ * New search flow:
+ * 1. Search Spotify for top 8 results
+ * 2. For each result, check LRCLIB for lyrics availability (get-cached -> get)
+ * 3. Return Spotify canonical data + LRCLIB ID for tracks with lyrics
+ * 4. If Spotify fails, fall back to LRCLIB search API
+ */
+
+interface SpotifyTrackWithLyrics {
+  readonly spotifyTrack: SpotifyTrack
+  readonly lrclibId: number
+  readonly normalizedName: string
+  readonly normalizedArtist: string
+  readonly normalizedAlbum: string
 }
 
-function normalizeDisplayText(text: string): string {
-  return text.replace(/_/g, " ").trim()
-}
+/**
+ * Check lyrics availability for a Spotify track
+ */
+function checkTrackLyrics(track: SpotifyTrack) {
+  // Use original Spotify values for LRCLIB query (maximizes match rate)
+  const originalName = track.name
+  const originalArtist = formatArtists(track.artists)
+  const originalAlbum = track.album.name
+  const durationSeconds = Math.round(track.duration_ms / 1000)
 
-interface SpotifyMatch {
-  readonly spotifyId: string
-  readonly trackName: string
-  readonly artistName: string
-  readonly albumArt: string | null
-  readonly albumName: string | null
-  readonly durationMs: number
-}
+  // Normalized values for storage/display
+  const normalizedName = normalizeTrackName(originalName)
+  const normalizedArtist = normalizeArtistName(originalArtist)
+  const normalizedAlbum = normalizeAlbumName(originalAlbum)
 
-function findSpotifyMatch(
-  query: string,
-  trackName: string,
-  artistName: string,
-): Effect.Effect<SpotifyMatch | null, never, SpotifyService> {
-  return searchTracksEffect(query, 10).pipe(
+  return checkLyricsAvailability(originalName, originalArtist, originalAlbum, durationSeconds).pipe(
     Effect.map(result => {
-      const normalizedTrack = normalizeForMatch(trackName)
-      const normalizedArtist = normalizeForMatch(artistName)
-
-      const match = result.tracks.items.find(track => {
-        const spotifyTrack = normalizeForMatch(track.name)
-        const spotifyArtist = normalizeForMatch(formatArtists(track.artists))
-        return spotifyTrack.includes(normalizedTrack) || normalizedTrack.includes(spotifyTrack)
-          ? spotifyArtist.includes(normalizedArtist) || normalizedArtist.includes(spotifyArtist)
-          : false
-      })
-
-      if (!match) return null
+      if (!result) return null
       return {
-        spotifyId: match.id,
-        trackName: normalizeTrackName(match.name),
-        artistName: normalizeArtistName(formatArtists(match.artists)),
-        albumArt: getAlbumImageUrl(match.album, "medium"),
-        albumName: match.album.name || null,
-        durationMs: match.duration_ms,
-      }
+        spotifyTrack: track,
+        lrclibId: result.lrclibId,
+        normalizedName,
+        normalizedArtist,
+        normalizedAlbum,
+      } satisfies SpotifyTrackWithLyrics
     }),
     Effect.catchAll(() => Effect.succeed(null)),
   )
 }
 
-function getAlbumArtRace(
-  artist: string,
-  track: string,
-  spotifyAlbumArt: string | null,
-): Effect.Effect<string | null, never> {
-  if (spotifyAlbumArt) {
-    return Effect.succeed(spotifyAlbumArt)
-  }
+/**
+ * Primary flow: Spotify search -> LRCLIB availability check
+ */
+function searchSpotifyFirst(
+  query: string,
+  limit: number,
+): Effect.Effect<SearchResultTrack[], SpotifyError, FetchService | SpotifyService> {
+  return Effect.gen(function* () {
+    // Search Spotify for top 8 results
+    const spotifyResult = yield* searchTracksEffect(query, 8)
+    const tracks = spotifyResult.tracks.items
 
-  return Effect.tryPromise({
-    try: () => getAlbumArt(artist, track, "medium"),
-    catch: () => null,
-  }).pipe(
-    Effect.map(art => art ?? null),
-    Effect.catchAll(() => Effect.succeed(null)),
-  )
+    if (tracks.length === 0) {
+      return []
+    }
+
+    // Check lyrics availability for each track in parallel
+    const results = yield* Effect.all(tracks.map(checkTrackLyrics), { concurrency: 4 })
+
+    // Filter to only tracks with lyrics
+    const withLyrics = results.filter((r): r is SpotifyTrackWithLyrics => r !== null)
+
+    // Deduplicate by normalized title+artist
+    const seen = new Set<string>()
+    const deduplicated: SpotifyTrackWithLyrics[] = []
+
+    for (const result of withLyrics) {
+      const key = `${result.normalizedName.toLowerCase()}|${result.normalizedArtist.toLowerCase()}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      deduplicated.push(result)
+      if (deduplicated.length >= limit) break
+    }
+
+    // Map to SearchResultTrack format
+    return deduplicated.map(r => ({
+      id: `lrclib-${r.lrclibId}`,
+      lrclibId: r.lrclibId,
+      spotifyId: r.spotifyTrack.id,
+      name: r.normalizedName,
+      artist: r.normalizedArtist,
+      album: r.normalizedAlbum,
+      albumArt: getAlbumImageUrl(r.spotifyTrack.album, "medium") ?? undefined,
+      duration: r.spotifyTrack.duration_ms,
+      hasLyrics: true,
+    })) satisfies SearchResultTrack[]
+  })
 }
 
 /**
- * Create a deduplication key from track name and artist.
- * Normalizes to lowercase and removes non-alphanumeric chars.
+ * Fallback flow: LRCLIB search (when Spotify fails)
+ * Results will be backfilled with Spotify data later
  */
-function dedupeKey(trackName: string, artistName: string): string {
-  const normalize = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/[^\w\s]/g, "")
-      .replace(/\s+/g, " ")
-      .trim()
-  return `${normalize(trackName)}|${normalize(artistName)}`
-}
-
-function searchLRCLib(
+function searchLRCLibFallback(
   query: string,
   limit: number,
-): Effect.Effect<SearchResultTrack[], LyricsError, FetchService | SpotifyService> {
+): Effect.Effect<SearchResultTrack[], never, FetchService> {
   return Effect.gen(function* () {
-    // Use Spotify-first flow for better accuracy
-    const results = yield* searchLRCLibBySpotifyMetadata(query)
+    const results = yield* searchLRCLibTracks(query).pipe(
+      Effect.catchAll(() => Effect.succeed([] as readonly LRCLibTrackResult[])),
+    )
 
     // Filter to only valid synced lyrics
     const synced = results.filter(r => r.hasValidSyncedLyrics)
 
-    // Detect if user wants non-studio version from query
-    const wantsNonStudio = NON_STUDIO_PATTERNS.some(p => p.test(query))
+    // Deduplicate by title+artist
+    const seen = new Set<string>()
+    const deduplicated: LRCLibTrackResult[] = []
 
-    // Try to get canonical metadata from Spotify for the query
-    const spotifyMatch = yield* findSpotifyMatch(query, query, "").pipe(
-      Effect.catchAll(() => Effect.succeed(null)),
-    )
-
-    // Score and rank results
-    const scored = synced
-      .map(r => ({
-        result: r,
-        score: scoreTrackCandidate(r, {
-          targetDuration: spotifyMatch ? Math.round(spotifyMatch.durationMs / 1000) : null,
-          targetTrackName: spotifyMatch?.trackName ?? undefined,
-          targetArtistName: spotifyMatch?.artistName ?? undefined,
-          canonicalAlbumName: spotifyMatch?.albumName ?? undefined,
-          wantStudioVersion: !wantsNonStudio,
-        }),
-      }))
-      .filter(x => x.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map(x => x.result)
-
-    // Deduplicate by track name + artist (not just ID)
-    const seenKeys = new Set<string>()
-    const uniqueTracks: typeof scored = []
-
-    for (const r of scored) {
-      const key = dedupeKey(r.trackName, r.artistName)
-      if (seenKeys.has(key)) continue
-      seenKeys.add(key)
-      uniqueTracks.push(r)
-      if (uniqueTracks.length >= limit) break
+    for (const r of synced) {
+      const key = `${r.trackName.toLowerCase()}|${r.artistName.toLowerCase()}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      deduplicated.push(r)
+      if (deduplicated.length >= limit) break
     }
 
-    const enrichedTracks = yield* Effect.all(
-      uniqueTracks.map(r =>
+    // Enrich with album art from Deezer (Spotify unavailable)
+    const enriched = yield* Effect.all(
+      deduplicated.map(r =>
         Effect.gen(function* () {
-          const searchQuery = `${r.trackName} ${r.artistName}`
-          const spotifyMatch = yield* findSpotifyMatch(searchQuery, r.trackName, r.artistName)
-          const albumArt = yield* getAlbumArtRace(
-            r.artistName,
-            r.trackName,
-            spotifyMatch?.albumArt ?? null,
-          )
+          const albumArt = yield* Effect.tryPromise({
+            try: () => getAlbumArt(r.artistName, r.trackName, "medium"),
+            catch: () => null,
+          }).pipe(Effect.catchAll(() => Effect.succeed(null)))
 
-          const lrclibAlbum = r.albumName ? normalizeDisplayText(r.albumName) : ""
-          const album = spotifyMatch?.albumName ?? (lrclibAlbum === "-" ? "" : lrclibAlbum)
+          const album =
+            r.albumName && r.albumName !== "-" ? normalizeAlbumName(r.albumName) : ""
+
           return {
             id: `lrclib-${r.id}`,
             lrclibId: r.id,
-            spotifyId: spotifyMatch?.spotifyId,
-            name: spotifyMatch?.trackName ?? normalizeDisplayText(r.trackName),
-            artist: spotifyMatch?.artistName ?? normalizeDisplayText(r.artistName),
+            spotifyId: undefined,
+            name: normalizeTrackName(r.trackName),
+            artist: normalizeArtistName(r.artistName),
             album,
             albumArt: albumArt ?? undefined,
             duration: r.duration * 1000,
@@ -177,15 +167,29 @@ function searchLRCLib(
           } satisfies SearchResultTrack
         }),
       ),
-      { concurrency: 5 },
+      { concurrency: 4 },
     )
 
-    return enrichedTracks
+    return enriched
   })
 }
 
+/**
+ * Combined search: try Spotify first, fall back to LRCLIB
+ */
+function search(
+  query: string,
+  limit: number,
+): Effect.Effect<SearchResultTrack[], never, FetchService | SpotifyService> {
+  return searchSpotifyFirst(query, limit).pipe(
+    Effect.catchAll(error => {
+      console.log("[SEARCH] Spotify failed, falling back to LRCLIB:", error._tag)
+      return searchLRCLibFallback(query, limit)
+    }),
+  )
+}
+
 export async function GET(request: NextRequest) {
-  // Log user agent for testing mobile detection
   const userAgent = request.headers.get("user-agent")
   console.log("[SEARCH] User-Agent:", userAgent)
 
@@ -205,23 +209,10 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const result = await Effect.runPromiseExit(
-    searchLRCLib(query, parsedLimit).pipe(Effect.provide(ServerLayer)),
-  )
+  const result = await Effect.runPromiseExit(search(query, parsedLimit).pipe(Effect.provide(ServerLayer)))
 
   if (result._tag === "Failure") {
-    const cause = result.cause
-    if (cause._tag === "Fail") {
-      const error = cause.error
-      if (error instanceof LyricsAPIError) {
-        console.error("LRCLIB API error:", error.status, error.message)
-        return NextResponse.json(
-          { error: "Search service temporarily unavailable" },
-          { status: 502 },
-        )
-      }
-    }
-    console.error("Search failed:", cause)
+    console.error("Search failed:", result.cause)
     return NextResponse.json({ error: "Search failed" }, { status: 500 })
   }
 

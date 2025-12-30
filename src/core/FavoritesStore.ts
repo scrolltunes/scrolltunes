@@ -7,7 +7,7 @@ export interface FavoriteItem {
   readonly id: number
   readonly title: string
   readonly artist: string
-  readonly album?: string
+  readonly album: string
   readonly albumArt?: string
   readonly addedAt: number
 }
@@ -17,7 +17,7 @@ export interface ServerFavorite {
   readonly songProvider: string
   readonly title: string
   readonly artist: string
-  readonly album?: string
+  readonly album: string
   readonly albumArt?: string
   readonly addedAt: string
 }
@@ -216,7 +216,7 @@ class FavoritesStore {
           id: numericId,
           title: s.title,
           artist: s.artist,
-          ...(s.album !== undefined && { album: s.album }),
+          album: s.album ?? "",
           ...(s.albumArt !== undefined && { albumArt: s.albumArt }),
           addedAt: new Date(s.addedAt).getTime(),
         }

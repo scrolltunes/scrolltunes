@@ -91,7 +91,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         songProvider,
         songTitle: title,
         songArtist: artist,
-        ...(album !== undefined && { songAlbum: album }),
+        songAlbum: album ?? "",
         sortOrder: maxSortOrder + 1,
       }),
     )

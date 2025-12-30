@@ -111,7 +111,7 @@ export const userSongItems = pgTable(
     songProvider: text("song_provider").notNull(),
     songTitle: text("song_title").notNull(),
     songArtist: text("song_artist").notNull(),
-    songAlbum: text("song_album"),
+    songAlbum: text("song_album").notNull().default(""),
     songDurationMs: integer("song_duration_ms"),
     // Optional link to global song catalog (populated lazily)
     catalogSongId: uuid("catalog_song_id").references(() => songs.id, { onDelete: "set null" }),
@@ -200,7 +200,7 @@ export const userSetlistSongs = pgTable(
     songProvider: text("song_provider").notNull(),
     songTitle: text("song_title").notNull(),
     songArtist: text("song_artist").notNull(),
-    songAlbum: text("song_album"),
+    songAlbum: text("song_album").notNull().default(""),
     sortOrder: integer("sort_order").notNull().default(0),
     addedAt: timestamp("added_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
   },
@@ -239,7 +239,7 @@ export const songs = pgTable(
     // Core metadata
     title: text("title").notNull(),
     artist: text("artist").notNull(),
-    album: text("album"),
+    album: text("album").notNull().default(""),
     durationMs: integer("duration_ms"),
 
     // Normalized for deduplication (lowercase, trimmed, punctuation removed)

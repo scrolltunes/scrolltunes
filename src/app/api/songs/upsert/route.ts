@@ -78,7 +78,7 @@ const upsertSong = (request: Request) =>
           .values({
             title: prepared.title,
             artist: prepared.artist,
-            album: prepared.album,
+            album: prepared.album ?? "",
             durationMs: prepared.durationMs,
             spotifyId: prepared.spotifyId,
             artistLower: prepared.artistLower,

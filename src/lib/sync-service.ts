@@ -57,7 +57,8 @@ export interface ServerFavorite {
   readonly songProvider: string
   readonly title: string
   readonly artist: string
-  readonly album?: string
+  readonly album: string
+  readonly albumArt?: string
   readonly addedAt: string
 }
 

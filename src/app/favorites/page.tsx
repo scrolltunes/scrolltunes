@@ -49,7 +49,7 @@ export default function FavoritesPage() {
         id: removedItem.song.id,
         title: removedItem.song.title,
         artist: removedItem.song.artist,
-        ...(removedItem.song.album ? { album: removedItem.song.album } : {}),
+        album: removedItem.song.album ?? "",
         ...(removedItem.albumArt ? { albumArt: removedItem.albumArt } : {}),
       },
       removedItem.song.addedAt,
