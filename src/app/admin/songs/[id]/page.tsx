@@ -296,7 +296,6 @@ function BpmEditorModal({
                 min={1}
                 max={300}
                 className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-indigo-500"
-                autoFocus
               />
             </label>
             <label className="block">
@@ -644,7 +643,6 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
               </div>
             </motion.div>
           )}
-
         </div>
       </main>
 

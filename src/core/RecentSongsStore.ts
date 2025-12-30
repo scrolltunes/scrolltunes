@@ -1,8 +1,11 @@
 "use client"
 
-import { loadCachedLyrics, removeCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
+import { applyEnhancement } from "@/lib/enhancement"
+import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
+import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { MAX_RECENT_SONGS, type RecentSong } from "@/lib/recent-songs-types"
 import { recentSongToHistorySyncItem, syncHistory } from "@/lib/sync-service"
+import { runPrefetchSongs } from "@/services/lyrics-prefetch"
 import { useSyncExternalStore } from "react"
 import { accountStore } from "./AccountStore"
 
@@ -257,10 +260,10 @@ class RecentSongsStore {
 
   /**
    * Remove a specific song from recents (local and server-side if authenticated)
+   * Note: Does not remove cached lyrics - they remain available for search
    */
   async remove(id: number): Promise<void> {
     this.setRecents(prev => prev.filter(s => s.id !== id))
-    removeCachedLyrics(id)
 
     if (accountStore.isAuthenticated()) {
       try {
@@ -340,18 +343,16 @@ class RecentSongsStore {
   }
 
   /**
-   * Preload catalog songs to cache their album art.
-   * Does not add to recents list, only fetches and caches lyrics/album art.
+   * Preload catalog songs to cache their lyrics and enhancements.
+   * Uses Effect-based prefetch service for proper DI and error handling.
    */
   preloadCatalogSongs(
     songs: Array<{ lrclibId: number; title: string; artist: string; album: string | null }>,
   ): void {
-    const idsToFetch = songs
-      .filter(s => !loadCachedLyrics(s.lrclibId))
-      .map(s => s.lrclibId)
+    const idsToFetch = songs.filter(s => !loadCachedLyrics(s.lrclibId)).map(s => s.lrclibId)
 
     if (idsToFetch.length > 0) {
-      this.fetchAlbumArtInBackground(idsToFetch)
+      runPrefetchSongs(idsToFetch)
     }
   }
 
@@ -364,22 +365,32 @@ class RecentSongsStore {
           return
         }
 
-        const data = await response.json()
+        const data = (await response.json()) as LyricsApiSuccessResponse
         if (!data.lyrics) {
           this.setLoadingAlbumArt(id, false)
           return
         }
 
-        const albumArt = data.albumArt as string | null | undefined
+        const albumArt = data.albumArt ?? undefined
+
+        // Apply enhancement to lyrics if available before caching
+        const enhancedLyrics =
+          data.enhancement && data.hasEnhancement
+            ? applyEnhancement(data.lyrics, data.enhancement)
+            : data.lyrics
 
         saveCachedLyrics(id, {
-          lyrics: data.lyrics,
+          lyrics: enhancedLyrics,
           bpm: data.bpm ?? null,
           key: data.key ?? null,
-          albumArt: albumArt ?? undefined,
+          albumArt,
           spotifyId: data.spotifyId ?? undefined,
           bpmSource: data.attribution?.bpm ?? undefined,
           lyricsSource: data.attribution?.lyrics ?? undefined,
+          hasEnhancement: data.hasEnhancement ?? undefined,
+          enhancement: data.enhancement ?? undefined,
+          hasChordEnhancement: data.hasChordEnhancement ?? undefined,
+          chordEnhancement: data.chordEnhancement ?? undefined,
         })
 
         if (albumArt) {

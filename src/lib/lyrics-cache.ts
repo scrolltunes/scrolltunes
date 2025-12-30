@@ -8,7 +8,7 @@ import type { CachedLyrics } from "./recent-songs-types"
 import { LYRICS_CACHE_TTL_MS } from "./recent-songs-types"
 
 const LYRICS_KEY_PREFIX = "scrolltunes:lyrics:"
-const CACHE_VERSION = 8 // v8: Added chord enhancement support
+const CACHE_VERSION = 9 // v9: Improved album metadata enrichment
 
 function lyricsKey(id: number): string {
   return `${LYRICS_KEY_PREFIX}${id}`
@@ -109,4 +109,34 @@ export function clearAllCachedLyrics(): void {
   } catch {
     // Ignore storage errors
   }
+}
+
+/**
+ * Get all valid cached lyrics entries.
+ * Returns array of [id, cachedLyrics] tuples for all non-expired entries.
+ */
+export function getAllCachedLyrics(): Array<{ id: number; cached: CachedLyrics }> {
+  if (typeof window === "undefined") return []
+
+  const results: Array<{ id: number; cached: CachedLyrics }> = []
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key?.startsWith(LYRICS_KEY_PREFIX)) continue
+
+      const idStr = key.slice(LYRICS_KEY_PREFIX.length)
+      const id = Number.parseInt(idStr, 10)
+      if (Number.isNaN(id)) continue
+
+      const cached = loadCachedLyrics(id)
+      if (cached) {
+        results.push({ id, cached })
+      }
+    }
+  } catch {
+    // Ignore storage errors
+  }
+
+  return results
 }

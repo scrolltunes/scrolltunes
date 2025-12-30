@@ -6,3 +6,13 @@ export { PublicConfig, PublicConfigLive, loadPublicConfig } from "./public-confi
 export { ServerConfig, ServerConfigLive, loadServerConfig } from "./server-config"
 export { ConfigLayer, ServerBaseLayer } from "./server-base-layer"
 export { ServerLayer } from "./server-layer"
+export {
+  LyricsPrefetchService,
+  LyricsPrefetchServiceLive,
+  PrefetchError,
+  runPrefetchRecents,
+  runPrefetchSongs,
+  runPrefetchTopSongs,
+  runRefreshMissingAlbums,
+  type PrefetchedLyricsData,
+} from "./lyrics-prefetch"

@@ -1,8 +1,9 @@
 "use client"
 
 import { useFavorites, useRecentSongs, useSetlists } from "@/core"
-import { loadCachedLyrics } from "@/lib/lyrics-cache"
-import { useMemo } from "react"
+import { getAllCachedLyrics, loadCachedLyrics } from "@/lib/lyrics-cache"
+import { runRefreshMissingAlbums } from "@/services/lyrics-prefetch"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 export interface LocalCachedSong {
   readonly id: number
@@ -11,15 +12,25 @@ export interface LocalCachedSong {
   readonly album?: string | undefined
   readonly albumArt?: string | undefined
   readonly durationMs: number
-  readonly source: "favorite" | "setlist" | "recent"
+  readonly source: "favorite" | "setlist" | "recent" | "prefetched"
 }
 
 export function useLocalSongCache(): readonly LocalCachedSong[] {
   const favorites = useFavorites()
   const setlists = useSetlists()
   const recentSongs = useRecentSongs()
+  const [prefetchedVersion, setPrefetchedVersion] = useState(0)
+  const refreshedIdsRef = useRef(new Set<number>())
 
-  return useMemo(() => {
+  // Re-scan prefetched cache periodically to pick up background fetches
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPrefetchedVersion(v => v + 1)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const songs = useMemo(() => {
     const seen = new Set<number>()
     const result: LocalCachedSong[] = []
 
@@ -90,6 +101,52 @@ export function useLocalSongCache(): readonly LocalCachedSong[] {
       }
     }
 
+    // Include all prefetched songs from localStorage cache
+    // This makes background-prefetched top songs searchable immediately
+    const allCached = getAllCachedLyrics()
+    for (const { id, cached } of allCached) {
+      if (!seen.has(id)) {
+        seen.add(id)
+        const { lyrics, albumArt } = cached
+        // Skip entries with missing title or artist
+        if (!lyrics.title || !lyrics.artist) continue
+        result.push({
+          id,
+          title: lyrics.title,
+          artist: lyrics.artist,
+          album: lyrics.album,
+          albumArt,
+          durationMs: (lyrics.duration ?? 0) * 1000,
+          source: "prefetched",
+        })
+      }
+    }
+
     return result
-  }, [favorites, setlists, recentSongs])
+  }, [favorites, setlists, recentSongs, prefetchedVersion])
+
+  // Trigger background refresh for songs missing album info
+  useEffect(() => {
+    const allCached = getAllCachedLyrics()
+    const songsNeedingAlbum = allCached
+      .filter(({ id, cached }) => {
+        // Skip if already refreshed this session
+        if (refreshedIdsRef.current.has(id)) return false
+        // Check if album is missing
+        const album = cached.lyrics.album
+        return !album || album.trim() === ""
+      })
+      .map(({ id, cached }) => ({ id, album: cached.lyrics.album }))
+
+    if (songsNeedingAlbum.length > 0) {
+      // Mark as refreshed to avoid repeated attempts
+      for (const { id } of songsNeedingAlbum) {
+        refreshedIdsRef.current.add(id)
+      }
+      // Trigger background refresh (fire and forget)
+      runRefreshMissingAlbums(songsNeedingAlbum)
+    }
+  }, [prefetchedVersion])
+
+  return songs
 }

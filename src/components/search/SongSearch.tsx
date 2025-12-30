@@ -10,6 +10,7 @@ import { fuzzyMatchSongs } from "@/lib/fuzzy-search"
 import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import type { SearchApiResponse, SearchResultTrack } from "@/lib/search-api-types"
 import { makeCanonicalPath } from "@/lib/slug"
+import { runRefreshMissingAlbums } from "@/services/lyrics-prefetch"
 import {
   CircleNotch,
   MagnifyingGlass,
@@ -118,32 +119,68 @@ export const SongSearch = memo(function SongSearch({
 
     const matches = fuzzyMatchSongs(trimmed, localSongCache, 0.7)
 
-    return matches.slice(0, 5).map(match => ({
-      id: `lrclib-${match.item.id}`,
-      name: match.item.title,
-      artist: match.item.artist,
-      album: match.item.album ?? "",
-      albumArt: match.item.albumArt,
-      duration: match.item.durationMs,
-      hasLyrics: true,
-      lrclibId: match.item.id,
-      displayName: normalizeTrackName(match.item.title),
-      displayArtist: normalizeArtistName(match.item.artist),
-      displayAlbum: match.item.album ? normalizeAlbumName(match.item.album) : "",
-      score: match.score,
-    }))
+    // Deduplicate by title+artist (keep highest scoring match)
+    const seenKeys = new Set<string>()
+    const dedupedMatches: Array<NormalizedSearchResult & { score: number }> = []
+
+    for (const match of matches) {
+      const normalized = normalizeTrackKey({ title: match.item.title, artist: match.item.artist })
+      const key = `${normalized.artist}:${normalized.title}`
+
+      if (seenKeys.has(key)) continue
+      seenKeys.add(key)
+
+      dedupedMatches.push({
+        id: `lrclib-${match.item.id}`,
+        name: match.item.title,
+        artist: match.item.artist,
+        album: match.item.album ?? "",
+        albumArt: match.item.albumArt,
+        duration: match.item.durationMs,
+        hasLyrics: true,
+        lrclibId: match.item.id,
+        displayName: normalizeTrackName(match.item.title),
+        displayArtist: normalizeArtistName(match.item.artist),
+        displayAlbum: match.item.album ? normalizeAlbumName(match.item.album) : "",
+        score: match.score,
+      })
+
+      if (dedupedMatches.length >= 5) break
+    }
+
+    return dedupedMatches
   }, [query, localSongCache])
 
   const results = useMemo((): NormalizedSearchResult[] => {
     if (localMatches.length === 0) return apiResults
 
-    // Build a map of API results by ID for merging metadata
-    const apiResultsById = new Map(apiResults.map(r => [r.id, r]))
+    // Build maps of API results by lrclibId and title+artist for enrichment
+    const apiResultsByLrclibId = new Map(
+      apiResults.filter(r => r.lrclibId).map(r => [r.lrclibId, r]),
+    )
+    const apiResultsByTitleArtist = new Map<string, NormalizedSearchResult>(
+      apiResults.map(r => {
+        const normalized = normalizeTrackKey({ title: r.name, artist: r.artist })
+        return [`${normalized.artist}:${normalized.title}`, r]
+      }),
+    )
 
     // Enrich local matches with album info from API results if missing
+    // Try matching by lrclibId first, then fall back to title+artist
     const enrichedLocalMatches = localMatches.map(local => {
-      const apiMatch = apiResultsById.get(local.id)
-      if (apiMatch && !local.album && apiMatch.album) {
+      if (local.album) return local // Already has album
+
+      // Try lrclibId match first
+      let apiMatch = local.lrclibId ? apiResultsByLrclibId.get(local.lrclibId) : undefined
+
+      // Fall back to title+artist match for different versions
+      if (!apiMatch) {
+        const normalized = normalizeTrackKey({ title: local.name, artist: local.artist })
+        const key = `${normalized.artist}:${normalized.title}`
+        apiMatch = apiResultsByTitleArtist.get(key)
+      }
+
+      if (apiMatch?.album) {
         return {
           ...local,
           album: apiMatch.album,
@@ -154,8 +191,23 @@ export const SongSearch = memo(function SongSearch({
       return local
     })
 
-    const localIds = new Set(enrichedLocalMatches.map(m => m.id))
-    const filteredApiResults = apiResults.filter(r => !localIds.has(r.id))
+    // Use both lrclibId AND title+artist for deduplication
+    const localLrclibIds = new Set(enrichedLocalMatches.map(m => m.lrclibId).filter(Boolean))
+    const localTitleArtistKeys = new Set(
+      enrichedLocalMatches.map(m => {
+        const normalized = normalizeTrackKey({ title: m.name, artist: m.artist })
+        return `${normalized.artist}:${normalized.title}`
+      }),
+    )
+    const filteredApiResults = apiResults.filter(r => {
+      // Exclude if same lrclibId
+      if (r.lrclibId && localLrclibIds.has(r.lrclibId)) return false
+      // Exclude if same title+artist (different version/duration)
+      const normalized = normalizeTrackKey({ title: r.name, artist: r.artist })
+      const key = `${normalized.artist}:${normalized.title}`
+      if (localTitleArtistKeys.has(key)) return false
+      return true
+    })
 
     const highConfidenceLocals = enrichedLocalMatches.filter(m => m.score >= 0.85)
     const lowerConfidenceLocals = enrichedLocalMatches.filter(m => m.score < 0.85)
@@ -164,14 +216,20 @@ export const SongSearch = memo(function SongSearch({
   }, [localMatches, apiResults])
 
   // Persist enriched album info to stores when API results provide missing data
+  // Also trigger background refresh for local matches still missing album after enrichment
   useEffect(() => {
-    if (apiResults.length === 0) return
+    if (localMatches.length === 0) return
 
-    const apiResultsById = new Map(apiResults.map(r => [r.id, r]))
+    const apiResultsByLrclibId = new Map(
+      apiResults.filter(r => r.lrclibId).map(r => [r.lrclibId, r]),
+    )
+    const stillMissingAlbum: Array<{ id: number; album: string | undefined }> = []
 
     for (const local of localMatches) {
-      const apiMatch = apiResultsById.get(local.id)
-      if (apiMatch && !local.album && apiMatch.album && local.lrclibId) {
+      if (!local.lrclibId) continue
+
+      const apiMatch = apiResultsByLrclibId.get(local.lrclibId)
+      if (apiMatch && !local.album && apiMatch.album) {
         // Only include defined values to satisfy exactOptionalPropertyTypes
         const updates: { album?: string; albumArt?: string } = {
           album: apiMatch.album,
@@ -182,7 +240,15 @@ export const SongSearch = memo(function SongSearch({
         // Update both stores - they'll no-op if song isn't in that store
         favoritesStore.updateMetadata(local.lrclibId, updates)
         recentSongsStore.updateAlbumInfo(local.lrclibId, updates)
+      } else if (!local.album) {
+        // Local match without album - trigger refresh (whether or not API matched)
+        stillMissingAlbum.push({ id: local.lrclibId, album: undefined })
       }
+    }
+
+    // Background refresh for songs still missing album info
+    if (stillMissingAlbum.length > 0) {
+      runRefreshMissingAlbums(stillMissingAlbum)
     }
   }, [localMatches, apiResults])
 

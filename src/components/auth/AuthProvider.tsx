@@ -8,6 +8,7 @@ import {
   setlistsStore,
 } from "@/core"
 import { fetchFavorites, fetchHistory, fetchTopCatalogSongs } from "@/lib/sync-service"
+import { runPrefetchTopSongs } from "@/services/lyrics-prefetch"
 import type { Session } from "next-auth"
 import { SessionProvider } from "next-auth/react"
 import { type ReactNode, useEffect } from "react"
@@ -39,6 +40,8 @@ export function AuthProvider({ children, session }: AuthProviderProps) {
         if (!hasCache) {
           recentSongsStore.setInitialized(true)
         }
+        // Prefetch top songs with enhancements for non-authenticated users
+        runPrefetchTopSongs(20)
         return
       }
 

@@ -160,9 +160,7 @@ function StatusBadge({
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
-        active
-          ? "bg-green-500/20 text-green-400"
-          : "bg-neutral-800 text-neutral-500"
+        active ? "bg-green-500/20 text-green-400" : "bg-neutral-800 text-neutral-500"
       }`}
     >
       {active ? <Check size={12} weight="bold" /> : <X size={12} />}
@@ -316,35 +314,35 @@ function SongCard({
         </div>
 
         <div className="flex items-center gap-2 pt-2 border-t border-neutral-800">
-        {song.lrclibId ? (
-          song.hasEnhancement ? (
-            <Link
-              href={`/admin/enhance/${song.lrclibId}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-500 transition-colors"
-            >
-              <PencilSimple size={14} />
-              <span>Edit</span>
-            </Link>
-          ) : (
-            <Link
-              href={`/admin/enhance/${song.lrclibId}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 transition-colors"
-            >
-              <Sparkle size={14} />
-              <span>Enhance</span>
-            </Link>
-          )
-        ) : null}
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={isDeleting}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 text-neutral-400 text-sm rounded-lg hover:bg-red-600/20 hover:text-red-400 transition-colors disabled:opacity-50 ml-auto"
-          title="Delete song permanently"
-        >
-          <Trash size={14} />
-          <span>{isDeleting ? "..." : "Delete"}</span>
-        </button>
+          {song.lrclibId ? (
+            song.hasEnhancement ? (
+              <Link
+                href={`/admin/enhance/${song.lrclibId}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-500 transition-colors"
+              >
+                <PencilSimple size={14} />
+                <span>Edit</span>
+              </Link>
+            ) : (
+              <Link
+                href={`/admin/enhance/${song.lrclibId}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 transition-colors"
+              >
+                <Sparkle size={14} />
+                <span>Enhance</span>
+              </Link>
+            )
+          ) : null}
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 text-neutral-400 text-sm rounded-lg hover:bg-red-600/20 hover:text-red-400 transition-colors disabled:opacity-50 ml-auto"
+            title="Delete song permanently"
+          >
+            <Trash size={14} />
+            <span>{isDeleting ? "..." : "Delete"}</span>
+          </button>
         </div>
       </div>
     </motion.div>
