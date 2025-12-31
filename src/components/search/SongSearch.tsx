@@ -4,8 +4,9 @@ import { springs } from "@/animations"
 import { ListeningWaveform, StreamingText, VoiceSearchButton } from "@/components/audio"
 import { INPUT_LIMITS } from "@/constants/limits"
 import { favoritesStore, recentSongsStore, useIsAuthenticated } from "@/core"
-import { useLocalSongCache, useVoiceSearch } from "@/hooks"
+import { useLocalSongCache, useSongIndexWithRefresh, useVoiceSearch } from "@/hooks"
 import { normalizeTrackKey } from "@/lib/bpm"
+import { searchSongIndex } from "@/lib/fuse-search"
 import { fuzzyMatchSongs } from "@/lib/fuzzy-search"
 import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import type { SearchApiResponse, SearchResultTrack } from "@/lib/search-api-types"
@@ -96,6 +97,7 @@ export const SongSearch = memo(function SongSearch({
   const isAuthenticated = useIsAuthenticated()
   const voiceSearch = useVoiceSearch()
   const localSongCache = useLocalSongCache()
+  const songIndex = useSongIndexWithRefresh()
   const [query, setQuery] = useState("")
   const [apiResults, setApiResults] = useState<NormalizedSearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -117,13 +119,12 @@ export const SongSearch = memo(function SongSearch({
     const trimmed = query.trim()
     if (!trimmed || trimmed.length < 2) return []
 
-    const matches = fuzzyMatchSongs(trimmed, localSongCache, 0.7)
-
-    // Deduplicate by title+artist (keep highest scoring match)
     const seenKeys = new Set<string>()
     const dedupedMatches: Array<NormalizedSearchResult & { score: number }> = []
 
-    for (const match of matches) {
+    const cacheMatches = fuzzyMatchSongs(trimmed, localSongCache, 0.7)
+
+    for (const match of cacheMatches) {
       const normalized = normalizeTrackKey({ title: match.item.title, artist: match.item.artist })
       const key = `${normalized.artist}:${normalized.title}`
 
@@ -144,12 +145,38 @@ export const SongSearch = memo(function SongSearch({
         displayAlbum: match.item.album ? normalizeAlbumName(match.item.album) : "",
         score: match.score,
       })
-
-      if (dedupedMatches.length >= 5) break
     }
 
-    return dedupedMatches
-  }, [query, localSongCache])
+    if (songIndex.length > 0) {
+      const indexMatches = searchSongIndex(trimmed, songIndex, 10)
+
+      for (const match of indexMatches) {
+        const key = `${match.item.a}:${match.item.t}`
+
+        if (seenKeys.has(key)) continue
+        seenKeys.add(key)
+
+        dedupedMatches.push({
+          id: `lrclib-${match.item.id}`,
+          name: match.item.t,
+          artist: match.item.a,
+          album: match.item.al ?? "",
+          albumArt: match.item.art,
+          duration: match.item.dur ? match.item.dur * 1000 : 0,
+          hasLyrics: true,
+          lrclibId: match.item.id,
+          displayName: match.item.t,
+          displayArtist: match.item.a,
+          displayAlbum: match.item.al ?? "",
+          score: match.score * 0.9,
+        })
+      }
+    }
+
+    dedupedMatches.sort((a, b) => b.score - a.score)
+
+    return dedupedMatches.slice(0, 10)
+  }, [query, localSongCache, songIndex])
 
   const results = useMemo((): NormalizedSearchResult[] => {
     if (localMatches.length === 0) return apiResults

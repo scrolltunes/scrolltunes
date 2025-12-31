@@ -29,3 +29,4 @@ export { useHaptic, type HapticPattern, type UseHapticResult } from "./useHaptic
 export { useVoiceSearch } from "./useVoiceSearch"
 export { useMediaQuery, useIsMobile, useIsDesktop } from "./useMediaQuery"
 export { useLocalSongCache, type LocalCachedSong } from "./useLocalSongCache"
+export { useSongIndexWithRefresh, useSongIndexReady } from "./useSongIndexWithRefresh"

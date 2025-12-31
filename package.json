@@ -30,6 +30,7 @@
     "@web-scrobbler/metadata-filter": "^3.2.0",
     "drizzle-orm": "^0.45.1",
     "effect": "^3",
+    "fuse.js": "^7.1.0",
     "html-to-image": "^1.11.13",
     "motion": "^11",
     "next": "16.0.10",
