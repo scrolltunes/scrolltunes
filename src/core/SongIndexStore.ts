@@ -170,6 +170,36 @@ class SongIndexStore {
   getSongs(): SongIndexEntry[] {
     return this.state.index?.songs ?? []
   }
+
+  private prefetchedArtists = new Set<string>()
+
+  async prefetchArtistSongs(artist: string): Promise<void> {
+    const artistLower = artist.toLowerCase()
+    if (this.prefetchedArtists.has(artistLower)) return
+
+    this.prefetchedArtists.add(artistLower)
+
+    try {
+      const response = await fetch(
+        `/api/songs/by-artist?artist=${encodeURIComponent(artist)}&limit=20`,
+      )
+      if (!response.ok) return
+
+      const data = (await response.json()) as {
+        songs: Array<{ id: number; t: string; a: string; al?: string; dur?: number }>
+      }
+
+      if (data.songs.length > 0) {
+        this.mergeLocalEntries(data.songs)
+      }
+    } catch {
+      this.prefetchedArtists.delete(artistLower)
+    }
+  }
+
+  hasPrefetchedArtist(artist: string): boolean {
+    return this.prefetchedArtists.has(artist.toLowerCase())
+  }
 }
 
 export const songIndexStore = new SongIndexStore()

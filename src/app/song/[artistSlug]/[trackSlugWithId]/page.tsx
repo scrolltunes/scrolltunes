@@ -15,6 +15,7 @@ import {
   chordsStore,
   metronomeStore,
   recentSongsStore,
+  songIndexStore,
   useChordsState,
   useDetailedActivityStatus,
   usePlayerControls,
@@ -258,6 +259,7 @@ export default function SongPage() {
           albumArt: cached.albumArt,
         })
 
+        songIndexStore.prefetchArtistSongs(cached.lyrics.artist)
         fetchChordsForSong(cached.lyrics.artist, cached.lyrics.title)
         return
       }
@@ -324,6 +326,8 @@ export default function SongPage() {
           durationSeconds: data.lyrics.duration,
           albumArt: data.albumArt ?? undefined,
         })
+
+        songIndexStore.prefetchArtistSongs(data.lyrics.artist)
 
         // Upsert to song catalog with BPM (fire-and-forget, only for authenticated users)
         fetch("/api/songs/upsert", {
