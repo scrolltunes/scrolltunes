@@ -96,13 +96,14 @@ const syncHistory = (request: Request) =>
                 durationMs: prepared.durationMs,
                 artistLower: prepared.artistLower,
                 titleLower: prepared.titleLower,
+                albumLower: prepared.albumLower,
                 hasSyncedLyrics: prepared.hasSyncedLyrics,
                 totalPlayCount: playCount,
               })
               .onConflictDoUpdate({
                 target: [songs.artistLower, songs.titleLower],
                 set: {
-                  ...(prepared.album && { album: prepared.album }),
+                  ...(prepared.album && { album: prepared.album, albumLower: prepared.albumLower }),
                   ...(prepared.durationMs && { durationMs: prepared.durationMs }),
                   updatedAt: now,
                 },

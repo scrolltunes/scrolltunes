@@ -5,7 +5,7 @@
  * Used to create consistent deduplication keys across different sources.
  */
 
-import { normalizeArtistName, normalizeTrackName } from "./normalize-track"
+import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "./normalize-track"
 
 /**
  * Create normalized lowercase key for song deduplication.
@@ -34,6 +34,15 @@ export function normalizeTitle(title: string): string {
  */
 export function normalizeArtist(artist: string): string {
   const cleaned = normalizeArtistName(artist)
+  return normalizeSongKey(cleaned)
+}
+
+/**
+ * Normalize album for catalog storage.
+ * Applies album cleaning (removes remaster labels, etc.) then creates lowercase key.
+ */
+export function normalizeAlbum(album: string): string {
+  const cleaned = normalizeAlbumName(album)
   return normalizeSongKey(cleaned)
 }
 
@@ -77,6 +86,9 @@ export function prepareCatalogSong(input: CatalogSongInput) {
     // Normalized keys for deduplication
     titleLower: normalizeTitle(input.title),
     artistLower: normalizeArtist(input.artist),
+
+    // Normalized album for search (not deduplication)
+    albumLower: input.album ? normalizeAlbum(input.album) : null,
 
     // Status
     hasSyncedLyrics: input.hasSyncedLyrics ?? false,

@@ -245,10 +245,11 @@ export const checkLyricsAvailability = (
 
   const tryEndpoint = (endpoint: "get-cached" | "get") =>
     Effect.gen(function* () {
-      const response = yield* fetchResponse(
-        `${LRCLIB_BASE_URL}/${endpoint}?${params.toString()}`,
-        { headers, cache: "force-cache", next: { revalidate: 600 } },
-      )
+      const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/${endpoint}?${params.toString()}`, {
+        headers,
+        cache: "force-cache",
+        next: { revalidate: 600 },
+      })
 
       if (response.status === 404) {
         return null
@@ -330,6 +331,87 @@ export const searchLRCLibTracks = (
       hasSyncedLyrics: r.syncedLyrics !== null && r.syncedLyrics.length > 0,
       hasValidSyncedLyrics: hasValidLrcTimestamps(r.syncedLyrics),
     }))
+  })
+}
+
+/**
+ * Scored candidate result from LRCLIB search
+ */
+export interface ScoredLrclibCandidate {
+  readonly lrclibId: number
+  readonly trackName: string
+  readonly artistName: string
+  readonly albumName: string | null
+  readonly duration: number
+  readonly score: number
+}
+
+/**
+ * Search LRCLIB for all valid lyrics candidates for a song.
+ * Returns ALL valid candidates sorted by score (highest first).
+ *
+ * @param title - Track title to search for
+ * @param artist - Artist name to search for
+ * @param targetDuration - Expected duration in seconds (for scoring)
+ */
+export const searchLRCLibByTitleArtist = (
+  title: string,
+  artist: string,
+  targetDuration: number | null,
+): Effect.Effect<readonly ScoredLrclibCandidate[], LyricsAPIError, LyricsClientEnv> => {
+  return Effect.gen(function* () {
+    const params = new URLSearchParams({
+      track_name: title,
+      artist_name: artist,
+    })
+
+    const response = yield* fetchResponse(`${LRCLIB_BASE_URL}/search?${params.toString()}`, {
+      headers,
+      cache: "force-cache",
+      next: { revalidate: 600 },
+    })
+
+    if (!response.ok) {
+      return yield* Effect.fail(
+        new LyricsAPIError({ status: response.status, message: response.statusText }),
+      )
+    }
+
+    const results = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<LRCLibResponse[]>,
+      catch: () => new LyricsAPIError({ status: 0, message: "Failed to parse response" }),
+    })
+
+    const candidates = results
+      .filter(r => hasValidLrcTimestamps(r.syncedLyrics))
+      .map(r => {
+        const track: LRCLibTrackResult = {
+          id: r.id,
+          trackName: r.trackName,
+          artistName: r.artistName,
+          albumName: r.albumName,
+          duration: r.duration,
+          hasSyncedLyrics: r.syncedLyrics !== null,
+          hasValidSyncedLyrics: true,
+        }
+        const score = scoreTrackCandidate(track, {
+          targetDuration,
+          targetTrackName: title,
+          targetArtistName: artist,
+        })
+        return {
+          lrclibId: r.id,
+          trackName: r.trackName,
+          artistName: r.artistName,
+          albumName: r.albumName,
+          duration: r.duration,
+          score,
+        }
+      })
+      .filter(c => c.score > 0)
+      .sort((a, b) => b.score - a.score)
+
+    return candidates
   })
 }
 

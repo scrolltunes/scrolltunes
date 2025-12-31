@@ -245,6 +245,7 @@ export const songs = pgTable(
     // Normalized for deduplication (lowercase, trimmed, punctuation removed)
     artistLower: text("artist_lower").notNull(),
     titleLower: text("title_lower").notNull(),
+    albumLower: text("album_lower"),
 
     // External IDs (Spotify is 1:1, LRCLIB is 1:many via separate table)
     spotifyId: text("spotify_id"),
@@ -272,6 +273,7 @@ export const songs = pgTable(
     uniqueIndex("songs_artist_title_lower_idx").on(table.artistLower, table.titleLower),
     uniqueIndex("songs_spotify_id_idx").on(table.spotifyId).where(sql`spotify_id IS NOT NULL`),
     index("songs_artist_title_idx").on(table.artist, table.title),
+    index("songs_album_lower_idx").on(table.albumLower).where(sql`album_lower IS NOT NULL`),
   ],
 )
 

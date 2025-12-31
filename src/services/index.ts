@@ -1,3 +1,13 @@
+export {
+  CatalogError,
+  CatalogService,
+  CatalogServiceLive,
+  type CatalogServiceShape,
+  type CatalogSong,
+  type LrclibCandidate,
+  type UpsertSongResult,
+  type UpsertSongWithLrclibIdsInput,
+} from "./catalog"
 export { DbConfigError, DbLayer, DbService, DbServiceLive } from "./db"
 export { FetchError, FetchService, FetchServiceLive } from "./fetch"
 export { BpmProviders, BpmProvidersLive } from "./bpm-providers"

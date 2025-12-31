@@ -289,16 +289,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     : id
 
   // Update catalog with album name and BPM if available (fire and forget)
+  // Also register the LRCLIB ID if not already in catalog
   const hasAlbumUpdate = !!spotifyAlbumName
   const hasBpmUpdate = bpmResult && !cachedBpm // Only update if BPM was fetched fresh (not from cache)
 
-  if (hasAlbumUpdate || hasBpmUpdate) {
-    db.select({ songId: songLrclibIds.songId })
-      .from(songLrclibIds)
-      .where(eq(songLrclibIds.lrclibId, actualLrclibId))
-      .limit(1)
-      .then(([mapping]) => {
-        if (mapping) {
+  // Fire-and-forget catalog update/registration
+  ;(async () => {
+    try {
+      // Check if this LRCLIB ID is already in catalog
+      const [existingMapping] = await db
+        .select({ songId: songLrclibIds.songId })
+        .from(songLrclibIds)
+        .where(eq(songLrclibIds.lrclibId, actualLrclibId))
+        .limit(1)
+
+      if (existingMapping) {
+        // Update existing song with new metadata
+        if (hasAlbumUpdate || hasBpmUpdate) {
           const updates: Record<string, unknown> = { updatedAt: new Date() }
           if (hasAlbumUpdate) {
             updates.album = spotifyAlbumName
@@ -308,11 +315,76 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             updates.musicalKey = bpmResult.key ?? null
             updates.bpmSource = bpmResult.source
           }
-          return db.update(songs).set(updates).where(eq(songs.id, mapping.songId))
+          await db.update(songs).set(updates).where(eq(songs.id, existingMapping.songId))
         }
-      })
-      .catch(() => {})
-  }
+      } else {
+        // LRCLIB ID not in catalog - register it via upsert
+        const { prepareCatalogSong } = await import("@/lib/song-catalog")
+
+        const prepared = prepareCatalogSong({
+          title: spotifyTrackName ?? lyrics.title,
+          artist: spotifyArtistName ?? lyrics.artist,
+          album: spotifyAlbumName,
+          spotifyId: resolvedSpotifyId,
+          hasSyncedLyrics: true,
+          bpmAttribution: bpmResult
+            ? {
+                bpm: bpmResult.bpm,
+                source: bpmResult.source,
+                sourceUrl: "",
+                musicalKey: bpmResult.key,
+              }
+            : undefined,
+        })
+
+        // Upsert song
+        const [upsertedSong] = await db
+          .insert(songs)
+          .values({
+            title: prepared.title,
+            artist: prepared.artist,
+            album: prepared.album ?? "",
+            artistLower: prepared.artistLower,
+            titleLower: prepared.titleLower,
+            albumLower: prepared.albumLower,
+            spotifyId: prepared.spotifyId,
+            hasSyncedLyrics: prepared.hasSyncedLyrics,
+            bpm: prepared.bpm,
+            musicalKey: prepared.musicalKey,
+            bpmSource: prepared.bpmSource,
+            bpmSourceUrl: prepared.bpmSourceUrl,
+          })
+          .onConflictDoUpdate({
+            target: [songs.artistLower, songs.titleLower],
+            set: {
+              updatedAt: new Date(),
+              ...(prepared.album && { album: prepared.album }),
+              ...(prepared.spotifyId && { spotifyId: prepared.spotifyId }),
+              ...(prepared.bpm && {
+                bpm: prepared.bpm,
+                musicalKey: prepared.musicalKey,
+                bpmSource: prepared.bpmSource,
+              }),
+            },
+          })
+          .returning({ id: songs.id })
+
+        // Register the LRCLIB ID
+        if (upsertedSong) {
+          await db
+            .insert(songLrclibIds)
+            .values({
+              songId: upsertedSong.id,
+              lrclibId: actualLrclibId,
+              isPrimary: true,
+            })
+            .onConflictDoNothing()
+        }
+      }
+    } catch (error) {
+      console.error("[Lyrics] Catalog update failed:", error)
+    }
+  })()
 
   // Fetch enhancement payload if it exists for this LRCLIB ID
   const [enhancement] = await db

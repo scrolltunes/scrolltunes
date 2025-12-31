@@ -83,6 +83,7 @@ const upsertSong = (request: Request) =>
             spotifyId: prepared.spotifyId,
             artistLower: prepared.artistLower,
             titleLower: prepared.titleLower,
+            albumLower: prepared.albumLower,
             hasSyncedLyrics: prepared.hasSyncedLyrics,
             bpm: prepared.bpm,
             musicalKey: prepared.musicalKey,
@@ -92,7 +93,7 @@ const upsertSong = (request: Request) =>
           .onConflictDoUpdate({
             target: [songs.artistLower, songs.titleLower],
             set: {
-              ...(prepared.album && { album: prepared.album }),
+              ...(prepared.album && { album: prepared.album, albumLower: prepared.albumLower }),
               ...(prepared.durationMs && { durationMs: prepared.durationMs }),
               ...(prepared.spotifyId && { spotifyId: prepared.spotifyId }),
               ...(prepared.hasSyncedLyrics && { hasSyncedLyrics: prepared.hasSyncedLyrics }),
