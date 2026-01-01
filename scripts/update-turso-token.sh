@@ -65,8 +65,8 @@ fi
 
 # Update Vercel (production)
 echo "Updating Vercel production environment..."
-echo "$NEW_TOKEN" | vercel env rm TURSO_AUTH_TOKEN production -y 2>/dev/null || true
-echo "$NEW_TOKEN" | vercel env add TURSO_AUTH_TOKEN production
+vercel env rm TURSO_AUTH_TOKEN production -y 2>/dev/null || true
+printf '%s' "$NEW_TOKEN" | vercel env add TURSO_AUTH_TOKEN production
 
 echo ""
 echo "=== Done! ==="
