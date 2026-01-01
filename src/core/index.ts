@@ -158,13 +158,3 @@ export {
   useUniqueChords,
   type ChordsState,
 } from "./ChordsStore"
-
-export {
-  songIndexStore,
-  useSongIndexState,
-  useSongIndex,
-  useIsSongIndexLoading,
-  type SongIndexEntry,
-  type SongIndex,
-  type SongIndexState,
-} from "./SongIndexStore"

@@ -409,7 +409,6 @@ Day 4: Admin uploads Guitar Pro enhancement
 | `scrolltunes:lyrics:{id}` | Cached lyrics + metadata | 7 days | ~10KB each |
 | `scrolltunes:favorites` | Favorite songs list | None | ~5KB |
 | `scrolltunes:prefs` | User preferences | None | ~1KB |
-| `scrolltunes:song-index` | Searchable song index (proposed) | 24h | ~200KB |
 
 ### CachedLyrics Structure
 
@@ -852,57 +851,12 @@ const prefetchLyricsImpl = (id: number) =>
 | After playing song | Same artist discography (proposed) | 2 parallel |
 | Search result click | Song + related (proposed) | 1 |
 
-## Proposed Song Index
+## ~~Proposed Song Index~~ (Removed)
 
-For instant search, maintain a lightweight index in localStorage:
-
-```typescript
-interface SongIndexEntry {
-  id: number          // lrclibId (primary)
-  t: string           // title (normalized, lowercase)
-  a: string           // artist (normalized, lowercase)
-  al?: string         // album (normalized)
-  art?: string        // albumArt URL
-  dur?: number        // duration in seconds
-}
-
-interface SongIndex {
-  version: number
-  updatedAt: number
-  entries: SongIndexEntry[]
-}
-
-// Storage key: scrolltunes:song-index
-// Target size: ~2000 songs, ~200KB
-// Refresh: Daily or on version mismatch
-```
-
-### Index Population
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Sources for Song Index                                      │
-├─────────────────────────────────────────────────────────────┤
-│ 1. Top songs from catalog (/api/songs/top?limit=500)        │
-│ 2. User's recent songs (localStorage)                       │
-│ 3. User's favorites (localStorage)                          │
-│ 4. Setlist songs (localStorage)                             │
-│ 5. All prefetched songs (localStorage lyrics cache)         │
-└─────────────────────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Deduplicate by normalized title+artist                      │
-│ Keep entry with most complete metadata                      │
-│ Prefer entries with albumArt                                │
-└─────────────────────────────────────────────────────────────┘
-     │
-     ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Save to scrolltunes:song-index                              │
-│ Fuse.js searches this in <10ms                              │
-└─────────────────────────────────────────────────────────────┘
-```
+> **Status:** This feature was implemented and later removed. The client-side songIndex
+> added complexity and caused display issues (lowercase text flashing before API enrichment).
+> With Turso providing fast FTS search (~100-350ms), the songIndex is no longer needed.
+> Local search now uses only `useLocalSongCache` (favorites, recents, setlists, prefetched lyrics).
 
 ## Vercel-Specific Optimizations
 
@@ -933,25 +887,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ tracks: results })
 }
 ```
-
-### Edge Config for Song Index
-
-Store the song index in Edge Config for ultra-fast reads:
-
-```typescript
-import { get } from '@vercel/edge-config'
-
-// /api/songs/index/route.ts
-export const runtime = 'edge'
-
-export async function GET() {
-  // Ultra-fast reads (<1ms)
-  const songIndex = await get<SongIndex>('songIndex')
-  return NextResponse.json(songIndex)
-}
-```
-
-**Limitation:** 512KB max, fits ~5000 minimal song entries.
 
 ### CDN Cache Headers
 
