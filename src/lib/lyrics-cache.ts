@@ -8,7 +8,7 @@ import type { CachedLyrics } from "./recent-songs-types"
 import { LYRICS_CACHE_TTL_MS } from "./recent-songs-types"
 
 const LYRICS_KEY_PREFIX = "scrolltunes:lyrics:"
-const CACHE_VERSION = 9 // v9: Improved album metadata enrichment
+const CACHE_VERSION = 10 // v10: Spotify-first search with proper casing
 
 function lyricsKey(id: number): string {
   return `${LYRICS_KEY_PREFIX}${id}`
