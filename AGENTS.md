@@ -4,547 +4,81 @@ Live lyrics teleprompter for musicians. Detects singing voice and syncs scrollin
 
 **Domain:** https://scrolltunes.com
 
+> **Keep this file lean.** No verbose examples, no TODO items, no feature status. Use `docs/` for detailed documentation and `TODO.md` for task tracking.
+
 ## Hard Requirements (Non-Negotiable)
 
-These rules are **strictly enforced**. Code that violates them will be rejected.
+1. **Use bun exclusively** — not `npm` or `node`
+2. **Do not commit unless explicitly asked**
+3. **Follow architectural patterns** — Effect.ts, useSyncExternalStore, tagged events
+4. **No external state libraries** — Use `useSyncExternalStore` with class-based stores
+5. **Effect.ts for async** — All async operations, error handling, side effects
+6. **Type safety** — No `any` types, no `@ts-ignore`
 
-1. **Use bun exclusively** — All package management and script execution must use `bun`, not `npm` or `node`
-2. **Do not commit unless explicitly asked** — Never run `git commit` or `git push` unless the user explicitly requests it
-3. **Follow architectural patterns** — All new code must conform to the patterns in this document (Effect.ts, useSyncExternalStore, tagged events, etc.)
-4. **No external state libraries** — Use `useSyncExternalStore` with class-based stores; no Redux, Zustand, Jotai, or similar
-5. **Effect.ts for async** — All async operations, error handling, and side effects must use Effect.ts patterns
-6. **Type safety** — No `any` types, no `@ts-ignore`, no suppressing errors; fix them properly
-
-**Use subagents for TODO items.** When implementing TODO items (from TODO.md, Oracle plans, or any task list), always use the Task tool to spawn subagents for each independent task. This enables parallel execution and keeps the main thread focused on coordination.
-
-## Feature Status
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Core teleprompter | ✅ Live | LyricsPlayer, smooth scrolling, click-to-seek |
-| Voice detection | ✅ Live | Silero VAD + energy gate + YAMNet classifier |
-| Song search | ✅ Live | Spotify-first with Turso LRCLIB verification |
-| User accounts | ✅ Live | Google OAuth, history/favorites sync |
-| Setlists | ✅ Live | Create, edit, reorder songs |
-| Chords | ✅ Live | Songsterr integration, transpose, inline display |
-| Word timing | ✅ Live | Guitar Pro enhancement, karaoke-style highlighting |
-| Voice search | ✅ Live | Web Speech + Google STT fallback |
-| Metronome | ⚠️ Partial | BPM display exists, tap tempo not implemented |
-| Jam session | ❌ Planned | Multi-device sync for groups |
-| Karaoke mode | ❌ Planned | Full-screen with pitch detection |
+**Use subagents for TODO items** to enable parallel execution.
 
 ## Commands
 
 ```bash
-bun install                        # Install deps
-bun run dev                        # Start Next.js dev server
-bun run build                      # Production build
-bun run typecheck                  # TypeScript check
-bun run lint                       # Biome lint
-bun run test                       # Run all tests
-bun run test src/path/file.test.ts # Run single test file
-bun run check                      # lint + typecheck + test
+bun install          # Install deps
+bun run dev          # Start dev server
+bun run build        # Production build
+bun run typecheck    # TypeScript check
+bun run lint         # Biome lint
+bun run test         # Run all tests
+bun run check        # lint + typecheck + test
 ```
-
-## Deployment
-
-Vercel auto-deploys from git. Just commit and push — no manual deploy needed.
 
 ## Documentation
 
 | Document | Purpose |
 |----------|---------|
-| **docs/architecture.md** | Tech stack, project structure, design patterns, API design |
-| **docs/design.md** | Features backlog, product requirements, open questions |
-| **docs/search-optimization-plan.md** | Spotify-first search with Turso LRCLIB index |
-| **docs/lrc-enhancement-system.md** | Word-level timing extraction from Guitar Pro files |
-| **docs/audio-classification-design.md** | YAMNet classifier for voice vs instrument detection |
+| **docs/architecture.md** | Tech stack, project structure, design patterns |
+| **docs/design.md** | Features backlog, product requirements |
 | **TODO.md** | Implementation progress tracking |
-| **docs/archive/** | Historical specs and plans (for reference only) |
 
 ## Code Style
 
-- TypeScript strict mode with `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `isolatedModules`
-- Biome for lint/format: 2-space indent, double quotes, no semicolons, trailing commas
+- TypeScript strict mode (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`)
+- Biome: 2-space indent, double quotes, no semicolons, trailing commas
 - Path alias: `@/*` → `src/*`
-- State: use `useSyncExternalStore` with class-based state, no Redux/Zustand
-- Components: memoize effects, test on mobile, use ARIA labels
 - Copy: imperative mood ("Detect voice"), no ending punctuation
-- Prefer Effect.ts conventions over pure TypeScript patterns
-
-## Effect.ts Requirements (Critical)
-
-- Use Effect for everything: async work, fanout/parallelism, timeouts, retries, and fallbacks.
-- Dependencies must be modeled as services and provided via `Layer` at the composition root.
-- Errors must be typed and handled through Effect error channels (no `try/catch` in domain logic).
-- All environment/config access must use `Effect.Config` + `ConfigProvider`; validate required config at startup.
-- External API access is always enabled; tests should mock or stub network calls as needed.
-
-## Core Concepts
-
-### 1. LyricsPlayer
-
-The `LyricsPlayer` class manages lyrics scrolling state using Effect.ts patterns with tagged events.
-
-```typescript
-import { lyricsPlayer, usePlayerState } from "@/core"
-
-lyricsPlayer.load(lyrics, true) // autoPlay = true
-const state = usePlayerState()
-```
-
-Key features:
-- **State tracking**: idle → ready → playing → paused → completed
-- **Observable hooks**: React components subscribe via `usePlayerState`, `useCurrentLineIndex`, `usePlayerControls`
-- **Tagged events**: Effect.ts `Data.TaggedClass` for type-safe event dispatching
-- **Effect caching**: Prevents re-execution of already completed effects
-- **Time-based scrolling**: Internal animation loop with configurable scroll speed
-- **Click-to-seek**: Jump to any line by clicking
-
-### 2. VoiceActivityStore
-
-The `VoiceActivityStore` handles voice activity detection (VAD) with hysteresis.
-
-```typescript
-import { voiceActivityStore, useVoiceActivity } from "@/core"
-
-await voiceActivityStore.startListening()
-const { isSpeaking, level } = useVoiceActivity()
-```
-
-Key features:
-- **Real-time VAD**: Energy-based voice detection with smoothing
-- **Hysteresis**: Separate on/off thresholds to prevent flickering
-- **Configurable**: Adjustable thresholds, hold time, smoothing factor
-- **Mic integration**: Uses SoundSystem for microphone access
-
-### 3. SoundSystem
-
-The `SoundSystem` is a singleton that owns the AudioContext via Tone.js.
-
-```typescript
-import { soundSystem } from "@/sounds"
-
-await soundSystem.initialize()
-await soundSystem.playClick()
-const analyser = await soundSystem.getMicrophoneAnalyser()
-```
-
-Key features:
-- **Lazy initialization**: Only initializes after user gesture
-- **Single AudioContext**: All audio routes through one context
-- **Mic access**: Provides AnalyserNode for voice detection
-- **UI sounds**: Click, notification, success, metronome sounds
-- **Mute control**: Global mute/unmute with user toggle
-
-### 4. RecentSongsStore
-
-The `RecentSongsStore` manages recent songs with localStorage persistence, server sync, and lyrics caching.
-
-```typescript
-import { recentSongsStore, useRecentSongs } from "@/core"
-
-recentSongsStore.upsertRecent(song) // Adds to recents, syncs to server
-const songs = useRecentSongs() // Subscribe to recent songs list
-```
-
-Key features:
-- **localStorage persistence**: `scrolltunes:recents` for song list (max 5 songs)
-- **Server sync**: Syncs to `/api/user/history` when authenticated
-- **Lyrics caching**: `scrolltunes:lyrics:{id}` with 7-day TTL
-- **Loading states**: `isLoading`, `isInitialized`, `expectedCount` for proper UI
-- **useSyncExternalStore pattern**: Same as other stores
-
-### 5. AccountStore
-
-The `AccountStore` manages authentication state.
-
-```typescript
-import { accountStore, useAccount, useIsAuthenticated } from "@/core"
-
-await accountStore.initialize() // Fetch user session
-const isAuth = useIsAuthenticated() // Subscribe to auth state
-```
-
-### 6. FavoritesStore
-
-The `FavoritesStore` manages favorite songs with localStorage and server sync.
-
-```typescript
-import { favoritesStore, useFavorites, useIsFavorite } from "@/core"
-
-favoritesStore.toggle(song) // Toggle favorite status
-const isFav = useIsFavorite(songId) // Check if song is favorited
-```
-
-### 7. SetlistsStore
-
-The `SetlistsStore` manages user setlists (server-only, requires auth).
-
-```typescript
-import { setlistsStore, useSetlists } from "@/core"
-
-await setlistsStore.fetchAll() // Load user's setlists
-await setlistsStore.create("My Setlist") // Create new setlist
-await setlistsStore.addSong(setlistId, song) // Add song to setlist
-```
-
-### 8. LRC Enhancement System
-
-Word-level timing for karaoke-style highlighting, sourced from Guitar Pro files.
-
-**Display modes:**
-- **Default (Word timing ON)**: Word-by-word animation (uses enhanced timing if available, otherwise estimates based on syllables)
-- **Word timing OFF**: Entire line highlights white instantly when active
-
-The `wordTimingEnabled` preference (stored in `PreferencesStore`) controls this behavior. The toggle appears in `SongActionBar` with a Timer icon. When enhanced timing is available, a sparkle indicator appears.
-
-**Admin features:**
-- Admins see a dropdown on the Word timing button to toggle between "Enhanced" and "Estimated" modes on the fly for comparison
-
-**Data flow:**
-1. Admin uploads Guitar Pro file at `/admin/enhance/[lrclibId]`
-2. GP syllables are joined into words with tick-based timing
-3. Words are aligned to LRCLIB lyrics using fuzzy matching
-4. Enhancement payload is stored in `lrc_word_enhancements` table
-5. `/api/lyrics/[id]` returns enhancement payload when available
-6. Song page stores original lyrics + enhancement payload separately
-7. Enhancement is applied on load if available (provides better timing data)
-8. `LyricLine` component renders word-by-word or whole-line based on `wordTimingEnabled` preference
-
-**Enhancement payload format:**
-```typescript
-interface EnhancementPayload {
-  version: number
-  algoVersion: number
-  lines: Array<{
-    idx: number  // line index
-    words: Array<{
-      idx: number   // word index
-      start: number // offset from line start in ms
-      dur: number   // duration in ms
-    }>
-  }>
-}
-```
-
-**Key files:**
-- `src/lib/gp/align-words.ts` - Alignment algorithm
-- `src/lib/gp/enhance-lrc.ts` - Enhancement pipeline (enhanceLrc, generateEnhancedLrc)
-- `src/lib/enhancement.ts` - Apply enhancement to lyrics
-- `src/app/admin/enhance/[slug]/page.tsx` - Admin UI
-- `src/core/PreferencesStore.ts` - `wordTimingEnabled` preference
-- `src/components/display/LyricLine.tsx` - Renders word timing animation
-
-### 9. SongListItem Component
-
-**Always use `SongListItem` when displaying a song in a list.** This component handles:
-- Loading and displaying cached normalized titles from Spotify
-- Album art loading with skeleton states
-- Optional favorite button and remove button
-- Optional entry/exit animations
-
-```typescript
-import { SongListItem } from "@/components/ui"
-
-// Basic usage
-<SongListItem
-  id={song.id}
-  title={song.title}
-  artist={song.artist}
-/>
-
-// With favorite and remove buttons
-<SongListItem
-  id={song.id}
-  title={song.title}
-  artist={song.artist}
-  albumArt={song.albumArt}
-  showFavorite
-  showRemove
-  onRemove={(id, albumArt) => handleRemove(id)}
-/>
-
-// With animations (for lists with AnimatePresence)
-<SongListItem
-  id={song.id}
-  title={song.title}
-  artist={song.artist}
-  animationIndex={index}
-  animateExit
-/>
-
-// With custom action button
-<SongListItem
-  id={song.id}
-  title={song.title}
-  artist={song.artist}
-  renderAction={({ albumArt }) => (
-    <button onClick={() => doSomething(albumArt)}>Action</button>
-  )}
-/>
-```
-
-Key features:
-- **Normalized titles**: Loads cached Spotify metadata for proper casing/formatting
-- **Album art loading**: Fetches from cache or API, shows skeleton during load
-- **Flexible actions**: `showFavorite`, `showRemove`, or custom `renderAction`
-- **Animation support**: `animationIndex` for staggered entry, `animateExit` for exit animations
 
 ## Key Patterns
 
-### 1. State Management with useSyncExternalStore
+### State Management
+Use `useSyncExternalStore` with class-based stores. No Redux/Zustand.
 
-```typescript
-class MyStore {
-  private listeners = new Set<() => void>()
-  private state: State = initialState
+### Effect.ts
+- Use Effect for async work, parallelism, timeouts, retries, fallbacks, DI
+- Dependencies via `Layer`, errors through Effect error channels
+- Tagged events with `Data.TaggedClass`
 
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
-  }
+### Core Stores
+All in `@/core`: `LyricsPlayer`, `VoiceActivityStore`, `RecentSongsStore`, `AccountStore`, `FavoritesStore`, `SetlistsStore`, `PreferencesStore`
 
-  getSnapshot = () => this.state
+### SoundSystem
+Singleton at `@/sounds` owns AudioContext via Tone.js. Lazy init after user gesture.
 
-  private notify() {
-    for (const listener of this.listeners) {
-      listener()
-    }
-  }
-}
+### SongListItem
+Always use `SongListItem` from `@/components/ui` when displaying songs in lists.
 
-export function useMyState() {
-  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
-}
-```
+## Database
 
-### 2. Effect.ts Tagged Events
+### Neon (Primary)
+- HTTP driver — no transactions
+- Use `db.batch()` for multiple updates
 
-```typescript
-import { Data, Effect } from "effect"
-
-export class Play extends Data.TaggedClass("Play")<object> {}
-export class Seek extends Data.TaggedClass("Seek")<{ readonly time: number }> {}
-
-readonly dispatch = (event: PlayerEvent): Effect.Effect<void> => {
-  return Effect.sync(() => {
-    switch (event._tag) {
-      case "Play":
-        this.handlePlay()
-        break
-      case "Seek":
-        this.handleSeek(event.time)
-        break
-    }
-  })
-}
-```
-
-### 3. Effect Memoization in Components
-
-```typescript
-export function MyComponent() {
-  const effect1 = useMemo(() => visualEffect("name", effect), [])
-  
-  const resultEffect = useMemo(() => {
-    const composed = Effect.all([effect1.effect, effect2.effect])
-    return new VisualEffect("result", composed, [effect1, effect2])
-  }, [effect1, effect2])
-}
-```
-
-### 4. Animation System
-
-Uses Motion (Framer Motion successor) with centralized config:
-
-```typescript
-// src/animations.ts
-export const springs = {
-  default: { type: "spring", stiffness: 180, damping: 25, mass: 0.8 },
-  scroll: { type: "spring", stiffness: 100, damping: 20, mass: 0.5 },
-  lyricHighlight: { type: "spring", stiffness: 260, damping: 18 },
-}
-```
-
-### 5. Sound System
-
-Centralized Tone.js audio with singleton pattern:
-- Lazy initialization (await user gesture)
-- Shared reverb and volume processing
-- Distinct synths for different sound types
-- Mute flag gates all playback
-- Sound triggers on state transitions
-
-## File Structure
-
-```
-app/                         # Next.js App Router
-├── layout.tsx              # Root layout
-├── page.tsx                # Home page
-├── globals.css             # Tailwind + global styles
-└── favicon.ico
-
-src/
-├── animations.ts           # Motion spring/timing config
-├── theme.ts                # Design tokens
-├── components/
-│   ├── display/            # Lyrics display components
-│   ├── audio/              # Voice detection UI
-│   ├── chords/             # Chord diagrams
-│   ├── feedback/           # Notifications, toasts
-│   ├── layout/             # Navigation, headers
-│   ├── session/            # Jam session UI
-│   └── ui/                 # Reusable primitives
-├── constants/
-│   └── index.ts            # App constants
-├── core/
-│   ├── LyricsPlayer.ts     # Lyrics state machine
-│   ├── VoiceActivityStore.ts # VAD state
-│   └── index.ts            # Exports
-├── hooks/                  # Custom React hooks
-├── lib/                    # Pure utilities
-├── shared/                 # Shared helpers
-├── sounds/
-│   ├── SoundSystem.ts      # Tone.js singleton
-│   └── index.ts
-└── tokens/                 # Design tokens (Figma)
-```
-
-## Design Decisions
-
-### 1. No External State Management
-Each store manages its own state internally via `useSyncExternalStore`. No Redux, Zustand, or other state libraries.
-
-### 2. Effect-First Design
-Use Effect.ts patterns throughout. Tagged events and Effect patterns provide compile-time safety for state transitions.
-
-### 3. Mobile-First
-Primary use case is phone on music stand/lap. All features must work hands-free. Large touch targets for musicians with occupied hands.
-
-### 4. Single Audio Owner
-SoundSystem owns the AudioContext. VAD uses its analyser, not a separate context.
-
-### 5. Type Safety
-Strict TypeScript configuration:
-- `noUncheckedIndexedAccess` for array safety
-- `exactOptionalPropertyTypes` for precise optionals
-- `isolatedModules` for Next.js compatibility
-- Effect language service for enhanced checking
-
-### 6. Neon Database
-Using Neon with the HTTP driver (neon-http). Key constraints:
-- **No transactions** — The HTTP driver doesn't support `db.transaction()`
-- **Use `db.batch()` for multiple updates** — Sends all queries in one HTTP request
-
-```typescript
-// DON'T: Individual updates (N requests)
-await Promise.all(items.map(item => db.update(table).set(...).where(...)))
-
-// DO: Batch updates (1 request)
-const updates = items.map(item => db.update(table).set(...).where(...))
-if (updates.length > 0) {
-  const [first, ...rest] = updates
-  await db.batch([first, ...rest])
-}
-```
-
-### 7. Turso Database (LRCLIB Search Index)
-
-Turso hosts the deduplicated LRCLIB search index (~4.2M songs, ~600MB). 
-
-**Search Architecture (Spotify-First):**
-```
-User: "never too late"
-       ↓
-1. Spotify Search (~100ms, popularity-ranked)
-   → [Three Days Grace, Kylie Minogue, ...]
-       ↓
-2. Turso Lookup (parallel, ~100-350ms total)
-   → Verify LRCLIB availability by title+artist phrase match
-       ↓
-3. Return Spotify metadata (album art, names) + LRCLIB ID
-```
-
-**Why Spotify-first?** Spotify handles popularity ranking. Without it, garbage titles and covers can outrank canonical versions in pure FTS search.
-
-**Fallback chain:** Spotify+Turso → Turso direct + Deezer → LRCLIB API + Deezer
-
-**Key files:**
-- `src/services/turso.ts` — TursoService with `search()`, `getById()`, `findByTitleArtist()`
-- `src/app/api/search/route.ts` — Search endpoint with Spotify-first flow
-- `src/lib/turso-usage-tracker.ts` — Usage monitoring via Platform API
-- `src/app/api/cron/turso-usage/route.ts` — Hourly cron for usage alerts (80%, 90%, 95%)
-- `scripts/lrclib-extract/` — Rust tool for building deduplicated index
-- `scripts/update-turso-token.sh` — Upload index to Turso, update tokens
-
-**Query patterns:**
-```sql
--- Spotify-first: phrase match (findByTitleArtist)
-WHERE tracks_fts MATCH '"Never Too Late" "Three Days Grace"'
-ORDER BY quality DESC
-
--- Fallback: free-form search
-WHERE tracks_fts MATCH 'never too late'
-ORDER BY -bm25(tracks_fts, 10.0, 1.0) + quality DESC
-```
-
-**Constraints:**
-- **Use FTS5 MATCH queries** — Always use `WHERE tracks_fts MATCH ?` for search
-- **Never use LIKE queries** — LIKE does full table scans and wastes read quota
-- **Query local SQLite for debugging** — Use `/Users/hmemcpy/git/music/lrclib-db-dump-20251209T092057Z-index.sqlite3`
-
-**Free tier limits (monthly):**
-| Resource | Limit |
-|----------|-------|
-| Row reads | 500M |
-| Row writes | 10M |
-| Storage | 5 GB |
-| Databases | 100 |
+### Turso (LRCLIB Search Index)
+- ~4.2M songs, FTS5 search
+- **Always use MATCH queries**, never LIKE
+- Spotify-first search → Turso verification
 
 ## Best Practices
 
-1. **Always memoize effects** — Prevents recreation on every render
-2. **Use `for...of` not `forEach`** — Biome lint rule for performance
-3. **Keep stores low-frequency** — Don't push per-frame audio into React state
-4. **Test on mobile** — Primary use case is phone/tablet
-5. **Follow the pattern** — Consistency makes the codebase maintainable
-6. **Use proper accessibility** — ARIA labels, focus states, keyboard controls
-7. **Use `@/` imports** — Path alias for src/
-8. **Enforce input limits** — All text inputs need `maxLength`; validate server-side too
-
-### Input Limits
-
-When adding new text inputs (name fields, descriptions, search boxes, etc.):
-
-1. Add the limit to `src/constants/limits.ts`
-2. Add `maxLength={INPUT_LIMITS.YOUR_FIELD}` to the input element
-3. Add server-side validation in the API route handler
-
-```typescript
-import { INPUT_LIMITS } from "@/constants/limits"
-
-// In component
-<input maxLength={INPUT_LIMITS.SETLIST_NAME} />
-
-// In API route
-if (name.length > INPUT_LIMITS.SETLIST_NAME) {
-  return NextResponse.json({ error: "Name too long" }, { status: 400 })
-}
-```
-
-## Copy Style Guide
-
-**Descriptions:**
-- Use imperative mood (e.g., "Detect", "Scroll", "Sync")
-- No ending punctuation
-- Start with action verbs
-
-**UI Text:**
-- Sentence case for buttons and labels
-- Keep instructions clear and action-oriented
-- No exclamation marks
-
-**Code Comments:**
-- Use present tense for describing what code does
-- Keep comments focused on the "why"
+1. Memoize effects
+2. Use `for...of` not `forEach`
+3. Test on mobile (primary use case)
+4. Use `@/` imports
+5. Enforce input limits via `src/constants/limits.ts`
+6. ARIA labels for accessibility
