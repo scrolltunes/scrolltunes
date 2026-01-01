@@ -1,4 +1,4 @@
-import { Config, Context, Effect, Layer } from "effect"
+import { Config, Context, Effect, Layer, Option } from "effect"
 import { AppConfigProviderLive } from "./config-provider"
 
 export interface ServerConfigValues {
@@ -15,6 +15,13 @@ export interface ServerConfigValues {
   readonly rapidApiKey: string
   readonly kvRestApiUrl: string
   readonly kvRestApiToken: string
+  readonly tursoUrl: string | undefined
+  readonly tursoAuthToken: string | undefined
+  readonly tursoLrclibUrl: string | undefined
+  readonly tursoLrclibAuthToken: string | undefined
+  readonly tursoPlatformToken: string | undefined
+  readonly tursoOrgSlug: string | undefined
+  readonly tursoDbName: string | undefined
   readonly vercelUrl: string
   readonly baseUrl: string
 }
@@ -35,6 +42,13 @@ const serverConfig = Config.all({
   rapidApiKey: Config.nonEmptyString("RAPIDAPI_KEY"),
   kvRestApiUrl: Config.nonEmptyString("KV_REST_API_URL"),
   kvRestApiToken: Config.nonEmptyString("KV_REST_API_TOKEN"),
+  tursoUrl: Config.string("TURSO_DATABASE_URL").pipe(Config.option),
+  tursoAuthToken: Config.string("TURSO_AUTH_TOKEN").pipe(Config.option),
+  tursoLrclibUrl: Config.string("TURSO_LRCLIB_URL").pipe(Config.option),
+  tursoLrclibAuthToken: Config.string("TURSO_LRCLIB_AUTH_TOKEN").pipe(Config.option),
+  tursoPlatformToken: Config.string("TURSO_PLATFORM_TOKEN").pipe(Config.option),
+  tursoOrgSlug: Config.string("TURSO_ORG_SLUG").pipe(Config.option),
+  tursoDbName: Config.string("TURSO_DB_NAME").pipe(Config.option),
   vercelUrl: Config.string("VERCEL_URL").pipe(Config.withDefault("localhost:3000")),
 }).pipe(
   Config.map(values => {
@@ -46,6 +60,13 @@ const serverConfig = Config.all({
 
     return {
       ...values,
+      tursoUrl: Option.getOrUndefined(values.tursoUrl),
+      tursoAuthToken: Option.getOrUndefined(values.tursoAuthToken),
+      tursoLrclibUrl: Option.getOrUndefined(values.tursoLrclibUrl),
+      tursoLrclibAuthToken: Option.getOrUndefined(values.tursoLrclibAuthToken),
+      tursoPlatformToken: Option.getOrUndefined(values.tursoPlatformToken),
+      tursoOrgSlug: Option.getOrUndefined(values.tursoOrgSlug),
+      tursoDbName: Option.getOrUndefined(values.tursoDbName),
       baseUrl,
     }
   }),

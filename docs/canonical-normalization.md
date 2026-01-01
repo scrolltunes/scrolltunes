@@ -1057,6 +1057,17 @@ export const revalidate = 3600 // Regenerate every hour
 
 ### To Implement 🔧
 
+**Turso Search Index (NEW - Priority: HIGH):**
+- [ ] Create extraction script to process LRCLIB dump (72GB → ~1.5GB)
+- [ ] Implement deduplication: group by (title_norm, artist_norm), score, select best
+- [ ] Scoring: album type (+40 studio, -20 live) + duration proximity + penalties
+- [ ] Build FTS5 index with porter tokenizer
+- [ ] Set up Turso account and upload index
+- [ ] Add `@libsql/client` and create `TursoSearchService`
+- [ ] Refactor `/api/search` to query Turso first
+- [ ] Implement fallback to Spotify→LRCLIB with upsert-on-success
+- [ ] Add Spotify enrichment (background) for album art + spotifyId
+
 **Schema Updates:**
 - [x] Add `album_lower` column to `songs` table
 - [x] Create index on `album_lower` for search
@@ -1073,6 +1084,7 @@ export const revalidate = 3600 // Regenerate every hour
 - [x] Add `classifyAlbum()` function for best album selection
 - [x] Add `selectBestAlbum()` function
 - [ ] Add spelling normalization (colors/colours) - optional, deferred
+- [ ] Port normalization logic to Python/SQL for extraction script
 
 **Search Flow Integration:**
 - [ ] Store ALL valid LRCLIB IDs during search (not just selected one)
@@ -1086,26 +1098,13 @@ export const revalidate = 3600 // Regenerate every hour
 - [ ] Add admin UI to manually merge/split song entries
 - [ ] Add monitoring for deduplication quality
 
-**Song Index (Instant Search):**
-- [ ] Create `SongIndexStore` with Effect.ts patterns
-- [ ] Add `/api/songs/index` endpoint (top 500-2000 songs)
-- [ ] Integrate Fuse.js for <10ms local search
-- [ ] Daily refresh of song index
-- [ ] Merge server index with local cache entries
+**Deprecated (superseded by Turso):**
+- ~~Song Index with Fuse.js~~ → Turso has 5-6M songs
+- ~~Vercel Edge Config for song index~~ → Turso replaces this
+- ~~Vercel KV for query caching~~ → Turso is fast enough
 
-**Vercel Optimizations:**
-- [ ] Add Vercel KV for query caching
-- [ ] Add Edge Config for song index (if fits <512KB)
-- [ ] Add CDN cache headers to search API
-- [ ] ISR for song index endpoint
-
-**Enhanced Prefetch:**
+**Optional Enhancements:**
+- [ ] Vercel KV for caching Turso results (<10ms repeat queries)
+- [ ] Local Fuse.js as offline fallback
 - [ ] Prefetch artist discography after song play
-- [ ] Add `/api/songs/by-artist` endpoint
-- [ ] Add `/api/songs/trending` endpoint
-- [ ] Prefetch on search result hover (proposed)
-
-**Cache Improvements:**
-- [ ] Consider IndexedDB for larger index storage
-- [ ] Add cache size monitoring/cleanup
-- [ ] Service worker for offline search (future)
+- [ ] Prefetch on search result hover

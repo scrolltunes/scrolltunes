@@ -23,7 +23,7 @@ These rules are **strictly enforced**. Code that violates them will be rejected.
 |---------|--------|-------|
 | Core teleprompter | ✅ Live | LyricsPlayer, smooth scrolling, click-to-seek |
 | Voice detection | ✅ Live | Silero VAD + energy gate + YAMNet classifier |
-| Song search | ✅ Live | LRCLIB integration, Spotify metadata |
+| Song search | ✅ Live | Spotify-first with Turso LRCLIB verification |
 | User accounts | ✅ Live | Google OAuth, history/favorites sync |
 | Setlists | ✅ Live | Create, edit, reorder songs |
 | Chords | ✅ Live | Songsterr integration, transpose, inline display |
@@ -56,6 +56,7 @@ Vercel auto-deploys from git. Just commit and push — no manual deploy needed.
 |----------|---------|
 | **docs/architecture.md** | Tech stack, project structure, design patterns, API design |
 | **docs/design.md** | Features backlog, product requirements, open questions |
+| **docs/search-optimization-plan.md** | Spotify-first search with Turso LRCLIB index |
 | **docs/lrc-enhancement-system.md** | Word-level timing extraction from Guitar Pro files |
 | **docs/audio-classification-design.md** | YAMNet classifier for voice vs instrument detection |
 | **TODO.md** | Implementation progress tracking |
@@ -447,6 +448,59 @@ if (updates.length > 0) {
   await db.batch([first, ...rest])
 }
 ```
+
+### 7. Turso Database (LRCLIB Search Index)
+
+Turso hosts the deduplicated LRCLIB search index (~4.2M songs, ~600MB). 
+
+**Search Architecture (Spotify-First):**
+```
+User: "never too late"
+       ↓
+1. Spotify Search (~100ms, popularity-ranked)
+   → [Three Days Grace, Kylie Minogue, ...]
+       ↓
+2. Turso Lookup (parallel, ~100-350ms total)
+   → Verify LRCLIB availability by title+artist phrase match
+       ↓
+3. Return Spotify metadata (album art, names) + LRCLIB ID
+```
+
+**Why Spotify-first?** Spotify handles popularity ranking. Without it, garbage titles and covers can outrank canonical versions in pure FTS search.
+
+**Fallback chain:** Spotify+Turso → Turso direct + Deezer → LRCLIB API + Deezer
+
+**Key files:**
+- `src/services/turso.ts` — TursoService with `search()`, `getById()`, `findByTitleArtist()`
+- `src/app/api/search/route.ts` — Search endpoint with Spotify-first flow
+- `src/lib/turso-usage-tracker.ts` — Usage monitoring via Platform API
+- `src/app/api/cron/turso-usage/route.ts` — Hourly cron for usage alerts (80%, 90%, 95%)
+- `scripts/lrclib-extract/` — Rust tool for building deduplicated index
+- `scripts/update-turso-token.sh` — Upload index to Turso, update tokens
+
+**Query patterns:**
+```sql
+-- Spotify-first: phrase match (findByTitleArtist)
+WHERE tracks_fts MATCH '"Never Too Late" "Three Days Grace"'
+ORDER BY quality DESC
+
+-- Fallback: free-form search
+WHERE tracks_fts MATCH 'never too late'
+ORDER BY -bm25(tracks_fts, 10.0, 1.0) + quality DESC
+```
+
+**Constraints:**
+- **Use FTS5 MATCH queries** — Always use `WHERE tracks_fts MATCH ?` for search
+- **Never use LIKE queries** — LIKE does full table scans and wastes read quota
+- **Query local SQLite for debugging** — Use `/Users/hmemcpy/git/music/lrclib-db-dump-20251209T092057Z-index.sqlite3`
+
+**Free tier limits (monthly):**
+| Resource | Limit |
+|----------|-------|
+| Row reads | 500M |
+| Row writes | 10M |
+| Storage | 5 GB |
+| Databases | 100 |
 
 ## Best Practices
 

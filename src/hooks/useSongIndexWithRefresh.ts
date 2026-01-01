@@ -1,11 +1,6 @@
 "use client"
 
-import {
-  type SongIndexEntry,
-  songIndexStore,
-  useSongIndex,
-  useSongIndexState,
-} from "@/core"
+import { type SongIndexEntry, songIndexStore, useSongIndex, useSongIndexState } from "@/core"
 import { useLocalSongCache } from "@/hooks/useLocalSongCache"
 import { useEffect, useRef } from "react"
 

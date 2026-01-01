@@ -1,0 +1,17 @@
+[package]
+name = "lrclib-extract"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rusqlite = { version = "0.31", features = ["bundled"] }
+rayon = "1.10"
+indicatif = "0.17"
+regex = "1.10"
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+once_cell = "1.19"
+
+[profile.release]
+lto = true
+codegen-units = 1

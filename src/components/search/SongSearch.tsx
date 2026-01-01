@@ -120,6 +120,7 @@ export const SongSearch = memo(function SongSearch({
     if (!trimmed || trimmed.length < 2) return []
 
     const seenKeys = new Set<string>()
+    const seenLrclibIds = new Set<number>()
     const dedupedMatches: Array<NormalizedSearchResult & { score: number }> = []
 
     const cacheMatches = fuzzyMatchSongs(trimmed, localSongCache, 0.7)
@@ -128,8 +129,9 @@ export const SongSearch = memo(function SongSearch({
       const normalized = normalizeTrackKey({ title: match.item.title, artist: match.item.artist })
       const key = `${normalized.artist}:${normalized.title}`
 
-      if (seenKeys.has(key)) continue
+      if (seenKeys.has(key) || seenLrclibIds.has(match.item.id)) continue
       seenKeys.add(key)
+      seenLrclibIds.add(match.item.id)
 
       dedupedMatches.push({
         id: `lrclib-${match.item.id}`,
@@ -153,8 +155,9 @@ export const SongSearch = memo(function SongSearch({
       for (const match of indexMatches) {
         const key = `${match.item.a}:${match.item.t}`
 
-        if (seenKeys.has(key)) continue
+        if (seenKeys.has(key) || seenLrclibIds.has(match.item.id)) continue
         seenKeys.add(key)
+        seenLrclibIds.add(match.item.id)
 
         dedupedMatches.push({
           id: `lrclib-${match.item.id}`,
@@ -192,11 +195,9 @@ export const SongSearch = memo(function SongSearch({
       }),
     )
 
-    // Enrich local matches with album info from API results if missing
+    // Enrich local matches with API data when available
     // Try matching by lrclibId first, then fall back to title+artist
     const enrichedLocalMatches = localMatches.map(local => {
-      if (local.album) return local // Already has album
-
       // Try lrclibId match first
       let apiMatch = local.lrclibId ? apiResultsByLrclibId.get(local.lrclibId) : undefined
 
@@ -207,12 +208,17 @@ export const SongSearch = memo(function SongSearch({
         apiMatch = apiResultsByTitleArtist.get(key)
       }
 
-      if (apiMatch?.album) {
+      // Use API data for display (proper casing, album art) but keep local score
+      if (apiMatch) {
         return {
           ...local,
+          name: apiMatch.name,
+          artist: apiMatch.artist,
           album: apiMatch.album,
+          displayName: apiMatch.displayName,
+          displayArtist: apiMatch.displayArtist,
           displayAlbum: apiMatch.displayAlbum,
-          albumArt: local.albumArt ?? apiMatch.albumArt,
+          albumArt: apiMatch.albumArt ?? local.albumArt,
         }
       }
       return local

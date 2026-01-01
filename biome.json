@@ -1,7 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
   "files": {
-    "ignore": [".next/**", "node_modules/**", "next-env.d.ts"]
+    "ignore": [".next/**", "node_modules/**", "next-env.d.ts", "scripts/lrclib-extract/target/**"]
   },
   "organizeImports": { "enabled": true },
   "linter": {
