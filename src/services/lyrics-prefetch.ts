@@ -11,15 +11,13 @@ import type { Lyrics } from "@/core"
 import type { EnhancementPayload } from "@/lib/db/schema"
 import { applyEnhancement } from "@/lib/enhancement"
 import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
+import { LYRICS_CACHE_VERSION, LYRICS_KEY_PREFIX } from "@/lib/lyrics-cache"
 import type { CachedLyrics, RecentSong } from "@/lib/recent-songs-types"
+import { LYRICS_CACHE_TTL_MS } from "@/lib/recent-songs-types"
 import type { TopCatalogSong } from "@/lib/sync-service"
 import { Context, Data, Effect, Layer } from "effect"
 import { FetchService } from "./fetch"
 import { StorageService } from "./storage"
-
-const LYRICS_KEY_PREFIX = "scrolltunes:lyrics:"
-const CACHE_VERSION = 9
-const LYRICS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 export class PrefetchError extends Data.TaggedClass("PrefetchError")<{
   readonly message: string
@@ -76,7 +74,7 @@ const isCachedImpl = (id: number): Effect.Effect<boolean, never, StorageService>
       const parsed = JSON.parse(raw) as CachedLyrics
       const now = Date.now()
 
-      if (parsed.version !== CACHE_VERSION) return false
+      if (parsed.version !== LYRICS_CACHE_VERSION) return false
       if (now - parsed.cachedAt > LYRICS_CACHE_TTL_MS) return false
       if (!parsed.lyrics?.lines || parsed.lyrics.lines.length === 0) return false
 
@@ -94,7 +92,7 @@ const cacheLyricsImpl = (
     const storage = yield* StorageService
 
     const cached: CachedLyrics = {
-      version: CACHE_VERSION,
+      version: LYRICS_CACHE_VERSION,
       lyrics: data.lyrics,
       bpm: data.bpm,
       key: data.key,

@@ -5,6 +5,8 @@ export interface HistorySyncItem {
   readonly songProvider: string
   readonly title: string
   readonly artist: string
+  readonly album?: string
+  readonly durationMs?: number
   readonly lastPlayedAt: string
   readonly playCount: number
 }
@@ -17,6 +19,8 @@ export function recentSongToHistorySyncItem(song: RecentSong): HistorySyncItem {
     artist: song.artist,
     lastPlayedAt: new Date(song.lastPlayedAt).toISOString(),
     playCount: 1,
+    ...(song.album && { album: song.album }),
+    ...(song.durationSeconds && { durationMs: song.durationSeconds * 1000 }),
   }
 }
 

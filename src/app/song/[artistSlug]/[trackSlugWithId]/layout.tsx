@@ -43,7 +43,7 @@ export async function generateMetadata(
 
     const title = normalizeTrackName(data.lyrics.title)
     const artist = normalizeArtistName(data.lyrics.artist)
-    const pageTitle = `Sing along to ${title} by ${artist} | ScrollTunes`
+    const pageTitle = `${title} by ${artist} | ScrollTunes`
     const albumArt = data.albumArt ?? undefined
 
     return {

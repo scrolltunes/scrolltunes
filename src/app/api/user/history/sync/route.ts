@@ -105,6 +105,7 @@ const syncHistory = (request: Request) =>
                 set: {
                   ...(prepared.album && { album: prepared.album, albumLower: prepared.albumLower }),
                   ...(prepared.durationMs && { durationMs: prepared.durationMs }),
+                  totalPlayCount: sql`${songs.totalPlayCount} + ${playCount}`,
                   updatedAt: now,
                 },
               })

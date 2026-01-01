@@ -40,17 +40,11 @@ const getClient = Effect.gen(function* () {
 
   const config = yield* ServerConfig
 
-  if (!config.tursoUrl || !config.tursoAuthToken) {
-    console.log("[TURSO] Credentials not configured, tursoUrl:", config.tursoUrl)
-    return yield* Effect.fail(
-      new TursoSearchError({ message: "Turso LRCLIB credentials not configured" }),
-    )
-  }
-  console.log("[TURSO] Connecting to:", config.tursoUrl)
+  console.log("[TURSO] Connecting to:", config.tursoLrclibUrl)
 
   clientInstance = createClient({
-    url: config.tursoUrl,
-    authToken: config.tursoAuthToken,
+    url: config.tursoLrclibUrl,
+    authToken: config.tursoLrclibAuthToken,
   })
 
   return clientInstance

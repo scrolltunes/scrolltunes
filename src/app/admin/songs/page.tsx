@@ -9,12 +9,14 @@ import {
   CaretRight,
   Check,
   FunnelSimple,
+  List,
   MagnifyingGlass,
   Metronome,
   MusicNote,
   PencilSimple,
   ShieldWarning,
   Sparkle,
+  SquaresFour,
   Timer,
   Trash,
   X,
@@ -48,8 +50,21 @@ interface SongsResponse {
 }
 
 type FilterType = "all" | "synced" | "enhanced" | "unenhanced"
+type ViewType = "grid" | "list"
 
 const LIMIT = 20
+const VIEW_TYPE_KEY = "scrolltunes:admin:songs:view"
+
+function loadViewType(): ViewType {
+  if (typeof window === "undefined") return "grid"
+  const stored = localStorage.getItem(VIEW_TYPE_KEY)
+  return stored === "list" ? "list" : "grid"
+}
+
+function saveViewType(viewType: ViewType): void {
+  if (typeof window === "undefined") return
+  localStorage.setItem(VIEW_TYPE_KEY, viewType)
+}
 
 function formatDuration(ms: number | null): string {
   if (!ms) return ""
@@ -261,13 +276,13 @@ function SongCard({
       className="bg-neutral-900 rounded-xl border border-neutral-800 flex flex-col hover:border-neutral-700 transition-colors"
     >
       <Link href={`/admin/songs/${song.id}`} className="p-4 flex gap-3">
-        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
+        <div className="flex-shrink-0 w-[60px] h-[60px] rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
           {isLoadingArt ? (
             <div className="w-full h-full bg-neutral-800 animate-pulse" />
           ) : albumArt ? (
             <img src={albumArt} alt="" className="w-full h-full object-cover" />
           ) : (
-            <MusicNote size={20} weight="fill" className="text-neutral-600" />
+            <MusicNote size={24} weight="fill" className="text-neutral-600" />
           )}
         </div>
 
@@ -349,6 +364,165 @@ function SongCard({
   )
 }
 
+function SongRow({
+  song,
+  index,
+  onDeleteSong,
+}: {
+  song: Song
+  index: number
+  onDeleteSong: (songId: string) => void
+}) {
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [albumArt, setAlbumArt] = useState<string | undefined>(undefined)
+  const [isLoadingArt, setIsLoadingArt] = useState(!!song.lrclibId)
+
+  useEffect(() => {
+    if (!song.lrclibId) {
+      setIsLoadingArt(false)
+      return
+    }
+
+    const cached = loadCachedLyrics(song.lrclibId)
+    if (cached?.albumArt) {
+      setAlbumArt(cached.albumArt)
+      setIsLoadingArt(false)
+      return
+    }
+
+    let cancelled = false
+
+    fetch(`/api/lyrics/${song.lrclibId}`)
+      .then(async response => {
+        if (!response.ok || cancelled) {
+          if (!cancelled) setIsLoadingArt(false)
+          return
+        }
+
+        const data = await response.json()
+        if (cancelled) return
+
+        const art = data.albumArt as string | undefined
+        if (data.lyrics) {
+          saveCachedLyrics(song.lrclibId as number, {
+            lyrics: data.lyrics,
+            bpm: data.bpm ?? null,
+            key: data.key ?? null,
+            albumArt: art,
+            spotifyId: data.spotifyId ?? undefined,
+            bpmSource: data.attribution?.bpm ?? undefined,
+            lyricsSource: data.attribution?.lyrics ?? undefined,
+          })
+        }
+
+        setAlbumArt(art)
+        setIsLoadingArt(false)
+      })
+      .catch(() => {
+        if (!cancelled) setIsLoadingArt(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [song.lrclibId])
+
+  const handleDelete = async () => {
+    if (!confirm(`Permanently delete "${song.title}" by ${song.artist}? This cannot be undone.`))
+      return
+    setIsDeleting(true)
+    try {
+      const response = await fetch("/api/admin/songs", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ songId: song.id }),
+      })
+      if (response.ok) {
+        onDeleteSong(song.id)
+      }
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const duration = formatDuration(song.durationMs)
+
+  return (
+    <motion.tr
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ ...springs.default, delay: index * 0.02 }}
+      className="border-b border-neutral-800 last:border-b-0 hover:bg-neutral-800/50 transition-colors"
+    >
+      <td className="px-4 py-3">
+        <Link href={`/admin/songs/${song.id}`} className="flex items-center gap-3">
+          <div className="flex-shrink-0 w-10 h-10 rounded bg-neutral-800 flex items-center justify-center overflow-hidden">
+            {isLoadingArt ? (
+              <div className="w-full h-full bg-neutral-800 animate-pulse" />
+            ) : albumArt ? (
+              <img src={albumArt} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <MusicNote size={16} weight="fill" className="text-neutral-600" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <span className="text-white font-medium hover:text-indigo-400 transition-colors line-clamp-1">
+              {song.title}
+            </span>
+            <p className="text-neutral-400 text-sm line-clamp-1">{song.artist}</p>
+          </div>
+        </Link>
+      </td>
+      <td className="px-4 py-3 text-neutral-400 hidden md:table-cell">
+        {song.album || "—"}
+      </td>
+      <td className="px-4 py-3 text-neutral-400 hidden lg:table-cell">
+        {duration || "—"}
+      </td>
+      <td className="px-4 py-3 text-neutral-400 hidden lg:table-cell">
+        {song.bpm ? `${song.bpm}` : "—"}
+        {song.musicalKey && ` · ${song.musicalKey}`}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-center gap-1">
+          {song.hasSyncedLyrics && (
+            <span className="w-2 h-2 rounded-full bg-green-500" title="Synced" />
+          )}
+          {song.hasEnhancement && (
+            <span className="w-2 h-2 rounded-full bg-indigo-500" title="Enhanced" />
+          )}
+          {song.hasChordEnhancement && (
+            <span className="w-2 h-2 rounded-full bg-amber-500" title="Chords" />
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex items-center justify-end gap-2">
+          <span className="text-neutral-400">{song.totalPlayCount.toLocaleString()}</span>
+          {song.lrclibId && (
+            <Link
+              href={`/admin/enhance/${song.lrclibId}`}
+              className="p-1.5 text-neutral-500 hover:text-indigo-400 transition-colors"
+              title={song.hasEnhancement ? "Edit enhancement" : "Enhance"}
+            >
+              {song.hasEnhancement ? <PencilSimple size={16} /> : <Sparkle size={16} />}
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="p-1.5 text-neutral-500 hover:text-red-400 transition-colors disabled:opacity-50"
+            title="Delete"
+          >
+            <Trash size={16} />
+          </button>
+        </div>
+      </td>
+    </motion.tr>
+  )
+}
+
 export default function AdminSongsPage() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAccount()
   const isAdmin = useIsAdmin()
@@ -358,7 +532,13 @@ export default function AdminSongsPage() {
   const [isDeletingAll, setIsDeletingAll] = useState(false)
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterType>("all")
+  const [viewType, setViewType] = useState<ViewType>(loadViewType)
   const [offset, setOffset] = useState(0)
+
+  const handleViewTypeChange = (newViewType: ViewType) => {
+    setViewType(newViewType)
+    saveViewType(newViewType)
+  }
 
   const handleDeleteAll = async () => {
     const filterDesc =
@@ -482,6 +662,24 @@ export default function AdminSongsPage() {
                 <option value="unenhanced">Unenhanced</option>
               </select>
             </div>
+            <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => handleViewTypeChange("grid")}
+                className={`p-2 rounded transition-colors ${viewType === "grid" ? "bg-neutral-800 text-white" : "text-neutral-500 hover:text-white"}`}
+                title="Grid view"
+              >
+                <SquaresFour size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleViewTypeChange("list")}
+                className={`p-2 rounded transition-colors ${viewType === "list" ? "bg-neutral-800 text-white" : "text-neutral-500 hover:text-white"}`}
+                title="List view"
+              >
+                <List size={18} />
+              </button>
+            </div>
             {total > 0 && (
               <button
                 type="button"
@@ -501,24 +699,59 @@ export default function AdminSongsPage() {
             <EmptyState hasSearch={search.length > 0 || filter !== "all"} />
           ) : (
             <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ ...springs.default, delay: 0.2 }}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-              >
-                {songs.map((song, index) => (
-                  <SongCard
-                    key={`${song.id}-${index}`}
-                    song={song}
-                    index={index}
-                    onDeleteSong={songId => {
-                      setSongs(prev => prev.filter(s => s.id !== songId))
-                      setTotal(prev => prev - 1)
-                    }}
-                  />
-                ))}
-              </motion.div>
+              {viewType === "grid" ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ ...springs.default, delay: 0.2 }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                >
+                  {songs.map((song, index) => (
+                    <SongCard
+                      key={`${song.id}-${index}`}
+                      song={song}
+                      index={index}
+                      onDeleteSong={songId => {
+                        setSongs(prev => prev.filter(s => s.id !== songId))
+                        setTotal(prev => prev - 1)
+                      }}
+                    />
+                  ))}
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ ...springs.default, delay: 0.2 }}
+                  className="bg-neutral-900 rounded-xl border border-neutral-800 overflow-hidden"
+                >
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-neutral-800 text-left text-neutral-400">
+                        <th className="px-4 py-3 font-medium">Song</th>
+                        <th className="px-4 py-3 font-medium hidden md:table-cell">Album</th>
+                        <th className="px-4 py-3 font-medium hidden lg:table-cell">Duration</th>
+                        <th className="px-4 py-3 font-medium hidden lg:table-cell">BPM</th>
+                        <th className="px-4 py-3 font-medium text-center">Status</th>
+                        <th className="px-4 py-3 font-medium text-right">Plays</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {songs.map((song, index) => (
+                        <SongRow
+                          key={`${song.id}-${index}`}
+                          song={song}
+                          index={index}
+                          onDeleteSong={songId => {
+                            setSongs(prev => prev.filter(s => s.id !== songId))
+                            setTotal(prev => prev - 1)
+                          }}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </motion.div>
+              )}
 
               {totalPages > 1 && (
                 <motion.div

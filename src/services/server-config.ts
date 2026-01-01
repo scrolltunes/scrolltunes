@@ -17,8 +17,8 @@ export interface ServerConfigValues {
   readonly kvRestApiToken: string
   readonly tursoUrl: string | undefined
   readonly tursoAuthToken: string | undefined
-  readonly tursoLrclibUrl: string | undefined
-  readonly tursoLrclibAuthToken: string | undefined
+  readonly tursoLrclibUrl: string
+  readonly tursoLrclibAuthToken: string
   readonly tursoPlatformToken: string | undefined
   readonly tursoOrgSlug: string | undefined
   readonly tursoDbName: string | undefined
@@ -44,8 +44,8 @@ const serverConfig = Config.all({
   kvRestApiToken: Config.nonEmptyString("KV_REST_API_TOKEN"),
   tursoUrl: Config.string("TURSO_DATABASE_URL").pipe(Config.option),
   tursoAuthToken: Config.string("TURSO_AUTH_TOKEN").pipe(Config.option),
-  tursoLrclibUrl: Config.string("TURSO_LRCLIB_URL").pipe(Config.option),
-  tursoLrclibAuthToken: Config.string("TURSO_LRCLIB_AUTH_TOKEN").pipe(Config.option),
+  tursoLrclibUrl: Config.nonEmptyString("TURSO_DATABASE_URL"),
+  tursoLrclibAuthToken: Config.nonEmptyString("TURSO_AUTH_TOKEN"),
   tursoPlatformToken: Config.string("TURSO_PLATFORM_TOKEN").pipe(Config.option),
   tursoOrgSlug: Config.string("TURSO_ORG_SLUG").pipe(Config.option),
   tursoDbName: Config.string("TURSO_DB_NAME").pipe(Config.option),
@@ -62,8 +62,8 @@ const serverConfig = Config.all({
       ...values,
       tursoUrl: Option.getOrUndefined(values.tursoUrl),
       tursoAuthToken: Option.getOrUndefined(values.tursoAuthToken),
-      tursoLrclibUrl: Option.getOrUndefined(values.tursoLrclibUrl),
-      tursoLrclibAuthToken: Option.getOrUndefined(values.tursoLrclibAuthToken),
+      tursoLrclibUrl: values.tursoLrclibUrl,
+      tursoLrclibAuthToken: values.tursoLrclibAuthToken,
       tursoPlatformToken: Option.getOrUndefined(values.tursoPlatformToken),
       tursoOrgSlug: Option.getOrUndefined(values.tursoOrgSlug),
       tursoDbName: Option.getOrUndefined(values.tursoDbName),
