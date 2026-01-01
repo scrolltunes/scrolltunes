@@ -615,8 +615,6 @@ export default function SongPage() {
                   artist={loadState.lyrics.artist}
                   {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
                   onAddToSetlist={() => setShowAddToSetlist(true)}
-                  onChordSettingsClick={() => setShowChordPanel(prev => !prev)}
-                  isChordPanelOpen={showChordPanel}
                   onShareClick={() => setShowShareModal(true)}
                 />
                 <ChordInfoPanel

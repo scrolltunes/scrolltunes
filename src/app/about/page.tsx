@@ -122,7 +122,7 @@ export default function AboutPage() {
                 <p className="text-neutral-300">
                   Guitar chords with transpose
                   <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-amber-500/20 text-amber-400 rounded">
-                    Beta
+                    Coming soon
                   </span>
                 </p>
               </div>

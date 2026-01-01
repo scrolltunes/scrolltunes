@@ -13,10 +13,12 @@ const nowFeatures: Array<string | { title: string; beta?: boolean }> = [
   "Favorites and setlists",
   "Cross-device sync",
   "Voice search",
-  { title: "Guitar chords", beta: true },
 ]
 
-const nextFeatures = [{ title: "Auto tempo", description: "Match scroll speed to your playing" }]
+const nextFeatures = [
+  { title: "Guitar chords", description: "Display chords with transpose support" },
+  { title: "Auto tempo", description: "Match scroll speed to your playing" },
+]
 
 const laterFeatures = [
   { title: "Karaoke mode", description: "Large text, word-by-word highlight" },

@@ -5,23 +5,17 @@ import {
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
   type Setlist,
-  chordsStore,
   preferencesStore,
-  useChordsState,
   useIsAuthenticated,
   usePreference,
   useSetlistsContainingSong,
-  useShowChords,
 } from "@/core"
 import {
-  CaretUp,
-  Guitar,
   ListPlus,
   Minus,
   MusicNote,
   Plus,
   ShareNetwork,
-  SlidersHorizontal,
   TextAa,
 } from "@phosphor-icons/react"
 import { memo, useCallback } from "react"
@@ -32,8 +26,6 @@ export interface SongActionBarProps {
   readonly artist: string
   readonly albumArt?: string
   readonly onAddToSetlist: () => void
-  readonly onChordSettingsClick: () => void
-  readonly isChordPanelOpen: boolean
   readonly onShareClick?: () => void
 }
 
@@ -59,19 +51,12 @@ export const SongActionBar = memo(function SongActionBar({
   artist,
   albumArt,
   onAddToSetlist,
-  onChordSettingsClick,
-  isChordPanelOpen,
   onShareClick,
 }: SongActionBarProps) {
   const isAuthenticated = useIsAuthenticated()
   const containingSetlists = useSetlistsContainingSong(songId)
   const isInSetlist = containingSetlists.length > 0
   const fontSize = usePreference("fontSize")
-  const chordsState = useChordsState()
-  const showChords = useShowChords()
-  const chordsReady = chordsState.status === "ready"
-  const chordsNotFound = chordsState.status === "not-found"
-  const chordsLoading = chordsState.status === "loading" || chordsState.status === "idle"
 
   const isAtMin = fontSize <= MIN_FONT_SIZE
   const isAtMax = fontSize >= MAX_FONT_SIZE
@@ -158,70 +143,6 @@ export const SongActionBar = memo(function SongActionBar({
       {/* Separator */}
       <div className="w-px h-6 bg-neutral-700" />
 
-      {/* Chords button - show different states based on availability */}
-      {chordsNotFound ? (
-        <div className="flex items-center gap-1.5 px-3 py-2 bg-neutral-800/50 rounded-full text-sm text-neutral-500">
-          <Guitar size={20} />
-          <span className="hidden sm:inline">No chords available</span>
-        </div>
-      ) : (
-        <div
-          className={`flex items-center rounded-full overflow-hidden transition-colors ${
-            showChords && chordsReady ? "bg-indigo-600/20" : "bg-neutral-800/50"
-          }`}
-        >
-          {/* Main button - toggle chords on/off */}
-          <button
-            type="button"
-            onClick={() => chordsStore.toggleShowChords()}
-            disabled={chordsLoading}
-            className={`flex items-center gap-1.5 px-4 py-2 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
-              showChords && chordsReady
-                ? "text-indigo-400 hover:bg-indigo-600/30"
-                : "text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
-            }`}
-            aria-label={showChords ? "Hide chords" : "Show chords"}
-            aria-pressed={showChords && chordsReady}
-          >
-            <Guitar size={20} weight={showChords && chordsReady ? "fill" : "regular"} />
-            <span className="hidden sm:inline">Chords</span>
-            <span className="text-[10px] font-semibold bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded-full">
-              Beta
-            </span>
-          </button>
-
-          {/* Divider */}
-          <div
-            className={`w-px h-5 ${showChords && chordsReady ? "bg-indigo-500/30" : "bg-neutral-600/50"}`}
-          />
-
-          {/* Settings dropdown */}
-          <button
-            type="button"
-            onClick={onChordSettingsClick}
-            disabled={!showChords || !chordsReady}
-            className={`flex items-center justify-center w-10 h-9 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-              showChords && chordsReady
-                ? isChordPanelOpen
-                  ? "text-indigo-300 bg-indigo-600/30"
-                  : "text-indigo-400 hover:bg-indigo-600/30"
-                : "text-neutral-400"
-            }`}
-            aria-label={isChordPanelOpen ? "Close chord settings" : "Open chord settings"}
-            aria-expanded={isChordPanelOpen}
-          >
-            {isChordPanelOpen ? (
-              <CaretUp size={14} weight="bold" />
-            ) : (
-              <SlidersHorizontal size={16} />
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* Separator */}
-      <div className="w-px h-6 bg-neutral-700" />
-
       {/* Share lyrics */}
       {onShareClick && (
         <button
@@ -231,7 +152,7 @@ export const SongActionBar = memo(function SongActionBar({
           aria-label="Share lyrics"
         >
           <ShareNetwork size={18} />
-          <span className="hidden sm:inline">Share</span>
+          <span className="hidden sm:inline">Share Lyrics</span>
         </button>
       )}
     </div>
