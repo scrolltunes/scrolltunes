@@ -20,7 +20,6 @@ import type { ChordEnhancementPayloadV1 } from "@/lib/gp/chord-types"
 import { animate, motion, useMotionValue, useTransform } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
-import { LyricsViewportStage } from "./LyricsViewportStage"
 
 const MANUAL_MODE_TIMEOUT = 6000 // Resume auto-scroll after 6s of no interaction
 const SCROLL_INDICATOR_TIMEOUT_TOUCH = 3000 // Hide manual scroll badge after touch scroll
@@ -70,7 +69,7 @@ export function LyricsDisplay({
   const currentTime = useCurrentTime()
   const resetCount = useResetCount()
   const { jumpToLine } = usePlayerControls()
-  const { fontSize, displayMode } = usePreferences()
+  const { fontSize } = usePreferences()
   const chordsData = useChordsData()
   const showChords = useShowChords()
   const transposeSemitones = useTranspose()
@@ -381,23 +380,6 @@ export function LyricsDisplay({
     }
     prevStateTag.current = state._tag
   }, [state._tag])
-
-  // Sync scroll position when switching from stage mode back to scroll mode
-  const prevDisplayMode = useRef(displayMode)
-  useEffect(() => {
-    if (prevDisplayMode.current === "stage" && displayMode === "scroll" && lyrics) {
-      const lineIndex = Math.max(0, currentLineIndex)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const target = getLineScrollTarget(lineIndex)
-          if (target !== null) {
-            setScrollYImmediate(target)
-          }
-        })
-      })
-    }
-    prevDisplayMode.current = displayMode
-  }, [displayMode, currentLineIndex, lyrics, getLineScrollTarget, setScrollYImmediate])
 
   // Update scroll position when current line changes (only during active playback)
   useEffect(() => {
@@ -796,27 +778,9 @@ export function LyricsDisplay({
     )
   }
 
-  // Show highlight when playing/paused, and also in Ready state for stage mode
+  // Show highlight when playing/paused
   const isPlayingOrPaused = isPlaying || state._tag === "Paused"
-  const scrollModeActiveIndex = isPlayingOrPaused ? Math.max(0, currentLineIndex) : -1
-  // Stage mode always shows first line highlighted when ready
-  const stageModeActiveIndex = Math.max(0, currentLineIndex)
-
-  if (displayMode === "stage") {
-    return (
-      <div className={`h-full ${className}`}>
-        <LyricsViewportStage
-          lines={lyrics.lines}
-          activeIndex={stageModeActiveIndex}
-          currentTime={currentTime}
-          isPlaying={isPlaying}
-          onLineClick={handleLineClick}
-          onCreateCard={onCreateCard}
-          fontSize={fontSize}
-        />
-      </div>
-    )
-  }
+  const activeIndex = isPlayingOrPaused ? Math.max(0, currentLineIndex) : -1
 
   return (
     <div
@@ -841,8 +805,8 @@ export function LyricsDisplay({
         style={{ y: scrollYOffset }}
       >
         {lyrics.lines.map((line, index) => {
-          const isActive = index === scrollModeActiveIndex
-          const isNext = index === scrollModeActiveIndex + 1
+          const isActive = index === activeIndex
+          const isNext = index === activeIndex + 1
           const duration = isActive
             ? (lyrics.lines[index + 1]?.startTime ?? lyrics.duration) - line.startTime
             : undefined
@@ -855,7 +819,7 @@ export function LyricsDisplay({
               key={line.id}
               text={line.text}
               isActive={isActive}
-              isPast={index < scrollModeActiveIndex}
+              isPast={index < activeIndex}
               isNext={isNext}
               onClick={() => handleLineClick(index)}
               index={index}

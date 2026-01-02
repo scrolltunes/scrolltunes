@@ -573,6 +573,8 @@ interface EnhancementPayload {
 
 **Completed:** Phase 0, 1, 2, 3, 4, 5, 6, 7 (core), Phase 8 (Recent Songs), Phase 9 (mostly complete), Phase 10 (LRC Enhancement)
 
+**Parked:** Stage mode (teleprompter-style continuous scroll with 25% anchor) - implemented but temporarily removed. Components deleted: `LyricsViewportStage`, `LyricLineStage`, `LyricsActionBar`. See commit `cee9b33` for implementation.
+
 **Active:** Phase 9 remaining items:
 - API: `/api/user/song-settings` GET/POST
 - UI: Drag-to-reorder songs in setlist detail, feature comparison screen, login page redesign

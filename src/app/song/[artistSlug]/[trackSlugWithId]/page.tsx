@@ -14,7 +14,6 @@ import {
   type Lyrics,
   chordsStore,
   metronomeStore,
-  preferencesStore,
   recentSongsStore,
   useChordsState,
   useDetailedActivityStatus,
@@ -43,11 +42,9 @@ import {
   ArrowCounterClockwise,
   ArrowLeft,
   Bug,
-  ListBullets,
   MusicNote,
   Pause,
   Play,
-  Rows,
   SpinnerGap,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
@@ -567,23 +564,6 @@ export default function SongPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                const current = preferencesStore.getDisplayMode()
-                preferencesStore.setDisplayMode(current === "scroll" ? "stage" : "scroll")
-              }}
-              className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-              aria-label={
-                preferences.displayMode === "stage"
-                  ? "Switch to scroll mode"
-                  : "Switch to stage mode"
-              }
-              title={preferences.displayMode === "stage" ? "Scroll mode" : "Stage mode"}
-            >
-              {preferences.displayMode === "stage" ? <ListBullets size={20} /> : <Rows size={20} />}
-            </button>
-
             <VoiceIndicator
               isListening={isListening}
               isSpeaking={isSpeaking}
