@@ -1,4 +1,5 @@
 import type { RecentSong } from "@/lib/recent-songs-types"
+import { userApi } from "@/lib/user-api"
 
 export interface HistorySyncItem {
   readonly songId: string
@@ -24,16 +25,8 @@ export function recentSongToHistorySyncItem(song: RecentSong): HistorySyncItem {
   }
 }
 
-export async function syncHistory(items: HistorySyncItem[]): Promise<void> {
-  const response = await fetch("/api/user/history/sync", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ songs: items }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Sync failed: ${response.status}`)
-  }
+export function syncHistory(items: HistorySyncItem[]): void {
+  userApi.post("/api/user/history/sync", { songs: items })
 }
 
 export interface HistoryItem {
@@ -46,14 +39,8 @@ export interface HistoryItem {
 }
 
 export async function fetchHistory(): Promise<HistoryItem[]> {
-  const response = await fetch("/api/user/history")
-
-  if (!response.ok) {
-    throw new Error(`Fetch history failed: ${response.status}`)
-  }
-
-  const data = (await response.json()) as { history: HistoryItem[] }
-  return data.history
+  const result = await userApi.get<{ history: HistoryItem[] }>("/api/user/history")
+  return result?.history ?? []
 }
 
 export interface ServerFavorite {
@@ -67,14 +54,8 @@ export interface ServerFavorite {
 }
 
 export async function fetchFavorites(): Promise<ServerFavorite[]> {
-  const response = await fetch("/api/user/favorites/sync")
-
-  if (!response.ok) {
-    throw new Error(`Fetch favorites failed: ${response.status}`)
-  }
-
-  const data = (await response.json()) as { favorites: ServerFavorite[] }
-  return data.favorites
+  const result = await userApi.get<{ favorites: ServerFavorite[] }>("/api/user/favorites/sync")
+  return result?.favorites ?? []
 }
 
 export interface TopCatalogSong {

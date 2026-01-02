@@ -29,6 +29,7 @@ export class TursoService extends Context.Tag("TursoService")<
     readonly findByTitleArtist: (
       title: string,
       artist: string,
+      targetDurationSec?: number,
     ) => Effect.Effect<TursoSearchResult | null, TursoSearchError, ServerConfig>
   }
 >() {}
@@ -118,7 +119,7 @@ const getById = (lrclibId: number) =>
     }
   })
 
-const findByTitleArtist = (title: string, artist: string) =>
+const findByTitleArtist = (title: string, artist: string, targetDurationSec?: number) =>
   Effect.gen(function* () {
     const client = yield* getClient
 
@@ -133,26 +134,42 @@ const findByTitleArtist = (title: string, artist: string) =>
             JOIN tracks t ON fts.rowid = t.id
             WHERE tracks_fts MATCH ?
             ORDER BY t.quality DESC
-            LIMIT 1
+            LIMIT 10
           `,
           args: [ftsQuery],
         })
-        return rs.rows[0] ?? null
+        return rs.rows
       },
       catch: error =>
         new TursoSearchError({ message: "Turso findByTitleArtist failed", cause: error }),
     })
 
-    if (!result) return null
+    if (result.length === 0) return null
 
-    return {
-      id: result.id as number,
-      title: result.title as string,
-      artist: result.artist as string,
-      album: result.album as string | null,
-      durationSec: result.duration_sec as number,
-      quality: result.quality as number,
+    const candidates = result.map(row => ({
+      id: row.id as number,
+      title: row.title as string,
+      artist: row.artist as string,
+      album: row.album as string | null,
+      durationSec: row.duration_sec as number,
+      quality: row.quality as number,
+    }))
+
+    if (targetDurationSec === undefined) {
+      return candidates[0] ?? null
     }
+
+    const scored = candidates.map(c => {
+      const durationDiff = Math.abs(c.durationSec - targetDurationSec)
+      let durationScore = 0
+      if (durationDiff <= 2) durationScore = 50
+      else if (durationDiff <= 5) durationScore = 30
+      else if (durationDiff <= 10) durationScore = 10
+      return { ...c, score: c.quality + durationScore }
+    })
+
+    scored.sort((a, b) => b.score - a.score)
+    return scored[0] ?? null
   })
 
 export const TursoServiceLive = Layer.succeed(TursoService, {

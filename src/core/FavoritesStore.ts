@@ -1,7 +1,7 @@
 "use client"
 
+import { userApi } from "@/lib/user-api"
 import { useSyncExternalStore } from "react"
-import { accountStore } from "./AccountStore"
 
 export interface FavoriteItem {
   readonly id: number
@@ -77,50 +77,24 @@ class FavoritesStore {
     this.notify()
   }
 
-  private async syncAddToServer(item: FavoriteItem): Promise<void> {
-    if (!accountStore.isAuthenticated()) return
-
-    try {
-      const response = await fetch("/api/user/favorites/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          favorites: [
-            {
-              songId: `lrclib:${item.id}`,
-              songProvider: "lrclib",
-              title: item.title,
-              artist: item.artist,
-              album: item.album,
-              albumArt: item.albumArt,
-              addedAt: new Date(item.addedAt).toISOString(),
-            },
-          ],
-        }),
-      })
-
-      if (response.ok) {
-        accountStore.setLastSyncAt(new Date())
-      }
-    } catch {
-      // Failed to sync favorite to server
-    }
+  private syncAddToServer(item: FavoriteItem): void {
+    userApi.post("/api/user/favorites/sync", {
+      favorites: [
+        {
+          songId: `lrclib:${item.id}`,
+          songProvider: "lrclib",
+          title: item.title,
+          artist: item.artist,
+          album: item.album,
+          albumArt: item.albumArt,
+          addedAt: new Date(item.addedAt).toISOString(),
+        },
+      ],
+    })
   }
 
-  private async syncRemoveFromServer(id: number): Promise<void> {
-    if (!accountStore.isAuthenticated()) return
-
-    try {
-      const response = await fetch(`/api/user/favorites/lrclib:${id}`, {
-        method: "DELETE",
-      })
-
-      if (response.ok) {
-        accountStore.setLastSyncAt(new Date())
-      }
-    } catch {
-      // Failed to remove favorite from server
-    }
+  private syncRemoveFromServer(id: number): void {
+    userApi.delete(`/api/user/favorites/lrclib:${id}`)
   }
 
   add(song: Omit<FavoriteItem, "addedAt">, addedAt?: number): void {
@@ -177,33 +151,20 @@ class FavoritesStore {
     )
   }
 
-  async syncAllToServer(): Promise<void> {
-    if (!accountStore.isAuthenticated()) return
+  syncAllToServer(): void {
     if (this.state.length === 0) return
 
-    try {
-      const favorites = this.state.map(item => ({
-        songId: `lrclib:${item.id}`,
-        songProvider: "lrclib",
-        title: item.title,
-        artist: item.artist,
-        album: item.album,
-        albumArt: item.albumArt,
-        addedAt: new Date(item.addedAt).toISOString(),
-      }))
+    const favorites = this.state.map(item => ({
+      songId: `lrclib:${item.id}`,
+      songProvider: "lrclib",
+      title: item.title,
+      artist: item.artist,
+      album: item.album,
+      albumArt: item.albumArt,
+      addedAt: new Date(item.addedAt).toISOString(),
+    }))
 
-      const response = await fetch("/api/user/favorites/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ favorites }),
-      })
-
-      if (response.ok) {
-        accountStore.setLastSyncAt(new Date())
-      }
-    } catch {
-      // Failed to sync all favorites to server
-    }
+    userApi.post("/api/user/favorites/sync", { favorites })
   }
 
   replaceFromServer(songs: ServerFavorite[]): void {

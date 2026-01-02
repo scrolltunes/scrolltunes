@@ -49,8 +49,9 @@ function findLrclibMatch(
   return Effect.gen(function* () {
     const turso = yield* TursoService
 
+    const durationSec = Math.round(track.duration_ms / 1000)
     const match = yield* turso
-      .findByTitleArtist(title, artist)
+      .findByTitleArtist(title, artist, durationSec)
       .pipe(Effect.catchAll(() => Effect.succeed(null)))
 
     if (!match) return null

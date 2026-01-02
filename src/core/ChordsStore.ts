@@ -1,9 +1,8 @@
 "use client"
 
 import { type SongsterrChordData, transposeChord } from "@/lib/chords"
+import { userApi } from "@/lib/user-api"
 import { useMemo, useSyncExternalStore } from "react"
-
-import { accountStore } from "./AccountStore"
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const CACHE_KEY_PREFIX = "scrolltunes:chords:"
@@ -251,36 +250,18 @@ class ChordsStore {
       return localTranspose
     }
 
-    if (accountStore.isAuthenticated()) {
-      try {
-        const response = await fetch(`/api/user/transpose/${songId}`)
-        if (response.ok) {
-          const data = (await response.json()) as { transpose: number }
-          saveTransposeForSong(songId, data.transpose)
-          return data.transpose
-        }
-      } catch {
-        // Failed to fetch from server, use default
-      }
+    const data = await userApi.get<{ transpose: number }>(`/api/user/transpose/${songId}`)
+    if (data) {
+      saveTransposeForSong(songId, data.transpose)
+      return data.transpose
     }
 
     return 0
   }
 
-  private async saveTranspose(songId: number, semitones: number): Promise<void> {
+  private saveTranspose(songId: number, semitones: number): void {
     saveTransposeForSong(songId, semitones)
-
-    if (accountStore.isAuthenticated()) {
-      try {
-        await fetch(`/api/user/transpose/${songId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transpose: semitones }),
-        })
-      } catch {
-        // Failed to sync to server, local storage is still updated
-      }
-    }
+    userApi.put(`/api/user/transpose/${songId}`, { transpose: semitones })
   }
 
   setTranspose(semitones: number): void {

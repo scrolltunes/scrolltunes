@@ -35,6 +35,7 @@ import {
 } from "@/hooks"
 import { type LyricsApiResponse, applyEnhancement, isLyricsApiSuccess } from "@/lib"
 import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
+import { userApi } from "@/lib/user-api"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { parseTrackSlugWithId } from "@/lib/slug"
 import { soundSystem } from "@/sounds"
@@ -332,29 +333,23 @@ export default function SongPage() {
         })
 
         // Upsert to song catalog with BPM (fire-and-forget, only for authenticated users)
-        fetch("/api/songs/upsert", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: data.lyrics.title,
-            artist: data.lyrics.artist,
-            album: data.lyrics.album,
-            durationMs: data.lyrics.duration ? data.lyrics.duration * 1000 : undefined,
-            spotifyId: data.spotifyId ?? spotifyId,
-            lrclibId: id,
-            hasSyncedLyrics: true,
-            bpmAttribution:
-              data.bpm && data.attribution?.bpm
-                ? {
-                    bpm: data.bpm,
-                    musicalKey: data.key,
-                    source: data.attribution.bpm.name,
-                    sourceUrl: data.attribution.bpm.url,
-                  }
-                : null,
-          }),
-        }).catch(() => {
-          // Silently ignore errors (user may not be authenticated)
+        userApi.post("/api/songs/upsert", {
+          title: data.lyrics.title,
+          artist: data.lyrics.artist,
+          album: data.lyrics.album,
+          durationMs: data.lyrics.duration ? data.lyrics.duration * 1000 : undefined,
+          spotifyId: data.spotifyId ?? spotifyId,
+          lrclibId: id,
+          hasSyncedLyrics: true,
+          bpmAttribution:
+            data.bpm && data.attribution?.bpm
+              ? {
+                  bpm: data.bpm,
+                  musicalKey: data.key,
+                  source: data.attribution.bpm.name,
+                  sourceUrl: data.attribution.bpm.url,
+                }
+              : null,
         })
 
         fetchChordsForSong(data.lyrics.artist, data.lyrics.title)

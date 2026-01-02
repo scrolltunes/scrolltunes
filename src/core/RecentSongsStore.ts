@@ -5,9 +5,9 @@ import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
 import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { MAX_RECENT_SONGS, type RecentSong } from "@/lib/recent-songs-types"
 import { recentSongToHistorySyncItem, syncHistory } from "@/lib/sync-service"
+import { userApi } from "@/lib/user-api"
 import { runPrefetchSongs } from "@/services/lyrics-prefetch"
 import { useSyncExternalStore } from "react"
-import { accountStore } from "./AccountStore"
 
 const STORAGE_KEY = "scrolltunes:recents"
 
@@ -122,18 +122,9 @@ class RecentSongsStore {
     this.saveToStorage()
   }
 
-  private async syncToServer(song: RecentSong): Promise<void> {
-    if (!accountStore.isAuthenticated()) {
-      return
-    }
-
-    try {
-      const item = recentSongToHistorySyncItem(song)
-      await syncHistory([item])
-      accountStore.setLastSyncAt(new Date())
-    } catch {
-      // Failed to sync song to server
-    }
+  private syncToServer(song: RecentSong): void {
+    const item = recentSongToHistorySyncItem(song)
+    syncHistory([item])
   }
 
   /**
@@ -247,14 +238,8 @@ class RecentSongsStore {
   /**
    * Clear all recent songs (local and server-side if authenticated)
    */
-  async clear(): Promise<void> {
-    if (accountStore.isAuthenticated()) {
-      try {
-        await fetch("/api/user/history", { method: "DELETE" })
-      } catch {
-        // Server delete failed, still clear localStorage
-      }
-    }
+  clear(): void {
+    userApi.delete("/api/user/history")
     this.setRecents(() => [])
   }
 
@@ -262,33 +247,15 @@ class RecentSongsStore {
    * Remove a specific song from recents (local and server-side if authenticated)
    * Note: Does not remove cached lyrics - they remain available for search
    */
-  async remove(id: number): Promise<void> {
+  remove(id: number): void {
     this.setRecents(prev => prev.filter(s => s.id !== id))
-
-    if (accountStore.isAuthenticated()) {
-      try {
-        await fetch("/api/user/history", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ songId: `lrclib:${id}` }),
-        })
-      } catch {
-        // Server delete failed, already removed from localStorage
-      }
-    }
+    userApi.delete("/api/user/history", { songId: `lrclib:${id}` })
   }
 
-  async syncAllToServer(): Promise<void> {
-    if (!accountStore.isAuthenticated()) return
+  syncAllToServer(): void {
     if (this.state.recents.length === 0) return
-
-    try {
-      const items = this.state.recents.map(recentSongToHistorySyncItem)
-      await syncHistory(items)
-      accountStore.setLastSyncAt(new Date())
-    } catch {
-      // Failed to sync all songs to server
-    }
+    const items = this.state.recents.map(recentSongToHistorySyncItem)
+    syncHistory(items)
   }
 
   replaceFromServer(

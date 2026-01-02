@@ -1,8 +1,7 @@
 "use client"
 
+import { userApi } from "@/lib/user-api"
 import { useSyncExternalStore } from "react"
-
-import { accountStore } from "./AccountStore"
 
 const STORAGE_KEY = "scrolltunes-preferences"
 
@@ -82,18 +81,8 @@ export class PreferencesStore {
     }
   }
 
-  private async syncToServer(): Promise<void> {
-    if (!accountStore.isAuthenticated()) return
-
-    try {
-      await fetch("/api/user/preferences", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preferences: this.state }),
-      })
-    } catch {
-      // Failed to sync to server
-    }
+  private syncToServer(): void {
+    userApi.put("/api/user/preferences", { preferences: this.state })
   }
 
   private setState(partial: Partial<Preferences>): void {
@@ -109,18 +98,13 @@ export class PreferencesStore {
 
     if (this.hasLocalData) return
 
-    try {
-      const response = await fetch("/api/user/preferences")
-      if (response.ok) {
-        const data = (await response.json()) as { preferences: Partial<Preferences> | null }
-        if (data.preferences) {
-          this.state = { ...DEFAULT_PREFERENCES, ...data.preferences }
-          this.saveToStorage()
-          this.notify()
-        }
-      }
-    } catch {
-      // Failed to fetch from server
+    const data = await userApi.get<{ preferences: Partial<Preferences> | null }>(
+      "/api/user/preferences",
+    )
+    if (data?.preferences) {
+      this.state = { ...DEFAULT_PREFERENCES, ...data.preferences }
+      this.saveToStorage()
+      this.notify()
     }
   }
 

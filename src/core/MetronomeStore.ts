@@ -1,7 +1,7 @@
 "use client"
 
+import { userApi } from "@/lib/user-api"
 import { useSyncExternalStore } from "react"
-import { accountStore } from "./AccountStore"
 
 export type MetronomeMode = "click" | "visual" | "both"
 
@@ -96,18 +96,8 @@ export class MetronomeStore {
     this.syncToServer(settings)
   }
 
-  private async syncToServer(settings: PersistedMetronomeSettings): Promise<void> {
-    if (!accountStore.isAuthenticated()) return
-
-    try {
-      await fetch("/api/user/metronome", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metronome: settings }),
-      })
-    } catch {
-      // Failed to sync to server
-    }
+  private syncToServer(settings: PersistedMetronomeSettings): void {
+    userApi.put("/api/user/metronome", { metronome: settings })
   }
 
   async initialize(): Promise<void> {
@@ -122,23 +112,16 @@ export class MetronomeStore {
       return
     }
 
-    if (!accountStore.isAuthenticated()) return
-
-    try {
-      const response = await fetch("/api/user/metronome")
-      if (response.ok) {
-        const data = (await response.json()) as { metronome: PersistedMetronomeSettings | null }
-        if (data.metronome) {
-          this.setState({
-            mode: data.metronome.mode,
-            isMuted: data.metronome.isMuted,
-            volume: data.metronome.volume,
-          })
-          savePersistedSettings(data.metronome)
-        }
-      }
-    } catch {
-      // Failed to fetch from server
+    const data = await userApi.get<{ metronome: PersistedMetronomeSettings | null }>(
+      "/api/user/metronome",
+    )
+    if (data?.metronome) {
+      this.setState({
+        mode: data.metronome.mode,
+        isMuted: data.metronome.isMuted,
+        volume: data.metronome.volume,
+      })
+      savePersistedSettings(data.metronome)
     }
   }
 
