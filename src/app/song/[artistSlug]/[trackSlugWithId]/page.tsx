@@ -14,6 +14,7 @@ import {
   type Lyrics,
   chordsStore,
   metronomeStore,
+  preferencesStore,
   recentSongsStore,
   useChordsState,
   useDetailedActivityStatus,
@@ -42,9 +43,11 @@ import {
   ArrowCounterClockwise,
   ArrowLeft,
   Bug,
+  ListBullets,
   MusicNote,
   Pause,
   Play,
+  Rows,
   SpinnerGap,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
@@ -107,6 +110,7 @@ export default function SongPage() {
 
   // Share lyrics modal state
   const [showShareModal, setShowShareModal] = useState(false)
+  const [shareInitialIds, setShareInitialIds] = useState<readonly string[]>([])
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
@@ -189,6 +193,11 @@ export default function SongPage() {
       await startListening()
     }
   }, [reset, startListening])
+
+  const handleCreateCard = useCallback((selectedIds: readonly string[]) => {
+    setShareInitialIds(selectedIds)
+    setShowShareModal(true)
+  }, [])
 
   const doubleTapRef = useDoubleTap<HTMLDivElement>({
     onDoubleTap: handleTogglePlayPause,
@@ -437,7 +446,6 @@ export default function SongPage() {
     }
   }, [])
 
-
   if (loadState._tag === "Loading") {
     return (
       <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center gap-4">
@@ -521,79 +529,92 @@ export default function SongPage() {
   return (
     <div ref={doubleTapRef} className="h-screen bg-neutral-950 text-white">
       <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
-            <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
-              <Link
-                href="/"
-                className="w-10 h-10 shrink-0 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-                aria-label="Back to search"
-              >
-                <ArrowLeft size={20} />
-              </Link>
-              {loadState.albumArt ? (
-                <img
-                  src={loadState.albumArt}
-                  alt=""
-                  className="w-10 h-10 shrink-0 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="w-10 h-10 shrink-0 rounded-lg bg-neutral-800 flex items-center justify-center">
-                  <MusicNote size={20} weight="fill" className="text-neutral-600" />
-                </div>
-              )}
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-sm font-medium truncate">{songTitle}</span>
-                  <span className="text-xs text-neutral-500 truncate">{songArtist}</span>
-                </div>
-                {lrclibId !== null && (
-                  <FavoriteButton
-                    songId={lrclibId}
-                    title={loadState._tag === "Loaded" ? loadState.lyrics.title : ""}
-                    artist={loadState._tag === "Loaded" ? loadState.lyrics.artist : ""}
-                    {...(loadState._tag === "Loaded" &&
-                      loadState.albumArt !== null && { albumArt: loadState.albumArt })}
-                    size="sm"
-                    className="shrink-0"
-                  />
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <VoiceIndicator
-                  isListening={isListening}
-                  isSpeaking={isSpeaking}
-                  level={level}
-                  onToggle={handleToggleListening}
-                  size="sm"
-                />
-
-                {isReady && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleTogglePlayPause}
-                      className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center transition-colors"
-                      aria-label={isPlaying ? "Pause" : "Play"}
-                    >
-                      {isPlaying ? (
-                        <Pause size={20} weight="fill" />
-                      ) : (
-                        <Play size={20} weight="fill" />
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleReset}
-                      className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-                      aria-label="Reset"
-                    >
-                      <ArrowCounterClockwise size={20} />
-                    </button>
-                  </div>
-                )}
-              </div>
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
+          <Link
+            href="/"
+            className="w-10 h-10 shrink-0 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+            aria-label="Back to search"
+          >
+            <ArrowLeft size={20} />
+          </Link>
+          {loadState.albumArt ? (
+            <img
+              src={loadState.albumArt}
+              alt=""
+              className="w-10 h-10 shrink-0 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="w-10 h-10 shrink-0 rounded-lg bg-neutral-800 flex items-center justify-center">
+              <MusicNote size={20} weight="fill" className="text-neutral-600" />
             </div>
+          )}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-sm font-medium truncate">{songTitle}</span>
+              <span className="text-xs text-neutral-500 truncate">{songArtist}</span>
+            </div>
+            {lrclibId !== null && (
+              <FavoriteButton
+                songId={lrclibId}
+                title={loadState._tag === "Loaded" ? loadState.lyrics.title : ""}
+                artist={loadState._tag === "Loaded" ? loadState.lyrics.artist : ""}
+                {...(loadState._tag === "Loaded" &&
+                  loadState.albumArt !== null && { albumArt: loadState.albumArt })}
+                size="sm"
+                className="shrink-0"
+              />
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                const current = preferencesStore.getDisplayMode()
+                preferencesStore.setDisplayMode(current === "scroll" ? "stage" : "scroll")
+              }}
+              className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+              aria-label={
+                preferences.displayMode === "stage"
+                  ? "Switch to scroll mode"
+                  : "Switch to stage mode"
+              }
+              title={preferences.displayMode === "stage" ? "Scroll mode" : "Stage mode"}
+            >
+              {preferences.displayMode === "stage" ? <ListBullets size={20} /> : <Rows size={20} />}
+            </button>
+
+            <VoiceIndicator
+              isListening={isListening}
+              isSpeaking={isSpeaking}
+              level={level}
+              onToggle={handleToggleListening}
+              size="sm"
+            />
+
+            {isReady && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleTogglePlayPause}
+                  className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center transition-colors"
+                  aria-label={isPlaying ? "Pause" : "Play"}
+                >
+                  {isPlaying ? <Pause size={20} weight="fill" /> : <Play size={20} weight="fill" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+                  aria-label="Reset"
+                >
+                  <ArrowCounterClockwise size={20} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </header>
 
       <main className="pt-16 h-[calc(100vh-4rem)] flex flex-col min-h-0">
@@ -634,6 +655,7 @@ export default function SongPage() {
         <LyricsDisplay
           className="flex-1 pb-12"
           chordEnhancement={loadState._tag === "Loaded" ? loadState.chordEnhancement : null}
+          onCreateCard={handleCreateCard}
         />
 
         <FloatingActions
@@ -703,12 +725,16 @@ export default function SongPage() {
       {loadState._tag === "Loaded" && (
         <LyricsShareModal
           isOpen={showShareModal}
-          onClose={() => setShowShareModal(false)}
+          onClose={() => {
+            setShowShareModal(false)
+            setShareInitialIds([])
+          }}
           title={loadState.lyrics.title}
           artist={loadState.lyrics.artist}
           albumArt={loadState.albumArt}
           spotifyId={loadState.spotifyId}
           lines={loadState.lyrics.lines}
+          initialSelectedIds={shareInitialIds}
         />
       )}
     </div>

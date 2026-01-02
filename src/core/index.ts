@@ -70,6 +70,7 @@ export {
   DEFAULT_FONT_SIZE,
   type Preferences,
   type ThemeMode,
+  type DisplayMode,
 } from "./PreferencesStore"
 
 export {

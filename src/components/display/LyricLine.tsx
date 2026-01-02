@@ -449,7 +449,11 @@ export const LyricLine = memo(function LyricLine({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ type: "tween", duration: 0.4, ease: "easeOut" }}
-            className="absolute inset-0 z-0 rounded-lg bg-indigo-500/20"
+            className="absolute inset-0 z-0 rounded-3xl"
+            style={{
+              background: "color-mix(in srgb, var(--stage-accent) 12%, transparent)",
+              border: "1px solid var(--stage-border-strong)",
+            }}
           />
         )}
       </AnimatePresence>

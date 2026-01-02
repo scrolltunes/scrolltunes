@@ -473,12 +473,8 @@ function SongRow({
           </div>
         </Link>
       </td>
-      <td className="px-4 py-3 text-neutral-400 hidden md:table-cell">
-        {song.album || "—"}
-      </td>
-      <td className="px-4 py-3 text-neutral-400 hidden lg:table-cell">
-        {duration || "—"}
-      </td>
+      <td className="px-4 py-3 text-neutral-400 hidden md:table-cell">{song.album || "—"}</td>
+      <td className="px-4 py-3 text-neutral-400 hidden lg:table-cell">{duration || "—"}</td>
       <td className="px-4 py-3 text-neutral-400 hidden lg:table-cell">
         {song.bpm ? `${song.bpm}` : "—"}
         {song.musicalKey && ` · ${song.musicalKey}`}

@@ -12,6 +12,7 @@ export const FONT_SIZE_STEP = 2
 export const DEFAULT_FONT_SIZE = 34
 
 export type ThemeMode = "system" | "light" | "dark"
+export type DisplayMode = "scroll" | "stage"
 
 export interface Preferences {
   readonly wakeLockEnabled: boolean
@@ -21,6 +22,7 @@ export interface Preferences {
   readonly themeMode: ThemeMode
   readonly metronomeEnabled: boolean
   readonly fontSize: number
+  readonly displayMode: DisplayMode
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -31,6 +33,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   themeMode: "dark",
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,
+  displayMode: "scroll",
 }
 
 export class PreferencesStore {
@@ -186,6 +189,14 @@ export class PreferencesStore {
 
   setFontSize(value: number): void {
     this.setState({ fontSize: value })
+  }
+
+  getDisplayMode(): DisplayMode {
+    return this.state.displayMode
+  }
+
+  setDisplayMode(value: DisplayMode): void {
+    this.setState({ displayMode: value })
   }
 
   reset(): void {

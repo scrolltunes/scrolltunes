@@ -20,6 +20,7 @@ import type { ChordEnhancementPayloadV1 } from "@/lib/gp/chord-types"
 import { animate, motion, useMotionValue, useTransform } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
+import { LyricsViewportStage } from "./LyricsViewportStage"
 
 const MANUAL_MODE_TIMEOUT = 6000 // Resume auto-scroll after 6s of no interaction
 const SCROLL_INDICATOR_TIMEOUT_TOUCH = 3000 // Hide manual scroll badge after touch scroll
@@ -50,6 +51,7 @@ const rubberbandDistance = (distance: number, dimension: number): number => {
 export interface LyricsDisplayProps {
   readonly className?: string
   readonly chordEnhancement?: ChordEnhancementPayloadV1 | null | undefined
+  readonly onCreateCard?: (selectedIds: readonly string[]) => void
 }
 
 /**
@@ -58,13 +60,17 @@ export interface LyricsDisplayProps {
  * Uses Motion transforms for GPU-accelerated scrolling.
  * Detects manual scroll/touch and temporarily disables auto-scroll.
  */
-export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDisplayProps) {
+export function LyricsDisplay({
+  className = "",
+  chordEnhancement,
+  onCreateCard,
+}: LyricsDisplayProps) {
   const state = usePlayerState()
   const currentLineIndex = useCurrentLineIndex()
   const currentTime = useCurrentTime()
   const resetCount = useResetCount()
   const { jumpToLine } = usePlayerControls()
-  const { fontSize } = usePreferences()
+  const { fontSize, displayMode } = usePreferences()
   const chordsData = useChordsData()
   const showChords = useShowChords()
   const transposeSemitones = useTranspose()
@@ -376,6 +382,23 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
     prevStateTag.current = state._tag
   }, [state._tag])
 
+  // Sync scroll position when switching from stage mode back to scroll mode
+  const prevDisplayMode = useRef(displayMode)
+  useEffect(() => {
+    if (prevDisplayMode.current === "stage" && displayMode === "scroll" && lyrics) {
+      const lineIndex = Math.max(0, currentLineIndex)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const target = getLineScrollTarget(lineIndex)
+          if (target !== null) {
+            setScrollYImmediate(target)
+          }
+        })
+      })
+    }
+    prevDisplayMode.current = displayMode
+  }, [displayMode, currentLineIndex, lyrics, getLineScrollTarget, setScrollYImmediate])
+
   // Update scroll position when current line changes (only during active playback)
   useEffect(() => {
     if (!lyrics || !isAutoScrollEnabled) return
@@ -451,17 +474,14 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
     }, MANUAL_MODE_TIMEOUT)
   }, [])
 
-  const scheduleManualIndicatorHide = useCallback(
-    (delayMs: number) => {
-      if (manualIndicatorTimeoutRef.current) {
-        clearTimeout(manualIndicatorTimeoutRef.current)
-      }
-      manualIndicatorTimeoutRef.current = setTimeout(() => {
-        setShowManualScrollIndicator(false)
-      }, delayMs)
-    },
-    [],
-  )
+  const scheduleManualIndicatorHide = useCallback((delayMs: number) => {
+    if (manualIndicatorTimeoutRef.current) {
+      clearTimeout(manualIndicatorTimeoutRef.current)
+    }
+    manualIndicatorTimeoutRef.current = setTimeout(() => {
+      setShowManualScrollIndicator(false)
+    }, delayMs)
+  }, [])
 
   // Handle wheel events
   const handleWheel = useCallback(
@@ -549,7 +569,14 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
     }
 
     momentumRafIdRef.current = requestAnimationFrame(step)
-  }, [applyRubberband, clampScroll, getScrollBounds, markManualInteraction, scrollY, stopScrollAnimation])
+  }, [
+    applyRubberband,
+    clampScroll,
+    getScrollBounds,
+    markManualInteraction,
+    scrollY,
+    stopScrollAnimation,
+  ])
 
   // Internal touch move handler
   const handleTouchMoveInternal = useCallback(
@@ -622,7 +649,15 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
       markManualInteraction()
       updateScrollY(prev => applyRubberband(prev + dy))
     },
-    [applyRubberband, enterManualMode, getScrollBounds, markManualInteraction, scrollMode, scrollY, updateScrollY],
+    [
+      applyRubberband,
+      enterManualMode,
+      getScrollBounds,
+      markManualInteraction,
+      scrollMode,
+      scrollY,
+      updateScrollY,
+    ],
   )
 
   // Internal touch end handler
@@ -683,7 +718,7 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
 
       const handleEnd = (event: TouchEvent) => {
         const stillActive = Array.from(event.touches).some(
-          t => t.identifier === activeTouchIdRef.current
+          t => t.identifier === activeTouchIdRef.current,
         )
         if (stillActive) return
         cleanup()
@@ -761,10 +796,27 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
     )
   }
 
-  // Only show highlight when playing/paused, not in Ready state
-  // Empty lines render as spacers without highlight, so no special handling needed
+  // Show highlight when playing/paused, and also in Ready state for stage mode
   const isPlayingOrPaused = isPlaying || state._tag === "Paused"
-  const activeLineIndex = isPlayingOrPaused ? Math.max(0, currentLineIndex) : -1
+  const scrollModeActiveIndex = isPlayingOrPaused ? Math.max(0, currentLineIndex) : -1
+  // Stage mode always shows first line highlighted when ready
+  const stageModeActiveIndex = Math.max(0, currentLineIndex)
+
+  if (displayMode === "stage") {
+    return (
+      <div className={`h-full ${className}`}>
+        <LyricsViewportStage
+          lines={lyrics.lines}
+          activeIndex={stageModeActiveIndex}
+          currentTime={currentTime}
+          isPlaying={isPlaying}
+          onLineClick={handleLineClick}
+          onCreateCard={onCreateCard}
+          fontSize={fontSize}
+        />
+      </div>
+    )
+  }
 
   return (
     <div
@@ -789,8 +841,8 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
         style={{ y: scrollYOffset }}
       >
         {lyrics.lines.map((line, index) => {
-          const isActive = index === activeLineIndex
-          const isNext = index === activeLineIndex + 1
+          const isActive = index === scrollModeActiveIndex
+          const isNext = index === scrollModeActiveIndex + 1
           const duration = isActive
             ? (lyrics.lines[index + 1]?.startTime ?? lyrics.duration) - line.startTime
             : undefined
@@ -803,7 +855,7 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
               key={line.id}
               text={line.text}
               isActive={isActive}
-              isPast={index < activeLineIndex}
+              isPast={index < scrollModeActiveIndex}
               isNext={isNext}
               onClick={() => handleLineClick(index)}
               index={index}

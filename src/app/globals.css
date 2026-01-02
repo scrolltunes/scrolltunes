@@ -5,6 +5,19 @@
   --foreground: #171717;
   --scrollbar-thumb: #d4d4d4;
   --scrollbar-thumb-hover: #a3a3a3;
+
+  /* Studio Pro Dark tokens */
+  --stage-bg: #070a12;
+  --stage-surface1: #0c1220;
+  --stage-surface2: #111a2c;
+  --stage-surface3: #151f33;
+  --stage-text: #f3f5f7;
+  --stage-text2: rgba(243, 245, 247, 0.72);
+  --stage-text3: rgba(243, 245, 247, 0.46);
+  --stage-accent: #5b6cff;
+  --stage-border: rgba(255, 255, 255, 0.1);
+  --stage-border-strong: rgba(255, 255, 255, 0.16);
+  --stage-radius-xl: 24px;
 }
 
 /* Dark mode via class */

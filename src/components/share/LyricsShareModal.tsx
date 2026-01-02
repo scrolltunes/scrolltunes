@@ -37,6 +37,7 @@ export interface LyricsShareModalProps {
   readonly albumArt?: string | null
   readonly spotifyId?: string | null
   readonly lines: readonly LyricLine[]
+  readonly initialSelectedIds?: readonly string[]
 }
 
 type Step = "select" | "preview"
@@ -128,6 +129,7 @@ export function LyricsShareModal({
   albumArt,
   spotifyId,
   lines,
+  initialSelectedIds,
 }: LyricsShareModalProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const innerCardRef = useRef<HTMLDivElement>(null)
@@ -187,8 +189,15 @@ export function LyricsShareModal({
 
   useEffect(() => {
     if (isOpen) {
-      setStep("select")
-      setSelectedIndices(new Set())
+      const hasInitialSelection = initialSelectedIds && initialSelectedIds.length > 0
+      const initialIndices = hasInitialSelection
+        ? new Set(
+            initialSelectedIds.map(id => lines.findIndex(l => l.id === id)).filter(i => i >= 0),
+          )
+        : new Set<number>()
+
+      setStep(hasInitialSelection ? "preview" : "select")
+      setSelectedIndices(initialIndices)
       setShowBranding(false)
       setShowSpotifyCode(false)
       setShowShadow(true)

@@ -10,14 +10,7 @@ import {
   usePreference,
   useSetlistsContainingSong,
 } from "@/core"
-import {
-  ListPlus,
-  Minus,
-  MusicNote,
-  Plus,
-  ShareNetwork,
-  TextAa,
-} from "@phosphor-icons/react"
+import { ListPlus, Minus, MusicNote, Plus, ShareNetwork, TextAa } from "@phosphor-icons/react"
 import { memo, useCallback } from "react"
 
 export interface SongActionBarProps {
