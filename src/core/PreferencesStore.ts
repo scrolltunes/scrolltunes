@@ -27,7 +27,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   wakeLockEnabled: true,
   doubleTapEnabled: true,
   shakeToRestartEnabled: false,
-  autoHideControlsMs: 0,
+  autoHideControlsMs: 3000,
   themeMode: "dark",
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,

@@ -423,11 +423,20 @@ export default function SongPage() {
   const isPlaying = playerState._tag === "Playing"
   const isReady = playerState._tag !== "Idle"
 
-  const shouldShowHeader = !isLoaded || isHeaderVisible
   const currentBpm = loadState._tag === "Loaded" ? loadState.bpm : null
   const songTitle = loadState._tag === "Loaded" ? normalizeTrackName(loadState.lyrics.title) : null
   const songArtist =
     loadState._tag === "Loaded" ? normalizeArtistName(loadState.lyrics.artist) : null
+
+  // Prevent overscroll chaining but allow pull-to-refresh
+  useEffect(() => {
+    const originalOverscroll = document.documentElement.style.overscrollBehaviorY
+    document.documentElement.style.overscrollBehaviorY = "contain"
+    return () => {
+      document.documentElement.style.overscrollBehaviorY = originalOverscroll
+    }
+  }, [])
+
 
   if (loadState._tag === "Loading") {
     return (
@@ -510,16 +519,8 @@ export default function SongPage() {
   }
 
   return (
-    <div ref={doubleTapRef} className="min-h-screen bg-neutral-950 text-white">
-      <AnimatePresence>
-        {shouldShowHeader && (
-          <motion.header
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -100, opacity: 0 }}
-            transition={springs.default}
-            className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800"
-          >
+    <div ref={doubleTapRef} className="h-screen bg-neutral-950 text-white">
+      <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
             <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
               <Link
                 href="/"
@@ -593,9 +594,7 @@ export default function SongPage() {
                 )}
               </div>
             </div>
-          </motion.header>
-        )}
-      </AnimatePresence>
+      </header>
 
       <main className="pt-16 h-[calc(100vh-4rem)] flex flex-col min-h-0">
         {lrclibId !== null && (

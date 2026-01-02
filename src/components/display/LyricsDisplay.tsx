@@ -21,6 +21,7 @@ import { animate, motion, useMotionValue, useTransform } from "motion/react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LyricLine } from "./LyricLine"
 
+const MANUAL_MODE_TIMEOUT = 6000 // Resume auto-scroll after 6s of no interaction
 const SCROLL_INDICATOR_TIMEOUT_TOUCH = 3000 // Hide manual scroll badge after touch scroll
 const SCROLL_INDICATOR_TIMEOUT_WHEEL = 6000 // Hide manual scroll badge after wheel scroll
 const MOMENTUM_FRICTION = 0.0022 // Velocity decay rate (higher = faster stop)
@@ -29,6 +30,9 @@ const MAX_VELOCITY = 4 // Maximum velocity clamp (pixels/ms)
 const VELOCITY_SMOOTHING = 0.2 // Smooths touch velocity for natural fling
 const RUBBERBAND_COEFFICIENT = 0.55
 const OVERSCROLL_DAMPING = 0.6
+const PTR_DEAD_ZONE = 10 // Minimum downward movement before declaring pull-to-refresh
+
+type ScrollMode = "auto" | "manual"
 
 const isEmptyLine = (text: string): boolean => {
   const trimmed = text.trim()
@@ -66,9 +70,11 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
   const transposeSemitones = useTranspose()
   const variableSpeed = useVariableSpeedPainting()
 
-  // Manual scroll override state
-  const [isManualScrolling, setIsManualScrolling] = useState(false)
+  // Scroll mode state machine: auto follows current line, manual lets user scroll freely
+  const [scrollMode, setScrollMode] = useState<ScrollMode>("auto")
   const [showManualScrollIndicator, setShowManualScrollIndicator] = useState(false)
+  const lastManualInteractionRef = useRef<number | null>(null)
+  const manualModeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const scrollY = useMotionValue(0)
   const manualIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const momentumRafIdRef = useRef<number | null>(null)
@@ -88,6 +94,9 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
     const containerHeight = container.clientHeight
     const contentHeight = content.scrollHeight
     const minScroll = initialScrollValue.current
+    // Standard scroll limit: contentHeight - containerHeight (content bottom at screen bottom)
+    // Subtract extra to keep the last line visible higher up on screen
+    // The content has 35vh bottom padding, so the last text line is already above the bottom
     const maxScroll = Math.max(minScroll, contentHeight - containerHeight)
 
     return { minScroll, maxScroll, containerHeight }
@@ -328,13 +337,13 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
   useEffect(() => {
     hasInitialScroll.current = false
     setScrollYImmediate(0)
-    setIsManualScrolling(false)
+    setScrollMode("auto")
     setShowManualScrollIndicator(false)
   }, [songId, setScrollYImmediate])
 
-  // Only auto-scroll when playing AND not manually overridden
+  // Only auto-scroll when playing AND in auto mode
   const isPlaying = state._tag === "Playing"
-  const isAutoScrollEnabled = isPlaying && !isManualScrolling
+  const isAutoScrollEnabled = isPlaying && scrollMode === "auto"
 
   // Reset scroll position when reset button is pressed
   const prevResetCount = useRef(resetCount)
@@ -351,7 +360,7 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
       const scrollTarget = target ?? initialScrollValue.current
       setScrollYImmediate(scrollTarget)
       hasInitialScroll.current = true
-      setIsManualScrolling(false)
+      setScrollMode("auto")
       setShowManualScrollIndicator(false)
     }
     prevResetCount.current = resetCount
@@ -361,7 +370,7 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
   const prevStateTag = useRef(state._tag)
   useEffect(() => {
     if (prevStateTag.current !== "Playing" && state._tag === "Playing") {
-      setIsManualScrolling(false)
+      setScrollMode("auto")
       setShowManualScrollIndicator(false)
     }
     prevStateTag.current = state._tag
@@ -410,19 +419,37 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
     stopScrollAnimation,
   ])
 
-  // Check if active line is visible in viewport
-  const isActiveLineVisible = useCallback(() => {
-    if (currentLineIndex < 0) return true
-    const container = containerRef.current
-    const activeLine = lineRefs.current[currentLineIndex]
-    if (!container || !activeLine) return true
+  // Enter manual scroll mode and reset the timeout
+  const enterManualMode = useCallback(() => {
+    setScrollMode("manual")
+    setShowManualScrollIndicator(true)
+    lastManualInteractionRef.current = performance.now()
 
-    const containerRect = container.getBoundingClientRect()
-    const lineRect = activeLine.getBoundingClientRect()
+    // Clear any existing timeout
+    if (manualModeTimeoutRef.current) {
+      clearTimeout(manualModeTimeoutRef.current)
+    }
 
-    // Line is visible if any part of it is within the container
-    return lineRect.bottom > containerRect.top && lineRect.top < containerRect.bottom
-  }, [currentLineIndex])
+    // Schedule return to auto mode after timeout
+    manualModeTimeoutRef.current = setTimeout(() => {
+      setScrollMode("auto")
+      setShowManualScrollIndicator(false)
+    }, MANUAL_MODE_TIMEOUT)
+  }, [])
+
+  // Mark an interaction to keep manual mode alive
+  const markManualInteraction = useCallback(() => {
+    lastManualInteractionRef.current = performance.now()
+
+    // Reset the timeout
+    if (manualModeTimeoutRef.current) {
+      clearTimeout(manualModeTimeoutRef.current)
+    }
+    manualModeTimeoutRef.current = setTimeout(() => {
+      setScrollMode("auto")
+      setShowManualScrollIndicator(false)
+    }, MANUAL_MODE_TIMEOUT)
+  }, [])
 
   const scheduleManualIndicatorHide = useCallback(
     (delayMs: number) => {
@@ -431,26 +458,10 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
       }
       manualIndicatorTimeoutRef.current = setTimeout(() => {
         setShowManualScrollIndicator(false)
-        if (isPlaying && isActiveLineVisible()) {
-          setIsManualScrolling(false)
-        }
       }, delayMs)
     },
-    [isPlaying, isActiveLineVisible],
+    [],
   )
-
-  // Handle manual scroll detection - sticky override until highlight leaves view
-  // When playing and highlight goes out of view, resume auto-follow
-  const handleUserScroll = useCallback(() => {
-    setIsManualScrolling(true)
-    setShowManualScrollIndicator(true)
-
-    // If playing and active line goes out of view, reset manual scroll to resume following
-    if (isPlaying && !isActiveLineVisible()) {
-      setIsManualScrolling(false)
-      setShowManualScrollIndicator(false)
-    }
-  }, [isPlaying, isActiveLineVisible])
 
   // Handle wheel events
   const handleWheel = useCallback(
@@ -459,12 +470,20 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
         e.preventDefault()
       }
       stopScrollAnimation()
-      handleUserScroll()
+
+      if (scrollMode === "auto") {
+        enterManualMode()
+      } else {
+        markManualInteraction()
+      }
+
       scheduleManualIndicatorHide(SCROLL_INDICATOR_TIMEOUT_WHEEL)
       updateScrollY(prev => clampScroll(prev + e.deltaY))
     },
     [
-      handleUserScroll,
+      scrollMode,
+      enterManualMode,
+      markManualInteraction,
       clampScroll,
       scheduleManualIndicatorHide,
       stopScrollAnimation,
@@ -473,10 +492,17 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
   )
 
   // Handle touch events for mobile with velocity-based momentum
+  // Uses document-level listeners during gesture to prevent browser scroll takeover
+  const activeTouchIdRef = useRef<number | null>(null)
   const touchStartY = useRef<number | null>(null)
   const touchLastY = useRef<number | null>(null)
   const touchLastTime = useRef<number | null>(null)
   const touchVelocity = useRef<number>(0)
+  const hasDecidedGestureRef = useRef<boolean>(false)
+  const isPullToRefreshRef = useRef<boolean>(false)
+  const totalDyRef = useRef<number>(0)
+  const gestureCleanupRef = useRef<(() => void) | null>(null)
+  const hasEnteredManualForGestureRef = useRef<boolean>(false)
 
   // Start momentum animation after touch ends
   const startMomentumScroll = useCallback(() => {
@@ -510,6 +536,9 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
 
       scrollY.set(next)
 
+      // Keep marking interaction during momentum to prevent timeout
+      markManualInteraction()
+
       if (Math.abs(v) < MIN_VELOCITY) {
         scrollY.set(clampScroll(scrollY.get()))
         momentumRafIdRef.current = null
@@ -520,30 +549,11 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
     }
 
     momentumRafIdRef.current = requestAnimationFrame(step)
-  }, [applyRubberband, clampScroll, getScrollBounds, scrollY, stopScrollAnimation])
+  }, [applyRubberband, clampScroll, getScrollBounds, markManualInteraction, scrollY, stopScrollAnimation])
 
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      const y = e.touches[0]?.clientY ?? null
-      touchStartY.current = y
-      touchLastY.current = y
-      touchLastTime.current = performance.now()
-      touchVelocity.current = 0
-
-      // Cancel any running momentum when user touches again
-      if (momentumRafIdRef.current !== null) {
-        cancelAnimationFrame(momentumRafIdRef.current)
-        momentumRafIdRef.current = null
-      }
-
-      stopScrollAnimation()
-      handleUserScroll()
-    },
-    [handleUserScroll, stopScrollAnimation],
-  )
-
-  const handleTouchMove = useCallback(
-    (currentY: number, event: Pick<TouchEvent, "cancelable" | "preventDefault">) => {
+  // Internal touch move handler
+  const handleTouchMoveInternal = useCallback(
+    (currentY: number, event: TouchEvent) => {
       if (
         touchStartY.current === null ||
         touchLastY.current === null ||
@@ -552,12 +562,55 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
         return
 
       const now = performance.now()
-      const dy = touchLastY.current - currentY // positive dy = scroll down
+      const dy = touchLastY.current - currentY // positive dy = scroll down (finger up)
       const dt = now - touchLastTime.current
 
-      touchStartY.current = currentY
       touchLastY.current = currentY
       touchLastTime.current = now
+      totalDyRef.current += dy
+
+      // Decide once per gesture: pull-to-refresh or custom scroll
+      if (!hasDecidedGestureRef.current) {
+        const bounds = getScrollBounds()
+        const minScroll = bounds?.minScroll ?? initialScrollValue.current
+        const currentScroll = scrollY.get()
+        const isAtTop = currentScroll <= minScroll + 0.5
+        const isPullingDown = totalDyRef.current < -PTR_DEAD_ZONE
+
+        if (isAtTop && isPullingDown) {
+          // Let browser handle pull-to-refresh - clean up our listeners
+          isPullToRefreshRef.current = true
+          hasDecidedGestureRef.current = true
+          if (gestureCleanupRef.current) {
+            gestureCleanupRef.current()
+            gestureCleanupRef.current = null
+          }
+          return
+        }
+
+        // Once we've moved enough, decide this is custom scroll
+        if (Math.abs(totalDyRef.current) > PTR_DEAD_ZONE) {
+          isPullToRefreshRef.current = false
+          hasDecidedGestureRef.current = true
+          // NOW enter manual mode since we're taking control
+          if (!hasEnteredManualForGestureRef.current) {
+            hasEnteredManualForGestureRef.current = true
+            if (scrollMode === "auto") {
+              enterManualMode()
+            }
+          }
+        }
+      }
+
+      // If this is a pull-to-refresh gesture, let browser handle it
+      if (isPullToRefreshRef.current) {
+        return
+      }
+
+      // Take full control: prevent default and update scroll
+      if (event.cancelable) {
+        event.preventDefault()
+      }
 
       if (dt > 0) {
         // Calculate velocity (pixels per ms), clamped to avoid crazy spikes
@@ -566,54 +619,107 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
         touchVelocity.current = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, smoothed))
       }
 
-      const bounds = getScrollBounds()
-      const minScroll = bounds?.minScroll ?? initialScrollValue.current
-      const currentScroll = scrollY.get()
-      const nextRaw = currentScroll + dy
-      const isAtTop = currentScroll <= minScroll + 0.5
-      const isPullingDown = dy < 0
-      const isRubberbanding = nextRaw < minScroll
-      const allowNativePullToRefresh = isPullingDown && isAtTop && isRubberbanding
-
-      if (!allowNativePullToRefresh && event.cancelable) {
-        event.preventDefault()
-      }
-
+      markManualInteraction()
       updateScrollY(prev => applyRubberband(prev + dy))
     },
-    [applyRubberband, getScrollBounds, scrollY, updateScrollY],
+    [applyRubberband, enterManualMode, getScrollBounds, markManualInteraction, scrollMode, scrollY, updateScrollY],
   )
 
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const handleMove = (event: TouchEvent) => {
-      const currentY = event.touches[0]?.clientY
-      if (currentY === undefined) return
-      handleTouchMove(currentY, event)
-    }
-
-    container.addEventListener("touchmove", handleMove, { passive: false })
-    return () => {
-      container.removeEventListener("touchmove", handleMove)
-    }
-  }, [handleTouchMove])
-
-  // Start momentum scroll when touch ends
-  const handleTouchEnd = useCallback(() => {
+  // Internal touch end handler
+  const handleTouchEndInternal = useCallback(() => {
     touchStartY.current = null
     touchLastY.current = null
     touchLastTime.current = null
-    scheduleManualIndicatorHide(SCROLL_INDICATOR_TIMEOUT_TOUCH)
-    startMomentumScroll()
+    activeTouchIdRef.current = null
+
+    const wasPullToRefresh = isPullToRefreshRef.current
+
+    // Reset gesture decision state
+    hasDecidedGestureRef.current = false
+    isPullToRefreshRef.current = false
+    totalDyRef.current = 0
+    hasEnteredManualForGestureRef.current = false
+    gestureCleanupRef.current = null
+
+    // Only run momentum if we owned the gesture (not pull-to-refresh)
+    if (!wasPullToRefresh) {
+      scheduleManualIndicatorHide(SCROLL_INDICATOR_TIMEOUT_TOUCH)
+      startMomentumScroll()
+    }
   }, [scheduleManualIndicatorHide, startMomentumScroll])
+
+  // Touch start: set up gesture and attach document-level listeners
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      const touch = e.touches[0]
+      if (!touch) return
+
+      activeTouchIdRef.current = touch.identifier
+      touchStartY.current = touch.clientY
+      touchLastY.current = touch.clientY
+      touchLastTime.current = performance.now()
+      touchVelocity.current = 0
+      hasDecidedGestureRef.current = false
+      isPullToRefreshRef.current = false
+      totalDyRef.current = 0
+      hasEnteredManualForGestureRef.current = false
+
+      // Cancel any running momentum when user touches again
+      if (momentumRafIdRef.current !== null) {
+        cancelAnimationFrame(momentumRafIdRef.current)
+        momentumRafIdRef.current = null
+      }
+
+      stopScrollAnimation()
+
+      // Don't enter manual mode yet - wait until we decide this is custom scroll, not PTR
+
+      // Attach global listeners for this gesture to capture moves outside container
+      const handleMove = (event: TouchEvent) => {
+        const t = Array.from(event.touches).find(t => t.identifier === activeTouchIdRef.current)
+        if (!t) return
+        handleTouchMoveInternal(t.clientY, event)
+      }
+
+      const handleEnd = (event: TouchEvent) => {
+        const stillActive = Array.from(event.touches).some(
+          t => t.identifier === activeTouchIdRef.current
+        )
+        if (stillActive) return
+        cleanup()
+        handleTouchEndInternal()
+      }
+
+      const cleanup = () => {
+        window.removeEventListener("touchmove", handleMove)
+        window.removeEventListener("touchend", handleEnd)
+        window.removeEventListener("touchcancel", handleEnd)
+        gestureCleanupRef.current = null
+      }
+
+      // Store cleanup so we can call it if we decide this is PTR
+      gestureCleanupRef.current = cleanup
+
+      window.addEventListener("touchmove", handleMove, { passive: false })
+      window.addEventListener("touchend", handleEnd)
+      window.addEventListener("touchcancel", handleEnd)
+    },
+    [handleTouchEndInternal, handleTouchMoveInternal, stopScrollAnimation],
+  )
+
+  // No-op handlers for React props (actual handling is via document listeners)
+  const handleTouchEnd = useCallback(() => {
+    // Handled by document-level listener
+  }, [])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (manualIndicatorTimeoutRef.current) {
         clearTimeout(manualIndicatorTimeoutRef.current)
+      }
+      if (manualModeTimeoutRef.current) {
+        clearTimeout(manualModeTimeoutRef.current)
       }
       if (momentumRafIdRef.current !== null) {
         cancelAnimationFrame(momentumRafIdRef.current)
@@ -629,7 +735,8 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
   const handleLineClick = useCallback(
     (index: number) => {
       jumpToLine(index)
-      setIsManualScrolling(false)
+      setScrollMode("auto")
+      setShowManualScrollIndicator(false)
     },
     [jumpToLine],
   )
@@ -662,7 +769,7 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden h-full ${className}`}
+      className={`relative overflow-hidden h-full overscroll-none ${className}`}
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -678,7 +785,7 @@ export function LyricsDisplay({ className = "", chordEnhancement }: LyricsDispla
 
       <motion.div
         ref={contentRef}
-        className="pt-[50vh] pb-[25vh] max-w-4xl mx-auto"
+        className="pt-[40vh] pb-[35vh] max-w-4xl mx-auto"
         style={{ y: scrollYOffset }}
       >
         {lyrics.lines.map((line, index) => {
