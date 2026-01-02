@@ -300,6 +300,11 @@ export default function AboutPage() {
               </Link>
             </div>
           </section>
+
+          {/* Copyright */}
+          <div className="text-center text-sm text-neutral-500 pt-4">
+            © 2025–2026 ScrollTunes. All rights reserved.
+          </div>
         </motion.div>
       </main>
     </div>

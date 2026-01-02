@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           transition={{ duration: 0.3 }}
           className="space-y-8"
         >
-          <p className="text-sm text-neutral-500">Last updated: December 2025</p>
+          <p className="text-sm text-neutral-500">Last updated: January 2026</p>
 
           <section className="space-y-4">
             <h2 className="text-xl font-semibold">Overview</h2>
@@ -29,8 +29,8 @@ export default function PrivacyPage() {
             </p>
             <p className="text-neutral-300 leading-relaxed">
               <strong className="text-white">Anonymous users</strong> can use ScrollTunes without
-              creating an account. We do not store any data on our servers, do not use cookies, and
-              do not track your activity. Everything stays in your browser.
+              creating an account. We do not store any user data on our servers, do not use
+              cookies, and do not track your activity. Everything stays in your browser.
             </p>
             <p className="text-neutral-300 leading-relaxed">
               <strong className="text-white">Account holders</strong> who choose to sign in consent
@@ -45,7 +45,7 @@ export default function PrivacyPage() {
               </div>
               <div className="flex items-center gap-2 text-green-400">
                 <span>✓</span>
-                <span>No server-side data retention</span>
+                <span>No server-side user data retention</span>
               </div>
               <div className="flex items-center gap-2 text-green-400">
                 <span>✓</span>
@@ -57,7 +57,7 @@ export default function PrivacyPage() {
               </div>
               <div className="flex items-center gap-2 text-green-400">
                 <span>✓</span>
-                <span>All data stays in your browser</span>
+                <span>All your data stays in your browser</span>
               </div>
             </div>
           </section>
@@ -66,8 +66,8 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-semibold">Accounts and Synced Data</h2>
             <p className="text-neutral-300 leading-relaxed">
               ScrollTunes can be used without creating an account. When you use ScrollTunes
-              anonymously, we do not store any usage data on our servers, do not use cookies, and do
-              not track your activity. Your settings, history, and favorites stay entirely in your
+              anonymously, we do not store any of your data on our servers, do not use cookies, and
+              do not track your activity. Your settings, history, and favorites stay entirely in your
               browser&apos;s local storage.
             </p>
 

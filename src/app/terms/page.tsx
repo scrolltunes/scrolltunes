@@ -13,7 +13,7 @@ export default function TermsOfService() {
         </div>
 
         <h1 className="mb-2 text-4xl font-bold">Terms of Service</h1>
-        <p className="mb-12 text-neutral-400">Last updated: December 2025</p>
+        <p className="mb-12 text-neutral-400">Last updated: January 2026</p>
 
         <div className="space-y-10">
           <section>
@@ -309,6 +309,11 @@ export default function TermsOfService() {
               .
             </p>
           </section>
+
+          {/* Copyright */}
+          <div className="text-center text-sm text-neutral-500 pt-8">
+            © 2025–2026 ScrollTunes. All rights reserved.
+          </div>
         </div>
       </div>
     </div>
