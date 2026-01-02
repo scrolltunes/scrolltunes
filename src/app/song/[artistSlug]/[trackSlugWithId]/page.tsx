@@ -434,14 +434,6 @@ export default function SongPage() {
   const songArtist =
     loadState._tag === "Loaded" ? normalizeArtistName(loadState.lyrics.artist) : null
 
-  // Prevent overscroll chaining but allow pull-to-refresh
-  useEffect(() => {
-    const originalOverscroll = document.documentElement.style.overscrollBehaviorY
-    document.documentElement.style.overscrollBehaviorY = "contain"
-    return () => {
-      document.documentElement.style.overscrollBehaviorY = originalOverscroll
-    }
-  }, [])
 
   if (loadState._tag === "Loading") {
     return (

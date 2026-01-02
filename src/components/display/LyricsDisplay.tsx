@@ -258,8 +258,8 @@ export function LyricsDisplay({
       // Where the line currently is (relative to container top)
       const lineCurrentY = lineRect.top - containerRect.top
 
-      // Target position: 25% from container top for comfortable reading
-      const targetY = containerRect.height * 0.25
+      // Target position: 15% from container top for comfortable reading
+      const targetY = containerRect.height * 0.15
 
       // Adjust scroll by the difference
       const delta = lineCurrentY - targetY
@@ -286,8 +286,8 @@ export function LyricsDisplay({
       const lineRect = targetLine.getBoundingClientRect()
       const lineCurrentY = lineRect.top - containerRect.top
 
-      // Target position: 25% from container top
-      const targetY = containerHeight * 0.25
+      // Target position: 15% from container top
+      const targetY = containerHeight * 0.15
 
       // Calculate what scroll value would position the line at targetY
       // lineCurrentY is based on currentScroll, so we need to account for that
@@ -505,6 +505,7 @@ export function LyricsDisplay({
   const totalDyRef = useRef<number>(0)
   const gestureCleanupRef = useRef<(() => void) | null>(null)
   const hasEnteredManualForGestureRef = useRef<boolean>(false)
+  const wasAtTopOnTouchStartRef = useRef<boolean>(false)
 
   // Start momentum animation after touch ends
   const startMomentumScroll = useCallback(() => {
@@ -580,13 +581,10 @@ export function LyricsDisplay({
 
       // Decide once per gesture: pull-to-refresh or custom scroll
       if (!hasDecidedGestureRef.current) {
-        const bounds = getScrollBounds()
-        const minScroll = bounds?.minScroll ?? initialScrollValue.current
-        const currentScroll = scrollY.get()
-        const isAtTop = currentScroll <= minScroll + 0.5
         const isPullingDown = totalDyRef.current < -PTR_DEAD_ZONE
 
-        if (isAtTop && isPullingDown) {
+        // Only allow PTR if we were already at top when touch started
+        if (wasAtTopOnTouchStartRef.current && isPullingDown) {
           // Let browser handle pull-to-refresh - clean up our listeners
           isPullToRefreshRef.current = true
           hasDecidedGestureRef.current = true
@@ -681,13 +679,20 @@ export function LyricsDisplay({
       totalDyRef.current = 0
       hasEnteredManualForGestureRef.current = false
 
-      // Cancel any running momentum when user touches again
+      // Cancel any running momentum FIRST before checking position
+      const wasMomentumScrolling = momentumRafIdRef.current !== null
       if (momentumRafIdRef.current !== null) {
         cancelAnimationFrame(momentumRafIdRef.current)
         momentumRafIdRef.current = null
       }
 
       stopScrollAnimation()
+
+      // Check if at top when touch starts - only allow PTR if already at top AND not interrupting momentum
+      const bounds = getScrollBounds()
+      const minScroll = bounds?.minScroll ?? initialScrollValue.current
+      const isAtTop = scrollY.get() <= minScroll + 0.5
+      wasAtTopOnTouchStartRef.current = isAtTop && !wasMomentumScrolling
 
       // Don't enter manual mode yet - wait until we decide this is custom scroll, not PTR
 
@@ -721,7 +726,7 @@ export function LyricsDisplay({
       window.addEventListener("touchend", handleEnd)
       window.addEventListener("touchcancel", handleEnd)
     },
-    [handleTouchEndInternal, handleTouchMoveInternal, stopScrollAnimation],
+    [getScrollBounds, handleTouchEndInternal, handleTouchMoveInternal, scrollY, stopScrollAnimation],
   )
 
   // No-op handlers for React props (actual handling is via document listeners)
@@ -785,7 +790,7 @@ export function LyricsDisplay({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden h-full overscroll-none ${className}`}
+      className={`relative overflow-hidden h-full ${className}`}
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -794,14 +799,14 @@ export function LyricsDisplay({
     >
       {/* Manual scroll indicator */}
       {showManualScrollIndicator && (
-        <div className="absolute top-4 right-4 z-30 px-3 py-1 bg-neutral-800/80 rounded-full text-sm text-neutral-400">
+        <div className="fixed top-32 right-4 z-30 px-3 py-1 bg-neutral-800/80 backdrop-blur-sm rounded-full text-sm text-neutral-400">
           Manual scroll
         </div>
       )}
 
       <motion.div
         ref={contentRef}
-        className="pt-[40vh] pb-[35vh] max-w-4xl mx-auto"
+        className="pt-[15vh] pb-[25vh] max-w-4xl mx-auto"
         style={{ y: scrollYOffset }}
       >
         {lyrics.lines.map((line, index) => {
