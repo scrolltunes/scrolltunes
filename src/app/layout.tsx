@@ -95,10 +95,17 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Inline blocking script to prevent theme flash on load */}
+        {/* Critical CSS to prevent flash - sets dark background before any CSS loads */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html:
+              "html,body{background:#070A12}html.light,html.light body{background:#FAF7F2}@media(prefers-color-scheme:light){html:not(.dark),html:not(.dark) body{background:#FAF7F2}}",
+          }}
+        />
+        {/* Inline blocking script to set theme class based on user preference */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){let d=true;try{const s=localStorage.getItem("scrolltunes-preferences");const p=s?JSON.parse(s):{};const m=p.themeMode||"system";d=m==="dark"||(m==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches)}catch(e){}document.documentElement.classList.add(d?"dark":"light");document.documentElement.style.backgroundColor=d?"#070A12":"#FAF7F2"})()`,
+            __html: `(function(){let d=true;try{const s=localStorage.getItem("scrolltunes-preferences");const p=s?JSON.parse(s):{};const m=p.themeMode||"system";d=m==="dark"||(m==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches)}catch(e){}document.documentElement.classList.add(d?"dark":"light")})()`,
           }}
         />
       </head>
