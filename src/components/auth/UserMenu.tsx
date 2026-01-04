@@ -18,7 +18,12 @@ function getInitials(name: string | null, email: string): string {
 export const UserMenu = memo(function UserMenu() {
   const { isAuthenticated, isLoading, user } = useAccount()
   const [isOpen, setIsOpen] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const handleToggle = useCallback(() => {
     setIsOpen(prev => !prev)
@@ -42,11 +47,12 @@ export const UserMenu = memo(function UserMenu() {
     }
   }, [isOpen])
 
-  if (isLoading) {
+  // Show skeleton before mount (SSR/hydration) or during loading
+  if (!isMounted || isLoading) {
     return (
       <div
         className="w-10 h-10 rounded-full animate-pulse"
-        style={{ background: "var(--color-surface2)" }}
+        style={{ background: "var(--color-surface3)" }}
       />
     )
   }
