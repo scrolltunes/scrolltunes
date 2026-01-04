@@ -93,8 +93,8 @@ export default async function RootLayout({
   const session = await auth()
 
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="en" style={{ backgroundColor: "#070A12" }}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} style={{ backgroundColor: "#070A12" }}>
         <AuthProvider session={session}>
           <ThemeProvider>
             <FooterProvider>

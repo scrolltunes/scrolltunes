@@ -146,7 +146,7 @@ export default function Home() {
         <section className="flex flex-col items-center px-6 pt-20 pb-12">
           <div
             className="mb-8 w-24 h-24 rounded-full flex items-center justify-center"
-            style={{ background: "var(--color-surface1)" }}
+            style={{ background: "var(--color-surface2)", border: "1px solid var(--color-border)" }}
           >
             <Logo size={56} style={{ color: "var(--color-accent)" }} />
           </div>
