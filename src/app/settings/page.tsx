@@ -525,8 +525,8 @@ export default function SettingsPage() {
               <SliderSetting
                 value={preferences.autoHideControlsMs}
                 onChange={handleAutoHideChange}
-                label="Auto-hide during playback"
-                description="Hide header after inactivity while playing"
+                label="Auto-hide toolbar"
+                description="Hide the song toolbar during playback after inactivity"
                 icon={<Timer size={20} weight="duotone" />}
                 min={0}
                 max={30000}
