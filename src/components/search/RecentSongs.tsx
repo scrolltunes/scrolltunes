@@ -35,8 +35,8 @@ export const RecentSongs = memo(function RecentSongs({
   // Limit items based on layout
   const displayRecents = layout === "horizontal" ? recents.slice(0, 20) : recents.slice(0, 5)
 
-  // Hide entire section when empty and initialized
-  if (isInitialized && recents.length === 0 && !isLoading) {
+  // Hide entire section when empty and initialized (only after mount to avoid hydration flash)
+  if (isMounted && isInitialized && recents.length === 0 && !isLoading) {
     return null
   }
 
