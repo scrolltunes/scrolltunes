@@ -3,7 +3,8 @@
 import { UserMenu } from "@/components/auth"
 import { LogoMenu } from "@/components/layout"
 import { HomeSetlists, RecentSongs, SongSearch } from "@/components/search"
-import { AmbientBackground, Attribution, Logo } from "@/components/ui"
+import { AmbientBackground, Attribution } from "@/components/ui"
+import Image from "next/image"
 import { CaretDown, GearSix } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
@@ -144,12 +145,20 @@ export default function Home() {
       <main className="pt-16 flex flex-col relative z-10">
         {/* Hero Section - Search First */}
         <section className="flex flex-col items-center px-6 pt-20 pb-12">
-          <div
-            className="mb-8 w-24 h-24 rounded-full flex items-center justify-center"
-            style={{ background: "var(--color-surface2)", border: "1px solid var(--color-border)" }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="mb-8"
           >
-            <Logo size={56} style={{ color: "var(--color-accent)" }} />
-          </div>
+            <Image
+              src="/scrolltunes-logo.png"
+              alt="ScrollTunes logo"
+              width={120}
+              height={120}
+              priority
+            />
+          </motion.div>
           <SongSearch className="w-full max-w-md" />
           <Attribution
             lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}
