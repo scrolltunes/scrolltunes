@@ -216,25 +216,9 @@ export default function SongPage() {
     const id = lrclibId
     const controller = new AbortController()
 
-    async function fetchChordsForSong(artist: string, title: string) {
-      const normalizedArtist = normalizeArtistName(artist)
-      const normalizedTitle = normalizeTrackName(title)
-      try {
-        const searchRes = await fetch(
-          `/api/chords/search?artist=${encodeURIComponent(normalizedArtist)}&title=${encodeURIComponent(normalizedTitle)}`,
-          { signal: controller.signal },
-        )
-        const searchData = await searchRes.json()
-
-        if (searchData.results && searchData.results.length > 0) {
-          const match = searchData.results[0]
-          await chordsStore.fetchChords(match.songId, match.artist, match.title)
-        }
-      } catch (error) {
-        if (error instanceof Error && error.name !== "AbortError") {
-          console.error("Failed to fetch chords:", error)
-        }
-      }
+    async function fetchChordsForSong(_artist: string, _title: string) {
+      // Chord fetching temporarily disabled
+      return
     }
 
     async function fetchLyrics() {
