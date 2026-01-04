@@ -1,7 +1,7 @@
 "use client"
 
-import { Logo } from "@/components/ui"
 import { useAccount, useIsAdmin } from "@/core"
+import { Logo } from "@/components/ui"
 import { CaretDown, GearSix, Heart, Info, MusicNotes, ShieldCheck } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
@@ -39,18 +39,15 @@ export const LogoMenu = memo(function LogoMenu() {
       <button
         type="button"
         onClick={handleToggle}
-        className="flex items-center gap-2 px-2 py-1 rounded-lg transition-colors focus:outline-none focus:ring-2 hover:brightness-110"
-        style={{ background: "transparent" }}
+        className="flex items-center gap-1 px-2 py-1.5 rounded-lg transition-colors focus:outline-none focus:ring-2 hover:brightness-110"
+        style={{ background: "var(--color-surface2)" }}
         aria-label="ScrollTunes menu"
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <Logo size={24} style={{ color: "var(--color-accent)" }} />
-        <span className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
-          ScrollTunes
-        </span>
+        <Logo size={24} />
         {isAdmin && (
-          <span className="px-2 py-0.5 text-xs font-bold rounded-full uppercase tracking-wide bg-amber-500 text-black">
+          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-amber-500 text-black">
             Admin
           </span>
         )}

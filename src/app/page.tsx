@@ -3,8 +3,7 @@
 import { UserMenu } from "@/components/auth"
 import { LogoMenu } from "@/components/layout"
 import { HomeSetlists, RecentSongs, SongSearch } from "@/components/search"
-import { AmbientBackground, Attribution } from "@/components/ui"
-import Image from "next/image"
+import { AmbientBackground, Attribution, Logo } from "@/components/ui"
 import { CaretDown, GearSix } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
@@ -121,7 +120,7 @@ export default function Home() {
       <header
         className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
         style={{
-          background: "rgba(7, 10, 18, 0.8)",
+          background: "var(--color-header-bg)",
           borderBottom: "1px solid var(--color-border)",
         }}
       >
@@ -145,20 +144,12 @@ export default function Home() {
       <main className="pt-16 flex flex-col relative z-10">
         {/* Hero Section - Search First */}
         <section className="flex flex-col items-center px-6 pt-20 pb-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mb-8"
-          >
-            <Image
-              src="/scrolltunes-logo.png"
-              alt="ScrollTunes logo"
-              width={120}
-              height={120}
-              priority
-            />
-          </motion.div>
+          <div className="mb-8 flex items-center gap-3">
+            <Logo size={48} colorful aria-label="ScrollTunes logo" />
+            <span className="text-3xl font-semibold" style={{ color: "var(--color-text)" }}>
+              ScrollTunes
+            </span>
+          </div>
           <SongSearch className="w-full max-w-md" />
           <Attribution
             lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}

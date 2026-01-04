@@ -534,7 +534,7 @@ export default function SongPage() {
       <header
         className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
         style={{
-          background: "rgba(7, 10, 18, 0.8)",
+          background: "var(--color-header-bg)",
           borderBottom: "1px solid var(--color-border)",
         }}
       >
@@ -624,7 +624,7 @@ export default function SongPage() {
             {(!isLoaded || isHeaderVisible) && (
               <motion.div
                 className="sticky top-16 z-30 backdrop-blur"
-                style={{ background: "rgba(7, 10, 18, 0.8)" }}
+                style={{ background: "var(--color-header-bg)" }}
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}

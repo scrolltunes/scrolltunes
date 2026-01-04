@@ -1,7 +1,16 @@
 "use client"
 
 import { AmbientBackground } from "@/components/ui"
-import { type ThemeMode, preferencesStore, useAccount, usePreferences } from "@/core"
+import {
+  DEFAULT_FONT_SIZE,
+  FONT_SIZE_STEP,
+  MAX_FONT_SIZE,
+  MIN_FONT_SIZE,
+  type ThemeMode,
+  preferencesStore,
+  useAccount,
+  usePreferences,
+} from "@/core"
 import {
   ArrowCounterClockwise,
   ArrowLeft,
@@ -10,6 +19,7 @@ import {
   Hand,
   Moon,
   SignOut,
+  TextAa,
   Timer,
   Trash,
   User,
@@ -418,6 +428,10 @@ export default function SettingsPage() {
     preferencesStore.setAutoHideControlsMs(value)
   }, [])
 
+  const handleFontSizeChange = useCallback((value: number) => {
+    preferencesStore.setFontSize(value)
+  }, [])
+
   const handleThemeModeChange = useCallback((mode: ThemeMode) => {
     preferencesStore.setThemeMode(mode)
   }, [])
@@ -431,13 +445,18 @@ export default function SettingsPage() {
     return `${ms / 1000}s`
   }
 
+  const formatFontSize = (px: number): string => {
+    if (px === DEFAULT_FONT_SIZE) return `${px}px (default)`
+    return `${px}px`
+  }
+
   return (
     <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <AmbientBackground variant="subtle" />
       <header
         className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
         style={{
-          background: "rgba(7, 10, 18, 0.8)",
+          background: "var(--color-header-bg)",
           borderBottom: "1px solid var(--color-border)",
         }}
       >
@@ -492,6 +511,17 @@ export default function SettingsPage() {
               Display
             </h2>
             <div className="space-y-3">
+              <SliderSetting
+                value={preferences.fontSize}
+                onChange={handleFontSizeChange}
+                label="Lyrics font size"
+                description="Adjust the size of lyrics text"
+                icon={<TextAa size={20} weight="duotone" />}
+                min={MIN_FONT_SIZE}
+                max={MAX_FONT_SIZE}
+                step={FONT_SIZE_STEP}
+                formatValue={formatFontSize}
+              />
               <SliderSetting
                 value={preferences.autoHideControlsMs}
                 onChange={handleAutoHideChange}

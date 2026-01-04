@@ -51,7 +51,7 @@ export default function LoginPage() {
       <header
         className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
         style={{
-          background: "rgba(7, 10, 18, 0.8)",
+          background: "var(--color-header-bg)",
           borderBottom: "1px solid var(--color-border)",
         }}
       >
@@ -102,8 +102,13 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-neutral-800 font-medium rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
-                style={{ fontFamily: "Roboto, system-ui, sans-serif" }}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 font-medium rounded-lg transition-colors cursor-pointer hover:brightness-95"
+                style={{
+                  fontFamily: "Roboto, system-ui, sans-serif",
+                  background: "#ffffff",
+                  color: "#1f1f1f",
+                  border: "1px solid var(--color-border-strong)",
+                }}
               >
                 <GoogleLogo />
                 Continue with Google

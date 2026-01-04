@@ -121,7 +121,7 @@ function EnhancedLrcView({
 
 function Header() {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-14 backdrop-blur-lg" style={{ background: "rgba(7, 10, 18, 0.8)", borderBottom: "1px solid var(--color-border)" }}>
+    <header className="fixed top-0 left-0 right-0 z-50 h-14 backdrop-blur-lg" style={{ background: "var(--color-header-bg)", borderBottom: "1px solid var(--color-border)" }}>
       <div className="max-w-7xl mx-auto h-full px-4 flex items-center">
         <Link
           href="/admin/songs"

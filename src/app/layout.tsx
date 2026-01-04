@@ -93,8 +93,12 @@ export default async function RootLayout({
   const session = await auth()
 
   return (
-    <html lang="en" style={{ backgroundColor: "#070A12" }}>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} style={{ backgroundColor: "#070A12" }}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Blocking script to prevent theme flash on load */}
+        <script src="/theme-init.js" />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AuthProvider session={session}>
           <ThemeProvider>
             <FooterProvider>

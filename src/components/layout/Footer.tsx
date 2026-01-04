@@ -18,9 +18,9 @@ export function Footer() {
 
   return (
     <footer
-      className="fixed bottom-0 left-0 right-0 h-7 text-xs flex items-center justify-between px-3 z-40"
+      className="fixed bottom-0 left-0 right-0 h-7 text-xs flex items-center justify-between px-3 z-40 backdrop-blur-lg"
       style={{
-        background: "var(--color-surface1)",
+        background: "var(--color-header-bg)",
         borderTop: "1px solid var(--color-border)",
         color: "var(--color-text-muted)",
       }}

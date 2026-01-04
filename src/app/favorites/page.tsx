@@ -211,7 +211,7 @@ function Header() {
     <header
       className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
       style={{
-        background: "rgba(7, 10, 18, 0.8)",
+        background: "var(--color-header-bg)",
         borderBottom: "1px solid var(--color-border)",
       }}
     >
@@ -225,7 +225,7 @@ function Header() {
           <ArrowLeft size={20} />
         </Link>
         <span className="text-lg font-semibold flex items-center gap-2">
-          <Logo size={24} style={{ color: "var(--color-accent)" }} />
+          <Logo size={24} />
           ScrollTunes
         </span>
       </div>

@@ -5,7 +5,7 @@ import { makeCanonicalPath } from "@/lib/slug"
 import { ClockCounterClockwise, MusicNote, Trash } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import Link from "next/link"
-import { memo, useCallback, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
 
 export interface RecentSongsProps {
   readonly className?: string
@@ -17,6 +17,11 @@ export const RecentSongs = memo(function RecentSongs({
   layout = "horizontal",
 }: RecentSongsProps) {
   const { recents, isLoading, isInitialized, expectedCount } = useRecentSongsState()
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const skeletonCount = expectedCount !== null && expectedCount > 0 ? Math.min(expectedCount, 6) : 4
 
@@ -24,7 +29,8 @@ export const RecentSongs = memo(function RecentSongs({
     recentSongsStore.clear()
   }, [])
 
-  const showSkeleton = recents.length === 0 && isLoading
+  // Show skeleton during initial mount (before hydration completes) or during loading
+  const showSkeleton = !isMounted || (recents.length === 0 && isLoading)
 
   // Limit items based on layout
   const displayRecents = layout === "horizontal" ? recents.slice(0, 20) : recents.slice(0, 5)
@@ -104,43 +110,39 @@ export const RecentSongs = memo(function RecentSongs({
           )}
           <span className="text-sm font-medium uppercase tracking-wider">Recently played</span>
         </div>
-        {recents.length > 0 ? (
+        {recents.length > 0 || showSkeleton ? (
           <button
             type="button"
             onClick={handleClear}
-            className="transition-colors p-1 hover:brightness-125"
+            disabled={showSkeleton}
+            className="transition-colors p-1 hover:brightness-125 disabled:opacity-40 disabled:cursor-default"
             style={{ color: "var(--color-text-muted)" }}
             aria-label="Clear history"
           >
             <Trash size={16} />
           </button>
-        ) : showSkeleton ? (
-          <div
-            className="w-6 h-6 rounded animate-pulse"
-            style={{ background: "var(--color-surface2)" }}
-          />
         ) : null}
       </div>
 
       {showSkeleton ? (
         layout === "horizontal" ? (
           <div
-            className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4"
+            className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide"
             aria-label="Loading recently played songs"
           >
             {Array.from({ length: skeletonCount }, (_, i) => (
               <div key={i} className="flex-shrink-0 w-24">
                 <div
                   className="w-24 h-24 rounded-xl animate-pulse"
-                  style={{ background: "var(--color-surface1)" }}
+                  style={{ background: "var(--color-surface3)" }}
                 />
                 <div
                   className="mt-2 h-4 w-20 rounded animate-pulse"
-                  style={{ background: "var(--color-surface1)" }}
+                  style={{ background: "var(--color-surface3)" }}
                 />
                 <div
                   className="mt-1 h-3 w-16 rounded animate-pulse"
-                  style={{ background: "var(--color-surface1)" }}
+                  style={{ background: "var(--color-surface2)" }}
                 />
               </div>
             ))}
@@ -151,20 +153,20 @@ export const RecentSongs = memo(function RecentSongs({
               <div
                 key={i}
                 className="flex items-center gap-3 p-3 rounded-xl animate-pulse"
-                style={{ background: "var(--color-surface1)" }}
+                style={{ background: "var(--color-surface3)" }}
               >
                 <div
                   className="w-10 h-10 rounded-lg"
-                  style={{ background: "var(--color-surface2)" }}
+                  style={{ background: "var(--color-border)" }}
                 />
                 <div className="flex-1 space-y-2">
                   <div
                     className="h-4 w-32 rounded"
-                    style={{ background: "var(--color-surface2)" }}
+                    style={{ background: "var(--color-border)" }}
                   />
                   <div
                     className="h-3 w-24 rounded"
-                    style={{ background: "var(--color-surface2)" }}
+                    style={{ background: "var(--color-surface3)" }}
                   />
                 </div>
               </div>

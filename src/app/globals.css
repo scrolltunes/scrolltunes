@@ -38,6 +38,9 @@
   --color-spotify: #1DB954;
   --color-spotify-soft: rgba(29, 185, 84, 0.14);
 
+  /* Header */
+  --color-header-bg: rgba(7, 10, 18, 0.8);
+
   /* Borders */
   --color-border: rgba(255, 255, 255, 0.10);
   --color-border-strong: rgba(255, 255, 255, 0.16);
@@ -88,6 +91,8 @@
   --color-border: rgba(26, 26, 26, 0.08);
   --color-border-strong: rgba(26, 26, 26, 0.15);
 
+  --color-header-bg: rgba(250, 247, 242, 0.85);
+
   --background: #FAF7F2;
   --foreground: #1A1A1A;
   --scrollbar-thumb: #d4d4d4;
@@ -113,6 +118,7 @@
     --color-text2: rgba(26, 26, 26, 0.72);
     --color-text3: rgba(26, 26, 26, 0.48);
     --color-text-muted: rgba(26, 26, 26, 0.32);
+    --color-header-bg: rgba(250, 247, 242, 0.85);
     --background: #FAF7F2;
     --foreground: #1A1A1A;
     --scrollbar-thumb: #d4d4d4;

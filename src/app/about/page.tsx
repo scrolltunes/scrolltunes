@@ -1,9 +1,8 @@
 "use client"
 
-import { BackButton } from "@/components/ui"
+import { BackButton, Logo } from "@/components/ui"
 import { ArrowRight, EnvelopeSimple, XLogo } from "@phosphor-icons/react"
 import { motion } from "motion/react"
-import Image from "next/image"
 import Link from "next/link"
 
 export default function AboutPage() {
@@ -12,7 +11,7 @@ export default function AboutPage() {
       <header
         className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
         style={{
-          background: "rgba(7, 10, 18, 0.8)",
+          background: "var(--color-header-bg)",
           borderBottom: "1px solid var(--color-border)",
         }}
       >
@@ -30,14 +29,11 @@ export default function AboutPage() {
           className="space-y-8"
         >
           {/* Logo */}
-          <div className="flex justify-center">
-            <Image
-              src="/scrolltunes-logo.png"
-              alt="ScrollTunes logo"
-              width={120}
-              height={120}
-              priority
-            />
+          <div className="flex items-center justify-center gap-3">
+            <Logo size={48} colorful aria-label="ScrollTunes logo" />
+            <span className="text-3xl font-semibold" style={{ color: "var(--color-text)" }}>
+              ScrollTunes
+            </span>
           </div>
 
           {/* What is ScrollTunes */}
