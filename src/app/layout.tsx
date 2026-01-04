@@ -95,8 +95,12 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Blocking script to prevent theme flash on load */}
-        <script src="/theme-init.js" />
+        {/* Inline blocking script to prevent theme flash on load */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){let d=true;try{const s=localStorage.getItem("scrolltunes-preferences");const p=s?JSON.parse(s):{};const m=p.themeMode||"system";d=m==="dark"||(m==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches)}catch(e){}document.documentElement.classList.add(d?"dark":"light");document.documentElement.style.backgroundColor=d?"#070A12":"#FAF7F2"})()`,
+          }}
+        />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AuthProvider session={session}>
