@@ -176,7 +176,7 @@ export default function SetlistsPage() {
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-10 h-10 rounded-lg"
+                      className="w-10 h-10 rounded-md"
                       style={{ background: "var(--color-surface2)" }}
                     />
                     <div className="flex-1">

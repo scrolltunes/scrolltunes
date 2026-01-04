@@ -35,11 +35,6 @@ export const RecentSongs = memo(function RecentSongs({
   // Limit items based on layout
   const displayRecents = layout === "horizontal" ? recents.slice(0, 20) : recents.slice(0, 5)
 
-  // Hide entire section when empty and initialized (only after mount to avoid hydration flash)
-  if (isMounted && isInitialized && recents.length === 0 && !isLoading) {
-    return null
-  }
-
   // Drag-to-scroll functionality
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -275,6 +270,10 @@ export const RecentSongs = memo(function RecentSongs({
             })}
           </ul>
         )
+      ) : isInitialized ? (
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          No recently played songs
+        </p>
       ) : null}
     </div>
   )

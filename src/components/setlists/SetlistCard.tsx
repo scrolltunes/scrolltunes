@@ -47,11 +47,11 @@ export const SetlistCard = memo(function SetlistCard({
       )}
 
       <div
-        className="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden"
+        className="flex-shrink-0 w-10 h-10 rounded-md overflow-hidden"
         style={{ background: "var(--color-surface2)" }}
       >
         {albumArts && albumArts.length > 0 ? (
-          <div className="w-full h-full grid grid-cols-2 grid-rows-2">
+          <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-px">
             {gridItems.map((art, i) => (
               <div key={i} style={{ background: "var(--color-surface3)" }}>
                 {art ? (

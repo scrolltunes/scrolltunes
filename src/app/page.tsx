@@ -5,9 +5,7 @@ import { LogoMenu } from "@/components/layout"
 import { HomeSetlists, RecentSongs, SongSearch } from "@/components/search"
 import { AmbientBackground, Attribution, Logo } from "@/components/ui"
 import { CaretDown, GearSix } from "@phosphor-icons/react"
-import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
-import { useState } from "react"
 
 const linkStyle = { color: "var(--color-accent)" }
 
@@ -160,11 +158,11 @@ export default function Home() {
 
         {/* Secondary Content */}
         <div className="flex-1 px-6 pb-8 max-w-3xl mx-auto w-full space-y-10">
-          <FAQSection />
-
           <RecentSongs className="w-full" layout="horizontal" />
 
           <HomeSetlists className="w-full" />
+
+          <FAQSection />
         </div>
       </main>
     </div>
@@ -172,12 +170,6 @@ export default function Home() {
 }
 
 function FAQSection() {
-  const [openIndex, setOpenIndex] = useState<number | null>(null)
-
-  const toggle = (index: number) => {
-    setOpenIndex(openIndex === index ? null : index)
-  }
-
   return (
     <section className="w-full max-w-md mx-auto">
       <h2
@@ -187,49 +179,32 @@ function FAQSection() {
         FAQ
       </h2>
       <div className="space-y-3">
-        {faqItems.map((item, index) => (
-          <div
+        {faqItems.map(item => (
+          <details
             key={item.question}
-            className="rounded-xl overflow-hidden"
+            className="group rounded-xl overflow-hidden"
             style={{
               background: "var(--color-surface1)",
               border: "1px solid var(--color-border)",
             }}
           >
-            <button
-              type="button"
-              onClick={() => toggle(index)}
-              className="w-full p-4 flex items-center justify-between text-left"
-            >
+            <summary className="w-full p-4 flex items-center justify-between text-left cursor-pointer list-none [&::-webkit-details-marker]:hidden">
               <h3 className="font-medium" style={{ color: "var(--color-text)" }}>
                 {item.question}
               </h3>
-              <motion.span
-                animate={{ rotate: openIndex === index ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
+              <CaretDown
+                size={18}
+                className="transition-transform duration-200 group-open:rotate-180"
                 style={{ color: "var(--color-text-muted)" }}
-              >
-                <CaretDown size={18} />
-              </motion.span>
-            </button>
-            <AnimatePresence initial={false}>
-              {openIndex === index && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <p
-                    className="text-sm leading-relaxed px-4 pb-4"
-                    style={{ color: "var(--color-text2)" }}
-                  >
-                    {item.answer}
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+              />
+            </summary>
+            <p
+              className="text-sm leading-relaxed px-4 pb-4"
+              style={{ color: "var(--color-text2)" }}
+            >
+              {item.answer}
+            </p>
+          </details>
         ))}
       </div>
     </section>
