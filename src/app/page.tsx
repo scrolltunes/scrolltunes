@@ -160,11 +160,11 @@ export default function Home() {
 
         {/* Secondary Content */}
         <div className="flex-1 px-6 pb-8 max-w-3xl mx-auto w-full space-y-10">
+          <FAQSection />
+
           <RecentSongs className="w-full" layout="horizontal" />
 
           <HomeSetlists className="w-full" />
-
-          <FAQSection />
         </div>
       </main>
     </div>
