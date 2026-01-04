@@ -1,8 +1,8 @@
 "use client"
 
-import { type Setlist, useIsAuthenticated, useSetlistsContainingSong } from "@/core"
-import { Info, ListPlus, MusicNote, ShareNetwork, Warning } from "@phosphor-icons/react"
-import { memo } from "react"
+import { favoritesStore, type Setlist, useIsAuthenticated, useIsFavorite, useSetlistsContainingSong } from "@/core"
+import { Heart, Info, ListPlus, MusicNote, ShareNetwork, Warning } from "@phosphor-icons/react"
+import { memo, useCallback } from "react"
 
 export interface SongActionBarProps {
   readonly songId: number
@@ -34,6 +34,9 @@ function SetlistIcon({ setlist }: { readonly setlist: Setlist }) {
 
 export const SongActionBar = memo(function SongActionBar({
   songId,
+  title,
+  artist,
+  albumArt,
   onAddToSetlist,
   onShareClick,
   onInfoClick,
@@ -43,6 +46,17 @@ export const SongActionBar = memo(function SongActionBar({
   const isAuthenticated = useIsAuthenticated()
   const containingSetlists = useSetlistsContainingSong(songId)
   const isInSetlist = containingSetlists.length > 0
+  const isFavorite = useIsFavorite(songId)
+
+  const handleToggleFavorite = useCallback(() => {
+    favoritesStore.toggle({
+      id: songId,
+      title,
+      artist,
+      album: "",
+      ...(albumArt && { albumArt }),
+    })
+  }, [songId, title, artist, albumArt])
 
   const showInfoOrWarning = onInfoClick || (hasIssue && onWarningClick)
 
@@ -79,9 +93,25 @@ export const SongActionBar = memo(function SongActionBar({
       ) : null}
 
       {/* Separator - show if info/warning button and other buttons are visible */}
-      {showInfoOrWarning && (isAuthenticated || onShareClick) && (
+      {showInfoOrWarning && (
         <div className="w-px h-6" style={{ background: "var(--color-border)" }} />
       )}
+
+      {/* Favorite button */}
+      <button
+        type="button"
+        onClick={handleToggleFavorite}
+        className="flex items-center justify-center p-2 rounded-full transition-colors hover:bg-white/5"
+        style={{ background: "var(--color-surface2)" }}
+        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+        aria-pressed={isFavorite}
+      >
+        <Heart
+          size={20}
+          weight={isFavorite ? "fill" : "regular"}
+          style={{ color: isFavorite ? "var(--color-favorite)" : "var(--color-text3)" }}
+        />
+      </button>
 
       {/* Setlist button - icon only on mobile, full on desktop */}
       {isAuthenticated && (
