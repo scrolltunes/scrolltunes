@@ -43,14 +43,20 @@ export const UserMenu = memo(function UserMenu() {
   }, [isOpen])
 
   if (isLoading) {
-    return <div className="w-10 h-10 rounded-full bg-neutral-800 animate-pulse" />
+    return (
+      <div
+        className="w-10 h-10 rounded-full animate-pulse"
+        style={{ background: "var(--color-surface2)" }}
+      />
+    )
   }
 
   if (!isAuthenticated || !user) {
     return (
       <Link
         href="/login"
-        className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+        className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+        style={{ background: "var(--color-surface2)" }}
         aria-label="Sign in"
       >
         <UserCircle size={20} />
@@ -65,7 +71,8 @@ export const UserMenu = memo(function UserMenu() {
       <button
         type="button"
         onClick={handleToggle}
-        className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden bg-neutral-800 hover:bg-neutral-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
+        className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden transition-colors focus:outline-none focus:ring-2 hover:brightness-110"
+        style={{ background: "var(--color-surface2)" }}
         aria-label="User menu"
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -79,7 +86,10 @@ export const UserMenu = memo(function UserMenu() {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-indigo-600 flex items-center justify-center text-white font-medium text-sm">
+          <div
+            className="w-full h-full flex items-center justify-center font-medium text-sm"
+            style={{ background: "var(--color-accent)", color: "white" }}
+          >
             {initials}
           </div>
         )}
@@ -92,9 +102,13 @@ export const UserMenu = memo(function UserMenu() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-64 bg-neutral-900 rounded-xl shadow-lg border border-neutral-800 overflow-hidden z-50"
+            className="absolute right-0 mt-2 w-64 rounded-xl shadow-lg overflow-hidden z-50"
+            style={{
+              background: "var(--color-surface1)",
+              border: "1px solid var(--color-border)",
+            }}
           >
-            <div className="p-4 border-b border-neutral-800">
+            <div className="p-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
               <div className="flex items-center gap-3">
                 {user.image ? (
                   <Image
@@ -105,13 +119,22 @@ export const UserMenu = memo(function UserMenu() {
                     className="w-10 h-10 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-medium">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-medium"
+                    style={{ background: "var(--color-accent)", color: "white" }}
+                  >
                     {initials}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  {user.name && <p className="text-white font-medium truncate">{user.name}</p>}
-                  <p className="text-sm text-neutral-400 truncate">{user.email}</p>
+                  {user.name && (
+                    <p className="font-medium truncate" style={{ color: "var(--color-text)" }}>
+                      {user.name}
+                    </p>
+                  )}
+                  <p className="text-sm truncate" style={{ color: "var(--color-text3)" }}>
+                    {user.email}
+                  </p>
                 </div>
               </div>
             </div>
@@ -120,7 +143,8 @@ export const UserMenu = memo(function UserMenu() {
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-4 py-2 text-neutral-300 hover:bg-neutral-800 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-2 transition-colors hover:brightness-110"
+                style={{ color: "var(--color-text2)" }}
               >
                 <SignOut size={20} />
                 <span>Sign out</span>

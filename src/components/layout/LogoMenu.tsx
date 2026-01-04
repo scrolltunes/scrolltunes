@@ -39,19 +39,22 @@ export const LogoMenu = memo(function LogoMenu() {
       <button
         type="button"
         onClick={handleToggle}
-        className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-neutral-800 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
+        className="flex items-center gap-2 px-2 py-1 rounded-lg transition-colors focus:outline-none focus:ring-2 hover:brightness-110"
+        style={{ background: "transparent" }}
         aria-label="ScrollTunes menu"
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <Logo size={24} className="text-indigo-500" />
-        <span className="text-lg font-semibold text-white">ScrollTunes</span>
+        <Logo size={24} style={{ color: "var(--color-accent)" }} />
+        <span className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          ScrollTunes
+        </span>
         {isAdmin && (
-          <span className="px-2 py-0.5 text-xs font-bold bg-amber-500 text-black rounded-full uppercase tracking-wide">
+          <span className="px-2 py-0.5 text-xs font-bold rounded-full uppercase tracking-wide bg-amber-500 text-black">
             Admin
           </span>
         )}
-        <CaretDown size={12} className="text-neutral-500" />
+        <CaretDown size={12} style={{ color: "var(--color-text-muted)" }} />
       </button>
 
       <AnimatePresence>
@@ -61,13 +64,18 @@ export const LogoMenu = memo(function LogoMenu() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 mt-2 w-56 bg-neutral-900 rounded-xl shadow-lg border border-neutral-800 overflow-hidden z-50"
+            className="absolute left-0 mt-2 w-56 rounded-xl shadow-lg overflow-hidden z-50"
+            style={{
+              background: "var(--color-surface1)",
+              border: "1px solid var(--color-border)",
+            }}
           >
             <div className="py-2">
               <Link
                 href="/settings"
                 onClick={handleClose}
-                className="flex items-center gap-3 px-4 py-2 text-neutral-300 hover:bg-neutral-800 transition-colors"
+                className="flex items-center gap-3 px-4 py-2 transition-colors hover:brightness-110"
+                style={{ color: "var(--color-text2)" }}
               >
                 <GearSix size={20} />
                 <span>Settings</span>
@@ -76,7 +84,8 @@ export const LogoMenu = memo(function LogoMenu() {
                 <Link
                   href="/admin"
                   onClick={handleClose}
-                  className="flex items-center gap-3 px-4 py-2 text-amber-400 hover:bg-neutral-800 transition-colors"
+                  className="flex items-center gap-3 px-4 py-2 transition-colors hover:brightness-110"
+                  style={{ color: "var(--color-warning)" }}
                 >
                   <ShieldCheck size={20} />
                   <span>Admin</span>
@@ -84,11 +93,12 @@ export const LogoMenu = memo(function LogoMenu() {
               )}
             </div>
 
-            <div className="border-t border-neutral-800 py-2">
+            <div className="py-2" style={{ borderTop: "1px solid var(--color-border)" }}>
               <Link
                 href="/favorites"
                 onClick={handleClose}
-                className="flex items-center gap-3 px-4 py-2 text-neutral-300 hover:bg-neutral-800 transition-colors"
+                className="flex items-center gap-3 px-4 py-2 transition-colors hover:brightness-110"
+                style={{ color: "var(--color-text2)" }}
               >
                 <Heart size={20} />
                 <span>Favorites</span>
@@ -97,7 +107,8 @@ export const LogoMenu = memo(function LogoMenu() {
                 <Link
                   href="/setlists"
                   onClick={handleClose}
-                  className="flex items-center gap-3 px-4 py-2 text-neutral-300 hover:bg-neutral-800 transition-colors"
+                  className="flex items-center gap-3 px-4 py-2 transition-colors hover:brightness-110"
+                  style={{ color: "var(--color-text2)" }}
                 >
                   <MusicNotes size={20} />
                   <span>Setlists</span>
@@ -105,11 +116,12 @@ export const LogoMenu = memo(function LogoMenu() {
               )}
             </div>
 
-            <div className="border-t border-neutral-800 py-2">
+            <div className="py-2" style={{ borderTop: "1px solid var(--color-border)" }}>
               <Link
                 href="/about"
                 onClick={handleClose}
-                className="flex items-center gap-3 px-4 py-2 text-neutral-300 hover:bg-neutral-800 transition-colors"
+                className="flex items-center gap-3 px-4 py-2 transition-colors hover:brightness-110"
+                style={{ color: "var(--color-text2)" }}
               >
                 <Info size={20} />
                 <span>About ScrollTunes</span>

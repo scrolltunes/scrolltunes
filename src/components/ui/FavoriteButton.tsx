@@ -46,8 +46,8 @@ export const FavoriteButton = memo(function FavoriteButton({
     <motion.button
       type="button"
       onClick={handleToggle}
-      className={`flex items-center justify-center rounded-full bg-neutral-800/50 hover:bg-neutral-700/50 transition-colors ${className}`}
-      style={{ width: config.button, height: config.button }}
+      className={`flex items-center justify-center rounded-full transition-colors hover:brightness-110 ${className}`}
+      style={{ width: config.button, height: config.button, background: "var(--color-surface2)" }}
       aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
       aria-pressed={isFavorite}
       whileTap={{ scale: 0.9 }}
@@ -61,11 +61,10 @@ export const FavoriteButton = memo(function FavoriteButton({
         <Heart
           size={config.icon}
           weight={isFavorite ? "fill" : "regular"}
-          className={
-            isFavorite
-              ? "text-red-500"
-              : "text-neutral-400 hover:text-neutral-300 transition-colors"
-          }
+          style={{
+            color: isFavorite ? "var(--color-danger)" : "var(--color-text3)",
+            transition: "color 0.2s",
+          }}
         />
       </motion.div>
     </motion.button>

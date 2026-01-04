@@ -27,7 +27,8 @@ export const Attribution = memo(function Attribution({
 
   return (
     <div
-      className={`text-xs text-neutral-500 text-center ${className}`}
+      className={`text-xs text-center ${className}`}
+      style={{ color: "var(--color-text-muted)" }}
       aria-label="Data attribution"
     >
       <span>Powered by </span>
@@ -38,7 +39,8 @@ export const Attribution = memo(function Attribution({
             href={source.url}
             target="_blank"
             rel="noreferrer noopener"
-            className="text-neutral-400 hover:text-white underline underline-offset-2 transition-colors"
+            className="underline underline-offset-2 transition-colors hover:brightness-125"
+            style={{ color: "var(--color-text3)" }}
           >
             {source.name}
           </a>
