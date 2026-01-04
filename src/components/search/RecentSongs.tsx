@@ -1,8 +1,8 @@
 "use client"
 
-import { recentSongsStore, useRecentSongsState } from "@/core"
+import { favoritesStore, recentSongsStore, useFavorites, useRecentSongsState } from "@/core"
 import { makeCanonicalPath } from "@/lib/slug"
-import { ClockCounterClockwise, MusicNote, Trash } from "@phosphor-icons/react"
+import { ClockCounterClockwise, Heart, MusicNote, Trash } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import Link from "next/link"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
@@ -17,6 +17,8 @@ export const RecentSongs = memo(function RecentSongs({
   layout = "horizontal",
 }: RecentSongsProps) {
   const { recents, isLoading, isInitialized, expectedCount } = useRecentSongsState()
+  const favorites = useFavorites()
+  const favoriteIds = new Set(favorites.map(f => f.id))
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -188,46 +190,72 @@ export const RecentSongs = memo(function RecentSongs({
           >
             {displayRecents.map(song => {
               const songPath = makeCanonicalPath({ id: song.id, title: song.title, artist: song.artist })
+              const isFavorite = favoriteIds.has(song.id)
               return (
-                <Link
-                  key={song.id}
-                  href={songPath}
-                  className="flex-shrink-0 w-24 group"
-                  aria-label={`${song.title} by ${song.artist}`}
-                  draggable={false}
-                >
-                  <div
-                    className="w-24 h-24 rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-105"
-                    style={{ background: "var(--color-surface1)" }}
+                <div key={song.id} className="flex-shrink-0 w-24 group relative">
+                  <Link
+                    href={songPath}
+                    className="block"
+                    aria-label={`${song.title} by ${song.artist}`}
+                    draggable={false}
                   >
-                    {song.albumArt ? (
-                      <img
-                        src={song.albumArt}
-                        alt=""
-                        className="w-full h-full object-cover pointer-events-none"
-                        draggable={false}
-                      />
-                    ) : (
-                      <MusicNote
-                        size={32}
-                        weight="fill"
-                        style={{ color: "var(--color-text-muted)" }}
-                      />
-                    )}
-                  </div>
-                  <p
-                    className="mt-2 text-sm font-medium truncate"
-                    style={{ color: "var(--color-text)" }}
+                    <div
+                      className="w-24 h-24 rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-105"
+                      style={{ background: "var(--color-surface1)" }}
+                    >
+                      {song.albumArt ? (
+                        <img
+                          src={song.albumArt}
+                          alt=""
+                          className="w-full h-full object-cover pointer-events-none"
+                          draggable={false}
+                        />
+                      ) : (
+                        <MusicNote
+                          size={32}
+                          weight="fill"
+                          style={{ color: "var(--color-text-muted)" }}
+                        />
+                      )}
+                    </div>
+                    <p
+                      className="mt-2 text-sm font-medium truncate"
+                      style={{ color: "var(--color-text)" }}
+                    >
+                      {song.title}
+                    </p>
+                    <p
+                      className="text-xs truncate"
+                      style={{ color: "var(--color-text3)" }}
+                    >
+                      {song.artist}
+                    </p>
+                  </Link>
+                  <motion.button
+                    type="button"
+                    onClick={e => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      favoritesStore.toggle({
+                        id: song.id,
+                        title: song.title,
+                        artist: song.artist,
+                        album: song.album ?? "",
+                        ...(song.albumArt && { albumArt: song.albumArt }),
+                      })
+                    }}
+                    className="absolute top-1 right-1 w-7 h-7 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ background: "rgba(0, 0, 0, 0.6)" }}
+                    aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                    whileTap={{ scale: 0.9 }}
                   >
-                    {song.title}
-                  </p>
-                  <p
-                    className="text-xs truncate"
-                    style={{ color: "var(--color-text3)" }}
-                  >
-                    {song.artist}
-                  </p>
-                </Link>
+                    <Heart
+                      size={16}
+                      weight={isFavorite ? "fill" : "regular"}
+                      style={{ color: isFavorite ? "var(--color-danger)" : "white" }}
+                    />
+                  </motion.button>
+                </div>
               )
             })}
           </div>

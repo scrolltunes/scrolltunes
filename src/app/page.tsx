@@ -182,7 +182,7 @@ function FAQSection() {
     <section className="w-full max-w-md mx-auto">
       <h2
         className="text-sm font-medium uppercase tracking-wider mb-4 px-1"
-        style={{ color: "var(--color-text-muted)" }}
+        style={{ color: "var(--color-text3)" }}
       >
         FAQ
       </h2>
