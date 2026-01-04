@@ -3,13 +3,13 @@
 import { UserMenu } from "@/components/auth"
 import { LogoMenu } from "@/components/layout"
 import { RecentSongs, SongSearch } from "@/components/search"
-import { Attribution } from "@/components/ui"
+import { AmbientBackground, Attribution } from "@/components/ui"
 import { CaretDown, GearSix } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
 import { useState } from "react"
 
-const linkClass = "text-indigo-400 hover:text-indigo-300"
+const linkStyle = { color: "var(--color-accent)" }
 
 const faqItems: { question: string; answer: React.ReactNode }[] = [
   {
@@ -24,7 +24,7 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
         Yes, ScrollTunes is free to use. We use third-party services to fetch lyrics, tempo, and
         other song data. Due to rate limiting and content availability from these sources, not every
         song may be available -{" "}
-        <a href="mailto:contact@scrolltunes.com" className="text-indigo-400 hover:text-indigo-300">
+        <a href="mailto:contact@scrolltunes.com" className="hover:brightness-110" style={linkStyle}>
           let us know
         </a>{" "}
         if something is missing!
@@ -47,11 +47,11 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
       <>
         Some features require an account, including voice search, favorites, setlists, and syncing
         your data across devices. To create an account, you will be asked to accept our{" "}
-        <Link href="/terms" className={linkClass}>
+        <Link href="/terms" className="hover:brightness-110" style={linkStyle}>
           Terms of Service
         </Link>{" "}
         and{" "}
-        <Link href="/privacy" className={linkClass}>
+        <Link href="/privacy" className="hover:brightness-110" style={linkStyle}>
           Privacy Policy
         </Link>
         , because we store your account data and enable analytics for signed-in users. You can use
@@ -69,7 +69,8 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
           href="https://x.com/ScrollTunes"
           target="_blank"
           rel="noopener noreferrer"
-          className={linkClass}
+          className="hover:brightness-110"
+          style={linkStyle}
         >
           @ScrollTunes
         </a>{" "}
@@ -82,7 +83,7 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
     answer: (
       <>
         Head over to the{" "}
-        <Link href="/about" className={linkClass}>
+        <Link href="/about" className="hover:brightness-110" style={linkStyle}>
           About page
         </Link>{" "}
         for contact details. You can reach us on X (Twitter){" "}
@@ -90,12 +91,17 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
           href="https://x.com/ScrollTunes"
           target="_blank"
           rel="noopener noreferrer"
-          className={linkClass}
+          className="hover:brightness-110"
+          style={linkStyle}
         >
           @ScrollTunes
         </a>{" "}
         or by email at{" "}
-        <a href="mailto:contact@scrolltunes.com" className={linkClass}>
+        <a
+          href="mailto:contact@scrolltunes.com"
+          className="hover:brightness-110"
+          style={linkStyle}
+        >
           contact@scrolltunes.com
         </a>
         .
@@ -106,15 +112,26 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-white pb-7">
-      <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
+    <div
+      className="min-h-screen pb-7"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
+      <AmbientBackground variant="subtle" />
+      <header
+        className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
+        style={{
+          background: "rgba(7, 10, 18, 0.8)",
+          borderBottom: "1px solid var(--color-border)",
+        }}
+      >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <LogoMenu />
 
           <div className="flex items-center gap-2">
             <Link
               href="/settings"
-              className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+              style={{ background: "var(--color-surface2)" }}
               aria-label="Settings"
             >
               <GearSix size={20} />
@@ -124,9 +141,14 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="pt-16 flex flex-col">
+      <main className="pt-16 flex flex-col relative z-10">
         <div className="flex-1 flex flex-col items-center p-6 pt-24">
-          <h2 className="text-2xl font-medium mb-8">Find a song</h2>
+          <h2
+            className="text-2xl font-medium mb-8"
+            style={{ color: "var(--color-text)" }}
+          >
+            Find a song
+          </h2>
           <SongSearch className="w-full max-w-md" />
           <Attribution
             lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}
@@ -151,23 +173,36 @@ function FAQSection() {
 
   return (
     <section className="w-full max-w-md mt-12">
-      <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-4 px-1">
+      <h2
+        className="text-sm font-medium uppercase tracking-wider mb-4 px-1"
+        style={{ color: "var(--color-text-muted)" }}
+      >
         FAQ
       </h2>
       <div className="space-y-3">
         {faqItems.map((item, index) => (
-          <div key={item.question} className="bg-neutral-900 rounded-xl overflow-hidden">
+          <div
+            key={item.question}
+            className="rounded-xl overflow-hidden"
+            style={{
+              background: "var(--color-surface1)",
+              border: "1px solid var(--color-border)",
+            }}
+          >
             <button
               type="button"
               onClick={() => toggle(index)}
               className="w-full p-4 flex items-center justify-between text-left"
             >
-              <h3 className="font-medium text-white">{item.question}</h3>
+              <h3 className="font-medium" style={{ color: "var(--color-text)" }}>
+                {item.question}
+              </h3>
               <motion.span
                 animate={{ rotate: openIndex === index ? 180 : 0 }}
                 transition={{ duration: 0.2 }}
+                style={{ color: "var(--color-text-muted)" }}
               >
-                <CaretDown size={18} className="text-neutral-500" />
+                <CaretDown size={18} />
               </motion.span>
             </button>
             <AnimatePresence initial={false}>
@@ -178,7 +213,10 @@ function FAQSection() {
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <p className="text-neutral-300 text-sm leading-relaxed px-4 pb-4">
+                  <p
+                    className="text-sm leading-relaxed px-4 pb-4"
+                    style={{ color: "var(--color-text2)" }}
+                  >
                     {item.answer}
                   </p>
                 </motion.div>

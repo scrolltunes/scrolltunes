@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ScrollTunes - Enhanced Performance View</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-bg: #070A12;
+      --color-surface1: #0C1220;
+      --color-surface2: #111A2C;
+      --color-surface3: #151F33;
+      --color-surface-elevated: #1A2540;
+
+      --color-text: #F3F5F7;
+      --color-text2: rgba(243, 245, 247, 0.72);
+      --color-text3: rgba(243, 245, 247, 0.46);
+      --color-text-muted: rgba(243, 245, 247, 0.28);
+      --color-text-ghost: rgba(243, 245, 247, 0.12);
+
+      --color-accent: #5B6CFF;
+      --color-accent-hover: #6F7DFF;
+      --color-accent-soft: rgba(91, 108, 255, 0.14);
+      --color-accent-glow: rgba(91, 108, 255, 0.25);
+      --color-accent-bright: #818CF8;
+
+      --color-success: #22C55E;
+      --color-success-soft: rgba(34, 197, 94, 0.14);
+      --color-warning: #FBBF24;
+      --color-chord: #FBBF24;
+      --color-chord-soft: rgba(251, 191, 36, 0.14);
+
+      --color-border: rgba(255, 255, 255, 0.10);
+      --color-border-strong: rgba(255, 255, 255, 0.16);
+
+      --shadow-glow: 0 0 20px rgba(91, 108, 255, 0.15);
+      --shadow-glow-active: 0 0 40px rgba(91, 108, 255, 0.3);
+      --shadow-glow-chord: 0 0 20px rgba(251, 191, 36, 0.3);
+
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+      --radius-full: 9999px;
+
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: ui-monospace, 'SF Mono', monospace;
+
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-ui);
+      background: var(--color-bg);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Ambient Background - Enhanced */
+    .ambient-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .ambient-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.6;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .ambient-orb-1 {
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(91, 108, 255, 0.15) 0%, transparent 70%);
+      top: -15%;
+      left: -10%;
+      animation-delay: 0s;
+    }
+
+    .ambient-orb-2 {
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%);
+      bottom: -10%;
+      right: -10%;
+      animation-delay: -10s;
+    }
+
+    .ambient-orb-3 {
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(91, 108, 255, 0.08) 0%, transparent 70%);
+      top: 40%;
+      right: 20%;
+      animation-delay: -5s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(20px, -30px) scale(1.05); }
+      50% { transform: translate(-10px, 20px) scale(0.95); }
+      75% { transform: translate(30px, 10px) scale(1.02); }
+    }
+
+    /* App Container */
+    .app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header - More refined */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      padding: 12px 16px;
+      padding-top: max(12px, env(safe-area-inset-top));
+      background: linear-gradient(
+        to bottom,
+        var(--color-bg) 0%,
+        rgba(7, 10, 18, 0.95) 50%,
+        rgba(7, 10, 18, 0.8) 75%,
+        transparent 100%
+      );
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: opacity 0.4s ease, transform 0.4s var(--ease-out-expo);
+    }
+
+    .header.hidden {
+      opacity: 0;
+      transform: translateY(-20px);
+      pointer-events: none;
+    }
+
+    .header-content {
+      max-width: 640px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      color: var(--color-text2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s var(--ease-out-expo);
+      flex-shrink: 0;
+    }
+
+    .btn-icon:hover {
+      background: var(--color-surface2);
+      border-color: var(--color-border-strong);
+      color: var(--color-text);
+      transform: scale(1.05);
+    }
+
+    .btn-icon:active {
+      transform: scale(0.95);
+    }
+
+    .song-artwork {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-sm);
+      background: var(--color-surface2);
+      flex-shrink: 0;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .song-artwork img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .song-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .song-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+
+    .song-artist {
+      font-size: 12px;
+      color: var(--color-text3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Voice Indicator - Enhanced */
+    .voice-indicator {
+      position: relative;
+    }
+
+    .voice-indicator.active {
+      border-color: var(--color-success);
+      color: var(--color-success);
+      background: var(--color-success-soft);
+    }
+
+    .voice-indicator.active::before {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: var(--radius-full);
+      border: 2px solid var(--color-success);
+      animation: voice-pulse 2s ease-out infinite;
+    }
+
+    .voice-indicator.active::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--color-success);
+      animation: voice-pulse 2s ease-out 0.5s infinite;
+      opacity: 0.5;
+    }
+
+    @keyframes voice-pulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+
+    /* Primary Play Button */
+    .btn-play {
+      background: var(--color-accent);
+      border: none;
+      color: white;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .btn-play:hover {
+      background: var(--color-accent-hover);
+      box-shadow: var(--shadow-glow-active);
+    }
+
+    /* Lyrics Container */
+    .lyrics-container {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      padding-top: 70px;
+    }
+
+    /* Reading Rail - Enhanced with gradient fade */
+    .reading-rail {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 22%;
+      height: 120px;
+      pointer-events: none;
+      z-index: 2;
+      transform: translateY(-50%);
+    }
+
+    .reading-rail::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(91, 108, 255, 0.02) 20%,
+        rgba(91, 108, 255, 0.04) 40%,
+        rgba(91, 108, 255, 0.04) 60%,
+        rgba(91, 108, 255, 0.02) 80%,
+        transparent 100%
+      );
+    }
+
+    /* Side rails */
+    .reading-rail::after {
+      content: '';
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 2px;
+      height: 40px;
+      background: linear-gradient(to bottom, transparent, var(--color-accent), transparent);
+      border-radius: 1px;
+      opacity: 0.4;
+    }
+
+    .lyrics-scroll {
+      height: 100%;
+      overflow-y: auto;
+      padding: 0 20px;
+      padding-top: calc(22vh - 40px);
+      padding-bottom: 40vh;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .lyrics-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .lyrics-content {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Lyric Lines - Refined typography */
+    .lyric-line {
+      padding: 14px 20px;
+      margin: 6px 0;
+      border-radius: var(--radius-lg);
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      font-size: 22px;
+      line-height: 1.4;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      transition:
+        color 0.3s ease,
+        transform 0.4s var(--ease-out-expo),
+        opacity 0.3s ease,
+        background 0.3s ease,
+        font-size 0.4s var(--ease-out-expo),
+        padding 0.4s var(--ease-out-expo);
+    }
+
+    .lyric-line.past {
+      color: var(--color-text-ghost);
+      font-weight: 400;
+      transform: scale(0.96);
+      opacity: 0.6;
+    }
+
+    .lyric-line.upcoming {
+      color: var(--color-text3);
+    }
+
+    .lyric-line.next {
+      color: var(--color-text2);
+      font-weight: 600;
+    }
+
+    .lyric-line.active {
+      color: var(--color-text);
+      font-weight: 700;
+      font-size: 26px;
+      background: linear-gradient(135deg, var(--color-accent-soft) 0%, rgba(139, 92, 246, 0.08) 100%);
+      border: 1px solid var(--color-border-strong);
+      padding: 18px 24px;
+      margin: 12px 0;
+      box-shadow: 0 4px 20px rgba(91, 108, 255, 0.1);
+    }
+
+    /* Active line indicator bar */
+    .lyric-line.active::before {
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 45%;
+      border-radius: 2px;
+      background: linear-gradient(to bottom, var(--color-accent-bright), var(--color-accent));
+      box-shadow: var(--shadow-glow);
+      animation: bar-glow 2s ease-in-out infinite;
+    }
+
+    @keyframes bar-glow {
+      0%, 100% { opacity: 1; box-shadow: var(--shadow-glow); }
+      50% { opacity: 0.7; box-shadow: var(--shadow-glow-active); }
+    }
+
+    .lyric-line.empty {
+      color: var(--color-text-muted);
+      font-size: 18px;
+      font-weight: 400;
+      padding: 24px 20px;
+    }
+
+    /* Chord badges - More prominent */
+    .chord-row {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .chord-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--color-chord-soft);
+      color: var(--color-chord);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      transition: all 0.3s var(--ease-out-expo);
+    }
+
+    .lyric-line.active .chord-badge {
+      background: var(--color-chord);
+      color: var(--color-bg);
+      box-shadow: var(--shadow-glow-chord);
+      transform: scale(1.05);
+    }
+
+    /* Control Strip - Floating pill design */
+    .control-strip {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      padding: 16px 20px;
+      padding-bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px));
+      background: linear-gradient(
+        to top,
+        var(--color-bg) 0%,
+        rgba(7, 10, 18, 0.98) 40%,
+        rgba(7, 10, 18, 0.9) 70%,
+        transparent 100%
+      );
+      display: flex;
+      justify-content: center;
+      transition: opacity 0.4s ease, transform 0.4s var(--ease-out-expo);
+    }
+
+    .control-strip.hidden {
+      opacity: 0;
+      transform: translateY(30px);
+      pointer-events: none;
+    }
+
+    .control-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px;
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .control-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface2);
+      border: none;
+      color: var(--color-text2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s var(--ease-out-expo);
+    }
+
+    .control-btn:hover {
+      background: var(--color-surface3);
+      color: var(--color-text);
+      transform: scale(1.08);
+    }
+
+    .control-btn:active {
+      transform: scale(0.95);
+    }
+
+    .control-btn.primary {
+      width: 56px;
+      height: 56px;
+      background: var(--color-accent);
+      color: white;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .control-btn.primary:hover {
+      background: var(--color-accent-hover);
+      box-shadow: var(--shadow-glow-active);
+    }
+
+    .control-divider {
+      width: 1px;
+      height: 28px;
+      background: var(--color-border);
+      margin: 0 4px;
+    }
+
+    .tempo-display {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 12px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .tempo-unit {
+      font-size: 11px;
+      color: var(--color-text3);
+      font-weight: 500;
+    }
+
+    /* Metronome Orb - Enhanced */
+    .metronome-orb {
+      position: fixed;
+      bottom: 110px;
+      right: 16px;
+      width: 52px;
+      height: 52px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 25;
+      transition: all 0.3s var(--ease-out-expo);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+
+    .metronome-orb:hover {
+      background: var(--color-surface2);
+      transform: scale(1.08);
+    }
+
+    .metronome-orb.active {
+      border-color: var(--color-accent);
+    }
+
+    .metronome-orb.active::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: var(--radius-full);
+      background: conic-gradient(
+        from 0deg,
+        var(--color-accent) 0deg,
+        transparent 90deg,
+        transparent 360deg
+      );
+      animation: metronome-spin 0.5s linear infinite;
+      z-index: -1;
+      opacity: 0.6;
+    }
+
+    @keyframes metronome-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .metronome-bpm {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-text);
+      line-height: 1;
+    }
+
+    .metronome-label {
+      font-size: 8px;
+      font-weight: 600;
+      color: var(--color-text3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* Gesture Hint */
+    .gesture-hint {
+      position: fixed;
+      bottom: 50%;
+      left: 50%;
+      transform: translate(-50%, 50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 50;
+    }
+
+    .gesture-hint.visible {
+      opacity: 1;
+    }
+
+    .gesture-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-accent-soft);
+      border: 2px solid var(--color-accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-accent);
+      animation: bounce 0.6s ease infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .gesture-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text2);
+      background: var(--color-surface2);
+      padding: 6px 12px;
+      border-radius: var(--radius-full);
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      top: 100px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      padding: 10px 20px;
+      background: var(--color-surface2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text);
+      opacity: 0;
+      transition: all 0.3s var(--ease-out-expo);
+      pointer-events: none;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast-icon {
+      width: 18px;
+      height: 18px;
+      color: var(--color-success);
+    }
+
+    /* Icons */
+    .icon {
+      width: 20px;
+      height: 20px;
+    }
+
+    .icon-lg {
+      width: 24px;
+      height: 24px;
+    }
+
+    /* Responsive */
+    @media (min-width: 768px) {
+      .lyric-line {
+        font-size: 26px;
+      }
+
+      .lyric-line.active {
+        font-size: 32px;
+      }
+
+      .control-btn.primary {
+        width: 64px;
+        height: 64px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-bg">
+    <div class="ambient-orb ambient-orb-1"></div>
+    <div class="ambient-orb ambient-orb-2"></div>
+    <div class="ambient-orb ambient-orb-3"></div>
+  </div>
+
+  <div class="app">
+    <header class="header" id="header">
+      <div class="header-content">
+        <button class="btn-icon" aria-label="Back">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+        </button>
+
+        <div class="song-artwork">
+          <img src="https://i.scdn.co/image/ab67616d0000b273c4fecd6c6e0d67a1b4a80efd" alt="Album art">
+        </div>
+
+        <div class="song-info">
+          <div class="song-title">Bohemian Rhapsody</div>
+          <div class="song-artist">Queen</div>
+        </div>
+
+        <div class="header-actions">
+          <button class="btn-icon voice-indicator active" id="voice-btn" aria-label="Voice detection">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
+          </button>
+          <button class="btn-icon btn-play" aria-label="Pause">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16" rx="1"/>
+              <rect x="14" y="4" width="4" height="16" rx="1"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="lyrics-container">
+      <div class="reading-rail"></div>
+      <div class="lyrics-scroll" id="lyrics-scroll">
+        <div class="lyrics-content">
+          <div class="lyric-line past">Is this the real life?</div>
+          <div class="lyric-line past">Is this just fantasy?</div>
+          <div class="lyric-line past">Caught in a landslide</div>
+          <div class="lyric-line past">No escape from reality</div>
+          <div class="lyric-line past">
+            <div class="chord-row">
+              <span class="chord-badge">Eb</span>
+            </div>
+            Open your eyes
+          </div>
+          <div class="lyric-line past">Look up to the skies and see</div>
+
+          <div class="lyric-line active">
+            <div class="chord-row">
+              <span class="chord-badge">Cm</span>
+              <span class="chord-badge">F7</span>
+            </div>
+            I'm just a poor boy, I need no sympathy
+          </div>
+
+          <div class="lyric-line next">
+            <div class="chord-row">
+              <span class="chord-badge">Bb</span>
+            </div>
+            Because I'm easy come, easy go
+          </div>
+          <div class="lyric-line upcoming">Little high, little low</div>
+          <div class="lyric-line upcoming">
+            <div class="chord-row">
+              <span class="chord-badge">Eb</span>
+              <span class="chord-badge">Bb</span>
+            </div>
+            Any way the wind blows
+          </div>
+          <div class="lyric-line upcoming">Doesn't really matter to me, to me</div>
+          <div class="lyric-line empty">~ ~ ~</div>
+          <div class="lyric-line upcoming">
+            <div class="chord-row">
+              <span class="chord-badge">Bb</span>
+            </div>
+            Mama, just killed a man
+          </div>
+          <div class="lyric-line upcoming">Put a gun against his head</div>
+          <div class="lyric-line upcoming">Pulled my trigger, now he's dead</div>
+          <div class="lyric-line upcoming">Mama, life had just begun</div>
+          <div class="lyric-line upcoming">But now I've gone and thrown it all away</div>
+          <div class="lyric-line upcoming">
+            <div class="chord-row">
+              <span class="chord-badge">Eb</span>
+              <span class="chord-badge">Gm</span>
+            </div>
+            Mama, ooh
+          </div>
+          <div class="lyric-line upcoming">Didn't mean to make you cry</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="metronome-orb active" id="metronome">
+      <span class="metronome-bpm">72</span>
+      <span class="metronome-label">BPM</span>
+    </div>
+
+    <div class="control-strip" id="control-strip">
+      <div class="control-pill">
+        <button class="control-btn" aria-label="Reset">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
+        </button>
+
+        <div class="control-divider"></div>
+
+        <div class="tempo-display">
+          <span>1.0</span>
+          <span class="tempo-unit">x</span>
+        </div>
+
+        <button class="control-btn primary" id="play-btn" aria-label="Play/Pause">
+          <svg class="icon-lg" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" rx="1"/>
+            <rect x="14" y="4" width="4" height="16" rx="1"/>
+          </svg>
+        </button>
+
+        <div class="tempo-display">
+          <span>A</span>
+          <span class="tempo-unit">a</span>
+        </div>
+
+        <div class="control-divider"></div>
+
+        <button class="control-btn" aria-label="Share">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"/>
+            <circle cx="6" cy="12" r="3"/>
+            <circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="gesture-hint" id="gesture-hint">
+      <div class="gesture-icon">
+        <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+        </svg>
+      </div>
+      <span class="gesture-text">Double-tap to pause</span>
+    </div>
+
+    <div class="toast" id="toast">
+      <svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      <span id="toast-text">Voice detection enabled</span>
+    </div>
+  </div>
+
+  <script>
+    const header = document.getElementById('header');
+    const controlStrip = document.getElementById('control-strip');
+    const lyricsScroll = document.getElementById('lyrics-scroll');
+    const gestureHint = document.getElementById('gesture-hint');
+    const toast = document.getElementById('toast');
+    const toastText = document.getElementById('toast-text');
+    const voiceBtn = document.getElementById('voice-btn');
+    const metronome = document.getElementById('metronome');
+    const lyricLines = document.querySelectorAll('.lyric-line');
+
+    let hideTimeout;
+    let isPlaying = true;
+
+    // Auto-hide controls
+    function showControls() {
+      header.classList.remove('hidden');
+      controlStrip.classList.remove('hidden');
+      clearTimeout(hideTimeout);
+      hideTimeout = setTimeout(() => {
+        if (isPlaying) {
+          header.classList.add('hidden');
+          controlStrip.classList.add('hidden');
+        }
+      }, 3000);
+    }
+
+    // Touch/mouse interaction
+    document.addEventListener('touchstart', showControls);
+    document.addEventListener('mousemove', showControls);
+
+    // Double tap to pause
+    let lastTap = 0;
+    document.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        e.preventDefault();
+        togglePlay();
+        showGestureHint(isPlaying ? 'Playing' : 'Paused');
+      }
+      lastTap = now;
+    });
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const playBtn = document.getElementById('play-btn');
+      if (isPlaying) {
+        playBtn.innerHTML = `<svg class="icon-lg" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="4" width="4" height="16" rx="1"/>
+          <rect x="14" y="4" width="4" height="16" rx="1"/>
+        </svg>`;
+      } else {
+        playBtn.innerHTML = `<svg class="icon-lg" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>`;
+      }
+    }
+
+    document.getElementById('play-btn').addEventListener('click', togglePlay);
+
+    // Show gesture hint briefly
+    function showGestureHint(text) {
+      gestureHint.querySelector('.gesture-text').textContent = text;
+      gestureHint.classList.add('visible');
+      setTimeout(() => {
+        gestureHint.classList.remove('visible');
+      }, 1000);
+    }
+
+    // Toast notification
+    function showToast(text) {
+      toastText.textContent = text;
+      toast.classList.add('visible');
+      setTimeout(() => {
+        toast.classList.remove('visible');
+      }, 2500);
+    }
+
+    // Voice indicator toggle
+    voiceBtn.addEventListener('click', () => {
+      voiceBtn.classList.toggle('active');
+      showToast(voiceBtn.classList.contains('active') ? 'Voice detection enabled' : 'Voice detection disabled');
+    });
+
+    // Metronome toggle
+    metronome.addEventListener('click', () => {
+      metronome.classList.toggle('active');
+      showToast(metronome.classList.contains('active') ? 'Metronome on' : 'Metronome off');
+    });
+
+    // Click on lyrics to jump
+    lyricLines.forEach(line => {
+      line.addEventListener('click', () => {
+        lyricLines.forEach(l => {
+          l.classList.remove('active', 'next');
+          const idx = Array.from(lyricLines).indexOf(l);
+          const activeIdx = Array.from(lyricLines).indexOf(line);
+          if (idx < activeIdx) {
+            l.classList.remove('upcoming');
+            l.classList.add('past');
+          } else if (idx > activeIdx) {
+            l.classList.remove('past');
+            l.classList.add('upcoming');
+          }
+        });
+        line.classList.remove('past', 'upcoming');
+        line.classList.add('active');
+
+        const nextLine = line.nextElementSibling;
+        if (nextLine && nextLine.classList.contains('lyric-line')) {
+          nextLine.classList.remove('past', 'upcoming');
+          nextLine.classList.add('next');
+        }
+
+        // Smooth scroll to center
+        line.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+
+    // Initialize
+    showControls();
+  </script>
+</body>
+</html>

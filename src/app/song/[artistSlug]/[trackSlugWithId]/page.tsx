@@ -8,7 +8,7 @@ import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
 import { LyricsShareModal } from "@/components/share"
-import { FavoriteButton, StatusLabel } from "@/components/ui"
+import { AmbientBackground, FavoriteButton, StatusLabel } from "@/components/ui"
 
 import {
   type Lyrics,
@@ -432,14 +432,18 @@ export default function SongPage() {
 
   if (loadState._tag === "Loading") {
     return (
-      <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center gap-4">
+      <div
+        className="min-h-screen flex flex-col items-center justify-center gap-4"
+        style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+      >
+        <AmbientBackground variant="subtle" />
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
         >
-          <SpinnerGap size={48} className="text-indigo-500" />
+          <SpinnerGap size={48} style={{ color: "var(--color-accent)" }} />
         </motion.div>
-        <p className="text-neutral-400">Loading lyrics...</p>
+        <p style={{ color: "var(--color-text3)" }}>Loading lyrics...</p>
       </div>
     )
   }
@@ -451,18 +455,23 @@ export default function SongPage() {
       loadState.errorType === "not-found" || loadState.errorType === "invalid-lyrics"
 
     return (
-      <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center gap-6 p-6">
-        <MusicNote size={64} weight="fill" className="text-neutral-700" />
+      <div
+        className="min-h-screen flex flex-col items-center justify-center gap-6 p-6"
+        style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+      >
+        <AmbientBackground variant="subtle" />
+        <MusicNote size={64} weight="fill" style={{ color: "var(--color-text-ghost)" }} />
         <div className="text-center">
           <h1 className="text-xl font-semibold mb-2">{title}</h1>
-          <p className="text-neutral-400">{description}</p>
+          <p style={{ color: "var(--color-text3)" }}>{description}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           {canRetry && (
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
+              className="px-6 py-3 rounded-full font-medium transition-colors flex items-center justify-center gap-2 hover:brightness-110"
+              style={{ background: "var(--color-accent)", color: "white" }}
             >
               <ArrowCounterClockwise size={20} />
               Try again
@@ -470,7 +479,8 @@ export default function SongPage() {
           )}
           <Link
             href="/"
-            className="px-6 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
+            className="px-6 py-3 rounded-full font-medium transition-colors flex items-center justify-center gap-2 hover:brightness-110"
+            style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
           >
             <ArrowLeft size={20} />
             Back to search
@@ -481,7 +491,11 @@ export default function SongPage() {
             <button
               type="button"
               onClick={() => setShowReportModal(true)}
-              className="px-6 py-3 bg-amber-600/20 hover:bg-amber-600/30 text-amber-500 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
+              className="px-6 py-3 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
+              style={{
+                background: "var(--color-warning-soft)",
+                color: "var(--color-warning)",
+              }}
             >
               <Bug size={20} />
               Report this issue
@@ -511,12 +525,24 @@ export default function SongPage() {
   }
 
   return (
-    <div ref={doubleTapRef} className="h-screen bg-neutral-950 text-white">
-      <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
+    <div
+      ref={doubleTapRef}
+      className="h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
+      <AmbientBackground variant="subtle" />
+      <header
+        className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
+        style={{
+          background: "rgba(7, 10, 18, 0.8)",
+          borderBottom: "1px solid var(--color-border)",
+        }}
+      >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
           <Link
             href="/"
-            className="w-10 h-10 shrink-0 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+            className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+            style={{ background: "var(--color-surface2)" }}
             aria-label="Back to search"
           >
             <ArrowLeft size={20} />
@@ -528,14 +554,19 @@ export default function SongPage() {
               className="w-10 h-10 shrink-0 rounded-lg object-cover"
             />
           ) : (
-            <div className="w-10 h-10 shrink-0 rounded-lg bg-neutral-800 flex items-center justify-center">
-              <MusicNote size={20} weight="fill" className="text-neutral-600" />
+            <div
+              className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center"
+              style={{ background: "var(--color-surface2)" }}
+            >
+              <MusicNote size={20} weight="fill" style={{ color: "var(--color-text-muted)" }} />
             </div>
           )}
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="flex flex-col min-w-0 flex-1">
               <span className="text-sm font-medium truncate">{songTitle}</span>
-              <span className="text-xs text-neutral-500 truncate">{songArtist}</span>
+              <span className="text-xs truncate" style={{ color: "var(--color-text3)" }}>
+                {songArtist}
+              </span>
             </div>
             {lrclibId !== null && (
               <FavoriteButton
@@ -564,7 +595,8 @@ export default function SongPage() {
                 <button
                   type="button"
                   onClick={handleTogglePlayPause}
-                  className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center transition-colors"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+                  style={{ background: "var(--color-accent)", color: "white" }}
                   aria-label={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? <Pause size={20} weight="fill" /> : <Play size={20} weight="fill" />}
@@ -573,7 +605,8 @@ export default function SongPage() {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+                  style={{ background: "var(--color-surface2)" }}
                   aria-label="Reset"
                 >
                   <ArrowCounterClockwise size={20} />
@@ -589,7 +622,8 @@ export default function SongPage() {
           <AnimatePresence initial={false}>
             {(!isLoaded || isHeaderVisible) && (
               <motion.div
-                className="sticky top-16 z-30 bg-neutral-950/80 backdrop-blur"
+                className="sticky top-16 z-30 backdrop-blur"
+                style={{ background: "rgba(7, 10, 18, 0.8)" }}
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}

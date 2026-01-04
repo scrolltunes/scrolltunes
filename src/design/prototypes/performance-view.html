@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ScrollTunes - Performance View Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    /* Reset */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Design Tokens */
+    :root {
+      --color-bg: #070A12;
+      --color-surface1: #0C1220;
+      --color-surface2: #111A2C;
+      --color-surface3: #151F33;
+      --color-surface-elevated: #1A2540;
+
+      --color-text: #F3F5F7;
+      --color-text2: rgba(243, 245, 247, 0.72);
+      --color-text3: rgba(243, 245, 247, 0.46);
+      --color-text-muted: rgba(243, 245, 247, 0.28);
+
+      --color-accent: #5B6CFF;
+      --color-accent-hover: #6F7DFF;
+      --color-accent-soft: rgba(91, 108, 255, 0.14);
+      --color-accent-glow: rgba(91, 108, 255, 0.25);
+
+      --color-success: #22C55E;
+      --color-warning: #FBBF24;
+      --color-chord: #FBBF24;
+      --color-chord-soft: rgba(251, 191, 36, 0.14);
+
+      --color-border: rgba(255, 255, 255, 0.10);
+      --color-border-strong: rgba(255, 255, 255, 0.16);
+
+      --shadow-glow: 0 0 20px rgba(91, 108, 255, 0.15);
+      --shadow-glow-active: 0 0 30px rgba(91, 108, 255, 0.25);
+
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+      --radius-full: 9999px;
+
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-ui);
+      background: var(--color-bg);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* Ambient Background */
+    .ambient-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(91, 108, 255, 0.08), transparent 50%),
+        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(139, 92, 246, 0.05), transparent 45%);
+      animation: ambient-drift 25s ease-in-out infinite alternate;
+    }
+
+    @keyframes ambient-drift {
+      0% { opacity: 0.7; transform: scale(1); }
+      100% { opacity: 1; transform: scale(1.05); }
+    }
+
+    /* Container */
+    .app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Header */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      padding: 16px 20px;
+      padding-top: max(16px, env(safe-area-inset-top));
+      background: linear-gradient(
+        to bottom,
+        var(--color-bg) 0%,
+        rgba(7, 10, 18, 0.92) 60%,
+        transparent 100%
+      );
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .header-content {
+      max-width: 640px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-back {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      color: var(--color-text2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .btn-back:hover {
+      background: var(--color-surface2);
+      color: var(--color-text);
+    }
+
+    .song-artwork {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      background: var(--color-surface2);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .song-artwork img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .song-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .song-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+
+    .song-artist {
+      font-size: 13px;
+      color: var(--color-text3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .voice-indicator {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      color: var(--color-text3);
+      transition: all 0.2s ease;
+    }
+
+    .voice-indicator.active {
+      border-color: var(--color-success);
+      color: var(--color-success);
+    }
+
+    .voice-indicator.active::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: var(--radius-full);
+      border: 2px solid var(--color-success);
+      animation: pulse-ring 1.5s ease-out infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.2); opacity: 0; }
+    }
+
+    .btn-play {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-full);
+      background: var(--color-accent);
+      border: none;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-glow);
+      transition: all 0.15s ease;
+    }
+
+    .btn-play:hover {
+      background: var(--color-accent-hover);
+      box-shadow: var(--shadow-glow-active);
+      transform: scale(1.05);
+    }
+
+    .btn-play:active {
+      transform: scale(0.95);
+    }
+
+    .btn-reset {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      color: var(--color-text2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-reset:hover {
+      background: var(--color-surface2);
+      color: var(--color-text);
+    }
+
+    /* Lyrics Container */
+    .lyrics-container {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      padding-top: 90px;
+    }
+
+    /* Reading Rail - subtle focus guide */
+    .reading-rail {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 15%;
+      height: 80px;
+      pointer-events: none;
+      background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(91, 108, 255, 0.03) 30%,
+        rgba(91, 108, 255, 0.05) 50%,
+        rgba(91, 108, 255, 0.03) 70%,
+        transparent 100%
+      );
+      transform: translateY(-50%);
+      z-index: 1;
+    }
+
+    .lyrics-scroll {
+      height: 100%;
+      overflow-y: auto;
+      padding: 0 24px;
+      padding-top: calc(15vh - 20px);
+      padding-bottom: 35vh;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .lyrics-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .lyrics-scroll::-webkit-scrollbar-thumb {
+      background: var(--color-surface3);
+      border-radius: 2px;
+    }
+
+    .lyrics-content {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    /* Lyric Lines */
+    .lyric-line {
+      padding: 12px 16px;
+      margin: 4px 0;
+      border-radius: var(--radius-lg);
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      font-size: 24px;
+      line-height: 1.35;
+      font-weight: 600;
+    }
+
+    .lyric-line.past {
+      color: var(--color-text-muted);
+      font-weight: 500;
+    }
+
+    .lyric-line.upcoming {
+      color: var(--color-text3);
+      font-weight: 500;
+    }
+
+    .lyric-line.next {
+      color: var(--color-text2);
+      font-weight: 600;
+    }
+
+    .lyric-line.active {
+      color: var(--color-text);
+      font-weight: 800;
+      font-size: 28px;
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-border-strong);
+      padding: 16px 20px;
+      margin: 8px 0;
+    }
+
+    /* Active line left indicator */
+    .lyric-line.active::before {
+      content: '';
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 50%;
+      border-radius: var(--radius-full);
+      background: var(--color-accent);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .lyric-line.empty {
+      color: var(--color-text-muted);
+      font-size: 20px;
+    }
+
+    /* Chord badges */
+    .chord-row {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .chord-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--color-chord-soft);
+      color: var(--color-chord);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .lyric-line.active .chord-badge {
+      background: var(--color-chord);
+      color: var(--color-bg);
+    }
+
+    /* Control Strip */
+    .control-strip {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      padding: 20px 24px;
+      padding-bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
+      background: linear-gradient(
+        to top,
+        var(--color-bg) 0%,
+        rgba(7, 10, 18, 0.95) 50%,
+        transparent 100%
+      );
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .tempo-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .tempo-control:hover {
+      background: var(--color-surface2);
+      border-color: var(--color-border-strong);
+    }
+
+    .tempo-icon {
+      color: var(--color-text3);
+    }
+
+    .tempo-value {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .tempo-unit {
+      font-size: 12px;
+      color: var(--color-text3);
+      font-weight: 500;
+    }
+
+    .btn-play-main {
+      width: 64px;
+      height: 64px;
+      border-radius: var(--radius-full);
+      background: var(--color-accent);
+      border: none;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-glow-active);
+      transition: all 0.15s ease;
+    }
+
+    .btn-play-main:hover {
+      background: var(--color-accent-hover);
+      transform: scale(1.05);
+    }
+
+    .btn-play-main:active {
+      transform: scale(0.95);
+    }
+
+    /* Manual Scroll Badge */
+    .manual-badge {
+      position: fixed;
+      top: 100px;
+      right: 20px;
+      padding: 6px 12px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface2);
+      border: 1px solid var(--color-border);
+      font-size: 12px;
+      color: var(--color-text3);
+      z-index: 25;
+      opacity: 0;
+      transform: translateX(20px);
+      transition: all 0.2s ease;
+    }
+
+    .manual-badge.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    /* Floating Action Buttons */
+    .floating-actions {
+      position: fixed;
+      bottom: 120px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 25;
+    }
+
+    .fab {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      color: var(--color-text3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .fab:hover {
+      background: var(--color-surface2);
+      color: var(--color-text);
+      border-color: var(--color-border-strong);
+    }
+
+    /* Metronome Orb */
+    .metronome-orb {
+      position: fixed;
+      bottom: 120px;
+      right: 20px;
+      width: 56px;
+      height: 56px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 25;
+      transition: all 0.15s ease;
+    }
+
+    .metronome-orb:hover {
+      background: var(--color-surface2);
+      border-color: var(--color-border-strong);
+    }
+
+    .metronome-orb.active {
+      border-color: var(--color-accent);
+      animation: metronome-pulse 0.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes metronome-pulse {
+      0% { box-shadow: 0 0 0 0 var(--color-accent-glow); }
+      100% { box-shadow: 0 0 12px 4px var(--color-accent-glow); }
+    }
+
+    .metronome-bpm {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-text);
+      line-height: 1;
+    }
+
+    .metronome-label {
+      font-size: 9px;
+      font-weight: 500;
+      color: var(--color-text3);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Icons (inline SVG) */
+    .icon {
+      width: 20px;
+      height: 20px;
+    }
+
+    .icon-lg {
+      width: 24px;
+      height: 24px;
+    }
+
+    /* Responsive */
+    @media (min-width: 768px) {
+      .lyric-line {
+        font-size: 28px;
+      }
+
+      .lyric-line.active {
+        font-size: 34px;
+      }
+
+      .btn-play-main {
+        width: 72px;
+        height: 72px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-bg"></div>
+
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="btn-back" aria-label="Back">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+        </button>
+
+        <div class="song-artwork">
+          <img src="https://i.scdn.co/image/ab67616d0000b273c4fecd6c6e0d67a1b4a80efd" alt="Album art">
+        </div>
+
+        <div class="song-info">
+          <div class="song-title">Bohemian Rhapsody</div>
+          <div class="song-artist">Queen</div>
+        </div>
+
+        <div class="header-actions">
+          <button class="voice-indicator active" aria-label="Voice detection active">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
+          </button>
+          <button class="btn-play" aria-label="Pause">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16" rx="1"/>
+              <rect x="14" y="4" width="4" height="16" rx="1"/>
+            </svg>
+          </button>
+          <button class="btn-reset" aria-label="Reset">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Lyrics -->
+    <div class="lyrics-container">
+      <div class="reading-rail"></div>
+      <div class="lyrics-scroll">
+        <div class="lyrics-content">
+          <div class="lyric-line past">Is this the real life?</div>
+          <div class="lyric-line past">Is this just fantasy?</div>
+          <div class="lyric-line past">Caught in a landslide</div>
+          <div class="lyric-line past">No escape from reality</div>
+          <div class="lyric-line past">
+            <div class="chord-row">
+              <span class="chord-badge">Eb</span>
+            </div>
+            Open your eyes
+          </div>
+          <div class="lyric-line past">Look up to the skies and see</div>
+
+          <div class="lyric-line active">
+            <div class="chord-row">
+              <span class="chord-badge">Cm</span>
+              <span class="chord-badge">F7</span>
+            </div>
+            I'm just a poor boy, I need no sympathy
+          </div>
+
+          <div class="lyric-line next">
+            <div class="chord-row">
+              <span class="chord-badge">Bb</span>
+            </div>
+            Because I'm easy come, easy go
+          </div>
+          <div class="lyric-line upcoming">Little high, little low</div>
+          <div class="lyric-line upcoming">
+            <div class="chord-row">
+              <span class="chord-badge">Eb</span>
+              <span class="chord-badge">Bb</span>
+            </div>
+            Any way the wind blows
+          </div>
+          <div class="lyric-line upcoming">Doesn't really matter to me, to me</div>
+          <div class="lyric-line empty">...</div>
+          <div class="lyric-line upcoming">
+            <div class="chord-row">
+              <span class="chord-badge">Bb</span>
+            </div>
+            Mama, just killed a man
+          </div>
+          <div class="lyric-line upcoming">Put a gun against his head</div>
+          <div class="lyric-line upcoming">Pulled my trigger, now he's dead</div>
+          <div class="lyric-line upcoming">Mama, life had just begun</div>
+          <div class="lyric-line upcoming">But now I've gone and thrown it all away</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manual Scroll Badge -->
+    <div class="manual-badge">Manual scroll</div>
+
+    <!-- Floating Actions -->
+    <div class="floating-actions">
+      <button class="fab" aria-label="Song info">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4M12 8h.01"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Metronome Orb -->
+    <div class="metronome-orb active">
+      <span class="metronome-bpm">72</span>
+      <span class="metronome-label">BPM</span>
+    </div>
+
+    <!-- Control Strip -->
+    <div class="control-strip">
+      <div class="tempo-control">
+        <svg class="icon tempo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span class="tempo-value">1.0x</span>
+      </div>
+
+      <button class="btn-play-main" aria-label="Play">
+        <svg class="icon-lg" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="4" width="4" height="16" rx="1"/>
+          <rect x="14" y="4" width="4" height="16" rx="1"/>
+        </svg>
+      </button>
+
+      <div class="tempo-control">
+        <svg class="icon tempo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+        <span class="tempo-value">A</span>
+        <span class="tempo-unit">size</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Interactive demo behavior
+    const voiceIndicator = document.querySelector('.voice-indicator');
+    voiceIndicator.addEventListener('click', () => {
+      voiceIndicator.classList.toggle('active');
+    });
+
+    const metronomeOrb = document.querySelector('.metronome-orb');
+    metronomeOrb.addEventListener('click', () => {
+      metronomeOrb.classList.toggle('active');
+    });
+
+    // Simulate scroll detection
+    const lyricsScroll = document.querySelector('.lyrics-scroll');
+    const manualBadge = document.querySelector('.manual-badge');
+    let scrollTimeout;
+
+    lyricsScroll.addEventListener('scroll', () => {
+      manualBadge.classList.add('visible');
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        manualBadge.classList.remove('visible');
+      }, 2000);
+    });
+
+    // Click on lyrics to highlight
+    const lyricLines = document.querySelectorAll('.lyric-line');
+    lyricLines.forEach(line => {
+      line.addEventListener('click', () => {
+        lyricLines.forEach(l => {
+          l.classList.remove('active', 'next');
+          if (l !== line) {
+            const idx = Array.from(lyricLines).indexOf(l);
+            const activeIdx = Array.from(lyricLines).indexOf(line);
+            if (idx < activeIdx) l.classList.add('past');
+            else l.classList.add('upcoming');
+          }
+        });
+        line.classList.remove('past', 'upcoming');
+        line.classList.add('active');
+        const nextLine = line.nextElementSibling;
+        if (nextLine && nextLine.classList.contains('lyric-line')) {
+          nextLine.classList.remove('past', 'upcoming');
+          nextLine.classList.add('next');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

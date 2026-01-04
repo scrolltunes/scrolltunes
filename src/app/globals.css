@@ -1,31 +1,122 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Studio Pro Dark theme tokens */
+  --color-bg: #070A12;
+  --color-surface1: #0C1220;
+  --color-surface2: #111A2C;
+  --color-surface3: #151F33;
+  --color-surface-elevated: #1A2540;
+
+  /* Text hierarchy */
+  --color-text: #F3F5F7;
+  --color-text2: rgba(243, 245, 247, 0.72);
+  --color-text3: rgba(243, 245, 247, 0.46);
+  --color-text-muted: rgba(243, 245, 247, 0.28);
+  --color-text-ghost: rgba(243, 245, 247, 0.12);
+
+  /* Accent colors */
+  --color-accent: #5B6CFF;
+  --color-accent-hover: #6F7DFF;
+  --color-accent-bright: #818CF8;
+  --color-accent-soft: rgba(91, 108, 255, 0.14);
+  --color-accent-glow: rgba(91, 108, 255, 0.25);
+
+  /* Semantic colors */
+  --color-success: #22C55E;
+  --color-success-soft: rgba(34, 197, 94, 0.14);
+  --color-warning: #FBBF24;
+  --color-warning-soft: rgba(251, 191, 36, 0.14);
+  --color-danger: #FB7185;
+  --color-danger-soft: rgba(251, 113, 133, 0.14);
+
+  /* Chord display */
+  --color-chord: #FBBF24;
+  --color-chord-soft: rgba(251, 191, 36, 0.14);
+
+  /* Spotify brand */
+  --color-spotify: #1DB954;
+  --color-spotify-soft: rgba(29, 185, 84, 0.14);
+
+  /* Borders */
+  --color-border: rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(91, 108, 255, 0.15);
+  --shadow-glow-active: 0 0 30px rgba(91, 108, 255, 0.25);
+  --shadow-glow-chord: 0 0 20px rgba(251, 191, 36, 0.3);
+
+  /* Border radius */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Legacy variables (for backward compatibility) */
+  --background: #070A12;
+  --foreground: #F3F5F7;
+  --scrollbar-thumb: #404040;
+  --scrollbar-thumb-hover: #525252;
+
+  /* Active line highlight tokens (legacy) */
+  --stage-accent: #5B6CFF;
+  --stage-border-strong: rgba(255, 255, 255, 0.16);
+}
+
+/* Light mode overrides */
+:root.light {
+  --color-bg: #FAF7F2;
+  --color-surface1: #FFFFFF;
+  --color-surface2: #F5F1EA;
+  --color-surface3: #EBE6DC;
+  --color-surface-elevated: #FFFFFF;
+
+  --color-text: #1A1A1A;
+  --color-text2: rgba(26, 26, 26, 0.72);
+  --color-text3: rgba(26, 26, 26, 0.48);
+  --color-text-muted: rgba(26, 26, 26, 0.32);
+  --color-text-ghost: rgba(26, 26, 26, 0.12);
+
+  --color-accent: #5B6CFF;
+  --color-accent-soft: rgba(91, 108, 255, 0.12);
+
+  --color-border: rgba(26, 26, 26, 0.08);
+  --color-border-strong: rgba(26, 26, 26, 0.15);
+
+  --background: #FAF7F2;
+  --foreground: #1A1A1A;
   --scrollbar-thumb: #d4d4d4;
   --scrollbar-thumb-hover: #a3a3a3;
-
-  /* Active line highlight tokens */
-  --stage-accent: #5b6cff;
-  --stage-border-strong: rgba(255, 255, 255, 0.16);
 }
 
 /* Dark mode via class */
 :root.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --background: #070A12;
+  --foreground: #F3F5F7;
   --scrollbar-thumb: #404040;
   --scrollbar-thumb-hover: #525252;
 }
 
 /* System preference fallback (when no explicit class) */
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root:not(.light):not(.dark) {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --scrollbar-thumb: #404040;
-    --scrollbar-thumb-hover: #525252;
+    --color-bg: #FAF7F2;
+    --color-surface1: #FFFFFF;
+    --color-surface2: #F5F1EA;
+    --color-surface3: #EBE6DC;
+    --color-text: #1A1A1A;
+    --color-text2: rgba(26, 26, 26, 0.72);
+    --color-text3: rgba(26, 26, 26, 0.48);
+    --color-text-muted: rgba(26, 26, 26, 0.32);
+    --background: #FAF7F2;
+    --foreground: #1A1A1A;
+    --scrollbar-thumb: #d4d4d4;
+    --scrollbar-thumb-hover: #a3a3a3;
   }
 }
 
@@ -37,28 +128,9 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-family: Arial, Helvetica, sans-serif;
-}
-
-/* Light mode: invert colors since app is designed dark-first */
-:root.light {
-  filter: invert(1) hue-rotate(180deg);
-}
-
-:root.light img,
-:root.light video {
-  filter: invert(1) hue-rotate(180deg);
-}
-
-/* Prevent light mode inversion on share modal */
-:root.light .share-modal-preserve {
-  filter: invert(1) hue-rotate(180deg);
-}
-
-:root.light .share-modal-preserve img {
-  filter: none;
 }
 
 /* Custom scrollbar styling using CSS variables */
@@ -120,4 +192,42 @@ html {
 
 .chord-diagram-svg rect[fill="black"] {
   fill: black !important;
+}
+
+/* Ambient background gradient utility */
+.ambient-bg {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, var(--color-accent-glow), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(139, 92, 246, 0.05), transparent 45%);
+}
+
+/* Reading rail gradient for performance view */
+.reading-rail {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(91, 108, 255, 0.03) 30%,
+    rgba(91, 108, 255, 0.05) 50%,
+    rgba(91, 108, 255, 0.03) 70%,
+    transparent 100%
+  );
+}
+
+/* Active lyric line styling */
+.lyric-active {
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: 0 4px 20px rgba(91, 108, 255, 0.1);
+}
+
+/* Chord badge styling */
+.chord-badge {
+  background: var(--color-chord-soft);
+  color: var(--color-chord);
+}
+
+.chord-badge-active {
+  background: var(--color-chord);
+  color: var(--color-bg);
+  box-shadow: var(--shadow-glow-chord);
 }

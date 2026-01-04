@@ -67,13 +67,17 @@ export const SongActionBar = memo(function SongActionBar({
   return (
     <div className="flex items-center justify-center gap-3 py-4 px-4">
       {/* Font size controls */}
-      <div className="flex items-center gap-1 bg-neutral-800/50 rounded-full px-2 py-1.5">
-        <TextAa size={18} weight="fill" className="text-neutral-400 mr-1" />
+      <div
+        className="flex items-center gap-1 rounded-full px-2 py-1.5"
+        style={{ background: "var(--color-surface2)" }}
+      >
+        <TextAa size={18} weight="fill" style={{ color: "var(--color-text3)" }} className="mr-1" />
         <button
           type="button"
           onClick={handleDecrease}
           disabled={isAtMin}
-          className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-300 hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="w-7 h-7 rounded-full flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:bg-white/5"
+          style={{ color: "var(--color-text2)" }}
           aria-label="Decrease font size"
         >
           <Minus size={14} weight="bold" />
@@ -82,7 +86,8 @@ export const SongActionBar = memo(function SongActionBar({
           type="button"
           onClick={handleIncrease}
           disabled={isAtMax}
-          className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-300 hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="w-7 h-7 rounded-full flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:bg-white/5"
+          style={{ color: "var(--color-text2)" }}
           aria-label="Increase font size"
         >
           <Plus size={14} weight="bold" />
@@ -92,21 +97,26 @@ export const SongActionBar = memo(function SongActionBar({
       {/* Setlist button - icon only on mobile, full on desktop */}
       {isAuthenticated && (
         <>
-          <div className="w-px h-6 bg-neutral-700" />
+          <div className="w-px h-6" style={{ background: "var(--color-border)" }} />
           <button
             type="button"
             onClick={onAddToSetlist}
-            className={`relative flex items-center gap-2 rounded-full transition-colors text-sm font-medium ${
-              isInSetlist
-                ? "bg-neutral-800/50 hover:bg-neutral-700/50"
-                : "bg-neutral-800/50 hover:bg-neutral-700/50 text-neutral-400 hover:text-neutral-300"
-            } ${isInSetlist ? "px-2 py-2 sm:px-3" : "p-2 sm:px-3 sm:py-2"}`}
+            className={`relative flex items-center gap-2 rounded-full transition-colors text-sm font-medium hover:bg-white/5 ${
+              isInSetlist ? "px-2 py-2 sm:px-3" : "p-2 sm:px-3 sm:py-2"
+            }`}
+            style={{
+              background: "var(--color-surface2)",
+              color: isInSetlist ? "var(--color-text)" : "var(--color-text3)",
+            }}
             aria-label={isInSetlist ? "Manage setlists" : "Add to setlist"}
           >
             {isInSetlist ? (
               <div className="flex items-center gap-2">
                 <span className="hidden sm:inline">Setlists</span>
-                <span className="text-[10px] text-neutral-500 leading-none">
+                <span
+                  className="text-[10px] leading-none"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
                   {containingSetlists.length}
                 </span>
                 <div className="flex items-center gap-0.5">
@@ -115,7 +125,11 @@ export const SongActionBar = memo(function SongActionBar({
                   ))}
                   {containingSetlists.length > 2 && (
                     <div
-                      className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 bg-neutral-700 text-neutral-400 text-[10px] font-medium"
+                      className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-[10px] font-medium"
+                      style={{
+                        background: "var(--color-surface3)",
+                        color: "var(--color-text3)",
+                      }}
                       title={`${containingSetlists.length - 2} more`}
                     >
                       +{containingSetlists.length - 2}
@@ -134,14 +148,18 @@ export const SongActionBar = memo(function SongActionBar({
       )}
 
       {/* Separator */}
-      <div className="w-px h-6 bg-neutral-700" />
+      <div className="w-px h-6" style={{ background: "var(--color-border)" }} />
 
       {/* Share lyrics */}
       {onShareClick && (
         <button
           type="button"
           onClick={onShareClick}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors bg-neutral-800/50 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors hover:bg-white/5"
+          style={{
+            background: "var(--color-surface2)",
+            color: "var(--color-text3)",
+          }}
           aria-label="Share lyrics"
         >
           <ShareNetwork size={18} />

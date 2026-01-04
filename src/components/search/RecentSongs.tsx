@@ -31,7 +31,7 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
   return (
     <div className={className}>
       <div className="flex items-center justify-between mb-3 h-6">
-        <div className="flex items-center gap-2 text-neutral-400">
+        <div className="flex items-center gap-2" style={{ color: "var(--color-text3)" }}>
           {isLoading ? (
             <motion.div
               animate={{ rotate: -360 }}
@@ -48,13 +48,17 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
           <button
             type="button"
             onClick={handleClear}
-            className="text-neutral-500 hover:text-neutral-300 transition-colors p-1"
+            className="transition-colors p-1 hover:brightness-125"
+            style={{ color: "var(--color-text-muted)" }}
             aria-label="Clear history"
           >
             <Trash size={16} />
           </button>
         ) : showSkeleton ? (
-          <div className="w-6 h-6 rounded bg-neutral-800 animate-pulse" />
+          <div
+            className="w-6 h-6 rounded animate-pulse"
+            style={{ background: "var(--color-surface2)" }}
+          />
         ) : null}
       </div>
 
@@ -62,17 +66,35 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
         <ul className="space-y-2" aria-label="Loading recently played songs">
           {Array.from({ length: skeletonCount || 1 }, (_, i) => (
             <li key={i}>
-              <div className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-900 animate-pulse">
+              <div
+                className="w-full flex items-center gap-3 p-3 rounded-xl animate-pulse"
+                style={{ background: "var(--color-surface1)" }}
+              >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden" />
+                  <div
+                    className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden"
+                    style={{ background: "var(--color-surface2)" }}
+                  />
                   <div className="flex-1 min-w-0 space-y-1">
-                    <div className="h-6 w-32 bg-neutral-800 rounded" />
-                    <div className="h-4 w-24 bg-neutral-800 rounded" />
+                    <div
+                      className="h-6 w-32 rounded"
+                      style={{ background: "var(--color-surface2)" }}
+                    />
+                    <div
+                      className="h-4 w-24 rounded"
+                      style={{ background: "var(--color-surface2)" }}
+                    />
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-neutral-800" />
-                  <div className="w-8 h-8 rounded-full bg-neutral-800" />
+                  <div
+                    className="w-8 h-8 rounded-full"
+                    style={{ background: "var(--color-surface2)" }}
+                  />
+                  <div
+                    className="w-8 h-8 rounded-full"
+                    style={{ background: "var(--color-surface2)" }}
+                  />
                 </div>
               </div>
             </li>
@@ -97,7 +119,9 @@ export const RecentSongs = memo(function RecentSongs({ className = "" }: RecentS
           ))}
         </ul>
       ) : isInitialized ? (
-        <p className="text-sm text-neutral-500">No recently played songs</p>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          No recently played songs
+        </p>
       ) : null}
     </div>
   )
