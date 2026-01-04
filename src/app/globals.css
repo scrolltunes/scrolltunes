@@ -29,6 +29,7 @@
   --color-warning-soft: rgba(251, 191, 36, 0.14);
   --color-danger: #FB7185;
   --color-danger-soft: rgba(251, 113, 133, 0.14);
+  --color-favorite: #EF4444;
 
   /* Chord display */
   --color-chord: #FBBF24;

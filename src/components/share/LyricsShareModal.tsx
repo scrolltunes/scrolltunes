@@ -1106,7 +1106,7 @@ export function LyricsShareModal({
                             style={{ color: "var(--color-text2)" }}
                           >
                             Support us
-                            <Heart size={14} weight="fill" style={{ color: "var(--color-danger)" }} />
+                            <Heart size={14} weight="fill" style={{ color: "var(--color-favorite)" }} />
                           </span>
                         </label>
                       </div>

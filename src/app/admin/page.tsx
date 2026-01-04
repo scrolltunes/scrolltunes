@@ -153,8 +153,8 @@ function AnalyticsSection({ stats, isLoading }: { stats: AdminStats | null; isLo
         className="p-5 rounded-xl" style={{ background: "var(--color-surface1)" }}
       >
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "var(--color-surface2)", color: "var(--color-accent)" }}>
-            <Heart size={20} />
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "var(--color-surface2)" }}>
+            <Heart size={20} style={{ color: "var(--color-favorite)" }} />
           </div>
           <span className="text-sm" style={{ color: "var(--color-text3)" }}>Top 5 favorite songs</span>
         </div>

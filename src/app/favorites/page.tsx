@@ -184,7 +184,7 @@ const FavoriteSongItem = memo(function FavoriteSongItem({
         aria-label="Remove from favorites"
         whileTap={{ scale: 0.9 }}
       >
-        <Heart size={18} weight="fill" style={{ color: "var(--color-danger)" }} />
+        <Heart size={18} weight="fill" style={{ color: "var(--color-favorite)" }} />
       </motion.button>
     ),
     [song.id, onRemove],

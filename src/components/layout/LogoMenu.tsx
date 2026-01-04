@@ -97,7 +97,7 @@ export const LogoMenu = memo(function LogoMenu() {
                 className="flex items-center gap-3 px-4 py-2 transition-colors hover:brightness-110"
                 style={{ color: "var(--color-text2)" }}
               >
-                <Heart size={20} />
+                <Heart size={20} style={{ color: "var(--color-favorite)" }} />
                 <span>Favorites</span>
               </Link>
               {isAuthenticated && (

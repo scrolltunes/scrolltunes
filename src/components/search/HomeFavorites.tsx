@@ -24,7 +24,7 @@ export const HomeFavorites = memo(function HomeFavorites({ className = "" }: Hom
     <div className={className}>
       <div className="flex items-center justify-between mb-3 h-6">
         <div className="flex items-center gap-2" style={{ color: "var(--color-text3)" }}>
-          <Heart size={16} weight="fill" style={{ color: "var(--color-danger)" }} />
+          <Heart size={16} weight="fill" style={{ color: "var(--color-favorite)" }} />
           <span className="text-sm font-medium uppercase tracking-wider">Favorites</span>
         </div>
         {favorites.length > 4 && (
@@ -73,7 +73,7 @@ export const HomeFavorites = memo(function HomeFavorites({ className = "" }: Hom
                 <Heart
                   size={18}
                   weight="fill"
-                  style={{ color: "var(--color-danger)" }}
+                  style={{ color: "var(--color-favorite)" }}
                   className="flex-shrink-0"
                 />
               </Link>

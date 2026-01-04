@@ -62,7 +62,7 @@ export const FavoriteButton = memo(function FavoriteButton({
           size={config.icon}
           weight={isFavorite ? "fill" : "regular"}
           style={{
-            color: isFavorite ? "var(--color-danger)" : "var(--color-text3)",
+            color: isFavorite ? "var(--color-favorite)" : "var(--color-text3)",
             transition: "color 0.2s",
           }}
         />
