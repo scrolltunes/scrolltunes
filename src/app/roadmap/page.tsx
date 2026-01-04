@@ -28,8 +28,17 @@ const laterFeatures = [
 
 export default function RoadmapPage() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
-      <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
+      <header
+        className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
+        style={{
+          background: "rgba(7, 10, 18, 0.8)",
+          borderBottom: "1px solid var(--color-border)",
+        }}
+      >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <BackButton fallbackHref="/about" ariaLabel="Back" />
           <h1 className="text-lg font-semibold">Roadmap</h1>
@@ -45,19 +54,30 @@ export default function RoadmapPage() {
         >
           {/* Now - Shipped features */}
           <section>
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+            <h2
+              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               Now
             </h2>
-            <div className="p-4 bg-neutral-900 rounded-xl space-y-3">
+            <div className="p-4 rounded-xl space-y-3" style={{ background: "var(--color-surface1)" }}>
               {nowFeatures.map(feature => {
                 const title = typeof feature === "string" ? feature : feature.title
                 const isBeta = typeof feature === "object" && feature.beta
                 return (
                   <div key={title} className="flex items-center gap-3">
-                    <Check size={16} weight="bold" className="text-green-500 shrink-0" />
-                    <span className="text-neutral-300">{title}</span>
+                    <Check
+                      size={16}
+                      weight="bold"
+                      className="shrink-0"
+                      style={{ color: "var(--color-success)" }}
+                    />
+                    <span style={{ color: "var(--color-text2)" }}>{title}</span>
                     {isBeta && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-amber-500/20 text-amber-400 rounded">
+                      <span
+                        className="px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded"
+                        style={{ background: "var(--color-warning-soft)", color: "var(--color-warning)" }}
+                      >
                         Beta
                       </span>
                     )}
@@ -69,17 +89,31 @@ export default function RoadmapPage() {
 
           {/* Next - Active development */}
           <section>
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+            <h2
+              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               Next
             </h2>
             <div className="space-y-3">
               {nextFeatures.map(feature => (
-                <div key={feature.title} className="p-4 bg-neutral-900 rounded-xl">
+                <div
+                  key={feature.title}
+                  className="p-4 rounded-xl"
+                  style={{ background: "var(--color-surface1)" }}
+                >
                   <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 shrink-0" />
+                    <div
+                      className="w-2 h-2 rounded-full mt-2 shrink-0"
+                      style={{ background: "var(--color-accent)" }}
+                    />
                     <div>
-                      <div className="font-medium text-white">{feature.title}</div>
-                      <div className="text-sm text-neutral-400 mt-1">{feature.description}</div>
+                      <div className="font-medium" style={{ color: "var(--color-text)" }}>
+                        {feature.title}
+                      </div>
+                      <div className="text-sm mt-1" style={{ color: "var(--color-text3)" }}>
+                        {feature.description}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -89,17 +123,31 @@ export default function RoadmapPage() {
 
           {/* Later */}
           <section>
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+            <h2
+              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               Later
             </h2>
             <div className="space-y-3">
               {laterFeatures.map(feature => (
-                <div key={feature.title} className="p-4 bg-neutral-900 rounded-xl">
+                <div
+                  key={feature.title}
+                  className="p-4 rounded-xl"
+                  style={{ background: "var(--color-surface1)" }}
+                >
                   <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 rounded-full bg-neutral-600 mt-2 shrink-0" />
+                    <div
+                      className="w-2 h-2 rounded-full mt-2 shrink-0"
+                      style={{ background: "var(--color-text-muted)" }}
+                    />
                     <div>
-                      <div className="font-medium text-white">{feature.title}</div>
-                      <div className="text-sm text-neutral-400 mt-1">{feature.description}</div>
+                      <div className="font-medium" style={{ color: "var(--color-text)" }}>
+                        {feature.title}
+                      </div>
+                      <div className="text-sm mt-1" style={{ color: "var(--color-text3)" }}>
+                        {feature.description}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -109,25 +157,30 @@ export default function RoadmapPage() {
 
           {/* Request a feature */}
           <section>
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+            <h2
+              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               Request a feature
             </h2>
             <a
               href="https://x.com/ScrollTunes"
               target="_blank"
               rel="noopener noreferrer"
-              className="block p-4 bg-neutral-900 rounded-xl hover:bg-neutral-800 transition-colors"
+              className="block p-4 rounded-xl transition-colors hover:brightness-110"
+              style={{ background: "var(--color-surface1)" }}
             >
-              <div className="font-medium text-white flex items-center gap-2">
+              <div className="font-medium flex items-center gap-2" style={{ color: "var(--color-text)" }}>
                 <XLogo size={18} />
                 @ScrollTunes
               </div>
             </a>
             <a
               href="mailto:contact@scrolltunes.com"
-              className="block p-4 bg-neutral-900 rounded-xl hover:bg-neutral-800 transition-colors mt-3"
+              className="block p-4 rounded-xl transition-colors hover:brightness-110 mt-3"
+              style={{ background: "var(--color-surface1)" }}
             >
-              <div className="font-medium text-white flex items-center gap-2">
+              <div className="font-medium flex items-center gap-2" style={{ color: "var(--color-text)" }}>
                 <EnvelopeSimple size={18} />
                 contact@scrolltunes.com
               </div>
