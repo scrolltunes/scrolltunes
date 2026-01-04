@@ -15,7 +15,7 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
   {
     question: "What is ScrollTunes?",
     answer:
-      "A live lyrics teleprompter for musicians. There's nothing more annoying than reading lyrics off a phone balanced on your knee while playing guitar. So we built this. Now you just sing, and the lyrics follow along.",
+      "A hands-free lyrics teleprompter for musicians. The lyrics start scrolling when you start singing, so you can focus on your performance instead of fumbling with your phone.",
   },
   {
     question: "Is it free?",

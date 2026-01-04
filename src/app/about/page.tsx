@@ -46,8 +46,9 @@ export default function AboutPage() {
             </h2>
             <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
               <p className="leading-relaxed" style={{ color: "var(--color-text2)" }}>
-                A live lyrics teleprompter for musicians. Place your phone on a music stand and
-                perform hands-free with synced scrolling lyrics
+                A hands-free lyrics teleprompter for musicians. The lyrics start scrolling when you
+                start singing, so you can focus on your performance instead of fumbling with your
+                phone.
               </p>
             </div>
           </section>
