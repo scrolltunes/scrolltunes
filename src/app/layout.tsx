@@ -95,11 +95,12 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning style={{ background: "#070A12" }}>
       <head>
-        {/* Critical CSS to prevent flash - sets dark background before any CSS loads */}
+        {/* Color scheme hint for browser - processed very early */}
+        <meta name="color-scheme" content="dark light" />
+        {/* Critical CSS for theme - no media query to avoid flash before JS checks preferences */}
         <style
           dangerouslySetInnerHTML={{
-            __html:
-              "html,body{background:#070A12}html.light,html.light body{background:#FAF7F2}@media(prefers-color-scheme:light){html:not(.dark),html:not(.dark) body{background:#FAF7F2}}",
+            __html: "html,body{background:#070A12!important}html.light,html.light body{background:#FAF7F2!important}",
           }}
         />
         {/* Inline blocking script to set theme class based on user preference */}

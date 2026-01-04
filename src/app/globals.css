@@ -107,24 +107,8 @@
   --scrollbar-thumb-hover: #525252;
 }
 
-/* System preference fallback (when no explicit class) */
-@media (prefers-color-scheme: light) {
-  :root:not(.light):not(.dark) {
-    --color-bg: #FAF7F2;
-    --color-surface1: #FFFFFF;
-    --color-surface2: #F5F1EA;
-    --color-surface3: #EBE6DC;
-    --color-text: #1A1A1A;
-    --color-text2: rgba(26, 26, 26, 0.72);
-    --color-text3: rgba(26, 26, 26, 0.48);
-    --color-text-muted: rgba(26, 26, 26, 0.32);
-    --color-header-bg: rgba(250, 247, 242, 0.85);
-    --background: #FAF7F2;
-    --foreground: #1A1A1A;
-    --scrollbar-thumb: #d4d4d4;
-    --scrollbar-thumb-hover: #a3a3a3;
-  }
-}
+/* Theme is handled by JavaScript in layout.tsx which adds .dark or .light class */
+/* No CSS media query fallback to avoid flash before JS runs */
 
 @theme inline {
   --color-background: var(--background);
