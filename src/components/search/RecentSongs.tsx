@@ -244,7 +244,9 @@ export const RecentSongs = memo(function RecentSongs({
                         ...(song.albumArt && { albumArt: song.albumArt }),
                       })
                     }}
-                    className="absolute top-1 right-1 w-7 h-7 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className={`absolute top-1 right-1 w-7 h-7 rounded-full flex items-center justify-center transition-opacity z-10 ${
+                      isFavorite ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    }`}
                     style={{ background: "rgba(0, 0, 0, 0.6)" }}
                     aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
                     whileTap={{ scale: 0.9 }}
