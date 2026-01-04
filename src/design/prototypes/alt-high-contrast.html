@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ScrollTunes - High Contrast Theme</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-bg: #000000;
+      --color-surface1: #0A0A0A;
+      --color-surface2: #141414;
+      --color-surface3: #1E1E1E;
+
+      --color-text: #FFFFFF;
+      --color-text2: rgba(255, 255, 255, 0.70);
+      --color-text3: rgba(255, 255, 255, 0.45);
+      --color-text-muted: rgba(255, 255, 255, 0.25);
+
+      --color-accent: #FFFFFF;
+      --color-accent-soft: rgba(255, 255, 255, 0.08);
+
+      --color-highlight: #00FF88;
+      --color-highlight-soft: rgba(0, 255, 136, 0.12);
+
+      --color-chord: #FF6B35;
+      --color-chord-soft: rgba(255, 107, 53, 0.15);
+
+      --color-border: rgba(255, 255, 255, 0.12);
+      --color-border-strong: rgba(255, 255, 255, 0.25);
+
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 9999px;
+
+      --font-ui: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-ui);
+      background: var(--color-bg);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    .app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header - minimal, left-aligned */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      padding: 20px 24px;
+      padding-top: max(20px, env(safe-area-inset-top));
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .song-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .song-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-text);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .song-artist {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--color-text3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-minimal {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background: transparent;
+      border: 1px solid var(--color-border);
+      color: var(--color-text2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-minimal:hover {
+      border-color: var(--color-text);
+      color: var(--color-text);
+    }
+
+    .btn-minimal.active {
+      background: var(--color-highlight-soft);
+      border-color: var(--color-highlight);
+      color: var(--color-highlight);
+    }
+
+    /* Lyrics - full screen, dramatic */
+    .lyrics-container {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+    }
+
+    .lyrics-scroll {
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      padding: 25vh 32px 40vh;
+    }
+
+    .lyrics-content {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .lyric-line {
+      padding: 20px 0;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      font-size: 32px;
+      line-height: 1.2;
+      font-weight: 600;
+      position: relative;
+    }
+
+    @media (min-width: 768px) {
+      .lyric-line {
+        font-size: 48px;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .lyric-line {
+        font-size: 56px;
+      }
+    }
+
+    .lyric-line.past {
+      color: var(--color-text-muted);
+      font-weight: 400;
+      transform: translateX(-8px);
+    }
+
+    .lyric-line.upcoming {
+      color: var(--color-text3);
+      font-weight: 500;
+    }
+
+    .lyric-line.next {
+      color: var(--color-text2);
+      font-weight: 600;
+    }
+
+    .lyric-line.active {
+      color: var(--color-text);
+      font-weight: 900;
+      padding-left: 24px;
+    }
+
+    .lyric-line.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 70%;
+      background: var(--color-highlight);
+      border-radius: 2px;
+      box-shadow: 0 0 20px var(--color-highlight);
+    }
+
+    .lyric-line.empty {
+      color: var(--color-text-muted);
+      font-size: 24px;
+      font-weight: 400;
+      padding: 40px 0;
+    }
+
+    /* Chord badges - inline, bold */
+    .chord-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .chord-badge {
+      display: inline-flex;
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      border: 2px solid var(--color-chord);
+      color: var(--color-chord);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .lyric-line.active .chord-badge {
+      background: var(--color-chord);
+      color: var(--color-bg);
+    }
+
+    /* Bottom controls - floating bar */
+    .control-bar {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: var(--color-surface2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      z-index: 30;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    @media (max-width: 480px) {
+      .control-bar {
+        left: 16px;
+        right: 16px;
+        transform: none;
+        justify-content: center;
+        bottom: max(16px, env(safe-area-inset-bottom));
+      }
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: var(--radius-full);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text2);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .control-item:hover {
+      background: var(--color-surface3);
+      color: var(--color-text);
+    }
+
+    .control-value {
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .control-divider {
+      width: 1px;
+      height: 24px;
+      background: var(--color-border);
+    }
+
+    .btn-play-bar {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-text);
+      border: none;
+      color: var(--color-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-play-bar:hover {
+      transform: scale(1.08);
+    }
+
+    .btn-play-bar:active {
+      transform: scale(0.95);
+    }
+
+    /* BPM corner indicator */
+    .bpm-corner {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      z-index: 20;
+    }
+
+    @media (max-width: 768px) {
+      .bpm-corner {
+        display: none;
+      }
+    }
+
+    .bpm-value {
+      font-size: 48px;
+      font-weight: 900;
+      color: var(--color-text);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .bpm-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-text3);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    /* Progress line */
+    .progress-line {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: var(--color-highlight);
+      width: 35%;
+      z-index: 40;
+      box-shadow: 0 0 10px var(--color-highlight);
+    }
+
+    .icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    .icon-lg {
+      width: 22px;
+      height: 22px;
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-line"></div>
+
+  <div class="app">
+    <header class="header">
+      <div class="song-info">
+        <div class="song-title">Bohemian Rhapsody</div>
+        <div class="song-artist">Queen</div>
+      </div>
+
+      <div class="header-controls">
+        <button class="btn-minimal active" aria-label="Microphone">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+          </svg>
+        </button>
+        <button class="btn-minimal" aria-label="Back">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="lyrics-container">
+      <div class="lyrics-scroll">
+        <div class="lyrics-content">
+          <div class="lyric-line past">Is this the real life?</div>
+          <div class="lyric-line past">Is this just fantasy?</div>
+          <div class="lyric-line past">Caught in a landslide</div>
+          <div class="lyric-line past">No escape from reality</div>
+          <div class="lyric-line past">
+            <div class="chord-row">
+              <span class="chord-badge">Eb</span>
+            </div>
+            Open your eyes
+          </div>
+          <div class="lyric-line past">Look up to the skies and see</div>
+
+          <div class="lyric-line active">
+            <div class="chord-row">
+              <span class="chord-badge">Cm</span>
+              <span class="chord-badge">F7</span>
+            </div>
+            I'm just a poor boy, I need no sympathy
+          </div>
+
+          <div class="lyric-line next">
+            <div class="chord-row">
+              <span class="chord-badge">Bb</span>
+            </div>
+            Because I'm easy come, easy go
+          </div>
+          <div class="lyric-line upcoming">Little high, little low</div>
+          <div class="lyric-line upcoming">
+            <div class="chord-row">
+              <span class="chord-badge">Eb</span>
+              <span class="chord-badge">Bb</span>
+            </div>
+            Any way the wind blows
+          </div>
+          <div class="lyric-line upcoming">Doesn't really matter to me, to me</div>
+          <div class="lyric-line empty">—</div>
+          <div class="lyric-line upcoming">Mama, just killed a man</div>
+          <div class="lyric-line upcoming">Put a gun against his head</div>
+          <div class="lyric-line upcoming">Pulled my trigger, now he's dead</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bpm-corner">
+      <span class="bpm-value">72</span>
+      <span class="bpm-label">Beats per minute</span>
+    </div>
+
+    <div class="control-bar">
+      <div class="control-item">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span class="control-value">1.0×</span>
+      </div>
+
+      <div class="control-divider"></div>
+
+      <button class="btn-play-bar" aria-label="Pause">
+        <svg class="icon-lg" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="4" width="4" height="16" rx="1"/>
+          <rect x="14" y="4" width="4" height="16" rx="1"/>
+        </svg>
+      </button>
+
+      <div class="control-divider"></div>
+
+      <div class="control-item">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 7V4h16v3M9 20h6M12 4v16"/>
+        </svg>
+        <span class="control-value">L</span>
+      </div>
+
+      <div class="control-item">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const lyricLines = document.querySelectorAll('.lyric-line');
+    lyricLines.forEach(line => {
+      line.addEventListener('click', () => {
+        lyricLines.forEach(l => {
+          l.classList.remove('active', 'next');
+          const idx = Array.from(lyricLines).indexOf(l);
+          const activeIdx = Array.from(lyricLines).indexOf(line);
+          if (idx < activeIdx) l.classList.add('past');
+          else if (idx > activeIdx) l.classList.add('upcoming');
+        });
+        line.classList.remove('past', 'upcoming');
+        line.classList.add('active');
+        const nextLine = line.nextElementSibling;
+        if (nextLine && nextLine.classList.contains('lyric-line')) {
+          nextLine.classList.remove('past', 'upcoming');
+          nextLine.classList.add('next');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -17,7 +17,8 @@
         "useKeyWithClickEvents": "off",
         "useSemanticElements": "off",
         "noNoninteractiveTabindex": "off"
-      }
+      },
+      "security": { "noDangerouslySetInnerHtml": "off" }
     }
   },
   "formatter": {

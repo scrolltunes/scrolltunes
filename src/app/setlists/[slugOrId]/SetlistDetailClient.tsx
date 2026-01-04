@@ -162,7 +162,7 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
   }, [])
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header setlistName={currentSetlist.name} shortUrl={shortUrl} onEdit={handleEditClick} />
 
       <main className="pt-20 pb-8 px-4">
@@ -182,9 +182,9 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl font-semibold truncate">{currentSetlist.name}</h1>
                 {currentSetlist.description && (
-                  <p className="text-neutral-400 mt-1">{currentSetlist.description}</p>
+                  <p className="mt-1" style={{ color: "var(--color-text3)" }}>{currentSetlist.description}</p>
                 )}
-                <p className="text-sm text-neutral-500 mt-2">
+                <p className="text-sm mt-2" style={{ color: "var(--color-text-muted)" }}>
                   {songs.length} {songs.length === 1 ? "song" : "songs"}
                 </p>
               </div>
@@ -192,10 +192,13 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
 
             {songs.length === 0 && !removedItem ? (
               <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-neutral-900 flex items-center justify-center">
-                  <MusicNotesSimple size={32} className="text-neutral-500" />
+                <div
+                  className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+                  style={{ background: "var(--color-surface1)" }}
+                >
+                  <MusicNotesSimple size={32} style={{ color: "var(--color-text-muted)" }} />
                 </div>
-                <p className="text-neutral-400">This setlist is empty</p>
+                <p style={{ color: "var(--color-text3)" }}>This setlist is empty</p>
               </div>
             ) : (
               <ul className="space-y-2" aria-label="Songs in setlist">
@@ -224,12 +227,16 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
             transition={springs.default}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
           >
-            <div className="flex items-center gap-3 px-4 py-3 bg-neutral-800 rounded-xl shadow-lg border border-neutral-700">
-              <span className="text-sm text-neutral-300">Removed</span>
+            <div
+              className="flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg"
+              style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)" }}
+            >
+              <span className="text-sm" style={{ color: "var(--color-text3)" }}>Removed</span>
               <button
                 type="button"
                 onClick={handleUndo}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:brightness-110"
+                style={{ background: "var(--color-accent)", color: "white" }}
               >
                 <ArrowCounterClockwise size={16} />
                 Undo
@@ -267,25 +274,28 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={springs.default}
-              className="mx-4 w-full max-w-sm rounded-2xl bg-neutral-900 p-6 shadow-xl"
+              className="mx-4 w-full max-w-sm rounded-2xl p-6 shadow-xl"
+              style={{ background: "var(--color-surface1)" }}
               onClick={e => e.stopPropagation()}
             >
-              <h2 className="text-xl font-semibold text-white mb-2">Delete setlist?</h2>
-              <p className="text-neutral-400 mb-6">
+              <h2 className="text-xl font-semibold mb-2" style={{ color: "var(--color-text)" }}>Delete setlist?</h2>
+              <p className="mb-6" style={{ color: "var(--color-text3)" }}>
                 This will permanently delete "{currentSetlist.name}" and remove all songs from it.
               </p>
               <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={handleDeleteCancel}
-                  className="flex-1 px-4 py-2.5 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-lg transition-colors hover:brightness-110"
+                  style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleDeleteConfirm}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-lg transition-colors hover:brightness-110"
+                  style={{ background: "var(--color-danger)", color: "white" }}
                 >
                   Delete
                 </button>
@@ -325,9 +335,12 @@ const SetlistSongItem = memo(function SetlistSongItem({
         exit={{ opacity: 0, x: -100, transition: { duration: 0.2 } }}
         transition={{ ...springs.default, delay: index * 0.03 }}
       >
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-neutral-900 opacity-50">
+        <div
+          className="flex items-center gap-3 p-4 rounded-xl opacity-50"
+          style={{ background: "var(--color-surface1)" }}
+        >
           <p className="font-medium truncate">{song.songTitle}</p>
-          <p className="text-sm text-neutral-400 truncate">{song.songArtist}</p>
+          <p className="text-sm truncate" style={{ color: "var(--color-text3)" }}>{song.songArtist}</p>
         </div>
       </motion.li>
     )
@@ -346,7 +359,8 @@ const SetlistSongItem = memo(function SetlistSongItem({
         e.stopPropagation()
         handleRemove(albumArt)
       }}
-      className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-800/50 hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
+      className="w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:brightness-110"
+      style={{ background: "var(--color-surface2)", color: "var(--color-text-muted)" }}
       aria-label="Remove from setlist"
     >
       <X size={16} />
@@ -392,19 +406,23 @@ function Header({ setlistName, shortUrl, onEdit }: HeaderProps) {
   }, [shortUrl])
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
+    <header
+      className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
+      style={{ background: "var(--color-header-bg)", borderBottom: "1px solid var(--color-border)" }}
+    >
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
         <BackButton fallbackHref="/setlists" ariaLabel="Back to setlists" />
 
-        <span className="flex-1 text-lg font-semibold flex items-center gap-2 truncate">
-          <Logo size={24} className="text-indigo-500 flex-shrink-0" />
+        <span className="flex-1 text-lg font-semibold flex items-center gap-2 truncate" style={{ color: "var(--color-text)" }}>
+          <Logo size={24} className="flex-shrink-0" />
           <span className="truncate">{setlistName}</span>
         </span>
 
         <button
           type="button"
           onClick={onEdit}
-          className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+          style={{ background: "var(--color-surface2)" }}
           aria-label="Edit setlist"
         >
           <PencilSimple size={20} />
@@ -414,25 +432,33 @@ function Header({ setlistName, shortUrl, onEdit }: HeaderProps) {
           <button
             type="button"
             onClick={handleShare}
-            className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+            style={{ background: "var(--color-surface2)" }}
             aria-label="Share setlist"
           >
             <Share size={20} />
           </button>
 
           {showShareMenu && (
-            <div className="absolute right-0 top-12 w-72 p-3 rounded-xl bg-neutral-900 border border-neutral-800 shadow-xl">
-              <p className="text-xs text-neutral-500 mb-2">Share link</p>
+            <div
+              className="absolute right-0 top-12 w-72 p-3 rounded-xl shadow-xl"
+              style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)" }}
+            >
+              <p className="text-xs mb-2" style={{ color: "var(--color-text-muted)" }}>Share link</p>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-neutral-300 truncate flex-1 font-mono bg-neutral-800 px-2 py-1.5 rounded">
+                <span
+                  className="text-sm truncate flex-1 font-mono px-2 py-1.5 rounded"
+                  style={{ background: "var(--color-surface2)", color: "var(--color-text2)" }}
+                >
                   {shortUrl}
                 </span>
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm transition-colors"
+                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm transition-colors hover:brightness-110"
+                  style={{ background: "var(--color-accent)", color: "white" }}
                 >
-                  {copied ? <Check size={16} className="text-white" /> : <Copy size={16} />}
+                  {copied ? <Check size={16} /> : <Copy size={16} />}
                 </button>
               </div>
             </div>

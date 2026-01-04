@@ -1,0 +1,628 @@
+/**
+ * ScrollTunes - Studio Pro Dark Theme
+ */
+
+/* ===================================================================
+   CSS Custom Properties (Design Tokens)
+   =================================================================== */
+
+:root {
+  /* Color Palette */
+  --color-bg: #070A12;
+  --color-surface1: #0C1220;
+  --color-surface2: #111A2C;
+  --color-surface3: #151F33;
+  --color-surface-elevated: #1A2540;
+
+  /* Text Hierarchy */
+  --color-text: #F3F5F7;
+  --color-text2: rgba(243, 245, 247, 0.72);
+  --color-text3: rgba(243, 245, 247, 0.46);
+  --color-text-muted: rgba(243, 245, 247, 0.28);
+
+  /* Primary Accent */
+  --color-accent: #5B6CFF;
+  --color-accent-hover: #6F7DFF;
+  --color-accent-soft: rgba(91, 108, 255, 0.14);
+  --color-accent-glow: rgba(91, 108, 255, 0.25);
+
+  /* Semantic Colors */
+  --color-success: #22C55E;
+  --color-success-soft: rgba(34, 197, 94, 0.14);
+  --color-warning: #FBBF24;
+  --color-warning-soft: rgba(251, 191, 36, 0.14);
+  --color-danger: #FB7185;
+  --color-danger-soft: rgba(251, 113, 133, 0.14);
+
+  /* Special */
+  --color-chord: #FBBF24;
+  --color-chord-soft: rgba(251, 191, 36, 0.14);
+
+  /* Borders */
+  --color-border: rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-border-focus: rgba(91, 108, 255, 0.50);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(91, 108, 255, 0.15);
+  --shadow-glow-active: 0 0 30px rgba(91, 108, 255, 0.25);
+
+  /* Radius (8pt grid based) */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Spacing (8pt grid) */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+
+  /* Typography */
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Font sizes */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 36px;
+  --text-5xl: 48px;
+  --text-6xl: 60px;
+
+  /* Line heights */
+  --leading-tight: 1.2;
+  --leading-snug: 1.3;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Animation */
+  --duration-instant: 0ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-slower: 600ms;
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Performance settings */
+  --lyrics-focus-position: 15%;
+  --reading-rail-opacity: 0.08;
+  --touch-target-min: 44px;
+  --button-primary-size: 56px;
+}
+
+/* ===================================================================
+   Base Styles
+   =================================================================== */
+
+body.studio-pro-dark {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===================================================================
+   Performance View - Reading Rail
+   =================================================================== */
+
+.reading-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--lyrics-focus-position);
+  height: 4rem;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--color-accent-soft) 50%,
+    transparent
+  );
+  opacity: var(--reading-rail-opacity);
+  transform: translateY(-50%);
+}
+
+/* ===================================================================
+   Active Line Spotlight
+   =================================================================== */
+
+.lyric-line-active {
+  position: relative;
+}
+
+.lyric-line-active::before {
+  content: '';
+  position: absolute;
+  inset: -4px -12px;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-border-strong);
+  z-index: -1;
+  transition: opacity var(--duration-normal) var(--ease-out);
+}
+
+/* Left indicator bar */
+.lyric-line-active::after {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  box-shadow: var(--shadow-glow);
+}
+
+/* ===================================================================
+   Lyric Text States
+   =================================================================== */
+
+.lyric-text {
+  font-weight: 600;
+  line-height: var(--leading-snug);
+  transition:
+    color var(--duration-normal) var(--ease-out),
+    opacity var(--duration-normal) var(--ease-out);
+}
+
+.lyric-text--active {
+  color: var(--color-text);
+  font-weight: 800;
+}
+
+.lyric-text--next {
+  color: var(--color-text2);
+  font-weight: 600;
+}
+
+.lyric-text--past {
+  color: var(--color-text3);
+  font-weight: 500;
+  opacity: 0.5;
+}
+
+.lyric-text--upcoming {
+  color: var(--color-text3);
+  font-weight: 500;
+}
+
+/* ===================================================================
+   Chord Display
+   =================================================================== */
+
+.chord-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-chord-soft);
+  color: var(--color-chord);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.chord-badge--active {
+  background: var(--color-chord);
+  color: var(--color-bg);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
+}
+
+/* ===================================================================
+   Control Strip
+   =================================================================== */
+
+.control-strip {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--spacing-md) var(--spacing-lg);
+  padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom));
+  background: linear-gradient(
+    to top,
+    var(--color-bg) 0%,
+    rgba(7, 10, 18, 0.95) 60%,
+    transparent 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-lg);
+  z-index: 20;
+}
+
+.control-strip--hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(100%);
+  transition:
+    opacity var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+/* ===================================================================
+   Primary Button (Play/Pause)
+   =================================================================== */
+
+.btn-primary {
+  width: var(--button-primary-size);
+  height: var(--button-primary-size);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring),
+    box-shadow var(--duration-fast) var(--ease-out);
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+  box-shadow: var(--shadow-glow-active);
+}
+
+.btn-primary:active {
+  transform: scale(0.95);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* ===================================================================
+   Secondary Button
+   =================================================================== */
+
+.btn-secondary {
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-surface2);
+  color: var(--color-text2);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.btn-secondary:hover {
+  background: var(--color-surface3);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ===================================================================
+   Icon Button
+   =================================================================== */
+
+.btn-icon {
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  border-radius: var(--radius-full);
+  background: var(--color-surface1);
+  color: var(--color-text2);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.btn-icon:hover {
+  background: var(--color-surface2);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.btn-icon--active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ===================================================================
+   Card Component
+   =================================================================== */
+
+.card {
+  background: var(--color-surface1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+.card--elevated {
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.card--interactive {
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+.card--interactive:hover {
+  background: var(--color-surface2);
+  border-color: var(--color-border-strong);
+}
+
+.card--interactive:active {
+  transform: scale(0.98);
+}
+
+/* ===================================================================
+   Header / Top Bar
+   =================================================================== */
+
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: linear-gradient(
+    to bottom,
+    var(--color-bg) 0%,
+    rgba(7, 10, 18, 0.95) 70%,
+    transparent 100%
+  );
+  padding: var(--spacing-md) var(--spacing-lg);
+  padding-top: calc(var(--spacing-md) + env(safe-area-inset-top));
+}
+
+.header-content {
+  max-width: 1024px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+/* ===================================================================
+   Song Info (Header)
+   =================================================================== */
+
+.song-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  flex: 1;
+}
+
+.song-artwork {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--color-surface2);
+  flex-shrink: 0;
+}
+
+.song-meta {
+  min-width: 0;
+}
+
+.song-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-artist {
+  font-size: var(--text-xs);
+  color: var(--color-text3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===================================================================
+   Voice Indicator
+   =================================================================== */
+
+.voice-indicator {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface1);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.voice-indicator--listening {
+  border-color: var(--color-success);
+  animation: voice-pulse 1.5s ease-in-out infinite;
+}
+
+.voice-indicator--speaking {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 16px var(--color-accent-glow);
+}
+
+@keyframes voice-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+  }
+}
+
+/* ===================================================================
+   Loading States
+   =================================================================== */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface2) 0%,
+    var(--color-surface3) 50%,
+    var(--color-surface2) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ===================================================================
+   Tempo Indicator
+   =================================================================== */
+
+.tempo-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text2);
+}
+
+.tempo-value {
+  color: var(--color-text);
+}
+
+/* ===================================================================
+   Manual Scroll Badge
+   =================================================================== */
+
+.manual-scroll-badge {
+  position: fixed;
+  top: 100px;
+  right: var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-full);
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  color: var(--color-text3);
+  opacity: 0.8;
+  z-index: 30;
+}
+
+/* ===================================================================
+   Ambient Background Effects
+   =================================================================== */
+
+.ambient-gradient {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 10% -20%, rgba(91, 108, 255, 0.06), transparent 55%),
+    radial-gradient(circle at 110% 120%, rgba(139, 92, 246, 0.04), transparent 60%);
+  animation: ambient-shift 20s ease-in-out infinite;
+}
+
+@keyframes ambient-shift {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+/* ===================================================================
+   Focus States (Accessibility)
+   =================================================================== */
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ===================================================================
+   Reduced Motion
+   =================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===================================================================
+   High Contrast Mode
+   =================================================================== */
+
+@media (prefers-contrast: more) {
+  :root {
+    --color-text: #FFFFFF;
+    --color-text2: rgba(255, 255, 255, 0.85);
+    --color-text3: rgba(255, 255, 255, 0.70);
+    --color-border: rgba(255, 255, 255, 0.25);
+    --color-border-strong: rgba(255, 255, 255, 0.40);
+  }
+
+  .lyric-line-active::before {
+    border-width: 2px;
+  }
+}

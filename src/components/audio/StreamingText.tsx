@@ -5,6 +5,7 @@ import { memo, useEffect, useRef } from "react"
 interface StreamingTextProps {
   readonly text: string
   readonly className?: string
+  readonly style?: React.CSSProperties
 }
 
 /**
@@ -15,6 +16,7 @@ interface StreamingTextProps {
 export const StreamingText = memo(function StreamingText({
   text,
   className = "",
+  style,
 }: StreamingTextProps) {
   const containerRef = useRef<HTMLSpanElement>(null)
   const displayedTextRef = useRef("")
@@ -81,7 +83,7 @@ export const StreamingText = memo(function StreamingText({
 
   // Initial render with cursor
   return (
-    <span ref={containerRef} className={className}>
+    <span ref={containerRef} className={className} style={style}>
       |
     </span>
   )

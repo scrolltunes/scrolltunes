@@ -71,17 +71,37 @@ function formatDuration(ms: number): string {
 function SearchSkeleton() {
   return (
     <div
-      className="absolute top-full left-0 right-0 z-50 mt-3 rounded-xl border border-neutral-700 bg-neutral-800 divide-y divide-neutral-700 shadow-2xl"
+      className="absolute top-full left-0 right-0 z-50 mt-3 rounded-xl shadow-2xl"
+      style={{
+        background: "var(--color-surface1)",
+        border: "1px solid var(--color-border)",
+      }}
       aria-label="Loading search results"
     >
       {[0, 1, 2, 3].map(i => (
-        <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
-          <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-700" />
+        <div
+          key={i}
+          className="flex items-center gap-3 p-3 animate-pulse"
+          style={{ borderBottom: "1px solid var(--color-border)" }}
+        >
+          <div
+            className="flex-shrink-0 w-12 h-12 rounded-lg"
+            style={{ background: "var(--color-surface2)" }}
+          />
           <div className="flex-1 min-w-0 space-y-2">
-            <div className="h-4 w-3/5 rounded bg-neutral-700" />
-            <div className="h-3 w-4/5 rounded bg-neutral-700" />
+            <div
+              className="h-4 w-3/5 rounded"
+              style={{ background: "var(--color-surface2)" }}
+            />
+            <div
+              className="h-3 w-4/5 rounded"
+              style={{ background: "var(--color-surface2)" }}
+            />
           </div>
-          <div className="flex-shrink-0 h-4 w-10 rounded bg-neutral-700" />
+          <div
+            className="flex-shrink-0 h-4 w-10 rounded"
+            style={{ background: "var(--color-surface2)" }}
+          />
         </div>
       ))}
     </div>
@@ -549,11 +569,19 @@ export const SongSearch = memo(function SongSearch({
       <div className="relative">
         {/* Search input */}
         <div className="relative z-10">
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
+          <div
+            className="absolute left-4 top-1/2 -translate-y-1/2"
+            style={{ color: "var(--color-text-muted)" }}
+          >
             {voiceSearch.isRecording || voiceSearch.isProcessing || streamingText ? (
               <ListeningWaveform variant={voiceSearch.isProcessing ? "processing" : "listening"} />
             ) : isLoading ? (
-              <CircleNotch size={20} weight="bold" className="text-indigo-500 animate-spin" />
+              <CircleNotch
+                size={20}
+                weight="bold"
+                className="animate-spin"
+                style={{ color: "var(--color-accent)" }}
+              />
             ) : (
               <MagnifyingGlass size={20} weight="bold" />
             )}
@@ -561,13 +589,30 @@ export const SongSearch = memo(function SongSearch({
 
           {/* Status overlay when recording, processing, or showing streaming text */}
           {(voiceSearch.isRecording || voiceSearch.isProcessing || streamingText) && (
-            <div className="absolute left-12 top-1/2 -translate-y-1/2 right-20 pointer-events-none overflow-hidden z-20 bg-neutral-900">
+            <div
+              className="absolute left-12 top-1/2 -translate-y-1/2 right-20 pointer-events-none overflow-hidden z-20"
+              style={{ background: "var(--color-surface1)" }}
+            >
               {voiceSearch.isProcessing ? (
-                <span className="truncate block text-emerald-400">Processing...</span>
+                <span
+                  className="truncate block"
+                  style={{ color: "var(--color-success)" }}
+                >
+                  Processing...
+                </span>
               ) : streamingText ? (
-                <StreamingText text={streamingText} className="truncate block text-indigo-400" />
+                <StreamingText
+                  text={streamingText}
+                  className="truncate block"
+                  style={{ color: "var(--color-accent)" }}
+                />
               ) : (
-                <span className="truncate block text-indigo-400">Listening...</span>
+                <span
+                  className="truncate block"
+                  style={{ color: "var(--color-accent)" }}
+                >
+                  Listening...
+                </span>
               )}
             </div>
           )}
@@ -582,13 +627,28 @@ export const SongSearch = memo(function SongSearch({
                 : "Search by song title or artist name"
             }
             maxLength={INPUT_LIMITS.SEARCH_QUERY}
-            className={`w-full bg-neutral-900 text-white placeholder-neutral-500 rounded-xl py-3 pl-12 border transition-colors ${
+            className={`w-full rounded-xl py-3 pl-12 border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-transparent ${
               voiceSearch.isProcessing
-                ? "border-emerald-500 ring-2 ring-emerald-500/20 text-transparent caret-transparent"
+                ? "text-transparent caret-transparent"
                 : voiceSearch.isRecording || streamingText
-                  ? "border-indigo-500 ring-2 ring-indigo-500/20 text-transparent caret-transparent"
-                  : "border-neutral-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  ? "text-transparent caret-transparent"
+                  : ""
             } ${isAuthenticated ? (query ? "pr-20" : "pr-12") : "pr-10"}`}
+            style={{
+              background: "var(--color-surface1)",
+              color: "var(--color-text)",
+              borderColor: voiceSearch.isProcessing
+                ? "var(--color-success)"
+                : voiceSearch.isRecording || streamingText
+                  ? "var(--color-accent)"
+                  : "var(--color-border)",
+              ...(voiceSearch.isProcessing && {
+                boxShadow: "0 0 0 3px rgba(16, 185, 129, 0.3)",
+              }),
+              ...((voiceSearch.isRecording || streamingText) && {
+                boxShadow: "0 0 0 3px rgba(99, 102, 241, 0.3)",
+              }),
+            }}
             aria-label="Search for a song"
           />
 
@@ -603,7 +663,10 @@ export const SongSearch = memo(function SongSearch({
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
                     transition={springs.snap}
-                    className="p-1 text-neutral-500 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    className="p-1 rounded-full transition-colors focus:outline-none focus-visible:ring-2"
+                    style={{
+                      color: "var(--color-text-muted)",
+                    }}
                     aria-label="Clear search"
                   >
                     <X size={16} weight="bold" />
@@ -629,7 +692,10 @@ export const SongSearch = memo(function SongSearch({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
                   transition={springs.snap}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-500 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors focus:outline-none focus-visible:ring-2"
+                  style={{
+                    color: "var(--color-text-muted)",
+                  }}
                   aria-label="Clear search"
                 >
                   <X size={16} weight="bold" />
@@ -665,11 +731,21 @@ export const SongSearch = memo(function SongSearch({
           )}
 
           {!error && hasSearched && results.length === 0 && !isPending && (
-            <div className="absolute top-full left-0 right-0 z-50 mt-3 p-8 flex flex-col items-center gap-3 text-center bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl">
-              <MusicNoteSimple size={32} weight="duotone" className="text-neutral-600" />
+            <div
+              className="absolute top-full left-0 right-0 z-50 mt-3 p-8 flex flex-col items-center gap-3 text-center rounded-xl shadow-2xl"
+              style={{
+                background: "var(--color-surface1)",
+                border: "1px solid var(--color-border)",
+              }}
+            >
+              <MusicNoteSimple
+                size={32}
+                weight="duotone"
+                style={{ color: "var(--color-text-muted)" }}
+              />
               <div>
-                <p className="text-neutral-400">No songs found for "{query}"</p>
-                <p className="text-sm text-neutral-600 mt-1">
+                <p style={{ color: "var(--color-text3)" }}>No songs found for "{query}"</p>
+                <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
                   Try a different spelling or search for the artist name
                 </p>
               </div>
@@ -681,18 +757,29 @@ export const SongSearch = memo(function SongSearch({
 
         {!error && results.length > 0 && (
           <ul
-            className="absolute top-full left-0 right-0 z-50 mt-3 max-h-80 overflow-y-auto rounded-xl border border-neutral-700 bg-neutral-800 divide-y divide-neutral-700 shadow-2xl"
+            className="absolute top-full left-0 right-0 z-50 mt-3 max-h-80 overflow-y-auto rounded-xl shadow-2xl"
+            style={{
+              background: "var(--color-surface1)",
+              border: "1px solid var(--color-border)",
+            }}
             aria-label="Search results"
           >
-            {results.map(track => (
-              <li key={track.id}>
+            {results.map((track, index) => (
+              <li
+                key={track.id}
+                style={index > 0 ? { borderTop: "1px solid var(--color-border)" } : undefined}
+              >
                 <button
                   type="button"
                   onClick={() => handleTrackClick(track)}
-                  className="w-full flex items-center gap-3 p-3 bg-neutral-800 hover:bg-neutral-700 transition-colors focus:outline-none focus-visible:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                  className="w-full flex items-center gap-3 p-3 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset hover:brightness-110"
+                  style={{ background: "var(--color-surface1)" }}
                   aria-label={`${track.name} by ${track.artist}`}
                 >
-                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-neutral-700 overflow-hidden flex items-center justify-center">
+                  <div
+                    className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center"
+                    style={{ background: "var(--color-surface2)" }}
+                  >
                     {track.albumArt ? (
                       <img
                         src={track.albumArt}
@@ -700,13 +787,19 @@ export const SongSearch = memo(function SongSearch({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <MusicNote size={24} weight="fill" className="text-neutral-600" />
+                      <MusicNote
+                        size={24}
+                        weight="fill"
+                        style={{ color: "var(--color-text-muted)" }}
+                      />
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-white font-medium truncate">{track.displayName}</p>
-                    <p className="text-sm text-neutral-500 truncate">
+                    <p className="font-medium truncate" style={{ color: "var(--color-text)" }}>
+                      {track.displayName}
+                    </p>
+                    <p className="text-sm truncate" style={{ color: "var(--color-text3)" }}>
                       {track.displayArtist}
                       {track.displayAlbum && track.displayAlbum !== "-"
                         ? ` • ${track.displayAlbum}`
@@ -715,7 +808,10 @@ export const SongSearch = memo(function SongSearch({
                   </div>
 
                   {track.duration > 0 && (
-                    <span className="flex-shrink-0 text-sm text-neutral-600 tabular-nums">
+                    <span
+                      className="flex-shrink-0 text-sm tabular-nums"
+                      style={{ color: "var(--color-text-muted)" }}
+                    >
                       {formatDuration(track.duration)}
                     </span>
                   )}

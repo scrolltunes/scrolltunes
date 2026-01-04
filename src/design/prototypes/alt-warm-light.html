@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ScrollTunes - Warm Light Theme</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-bg: #FAF7F2;
+      --color-surface1: #FFFFFF;
+      --color-surface2: #F5F1EA;
+      --color-surface3: #EBE6DC;
+
+      --color-text: #1A1A1A;
+      --color-text2: rgba(26, 26, 26, 0.72);
+      --color-text3: rgba(26, 26, 26, 0.48);
+      --color-text-muted: rgba(26, 26, 26, 0.32);
+
+      --color-accent: #C45D3A;
+      --color-accent-hover: #B54E2B;
+      --color-accent-soft: rgba(196, 93, 58, 0.12);
+
+      --color-success: #3D8B40;
+      --color-chord: #8B6914;
+      --color-chord-soft: rgba(139, 105, 20, 0.12);
+
+      --color-border: rgba(26, 26, 26, 0.08);
+      --color-border-strong: rgba(26, 26, 26, 0.15);
+
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+      --radius-full: 9999px;
+
+      --font-display: 'Source Serif 4', Georgia, serif;
+      --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-ui);
+      background: var(--color-bg);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* Subtle texture */
+    .texture-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.3;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)'/%3E%3C/svg%3E");
+      z-index: 0;
+    }
+
+    .app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      padding: 12px 20px;
+      padding-top: max(12px, env(safe-area-inset-top));
+      background: var(--color-bg);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .header-content {
+      max-width: 600px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .btn-back {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      color: var(--color-text2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-back:hover {
+      background: var(--color-surface2);
+      color: var(--color-text);
+    }
+
+    .song-info {
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+    }
+
+    .song-title {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--color-text);
+      line-height: 1.3;
+    }
+
+    .song-artist {
+      font-size: 13px;
+      color: var(--color-text3);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      color: var(--color-text3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-icon:hover {
+      background: var(--color-surface2);
+      color: var(--color-text);
+    }
+
+    .btn-icon.active {
+      background: var(--color-accent-soft);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+
+    /* Lyrics */
+    .lyrics-container {
+      flex: 1;
+      overflow: hidden;
+      padding-top: 70px;
+    }
+
+    .lyrics-scroll {
+      height: 100%;
+      overflow-y: auto;
+      padding: 0 24px;
+      padding-top: 20vh;
+      padding-bottom: 40vh;
+    }
+
+    .lyrics-content {
+      max-width: 540px;
+      margin: 0 auto;
+    }
+
+    .lyric-line {
+      padding: 14px 20px;
+      margin: 6px 0;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: var(--font-display);
+      font-size: 22px;
+      line-height: 1.45;
+      font-weight: 500;
+      border-radius: var(--radius-lg);
+    }
+
+    .lyric-line.past {
+      color: var(--color-text-muted);
+      font-weight: 400;
+    }
+
+    .lyric-line.upcoming {
+      color: var(--color-text3);
+    }
+
+    .lyric-line.next {
+      color: var(--color-text2);
+      font-weight: 500;
+    }
+
+    .lyric-line.active {
+      color: var(--color-text);
+      font-weight: 700;
+      font-size: 26px;
+      background: var(--color-surface1);
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--color-border);
+      padding: 18px 24px;
+      margin: 12px 0;
+    }
+
+    .lyric-line.empty {
+      color: var(--color-text-muted);
+      font-size: 18px;
+      font-family: var(--font-ui);
+    }
+
+    /* Chord badges */
+    .chord-row {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .chord-badge {
+      display: inline-flex;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--color-chord-soft);
+      color: var(--color-chord);
+      font-family: var(--font-ui);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .lyric-line.active .chord-badge {
+      background: var(--color-chord);
+      color: white;
+    }
+
+    /* Control Strip */
+    .control-strip {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      padding: 16px 24px;
+      padding-bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px));
+      background: var(--color-bg);
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .control-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      color: var(--color-text2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .control-btn:hover {
+      background: var(--color-surface2);
+      color: var(--color-text);
+    }
+
+    .btn-play-main {
+      width: 64px;
+      height: 64px;
+      border-radius: var(--radius-full);
+      background: var(--color-accent);
+      border: none;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-md), 0 0 0 4px var(--color-accent-soft);
+      transition: all 0.15s ease;
+    }
+
+    .btn-play-main:hover {
+      background: var(--color-accent-hover);
+      transform: scale(1.05);
+    }
+
+    .btn-play-main:active {
+      transform: scale(0.95);
+    }
+
+    .tempo-display {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      padding: 8px 14px;
+      background: var(--color-surface2);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .tempo-unit {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--color-text3);
+    }
+
+    /* BPM indicator */
+    .bpm-orb {
+      position: fixed;
+      bottom: 100px;
+      right: 20px;
+      width: 52px;
+      height: 52px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface1);
+      border: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-md);
+      cursor: pointer;
+      z-index: 25;
+    }
+
+    .bpm-value {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-text);
+      line-height: 1;
+    }
+
+    .bpm-label {
+      font-size: 9px;
+      font-weight: 500;
+      color: var(--color-text3);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .icon {
+      width: 20px;
+      height: 20px;
+    }
+
+    .icon-lg {
+      width: 26px;
+      height: 26px;
+    }
+
+    @media (min-width: 768px) {
+      .lyric-line {
+        font-size: 26px;
+      }
+      .lyric-line.active {
+        font-size: 32px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="texture-overlay"></div>
+
+  <div class="app">
+    <header class="header">
+      <div class="header-content">
+        <button class="btn-back" aria-label="Back">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+        </button>
+
+        <div class="song-info">
+          <div class="song-title">Bohemian Rhapsody</div>
+          <div class="song-artist">Queen</div>
+        </div>
+
+        <div class="header-actions">
+          <button class="btn-icon active" aria-label="Microphone">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="lyrics-container">
+      <div class="lyrics-scroll">
+        <div class="lyrics-content">
+          <div class="lyric-line past">Is this the real life?</div>
+          <div class="lyric-line past">Is this just fantasy?</div>
+          <div class="lyric-line past">Caught in a landslide</div>
+          <div class="lyric-line past">No escape from reality</div>
+          <div class="lyric-line past">
+            <div class="chord-row">
+              <span class="chord-badge">Eb</span>
+            </div>
+            Open your eyes
+          </div>
+          <div class="lyric-line past">Look up to the skies and see</div>
+
+          <div class="lyric-line active">
+            <div class="chord-row">
+              <span class="chord-badge">Cm</span>
+              <span class="chord-badge">F7</span>
+            </div>
+            I'm just a poor boy, I need no sympathy
+          </div>
+
+          <div class="lyric-line next">
+            <div class="chord-row">
+              <span class="chord-badge">Bb</span>
+            </div>
+            Because I'm easy come, easy go
+          </div>
+          <div class="lyric-line upcoming">Little high, little low</div>
+          <div class="lyric-line upcoming">
+            <div class="chord-row">
+              <span class="chord-badge">Eb</span>
+              <span class="chord-badge">Bb</span>
+            </div>
+            Any way the wind blows
+          </div>
+          <div class="lyric-line upcoming">Doesn't really matter to me, to me</div>
+          <div class="lyric-line empty">• • •</div>
+          <div class="lyric-line upcoming">Mama, just killed a man</div>
+          <div class="lyric-line upcoming">Put a gun against his head</div>
+          <div class="lyric-line upcoming">Pulled my trigger, now he's dead</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bpm-orb">
+      <span class="bpm-value">72</span>
+      <span class="bpm-label">BPM</span>
+    </div>
+
+    <div class="control-strip">
+      <div class="tempo-display">
+        <span>1.0</span>
+        <span class="tempo-unit">×</span>
+      </div>
+
+      <button class="control-btn" aria-label="Reset">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </button>
+
+      <button class="btn-play-main" aria-label="Pause">
+        <svg class="icon-lg" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="4" width="4" height="16" rx="1"/>
+          <rect x="14" y="4" width="4" height="16" rx="1"/>
+        </svg>
+      </button>
+
+      <button class="control-btn" aria-label="Font size">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 7V4h16v3M9 20h6M12 4v16"/>
+        </svg>
+      </button>
+
+      <div class="tempo-display">
+        <span>A</span>
+        <span class="tempo-unit">a</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const lyricLines = document.querySelectorAll('.lyric-line');
+    lyricLines.forEach(line => {
+      line.addEventListener('click', () => {
+        lyricLines.forEach(l => {
+          l.classList.remove('active', 'next');
+          const idx = Array.from(lyricLines).indexOf(l);
+          const activeIdx = Array.from(lyricLines).indexOf(line);
+          if (idx < activeIdx) l.classList.add('past');
+          else if (idx > activeIdx) l.classList.add('upcoming');
+        });
+        line.classList.remove('past', 'upcoming');
+        line.classList.add('active');
+        const nextLine = line.nextElementSibling;
+        if (nextLine && nextLine.classList.contains('lyric-line')) {
+          nextLine.classList.remove('past', 'upcoming');
+          nextLine.classList.add('next');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

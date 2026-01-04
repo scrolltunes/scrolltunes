@@ -275,12 +275,15 @@ function WordOverlay({ word, delay, wordDuration, elapsedInLine, isRTL }: WordOv
   const wordEndTime = delay + wordDuration
   const timeIntoWord = elapsedInLine - delay
 
+  const highlightStyle = { color: "var(--color-text)" }
+
   // Word hasn't started yet
   if (elapsedInLine < delay) {
     const remainingDelay = delay - elapsedInLine
     return (
       <motion.span
-        className="absolute inset-0 text-white overflow-hidden pointer-events-none"
+        className="absolute inset-0 overflow-hidden pointer-events-none"
+        style={highlightStyle}
         initial={{ clipPath: isRTL ? "inset(0 0 0 100%)" : "inset(0 100% 0 0)" }}
         animate={{ clipPath: "inset(0 0% 0 0)" }}
         transition={{
@@ -296,7 +299,11 @@ function WordOverlay({ word, delay, wordDuration, elapsedInLine, isRTL }: WordOv
 
   // Word is already complete
   if (elapsedInLine >= wordEndTime) {
-    return <span className="absolute inset-0 text-white pointer-events-none">{word}</span>
+    return (
+      <span className="absolute inset-0 pointer-events-none" style={highlightStyle}>
+        {word}
+      </span>
+    )
   }
 
   // Word is in progress - calculate initial clip percentage
@@ -311,7 +318,8 @@ function WordOverlay({ word, delay, wordDuration, elapsedInLine, isRTL }: WordOv
 
   return (
     <motion.span
-      className="absolute inset-0 text-white overflow-hidden pointer-events-none"
+      className="absolute inset-0 overflow-hidden pointer-events-none"
+      style={highlightStyle}
       initial={{ clipPath: initialClip }}
       animate={{ clipPath: "inset(0 0% 0 0)" }}
       transition={{
@@ -370,7 +378,11 @@ export const LyricLine = memo(function LyricLine({
 
   if (!text.trim()) {
     return (
-      <div className="py-2 text-center text-neutral-600 text-2xl" aria-hidden="true">
+      <div
+        className="py-2 text-center text-2xl"
+        style={{ color: "var(--color-text-ghost)" }}
+        aria-hidden="true"
+      >
         ♪
       </div>
     )
@@ -379,11 +391,14 @@ export const LyricLine = memo(function LyricLine({
   const hasPositionedChords = chordPositions && chordPositions.length > 0
   // When chords are shown, keep lyrics visible but neutral so chords stand out
   const opacityClass = isPast ? "opacity-40" : "opacity-100"
-  const baseTextColor = isPast
-    ? "text-neutral-600"
+  // Use CSS custom properties for theme-aware colors
+  const baseTextStyle = isPast
+    ? { color: "var(--color-text-muted)" }
     : isActive
-      ? "text-neutral-400"
-      : "text-neutral-500"
+      ? { color: "var(--color-text3)" }
+      : isNext
+        ? { color: "var(--color-text2)" }
+        : { color: "var(--color-text3)" }
   const textSizeClass = fontSize === undefined ? "text-2xl md:text-3xl lg:text-4xl" : ""
   // Word timing animation when active, playing, has duration, and no positioned chords
   const shouldAnimateWords = isActive && isPlaying && duration !== undefined && !hasPositionedChords
@@ -420,11 +435,11 @@ export const LyricLine = memo(function LyricLine({
           return (
             <span key={i} className="relative inline-block">
               {/* Base layer: text with chord anchors (always rendered, stable structure) */}
-              <span className={isActive ? "text-neutral-500" : baseTextColor}>
+              <span style={isActive ? { color: "var(--color-text3)" } : baseTextStyle}>
                 {renderWordWithChordAnchors(word, wordChords, isActive, isNext)}
               </span>
 
-              {/* Overlay layer: white text (word animation or whole-line highlight) */}
+              {/* Overlay layer: highlighted text (word animation or whole-line highlight) */}
               {shouldAnimateWords ? (
                 <WordOverlay
                   word={word}
@@ -434,8 +449,13 @@ export const LyricLine = memo(function LyricLine({
                   isRTL={isRTL}
                 />
               ) : isActive ? (
-                // Default: instant white highlight for the whole line
-                <span className="absolute inset-0 text-white pointer-events-none">{word}</span>
+                // Default: instant highlight for the whole line
+                <span
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ color: "var(--color-text)" }}
+                >
+                  {word}
+                </span>
               ) : null}
             </span>
           )
@@ -445,14 +465,15 @@ export const LyricLine = memo(function LyricLine({
       <AnimatePresence>
         {isActive && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ type: "tween", duration: 0.4, ease: "easeOut" }}
-            className="absolute inset-0 z-0 rounded-3xl"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className="absolute inset-0 z-0 rounded-2xl"
             style={{
-              background: "color-mix(in srgb, var(--stage-accent) 12%, transparent)",
-              border: "1px solid var(--stage-border-strong)",
+              background: "var(--color-accent-soft)",
+              border: "1px solid var(--color-border-strong)",
+              boxShadow: "0 4px 20px rgba(91, 108, 255, 0.1)",
             }}
           />
         )}

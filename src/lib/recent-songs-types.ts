@@ -56,7 +56,7 @@ export const LYRICS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 /**
  * Configuration for recent songs
  */
-export const MAX_RECENT_SONGS = 5
+export const MAX_RECENT_SONGS = 20
 
 /**
  * Position validation constants (used internally by RecentSongsStore)

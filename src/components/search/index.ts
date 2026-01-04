@@ -1,3 +1,5 @@
 export { SongSearch, type SongSearchProps } from "./SongSearch"
 export { RecentSongs, type RecentSongsProps } from "./RecentSongs"
+export { HomeFavorites, type HomeFavoritesProps } from "./HomeFavorites"
+export { HomeSetlists, type HomeSetlistsProps } from "./HomeSetlists"
 export type { SearchResultTrack } from "@/lib/search-api-types"

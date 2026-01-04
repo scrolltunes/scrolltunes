@@ -1,7 +1,7 @@
 "use client"
 
 import { useAccount } from "@/core"
-import { SignOut, UserCircle } from "@phosphor-icons/react"
+import { CircleNotch, SignOut, UserCircle } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { signOut } from "next-auth/react"
 import Image from "next/image"
@@ -18,7 +18,12 @@ function getInitials(name: string | null, email: string): string {
 export const UserMenu = memo(function UserMenu() {
   const { isAuthenticated, isLoading, user } = useAccount()
   const [isOpen, setIsOpen] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const handleToggle = useCallback(() => {
     setIsOpen(prev => !prev)
@@ -42,59 +47,100 @@ export const UserMenu = memo(function UserMenu() {
     }
   }, [isOpen])
 
-  if (isLoading) {
-    return <div className="w-10 h-10 rounded-full bg-neutral-800 animate-pulse" />
-  }
-
-  if (!isAuthenticated || !user) {
-    return (
-      <Link
-        href="/login"
-        className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
-        aria-label="Sign in"
-      >
-        <UserCircle size={20} />
-      </Link>
-    )
-  }
-
-  const initials = getInitials(user.name, user.email)
+  // Determine which state to show:
+  // 1. Not mounted (SSR) or not authenticated: show sign-in button (default)
+  // 2. Mounted but loading: show spinner
+  // 3. Mounted, not loading, authenticated: show user avatar
+  const showSpinner = isMounted && isLoading
+  const showUser = isMounted && !isLoading && isAuthenticated && user
+  const initials = user ? getInitials(user.name, user.email) : ""
 
   return (
     <div ref={menuRef} className="relative w-10 h-10 flex-shrink-0">
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden bg-neutral-800 hover:bg-neutral-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
-        aria-label="User menu"
-        aria-expanded={isOpen}
-        aria-haspopup="true"
-      >
-        {user.image ? (
-          <Image
-            src={user.image}
-            alt=""
-            width={40}
-            height={40}
-            className="w-full h-full object-cover"
-          />
+      <AnimatePresence mode="wait" initial={false}>
+        {showSpinner ? (
+          <motion.div
+            key="spinner"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ background: "var(--color-surface2)" }}
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+            >
+              <CircleNotch size={20} style={{ color: "var(--color-text-muted)" }} />
+            </motion.div>
+          </motion.div>
+        ) : showUser ? (
+          <motion.button
+            key="user-menu"
+            type="button"
+            onClick={handleToggle}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.15 }}
+            className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden transition-colors focus:outline-none focus:ring-2 hover:brightness-110"
+            style={{ background: "var(--color-surface2)" }}
+            aria-label="User menu"
+            aria-expanded={isOpen}
+            aria-haspopup="true"
+          >
+            {user.image ? (
+              <Image
+                src={user.image}
+                alt=""
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center font-medium text-sm"
+                style={{ background: "var(--color-accent)", color: "white" }}
+              >
+                {initials}
+              </div>
+            )}
+          </motion.button>
         ) : (
-          <div className="w-full h-full bg-indigo-600 flex items-center justify-center text-white font-medium text-sm">
-            {initials}
-          </div>
+          <motion.div
+            key="sign-in"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.15 }}
+          >
+            <Link
+              href="/login"
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+              style={{ background: "var(--color-surface2)" }}
+              aria-label="Sign in"
+            >
+              <UserCircle size={20} />
+            </Link>
+          </motion.div>
         )}
-      </button>
+      </AnimatePresence>
 
       <AnimatePresence>
-        {isOpen && (
+        {isOpen && user && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-64 bg-neutral-900 rounded-xl shadow-lg border border-neutral-800 overflow-hidden z-50"
+            className="absolute right-0 mt-2 w-64 rounded-xl shadow-lg overflow-hidden z-50"
+            style={{
+              background: "var(--color-surface1)",
+              border: "1px solid var(--color-border)",
+            }}
           >
-            <div className="p-4 border-b border-neutral-800">
+            <div className="p-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
               <div className="flex items-center gap-3">
                 {user.image ? (
                   <Image
@@ -105,13 +151,22 @@ export const UserMenu = memo(function UserMenu() {
                     className="w-10 h-10 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-medium">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-medium"
+                    style={{ background: "var(--color-accent)", color: "white" }}
+                  >
                     {initials}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  {user.name && <p className="text-white font-medium truncate">{user.name}</p>}
-                  <p className="text-sm text-neutral-400 truncate">{user.email}</p>
+                  {user.name && (
+                    <p className="font-medium truncate" style={{ color: "var(--color-text)" }}>
+                      {user.name}
+                    </p>
+                  )}
+                  <p className="text-sm truncate" style={{ color: "var(--color-text3)" }}>
+                    {user.email}
+                  </p>
                 </div>
               </div>
             </div>
@@ -120,7 +175,8 @@ export const UserMenu = memo(function UserMenu() {
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-4 py-2 text-neutral-300 hover:bg-neutral-800 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-2 transition-colors hover:brightness-110"
+                style={{ color: "var(--color-text2)" }}
               >
                 <SignOut size={20} />
                 <span>Sign out</span>

@@ -131,19 +131,24 @@ export const SongListItem = memo(function SongListItem({
         className="flex items-center gap-3 flex-1 min-w-0"
         aria-label={`${displayTitle} by ${displayArtist}`}
       >
-        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
+        <div
+          className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden"
+          style={{ background: "var(--color-surface2)" }}
+        >
           {isLoading ? (
             <AlbumArtSkeleton />
           ) : albumArt ? (
             <img src={albumArt} alt="" className="w-full h-full object-cover" />
           ) : (
-            <MusicNote size={20} weight="fill" className="text-neutral-600" />
+            <MusicNote size={20} weight="fill" style={{ color: "var(--color-text-muted)" }} />
           )}
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-white font-medium truncate">{displayTitle}</p>
-          <p className="text-sm text-neutral-500 truncate">
+          <p className="font-medium truncate" style={{ color: "var(--color-text)" }}>
+            {displayTitle}
+          </p>
+          <p className="text-sm truncate" style={{ color: "var(--color-text3)" }}>
             {displayArtist}
             {displayAlbum && ` • ${displayAlbum}`}
           </p>
@@ -166,7 +171,11 @@ export const SongListItem = memo(function SongListItem({
             <button
               type="button"
               onClick={handleRemove}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-800/50 hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-full transition-colors"
+              style={{
+                background: "var(--color-surface2)",
+                color: "var(--color-text-muted)",
+              }}
               aria-label="Remove"
             >
               <X size={16} />
@@ -178,6 +187,11 @@ export const SongListItem = memo(function SongListItem({
     </>
   )
 
+  const cardStyle = {
+    background: "var(--color-surface1)",
+    border: "1px solid var(--color-border)",
+  }
+
   if (animationIndex !== undefined) {
     return (
       <motion.div
@@ -186,7 +200,8 @@ export const SongListItem = memo(function SongListItem({
         animate={{ opacity: 1, y: 0 }}
         {...(animateExit && { exit: { opacity: 0, x: -100, transition: { duration: 0.2 } } })}
         transition={{ ...springs.default, delay: animationIndex * 0.03 }}
-        className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition-colors"
+        className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors hover:brightness-105"
+        style={cardStyle}
       >
         {content}
       </motion.div>
@@ -194,7 +209,10 @@ export const SongListItem = memo(function SongListItem({
   }
 
   return (
-    <div className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition-colors">
+    <div
+      className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors hover:brightness-105"
+      style={cardStyle}
+    >
       {content}
     </div>
   )

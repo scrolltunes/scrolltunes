@@ -71,11 +71,12 @@ function formatDate(isoString: string): string {
 
 function Header() {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
+    <header className="fixed top-0 left-0 right-0 z-50 h-14 backdrop-blur-lg" style={{ background: "var(--color-header-bg)", borderBottom: "1px solid var(--color-border)" }}>
       <div className="max-w-4xl mx-auto h-full px-4 flex items-center">
         <Link
           href="/admin/songs"
-          className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
+          className="flex items-center gap-2 transition-colors hover:brightness-125"
+          style={{ color: "var(--color-text3)" }}
         >
           <ArrowLeft size={20} />
           <span>Songs</span>
@@ -87,7 +88,7 @@ function Header() {
 
 function AccessDenied() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header />
       <main className="pt-20 pb-8 px-4 flex items-center justify-center min-h-screen">
         <motion.div
@@ -96,14 +97,15 @@ function AccessDenied() {
           transition={springs.default}
           className="text-center max-w-sm"
         >
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-neutral-900 flex items-center justify-center">
-            <ShieldWarning size={32} className="text-neutral-500" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-surface1)" }}>
+            <ShieldWarning size={32} style={{ color: "var(--color-text-muted)" }} />
           </div>
           <h2 className="text-xl font-semibold mb-2">Access denied</h2>
-          <p className="text-neutral-400 mb-6">You don't have permission to view this page</p>
+          <p className="mb-6" style={{ color: "var(--color-text3)" }}>You don't have permission to view this page</p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors hover:brightness-110"
+            style={{ background: "var(--color-accent)", color: "white" }}
           >
             Go home
           </Link>
@@ -115,17 +117,17 @@ function AccessDenied() {
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-4xl mx-auto">
-          <div className="bg-neutral-900 rounded-xl p-6">
+          <div className="rounded-xl p-6" style={{ background: "var(--color-surface1)" }}>
             <div className="flex gap-6">
-              <div className="w-32 h-32 bg-neutral-800 rounded-lg animate-pulse shrink-0" />
+              <div className="w-32 h-32 rounded-lg animate-pulse shrink-0" style={{ background: "var(--color-surface2)" }} />
               <div className="flex-1 space-y-3">
-                <div className="h-8 w-64 bg-neutral-800 rounded animate-pulse" />
-                <div className="h-5 w-48 bg-neutral-800 rounded animate-pulse" />
-                <div className="h-5 w-32 bg-neutral-800 rounded animate-pulse" />
+                <div className="h-8 w-64 rounded animate-pulse" style={{ background: "var(--color-surface2)" }} />
+                <div className="h-5 w-48 rounded animate-pulse" style={{ background: "var(--color-surface2)" }} />
+                <div className="h-5 w-32 rounded animate-pulse" style={{ background: "var(--color-surface2)" }} />
               </div>
             </div>
           </div>
@@ -137,7 +139,7 @@ function LoadingScreen() {
 
 function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header />
       <main className="pt-20 pb-8 px-4 flex items-center justify-center min-h-screen">
         <motion.div
@@ -146,15 +148,16 @@ function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => voi
           transition={springs.default}
           className="text-center max-w-sm"
         >
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-neutral-900 flex items-center justify-center">
-            <X size={32} className="text-red-500" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-surface1)" }}>
+            <X size={32} style={{ color: "var(--color-danger)" }} />
           </div>
           <h2 className="text-xl font-semibold mb-2">Failed to load song</h2>
-          <p className="text-neutral-400 mb-6">{message}</p>
+          <p className="mb-6" style={{ color: "var(--color-text3)" }}>{message}</p>
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors hover:brightness-110"
+            style={{ background: "var(--color-accent)", color: "white" }}
           >
             Try again
           </button>
@@ -167,9 +170,12 @@ function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => voi
 function StatusBadge({ label, active }: { label: string; active: boolean }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2.5 py-1 text-sm font-medium rounded-full ${
-        active ? "bg-green-500/20 text-green-400" : "bg-neutral-800 text-neutral-500"
-      }`}
+      className="inline-flex items-center gap-1 px-2.5 py-1 text-sm font-medium rounded-full"
+      style={
+        active
+          ? { background: "var(--color-success-soft)", color: "var(--color-success)" }
+          : { background: "var(--color-surface2)", color: "var(--color-text-muted)" }
+      }
     >
       {active ? <Check size={14} weight="bold" /> : <X size={14} />}
       {label}
@@ -179,9 +185,9 @@ function StatusBadge({ label, active }: { label: string; active: boolean }) {
 
 function MetadataRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-4 py-2 border-b border-neutral-800 last:border-b-0">
-      <span className="text-neutral-500 w-28 shrink-0">{label}</span>
-      <span className="text-white">{value ?? "—"}</span>
+    <div className="flex items-start gap-4 py-2 last:border-b-0" style={{ borderBottom: "1px solid var(--color-border)" }}>
+      <span className="w-28 shrink-0" style={{ color: "var(--color-text-muted)" }}>{label}</span>
+      <span style={{ color: "var(--color-text)" }}>{value ?? "—"}</span>
     </div>
   )
 }
@@ -269,9 +275,10 @@ function BpmEditorModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={springs.default}
-        className="relative z-10 w-full max-w-md mx-4 bg-neutral-900 rounded-xl border border-neutral-800 shadow-xl"
+        className="relative z-10 w-full max-w-md mx-4 rounded-xl shadow-xl"
+        style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)" }}
       >
-        <div className="flex items-center justify-between p-4 border-b border-neutral-800">
+        <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <h2 className="text-lg font-medium flex items-center gap-2">
             <Metronome size={20} />
             Edit BPM
@@ -279,7 +286,8 @@ function BpmEditorModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 text-neutral-400 hover:text-white transition-colors"
+            className="p-1 transition-colors hover:brightness-125"
+            style={{ color: "var(--color-text3)" }}
           >
             <X size={20} />
           </button>
@@ -288,53 +296,57 @@ function BpmEditorModal({
         <div className="p-4 space-y-4">
           <div className="grid grid-cols-1 gap-4">
             <label className="block">
-              <span className="text-sm text-neutral-400 mb-1.5 block">BPM</span>
+              <span className="text-sm mb-1.5 block" style={{ color: "var(--color-text3)" }}>BPM</span>
               <input
                 type="number"
                 value={bpm}
                 onChange={e => setBpm(e.target.value)}
                 min={1}
                 max={300}
-                className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2.5 rounded-lg focus:outline-none"
+                style={{ background: "var(--color-surface2)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
               />
             </label>
             <label className="block">
-              <span className="text-sm text-neutral-400 mb-1.5 block">Musical Key</span>
+              <span className="text-sm mb-1.5 block" style={{ color: "var(--color-text3)" }}>Musical Key</span>
               <input
                 type="text"
                 value={musicalKey}
                 onChange={e => setMusicalKey(e.target.value)}
                 placeholder="e.g. C major, Am, F# minor"
                 maxLength={20}
-                className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2.5 rounded-lg focus:outline-none"
+                style={{ background: "var(--color-surface2)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
               />
             </label>
             <label className="block">
-              <span className="text-sm text-neutral-400 mb-1.5 block">Source</span>
+              <span className="text-sm mb-1.5 block" style={{ color: "var(--color-text3)" }}>Source</span>
               <input
                 type="text"
                 value={source}
                 onChange={e => setSource(e.target.value)}
                 placeholder="Manual"
                 maxLength={50}
-                className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2.5 rounded-lg focus:outline-none"
+                style={{ background: "var(--color-surface2)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
               />
             </label>
           </div>
 
           {error && (
-            <div className="p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
-              <p className="text-sm text-red-400">{error}</p>
+            <div className="p-3 rounded-lg" style={{ background: "var(--color-danger-soft)", border: "1px solid var(--color-danger)" }}>
+              <p className="text-sm" style={{ color: "var(--color-danger)" }}>{error}</p>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3 p-4 border-t border-neutral-800">
+        <div className="flex items-center justify-end gap-3 p-4" style={{ borderTop: "1px solid var(--color-border)" }}>
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="px-4 py-2 text-neutral-400 hover:text-white transition-colors"
+            className="px-4 py-2 transition-colors hover:brightness-125"
+            style={{ color: "var(--color-text3)" }}
           >
             Cancel
           </button>
@@ -342,7 +354,8 @@ function BpmEditorModal({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 hover:brightness-110"
+            style={{ background: "var(--color-accent)", color: "white" }}
           >
             <FloppyDisk size={16} />
             <span>{isSaving ? "Saving..." : "Save"}</span>
@@ -448,7 +461,7 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
     : null
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-4xl mx-auto space-y-6">
@@ -456,12 +469,13 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={springs.default}
-            className="bg-neutral-900 rounded-xl p-6"
+            className="rounded-xl p-6"
+            style={{ background: "var(--color-surface1)" }}
           >
             <div className="flex gap-6">
-              <div className="w-32 h-32 bg-neutral-800 rounded-lg shrink-0 overflow-hidden flex items-center justify-center">
+              <div className="w-32 h-32 rounded-lg shrink-0 overflow-hidden flex items-center justify-center" style={{ background: "var(--color-surface2)" }}>
                 {isLoadingArt ? (
-                  <div className="w-full h-full animate-pulse bg-neutral-700" />
+                  <div className="w-full h-full animate-pulse" style={{ background: "var(--color-surface2)" }} />
                 ) : albumArt ? (
                   <Image
                     src={albumArt}
@@ -471,14 +485,14 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <MusicNote size={48} className="text-neutral-600" />
+                  <MusicNote size={48} style={{ color: "var(--color-text-muted)" }} />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl font-semibold truncate">{song.title}</h1>
-                <p className="text-lg text-neutral-400 truncate">{song.artist}</p>
+                <p className="text-lg truncate" style={{ color: "var(--color-text3)" }}>{song.artist}</p>
                 {song.album && (
-                  <p className="text-sm text-neutral-500 truncate mt-1">{song.album}</p>
+                  <p className="text-sm truncate mt-1" style={{ color: "var(--color-text-muted)" }}>{song.album}</p>
                 )}
                 <div className="flex flex-wrap gap-2 mt-3">
                   <StatusBadge label="Synced Lyrics" active={song.hasSyncedLyrics} />
@@ -488,11 +502,12 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-neutral-800">
+            <div className="flex flex-wrap gap-2 mt-5 pt-5" style={{ borderTop: "1px solid var(--color-border)" }}>
               {songPath && (
                 <Link
                   href={songPath}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-110"
+                  style={{ background: "var(--color-accent)", color: "white" }}
                 >
                   <MusicNote size={16} />
                   <span>View Song</span>
@@ -501,11 +516,12 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
               {primaryLrclibId && (
                 <Link
                   href={`/admin/enhance/${primaryLrclibId}`}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-110"
+                  style={
                     song.hasEnhancement
-                      ? "bg-green-600 text-white hover:bg-green-500"
-                      : "bg-amber-600 text-white hover:bg-amber-500"
-                  }`}
+                      ? { background: "var(--color-success)", color: "white" }
+                      : { background: "var(--color-warning)", color: "white" }
+                  }
                 >
                   {song.hasEnhancement ? (
                     <>
@@ -523,7 +539,8 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
               <button
                 type="button"
                 onClick={() => setIsBpmModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 text-neutral-300 text-sm rounded-lg hover:bg-neutral-700 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-125"
+                style={{ background: "var(--color-surface2)", color: "var(--color-text2)" }}
               >
                 <Metronome size={16} />
                 <span>Edit BPM</span>
@@ -532,7 +549,8 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50 ml-auto"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors disabled:opacity-50 ml-auto"
+                style={{ background: "var(--color-danger-soft)", color: "var(--color-danger)" }}
               >
                 <Trash size={16} />
                 <span>{isDeleting ? "Deleting..." : "Delete"}</span>
@@ -544,7 +562,8 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...springs.default, delay: 0.1 }}
-            className="bg-neutral-900 rounded-xl p-6"
+            className="rounded-xl p-6"
+            style={{ background: "var(--color-surface1)" }}
           >
             <h2 className="text-lg font-medium mb-4">Metadata</h2>
             <div className="space-y-0">
@@ -558,7 +577,8 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
                       href={`https://open.spotify.com/track/${song.spotifyId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
+                      className="inline-flex items-center gap-1 hover:brightness-125"
+                      style={{ color: "var(--color-accent)" }}
                     >
                       {song.spotifyId}
                       <ArrowSquareOut size={14} />
@@ -573,17 +593,18 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
                     <span>
                       {song.bpm}
                       {song.musicalKey && (
-                        <span className="text-neutral-400 ml-2">({song.musicalKey})</span>
+                        <span className="ml-2" style={{ color: "var(--color-text3)" }}>({song.musicalKey})</span>
                       )}
                       {song.bpmSource && (
-                        <span className="text-neutral-500 text-sm ml-2">
+                        <span className="text-sm ml-2" style={{ color: "var(--color-text-muted)" }}>
                           via{" "}
                           {song.bpmSourceUrl ? (
                             <a
                               href={song.bpmSourceUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-indigo-400 hover:text-indigo-300"
+                              className="hover:brightness-125"
+                              style={{ color: "var(--color-accent)" }}
                             >
                               {song.bpmSource}
                             </a>
@@ -603,7 +624,8 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...springs.default, delay: 0.15 }}
-            className="bg-neutral-900 rounded-xl p-6"
+            className="rounded-xl p-6"
+            style={{ background: "var(--color-surface1)" }}
           >
             <h2 className="text-lg font-medium mb-4">Stats</h2>
             <div className="space-y-0">
@@ -618,7 +640,8 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...springs.default, delay: 0.2 }}
-              className="bg-neutral-900 rounded-xl p-6"
+              className="rounded-xl p-6"
+            style={{ background: "var(--color-surface1)" }}
             >
               <h2 className="text-lg font-medium mb-4">LRCLIB IDs</h2>
               <div className="space-y-2">
@@ -628,13 +651,14 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
                       href={`https://lrclib.net/api/get/${lrclib.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-mono text-sm"
+                      className="inline-flex items-center gap-1 hover:brightness-125 font-mono text-sm"
+                      style={{ color: "var(--color-accent)" }}
                     >
                       {lrclib.id}
                       <ArrowSquareOut size={14} />
                     </a>
                     {lrclib.isPrimary && (
-                      <span className="px-2 py-0.5 text-xs bg-indigo-600/20 text-indigo-400 rounded-full">
+                      <span className="px-2 py-0.5 text-xs rounded-full" style={{ background: "var(--color-accent-soft)", color: "var(--color-accent)" }}>
                         Primary
                       </span>
                     )}

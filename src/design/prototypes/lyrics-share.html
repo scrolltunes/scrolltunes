@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ScrollTunes - Lyrics Share Card Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-bg: #070A12;
+      --color-surface1: #0C1220;
+      --color-surface2: #111A2C;
+      --color-surface3: #151F33;
+      --color-surface-elevated: #1A2540;
+
+      --color-text: #F3F5F7;
+      --color-text2: rgba(243, 245, 247, 0.72);
+      --color-text3: rgba(243, 245, 247, 0.46);
+      --color-text-muted: rgba(243, 245, 247, 0.28);
+
+      --color-accent: #5B6CFF;
+      --color-accent-hover: #6F7DFF;
+      --color-accent-soft: rgba(91, 108, 255, 0.14);
+      --color-accent-glow: rgba(91, 108, 255, 0.25);
+
+      --color-success: #22C55E;
+      --color-success-soft: rgba(34, 197, 94, 0.14);
+
+      --color-border: rgba(255, 255, 255, 0.10);
+      --color-border-strong: rgba(255, 255, 255, 0.16);
+
+      --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+      --shadow-glow: 0 0 30px rgba(91, 108, 255, 0.2);
+
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+      --radius-full: 9999px;
+
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-display: 'Playfair Display', Georgia, serif;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-ui);
+      background: var(--color-bg);
+      color: var(--color-text);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    .app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      padding-top: max(16px, env(safe-area-inset-top));
+      background: var(--color-surface1);
+      border-bottom: 1px solid var(--color-border);
+      flex-shrink: 0;
+    }
+
+    .btn-close {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface2);
+      border: 1px solid var(--color-border);
+      color: var(--color-text2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-close:hover {
+      background: var(--color-surface3);
+      color: var(--color-text);
+    }
+
+    .header-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .btn-export {
+      padding: 10px 20px;
+      border-radius: var(--radius-full);
+      background: var(--color-accent);
+      border: none;
+      color: white;
+      font-family: var(--font-ui);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .btn-export:hover {
+      background: var(--color-accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-export:active {
+      transform: scale(0.98);
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    @media (min-width: 768px) {
+      .main {
+        flex-direction: row;
+      }
+    }
+
+    /* Preview Panel */
+    .preview-panel {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: var(--color-bg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .preview-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 30% 20%, rgba(91, 108, 255, 0.08), transparent 50%),
+        radial-gradient(ellipse 50% 35% at 70% 80%, rgba(139, 92, 246, 0.06), transparent 45%);
+      pointer-events: none;
+    }
+
+    /* Checkerboard for transparency indication */
+    .preview-panel::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(45deg, rgba(255,255,255,0.02) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,0.02) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.02) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.02) 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    /* Card Preview */
+    .card-wrapper {
+      position: relative;
+      z-index: 1;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .card-wrapper.square {
+      width: min(320px, 80vw);
+      aspect-ratio: 1;
+    }
+
+    .card-wrapper.story {
+      width: min(280px, 60vw);
+      aspect-ratio: 9/16;
+    }
+
+    .card-wrapper.wide {
+      width: min(420px, 90vw);
+      aspect-ratio: 16/9;
+    }
+
+    .share-card {
+      width: 100%;
+      height: 100%;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      position: relative;
+      box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255,255,255,0.1);
+      transition: all 0.3s ease;
+    }
+
+    .share-card:hover {
+      transform: scale(1.02);
+      box-shadow: var(--shadow-lg), 0 0 60px rgba(91, 108, 255, 0.2);
+    }
+
+    /* Card Styles */
+    .share-card.style-gradient {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    }
+
+    .share-card.style-album {
+      background: var(--color-surface2);
+    }
+
+    .share-card.style-album .card-album-bg {
+      position: absolute;
+      inset: 0;
+      background-image: url('https://i.scdn.co/image/ab67616d0000b273c4fecd6c6e0d67a1b4a80efd');
+      background-size: cover;
+      background-position: center;
+      filter: blur(30px) saturate(1.2);
+      transform: scale(1.2);
+    }
+
+    .share-card.style-album .card-album-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, var(--overlay-opacity, 0.6));
+      transition: background 0.3s ease;
+    }
+
+    .share-card.style-minimal {
+      background: linear-gradient(180deg, var(--color-surface1) 0%, var(--color-bg) 100%);
+    }
+
+    .card-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 28px;
+    }
+
+    /* Card Header */
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: auto;
+    }
+
+    .card-artwork {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .card-artwork img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .card-meta {
+      min-width: 0;
+    }
+
+    .card-song-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-song-artist {
+      font-size: 12px;
+      color: rgba(255,255,255,0.7);
+    }
+
+    /* Card Lyrics */
+    .card-lyrics {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .card-lyrics-text {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 500;
+      line-height: 1.4;
+      color: white;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      max-width: 90%;
+    }
+
+    .card-lyrics-text::before,
+    .card-lyrics-text::after {
+      content: '"';
+      opacity: 0.5;
+    }
+
+    /* Card Footer */
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: auto;
+    }
+
+    .card-brand {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .card-brand-icon {
+      width: 16px;
+      height: 16px;
+      opacity: 0.6;
+    }
+
+    /* Controls Panel */
+    .controls-panel {
+      flex-shrink: 0;
+      background: var(--color-surface1);
+      border-top: 1px solid var(--color-border);
+      padding: 20px;
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+      overflow-y: auto;
+      max-height: 45vh;
+    }
+
+    @media (min-width: 768px) {
+      .controls-panel {
+        width: 340px;
+        max-height: none;
+        border-top: none;
+        border-left: 1px solid var(--color-border);
+        padding: 24px;
+      }
+    }
+
+    .control-section {
+      margin-bottom: 24px;
+    }
+
+    .control-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-text3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+
+    /* Style Selector */
+    .style-options {
+      display: flex;
+      gap: 10px;
+    }
+
+    .style-option {
+      flex: 1;
+      aspect-ratio: 1;
+      border-radius: var(--radius-md);
+      border: 2px solid var(--color-border);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s ease;
+    }
+
+    .style-option:hover {
+      border-color: var(--color-border-strong);
+    }
+
+    .style-option.active {
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px var(--color-accent-soft);
+    }
+
+    .style-option-preview {
+      width: 100%;
+      height: 100%;
+    }
+
+    .style-option[data-style="gradient"] .style-option-preview {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    }
+
+    .style-option[data-style="album"] .style-option-preview {
+      background-image: url('https://i.scdn.co/image/ab67616d0000b273c4fecd6c6e0d67a1b4a80efd');
+      background-size: cover;
+      filter: blur(3px) brightness(0.7);
+    }
+
+    .style-option[data-style="minimal"] .style-option-preview {
+      background: linear-gradient(180deg, var(--color-surface2) 0%, var(--color-bg) 100%);
+    }
+
+    .style-option-label {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-weight: 600;
+      color: white;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    .style-option-check {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 20px;
+      height: 20px;
+      border-radius: var(--radius-full);
+      background: var(--color-accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: all 0.2s ease;
+    }
+
+    .style-option.active .style-option-check {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .style-option-check svg {
+      width: 12px;
+      height: 12px;
+      color: white;
+    }
+
+    /* Template Gallery */
+    .template-gallery {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .template-item {
+      aspect-ratio: 1;
+      border-radius: var(--radius-sm);
+      border: 2px solid var(--color-border);
+      background: var(--color-surface2);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s ease;
+    }
+
+    .template-item:hover {
+      border-color: var(--color-border-strong);
+      transform: scale(1.05);
+    }
+
+    .template-item.active {
+      border-color: var(--color-accent);
+    }
+
+    .template-preview {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 6px;
+      font-size: 4px;
+      color: var(--color-text-muted);
+    }
+
+    .template-preview .t-header {
+      height: 15%;
+      background: var(--color-surface3);
+      border-radius: 2px;
+      margin-bottom: 4px;
+    }
+
+    .template-preview .t-lyrics {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .template-preview .t-lyrics-line {
+      width: 70%;
+      height: 3px;
+      background: var(--color-text-muted);
+      border-radius: 1px;
+    }
+
+    /* Different template layouts */
+    .template-item[data-template="1"] .template-preview .t-header { display: none; }
+    .template-item[data-template="2"] .template-preview { justify-content: flex-end; }
+    .template-item[data-template="3"] .template-preview .t-header { height: 20%; width: 40%; }
+    .template-item[data-template="4"] .template-preview { flex-direction: row; }
+    .template-item[data-template="4"] .template-preview .t-header { width: 30%; height: 100%; margin-bottom: 0; margin-right: 4px; }
+
+    /* Slider */
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .slider {
+      flex: 1;
+      height: 6px;
+      background: var(--color-surface3);
+      border-radius: 3px;
+      appearance: none;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--color-text);
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      transition: transform 0.15s ease;
+    }
+
+    .slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .slider-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text);
+      min-width: 40px;
+      text-align: right;
+    }
+
+    /* Aspect Ratio Selector */
+    .ratio-options {
+      display: flex;
+      gap: 8px;
+    }
+
+    .ratio-option {
+      flex: 1;
+      padding: 12px 8px;
+      border-radius: var(--radius-md);
+      border: 2px solid var(--color-border);
+      background: var(--color-surface2);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .ratio-option:hover {
+      border-color: var(--color-border-strong);
+    }
+
+    .ratio-option.active {
+      border-color: var(--color-accent);
+      background: var(--color-accent-soft);
+    }
+
+    .ratio-icon {
+      width: 24px;
+      height: 24px;
+      margin: 0 auto 6px;
+      border: 2px solid currentColor;
+      border-radius: 3px;
+      color: var(--color-text3);
+      transition: color 0.15s ease;
+    }
+
+    .ratio-option.active .ratio-icon {
+      color: var(--color-accent);
+    }
+
+    .ratio-icon.square {
+      aspect-ratio: 1;
+      width: 20px;
+    }
+
+    .ratio-icon.story {
+      aspect-ratio: 9/16;
+      width: 14px;
+      height: 24px;
+    }
+
+    .ratio-icon.wide {
+      aspect-ratio: 16/9;
+      width: 28px;
+      height: 16px;
+    }
+
+    .ratio-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text3);
+    }
+
+    .ratio-option.active .ratio-label {
+      color: var(--color-accent);
+    }
+
+    .ratio-size {
+      font-size: 10px;
+      color: var(--color-text-muted);
+      margin-top: 2px;
+    }
+
+    /* Export Success Toast */
+    .toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      padding: 14px 24px;
+      background: var(--color-success);
+      border-radius: var(--radius-full);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .icon {
+      width: 20px;
+      height: 20px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <button class="btn-close" aria-label="Close">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <span class="header-title">Create Card</span>
+      <button class="btn-export" id="btn-export">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Export
+      </button>
+    </header>
+
+    <main class="main">
+      <div class="preview-panel">
+        <div class="card-wrapper square" id="card-wrapper">
+          <div class="share-card style-gradient" id="share-card">
+            <div class="card-album-bg"></div>
+            <div class="card-album-overlay"></div>
+            <div class="card-content">
+              <div class="card-header">
+                <div class="card-artwork">
+                  <img src="https://i.scdn.co/image/ab67616d0000b273c4fecd6c6e0d67a1b4a80efd" alt="Album">
+                </div>
+                <div class="card-meta">
+                  <div class="card-song-title">Bohemian Rhapsody</div>
+                  <div class="card-song-artist">Queen</div>
+                </div>
+              </div>
+
+              <div class="card-lyrics">
+                <div class="card-lyrics-text">I'm just a poor boy, I need no sympathy</div>
+              </div>
+
+              <div class="card-footer">
+                <div class="card-brand">
+                  <svg class="card-brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13"/>
+                    <circle cx="6" cy="18" r="3"/>
+                    <circle cx="18" cy="16" r="3"/>
+                  </svg>
+                  ScrollTunes
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-panel">
+        <div class="control-section">
+          <div class="control-label">Style</div>
+          <div class="style-options">
+            <div class="style-option active" data-style="gradient">
+              <div class="style-option-preview"></div>
+              <span class="style-option-label">Gradient</span>
+              <div class="style-option-check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+            </div>
+            <div class="style-option" data-style="album">
+              <div class="style-option-preview"></div>
+              <span class="style-option-label">Album</span>
+              <div class="style-option-check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+            </div>
+            <div class="style-option" data-style="minimal">
+              <div class="style-option-preview"></div>
+              <span class="style-option-label">Minimal</span>
+              <div class="style-option-check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <div class="control-label">Template</div>
+          <div class="template-gallery">
+            <div class="template-item active" data-template="1">
+              <div class="template-preview">
+                <div class="t-lyrics"><div class="t-lyrics-line"></div></div>
+              </div>
+            </div>
+            <div class="template-item" data-template="2">
+              <div class="template-preview">
+                <div class="t-header"></div>
+                <div class="t-lyrics"><div class="t-lyrics-line"></div></div>
+              </div>
+            </div>
+            <div class="template-item" data-template="3">
+              <div class="template-preview">
+                <div class="t-header"></div>
+                <div class="t-lyrics"><div class="t-lyrics-line"></div></div>
+              </div>
+            </div>
+            <div class="template-item" data-template="4">
+              <div class="template-preview">
+                <div class="t-header"></div>
+                <div class="t-lyrics"><div class="t-lyrics-line"></div></div>
+              </div>
+            </div>
+            <div class="template-item" data-template="5">
+              <div class="template-preview">
+                <div class="t-lyrics"><div class="t-lyrics-line" style="width: 90%"></div></div>
+              </div>
+            </div>
+            <div class="template-item" data-template="6">
+              <div class="template-preview" style="background: linear-gradient(135deg, #667eea22 0%, #764ba222 100%);">
+                <div class="t-lyrics"><div class="t-lyrics-line"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-section" id="overlay-section" style="display: none;">
+          <div class="control-label">Overlay Intensity</div>
+          <div class="slider-container">
+            <input type="range" class="slider" id="overlay-slider" min="30" max="90" value="60">
+            <span class="slider-value" id="overlay-value">60%</span>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <div class="control-label">Aspect Ratio</div>
+          <div class="ratio-options">
+            <div class="ratio-option active" data-ratio="square">
+              <div class="ratio-icon square"></div>
+              <div class="ratio-label">Square</div>
+              <div class="ratio-size">1:1</div>
+            </div>
+            <div class="ratio-option" data-ratio="story">
+              <div class="ratio-icon story"></div>
+              <div class="ratio-label">Story</div>
+              <div class="ratio-size">9:16</div>
+            </div>
+            <div class="ratio-option" data-ratio="wide">
+              <div class="ratio-icon wide"></div>
+              <div class="ratio-label">Wide</div>
+              <div class="ratio-size">16:9</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div class="toast" id="toast">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      Card saved to gallery!
+    </div>
+  </div>
+
+  <script>
+    const shareCard = document.getElementById('share-card');
+    const cardWrapper = document.getElementById('card-wrapper');
+    const overlaySection = document.getElementById('overlay-section');
+    const overlaySlider = document.getElementById('overlay-slider');
+    const overlayValue = document.getElementById('overlay-value');
+    const toast = document.getElementById('toast');
+
+    // Style selection
+    const styleOptions = document.querySelectorAll('.style-option');
+    styleOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        styleOptions.forEach(o => o.classList.remove('active'));
+        option.classList.add('active');
+
+        const style = option.dataset.style;
+        shareCard.className = 'share-card style-' + style;
+
+        // Show overlay slider only for album style
+        overlaySection.style.display = style === 'album' ? 'block' : 'none';
+      });
+    });
+
+    // Template selection
+    const templateItems = document.querySelectorAll('.template-item');
+    templateItems.forEach(item => {
+      item.addEventListener('click', () => {
+        templateItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+      });
+    });
+
+    // Overlay slider
+    overlaySlider.addEventListener('input', () => {
+      const value = overlaySlider.value;
+      overlayValue.textContent = value + '%';
+      shareCard.style.setProperty('--overlay-opacity', value / 100);
+    });
+
+    // Aspect ratio selection
+    const ratioOptions = document.querySelectorAll('.ratio-option');
+    ratioOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        ratioOptions.forEach(o => o.classList.remove('active'));
+        option.classList.add('active');
+
+        const ratio = option.dataset.ratio;
+        cardWrapper.className = 'card-wrapper ' + ratio;
+      });
+    });
+
+    // Export button
+    document.getElementById('btn-export').addEventListener('click', () => {
+      toast.classList.add('visible');
+      setTimeout(() => {
+        toast.classList.remove('visible');
+      }, 3000);
+    });
+  </script>
+</body>
+</html>

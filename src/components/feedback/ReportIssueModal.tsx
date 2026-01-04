@@ -192,21 +192,31 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
           onClick={handleBackdropClick}
         >
           <motion.div
-            className="relative w-full max-w-md rounded-xl bg-neutral-900 border border-neutral-800 shadow-xl"
+            className="relative w-full max-w-md rounded-xl shadow-xl"
+            style={{
+              background: "var(--color-surface1)",
+              border: "1px solid var(--color-border)",
+            }}
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={springs.default}
           >
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800">
+            <div
+              className="flex items-center justify-between p-4"
+              style={{ borderBottom: "1px solid var(--color-border)" }}
+            >
               <div className="flex items-center gap-2">
-                <Bug size={20} className="text-amber-500" />
-                <h2 className="text-lg font-semibold text-white">Report an Issue</h2>
+                <Bug size={20} style={{ color: "var(--color-warning)" }} />
+                <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+                  Report an Issue
+                </h2>
               </div>
               <button
                 type="button"
                 onClick={handleClose}
-                className="rounded-full p-1 text-neutral-400 hover:bg-neutral-800 hover:text-white transition-colors"
+                className="rounded-full p-1 transition-colors hover:brightness-110"
+                style={{ color: "var(--color-text3)" }}
                 aria-label="Close"
                 disabled={submitState === "submitting"}
               >
@@ -216,20 +226,29 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
 
             <form onSubmit={handleSubmit} className="p-4 space-y-4">
               {songContext && (
-                <div className="rounded-lg bg-neutral-800/50 p-3 text-sm">
-                  <div className="text-neutral-400 mb-1">Reporting issue for:</div>
-                  <div className="text-white font-medium">{displayTitle}</div>
-                  <div className="text-neutral-500">{displayArtist}</div>
+                <div
+                  className="rounded-lg p-3 text-sm"
+                  style={{ background: "var(--color-surface2)" }}
+                >
+                  <div className="mb-1" style={{ color: "var(--color-text3)" }}>
+                    Reporting issue for:
+                  </div>
+                  <div className="font-medium" style={{ color: "var(--color-text)" }}>
+                    {displayTitle}
+                  </div>
+                  <div style={{ color: "var(--color-text-muted)" }}>{displayArtist}</div>
                   {!songContext.bpm && (
-                    <div className="mt-2 text-amber-500 text-xs">⚠ BPM data is missing</div>
+                    <div className="mt-2 text-xs" style={{ color: "var(--color-warning)" }}>
+                      ⚠ BPM data is missing
+                    </div>
                   )}
                   {songContext.chordsError && (
-                    <div className="mt-2 text-amber-500 text-xs">
+                    <div className="mt-2 text-xs" style={{ color: "var(--color-warning)" }}>
                       ⚠ Chords error: {songContext.chordsError}
                     </div>
                   )}
                   {songContext.lyricsError && (
-                    <div className="mt-2 text-amber-500 text-xs">
+                    <div className="mt-2 text-xs" style={{ color: "var(--color-warning)" }}>
                       ⚠ Lyrics error: {songContext.lyricsError}
                     </div>
                   )}
@@ -237,7 +256,11 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
               )}
 
               <div>
-                <label htmlFor="description" className="block text-sm text-neutral-400 mb-1">
+                <label
+                  htmlFor="description"
+                  className="block text-sm mb-1"
+                  style={{ color: "var(--color-text3)" }}
+                >
                   {isDescriptionRequired ? "Describe the issue *" : "Additional details (optional)"}
                 </label>
                 <textarea
@@ -249,12 +272,21 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   required={isDescriptionRequired}
                   disabled={submitState === "submitting"}
                   maxLength={INPUT_LIMITS.REPORT_DESCRIPTION}
-                  className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-lg px-3 py-2 focus:outline-none focus:ring-2 disabled:opacity-50"
+                  style={{
+                    background: "var(--color-surface2)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                  }}
                 />
               </div>
 
               <div>
-                <label htmlFor="email" className="block text-sm text-neutral-400 mb-1">
+                <label
+                  htmlFor="email"
+                  className="block text-sm mb-1"
+                  style={{ color: "var(--color-text3)" }}
+                >
                   Email (optional, for follow-up)
                 </label>
                 <input
@@ -265,16 +297,26 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   placeholder="your@email.com"
                   disabled={submitState === "submitting"}
                   maxLength={INPUT_LIMITS.EMAIL}
-                  className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-lg px-3 py-2 focus:outline-none focus:ring-2 disabled:opacity-50"
+                  style={{
+                    background: "var(--color-surface2)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                  }}
                 />
               </div>
 
               {submitState === "error" && (
-                <div className="text-red-400 text-sm">Failed to submit. Please try again.</div>
+                <div className="text-sm" style={{ color: "var(--color-danger)" }}>
+                  Failed to submit. Please try again.
+                </div>
               )}
 
               {submitState === "success" && (
-                <div className="flex items-center gap-2 text-green-400 text-sm">
+                <div
+                  className="flex items-center gap-2 text-sm"
+                  style={{ color: "var(--color-success)" }}
+                >
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 2, ease: "linear" }}
@@ -290,7 +332,8 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                 disabled={
                   submitState === "submitting" || (isDescriptionRequired && !description.trim())
                 }
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-neutral-700 disabled:cursor-not-allowed px-4 py-2.5 text-white font-medium transition-colors"
+                className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-medium transition-colors hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "var(--color-accent)", color: "white" }}
               >
                 {submitState === "submitting" ? (
                   "Submitting..."

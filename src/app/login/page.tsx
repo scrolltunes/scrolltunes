@@ -1,6 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
+import { AmbientBackground } from "@/components/ui"
 import { ArrowLeft, Check } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { signIn } from "next-auth/react"
@@ -42,12 +43,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
-      <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
+      <AmbientBackground variant="subtle" />
+      <header
+        className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
+        style={{
+          background: "var(--color-header-bg)",
+          borderBottom: "1px solid var(--color-border)",
+        }}
+      >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <Link
             href="/"
-            className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+            style={{ background: "var(--color-surface2)" }}
             aria-label="Back"
           >
             <ArrowLeft size={20} />
@@ -55,14 +67,17 @@ export default function LoginPage() {
         </div>
       </header>
 
-      <main className="pt-20 pb-8 px-4 flex items-center justify-center min-h-screen">
+      <main className="pt-20 pb-8 px-4 flex items-center justify-center min-h-screen relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={springs.default}
           className="w-full max-w-sm"
         >
-          <div className="p-6 bg-neutral-900 rounded-xl space-y-6">
+          <div
+            className="p-6 rounded-xl space-y-6"
+            style={{ background: "var(--color-surface1)" }}
+          >
             <div className="text-center">
               <h1 className="text-2xl font-semibold">Sign in to ScrollTunes</h1>
             </div>
@@ -70,10 +85,15 @@ export default function LoginPage() {
             <ul className="space-y-3">
               {benefits.map(benefit => (
                 <li key={benefit} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/30 flex items-center justify-center mt-0.5">
-                    <Check size={12} weight="bold" className="text-emerald-300" />
+                  <span
+                    className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
+                    style={{ background: "var(--color-success-soft)" }}
+                  >
+                    <Check size={12} weight="bold" style={{ color: "var(--color-success)" }} />
                   </span>
-                  <span className="text-neutral-300 text-sm">{benefit}</span>
+                  <span className="text-sm" style={{ color: "var(--color-text2)" }}>
+                    {benefit}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -82,23 +102,34 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-neutral-800 font-medium rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
-                style={{ fontFamily: "Roboto, system-ui, sans-serif" }}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 font-medium rounded-lg transition-colors cursor-pointer hover:brightness-95"
+                style={{
+                  fontFamily: "Roboto, system-ui, sans-serif",
+                  background: "#ffffff",
+                  color: "#1f1f1f",
+                  border: "1px solid var(--color-border-strong)",
+                }}
               >
                 <GoogleLogo />
                 Continue with Google
               </button>
-
-              {/* Spotify login temporarily disabled */}
             </div>
 
-            <p className="text-xs text-neutral-500 text-center">
+            <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
               By signing in, you agree to our{" "}
-              <Link href="/terms" className="text-neutral-400 hover:text-neutral-300 underline">
+              <Link
+                href="/terms"
+                className="underline transition-colors hover:brightness-125"
+                style={{ color: "var(--color-text3)" }}
+              >
                 Terms
               </Link>{" "}
               and{" "}
-              <Link href="/privacy" className="text-neutral-400 hover:text-neutral-300 underline">
+              <Link
+                href="/privacy"
+                className="underline transition-colors hover:brightness-125"
+                style={{ color: "var(--color-text3)" }}
+              >
                 Privacy Policy
               </Link>
             </p>
@@ -106,7 +137,8 @@ export default function LoginPage() {
             <div className="text-center">
               <Link
                 href="/"
-                className="text-sm text-neutral-400 hover:text-neutral-300 transition-colors"
+                className="text-sm transition-colors hover:brightness-125"
+                style={{ color: "var(--color-text3)" }}
               >
                 Continue without account
               </Link>

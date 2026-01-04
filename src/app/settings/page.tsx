@@ -1,6 +1,16 @@
 "use client"
 
-import { type ThemeMode, preferencesStore, useAccount, usePreferences } from "@/core"
+import { AmbientBackground } from "@/components/ui"
+import {
+  DEFAULT_FONT_SIZE,
+  FONT_SIZE_STEP,
+  MAX_FONT_SIZE,
+  MIN_FONT_SIZE,
+  type ThemeMode,
+  preferencesStore,
+  useAccount,
+  usePreferences,
+} from "@/core"
 import {
   ArrowCounterClockwise,
   ArrowLeft,
@@ -9,6 +19,7 @@ import {
   Hand,
   Moon,
   SignOut,
+  TextAa,
   Timer,
   Trash,
   User,
@@ -33,18 +44,27 @@ function Toggle({ enabled, onToggle, label, description, icon }: ToggleProps) {
     <button
       type="button"
       onClick={onToggle}
-      className="w-full flex items-start gap-4 p-4 bg-neutral-900 rounded-xl text-left hover:bg-neutral-800 transition-colors"
+      className="w-full flex items-start gap-4 p-4 rounded-xl text-left transition-colors hover:brightness-110"
+      style={{ background: "var(--color-surface1)" }}
     >
-      <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center shrink-0 text-indigo-400">
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+        style={{ background: "var(--color-surface2)", color: "var(--color-accent)" }}
+      >
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-medium">{label}</div>
-        <div className="text-sm text-neutral-400 mt-0.5">{description}</div>
+        <div className="font-medium" style={{ color: "var(--color-text)" }}>
+          {label}
+        </div>
+        <div className="text-sm mt-0.5" style={{ color: "var(--color-text3)" }}>
+          {description}
+        </div>
       </div>
       <motion.div
-        className={`w-12 h-7 rounded-full p-1 shrink-0 ${enabled ? "bg-indigo-500" : "bg-neutral-700"}`}
-        animate={{ backgroundColor: enabled ? "#6366f1" : "#404040" }}
+        className="w-12 h-7 rounded-full p-1 shrink-0"
+        style={{ background: enabled ? "var(--color-accent)" : "var(--color-surface3)" }}
+        animate={{ backgroundColor: enabled ? "var(--color-accent)" : "var(--color-surface3)" }}
       >
         <motion.div
           className="w-5 h-5 rounded-full bg-white shadow-sm"
@@ -80,16 +100,25 @@ function SliderSetting({
   formatValue,
 }: SliderSettingProps) {
   return (
-    <div className="p-4 bg-neutral-900 rounded-xl">
+    <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
       <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center shrink-0 text-indigo-400">
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+          style={{ background: "var(--color-surface2)", color: "var(--color-accent)" }}
+        >
           {icon}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-medium">{label}</div>
-          <div className="text-sm text-neutral-400 mt-0.5">{description}</div>
+          <div className="font-medium" style={{ color: "var(--color-text)" }}>
+            {label}
+          </div>
+          <div className="text-sm mt-0.5" style={{ color: "var(--color-text3)" }}>
+            {description}
+          </div>
         </div>
-        <div className="text-sm text-indigo-400 font-medium shrink-0">{formatValue(value)}</div>
+        <div className="text-sm font-medium shrink-0" style={{ color: "var(--color-accent)" }}>
+          {formatValue(value)}
+        </div>
       </div>
       <div className="mt-4 pl-14">
         <input
@@ -99,7 +128,8 @@ function SliderSetting({
           step={step}
           value={value}
           onChange={e => onChange(Number(e.target.value))}
-          className="w-full h-2 bg-neutral-700 rounded-full appearance-none cursor-pointer accent-indigo-500"
+          className="w-full h-2 rounded-full appearance-none cursor-pointer"
+          style={{ background: "var(--color-surface3)", accentColor: "var(--color-accent)" }}
         />
       </div>
     </div>
@@ -145,19 +175,21 @@ function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-neutral-900 rounded-2xl p-6"
+        className="w-full max-w-md rounded-2xl p-6"
+        style={{ background: "var(--color-surface1)" }}
       >
-        <div className="flex items-center gap-3 mb-4 text-red-400">
+        <div className="flex items-center gap-3 mb-4" style={{ color: "var(--color-danger)" }}>
           <Warning size={24} weight="duotone" />
           <h2 className="text-lg font-semibold">Delete Account</h2>
         </div>
 
-        <p className="text-neutral-300 mb-4">
+        <p className="mb-4" style={{ color: "var(--color-text2)" }}>
           This action is permanent and cannot be undone. All your data will be deleted.
         </p>
 
-        <p className="text-sm text-neutral-400 mb-2">
-          Type <span className="font-mono text-red-400">DELETE</span> to confirm:
+        <p className="text-sm mb-2" style={{ color: "var(--color-text3)" }}>
+          Type <span className="font-mono" style={{ color: "var(--color-danger)" }}>DELETE</span> to
+          confirm:
         </p>
 
         <input
@@ -165,7 +197,12 @@ function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
           value={confirmText}
           onChange={e => setConfirmText(e.target.value)}
           placeholder="DELETE"
-          className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-red-500 mb-4"
+          className="w-full px-4 py-3 rounded-xl mb-4 focus:outline-none"
+          style={{
+            background: "var(--color-surface2)",
+            border: "1px solid var(--color-border)",
+            color: "var(--color-text)",
+          }}
           autoComplete="off"
         />
 
@@ -173,7 +210,8 @@ function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
           <button
             type="button"
             onClick={handleClose}
-            className="flex-1 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-white transition-colors"
+            className="flex-1 px-4 py-3 rounded-xl transition-colors hover:brightness-110"
+            style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
           >
             Cancel
           </button>
@@ -181,7 +219,8 @@ function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
             type="button"
             onClick={handleDelete}
             disabled={confirmText !== "DELETE" || isDeleting}
-            className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-500 disabled:bg-neutral-700 disabled:text-neutral-500 rounded-xl text-white transition-colors"
+            className="flex-1 px-4 py-3 rounded-xl transition-colors hover:brightness-110 disabled:opacity-50"
+            style={{ background: "var(--color-danger)", color: "white" }}
           >
             {isDeleting ? "Deleting..." : "Delete"}
           </button>
@@ -211,15 +250,27 @@ function AccountSection() {
   if (account.isLoading) {
     return (
       <section>
-        <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+        <h2
+          className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+          style={{ color: "var(--color-text-muted)" }}
+        >
           Account
         </h2>
-        <div className="p-4 bg-neutral-900 rounded-xl">
+        <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
           <div className="animate-pulse flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-neutral-800" />
+            <div
+              className="w-12 h-12 rounded-full"
+              style={{ background: "var(--color-surface2)" }}
+            />
             <div className="flex-1 space-y-2">
-              <div className="h-4 w-24 bg-neutral-800 rounded" />
-              <div className="h-3 w-32 bg-neutral-800 rounded" />
+              <div
+                className="h-4 w-24 rounded"
+                style={{ background: "var(--color-surface2)" }}
+              />
+              <div
+                className="h-3 w-32 rounded"
+                style={{ background: "var(--color-surface2)" }}
+              />
             </div>
           </div>
         </div>
@@ -230,21 +281,30 @@ function AccountSection() {
   if (!account.isAuthenticated) {
     return (
       <section>
-        <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+        <h2
+          className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+          style={{ color: "var(--color-text-muted)" }}
+        >
           Account
         </h2>
-        <div className="p-4 bg-neutral-900 rounded-xl">
+        <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
           <div className="flex flex-col items-center text-center py-4">
-            <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center mb-3 text-indigo-400">
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
+              style={{ background: "var(--color-surface2)", color: "var(--color-accent)" }}
+            >
               <User size={24} weight="duotone" />
             </div>
-            <div className="font-medium mb-1">Sign in to sync</div>
-            <div className="text-sm text-neutral-400 mb-4">
+            <div className="font-medium mb-1" style={{ color: "var(--color-text)" }}>
+              Sign in to sync
+            </div>
+            <div className="text-sm mb-4" style={{ color: "var(--color-text3)" }}>
               Sync your history and favorites across devices
             </div>
             <Link
               href="/login"
-              className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-full text-white font-medium transition-colors"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-full font-medium transition-colors hover:brightness-110"
+              style={{ background: "var(--color-accent)", color: "white" }}
             >
               Sign in
               <ArrowLeft size={16} className="rotate-180" />
@@ -260,10 +320,13 @@ function AccountSection() {
   return (
     <>
       <section>
-        <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+        <h2
+          className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+          style={{ color: "var(--color-text-muted)" }}
+        >
           Account
         </h2>
-        <div className="bg-neutral-900 rounded-xl overflow-hidden">
+        <div className="rounded-xl overflow-hidden" style={{ background: "var(--color-surface1)" }}>
           <div className="p-4">
             <div className="flex items-center gap-4">
               {account.user?.image ? (
@@ -275,14 +338,23 @@ function AccountSection() {
                   className="w-12 h-12 rounded-full"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center text-indigo-400">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                  style={{ background: "var(--color-surface2)", color: "var(--color-accent)" }}
+                >
                   <User size={24} weight="duotone" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{account.user?.name ?? "User"}</div>
-                <div className="text-sm text-neutral-400 truncate">{account.user?.email}</div>
-                <div className="text-xs text-neutral-500 mt-0.5">Signed in with {providerName}</div>
+                <div className="font-medium truncate" style={{ color: "var(--color-text)" }}>
+                  {account.user?.name ?? "User"}
+                </div>
+                <div className="text-sm truncate" style={{ color: "var(--color-text3)" }}>
+                  {account.user?.email}
+                </div>
+                <div className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+                  Signed in with {providerName}
+                </div>
               </div>
             </div>
 
@@ -290,7 +362,8 @@ function AccountSection() {
               <button
                 type="button"
                 onClick={handleExportData}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:brightness-110"
+                style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
               >
                 <DownloadSimple size={18} />
                 Export my data
@@ -298,7 +371,8 @@ function AccountSection() {
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:brightness-110"
+                style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
               >
                 <SignOut size={18} />
                 Sign out
@@ -306,17 +380,24 @@ function AccountSection() {
             </div>
           </div>
 
-          <div className="border-t border-neutral-800 p-4">
-            <div className="text-sm font-medium text-red-400 mb-3">Danger Zone</div>
+          <div className="p-4" style={{ borderTop: "1px solid var(--color-border)" }}>
+            <div className="text-sm font-medium mb-3" style={{ color: "var(--color-danger)" }}>
+              Danger Zone
+            </div>
             <button
               type="button"
               onClick={() => setShowDeleteModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-red-950/50 hover:bg-red-900/50 border border-red-900/50 rounded-xl text-red-400 text-sm font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:brightness-110"
+              style={{
+                background: "var(--color-danger-soft)",
+                border: "1px solid var(--color-danger)",
+                color: "var(--color-danger)",
+              }}
             >
               <Trash size={18} />
               Delete my account
             </button>
-            <div className="text-xs text-neutral-500 mt-2">
+            <div className="text-xs mt-2" style={{ color: "var(--color-text-muted)" }}>
               Permanently delete your account and all data
             </div>
           </div>
@@ -347,6 +428,10 @@ export default function SettingsPage() {
     preferencesStore.setAutoHideControlsMs(value)
   }, [])
 
+  const handleFontSizeChange = useCallback((value: number) => {
+    preferencesStore.setFontSize(value)
+  }, [])
+
   const handleThemeModeChange = useCallback((mode: ThemeMode) => {
     preferencesStore.setThemeMode(mode)
   }, [])
@@ -360,13 +445,26 @@ export default function SettingsPage() {
     return `${ms / 1000}s`
   }
 
+  const formatFontSize = (px: number): string => {
+    if (px === DEFAULT_FONT_SIZE) return `${px}px (default)`
+    return `${px}px`
+  }
+
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
-      <header className="fixed top-0 left-0 right-0 z-20 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+      <AmbientBackground variant="subtle" />
+      <header
+        className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
+        style={{
+          background: "var(--color-header-bg)",
+          borderBottom: "1px solid var(--color-border)",
+        }}
+      >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <Link
             href="/"
-            className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+            style={{ background: "var(--color-surface2)" }}
             aria-label="Back"
           >
             <ArrowLeft size={20} />
@@ -375,7 +473,7 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <main className="pt-20 pb-8 px-4 max-w-lg mx-auto">
+      <main className="pt-20 pb-8 px-4 max-w-lg mx-auto relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -387,7 +485,10 @@ export default function SettingsPage() {
 
           {/* Appearance Section */}
           <section>
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+            <h2
+              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               Appearance
             </h2>
             <Toggle
@@ -403,15 +504,29 @@ export default function SettingsPage() {
 
           {/* Display Section */}
           <section>
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+            <h2
+              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               Display
             </h2>
             <div className="space-y-3">
               <SliderSetting
+                value={preferences.fontSize}
+                onChange={handleFontSizeChange}
+                label="Lyrics font size"
+                description="Adjust the size of lyrics text"
+                icon={<TextAa size={20} weight="duotone" />}
+                min={MIN_FONT_SIZE}
+                max={MAX_FONT_SIZE}
+                step={FONT_SIZE_STEP}
+                formatValue={formatFontSize}
+              />
+              <SliderSetting
                 value={preferences.autoHideControlsMs}
                 onChange={handleAutoHideChange}
-                label="Auto-hide during playback"
-                description="Hide header after inactivity while playing"
+                label="Auto-hide toolbar"
+                description="Hide the song toolbar during playback after inactivity"
                 icon={<Timer size={20} weight="duotone" />}
                 min={0}
                 max={30000}
@@ -423,7 +538,10 @@ export default function SettingsPage() {
 
           {/* Gestures Section */}
           <section>
-            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-3 px-1">
+            <h2
+              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               Gestures
             </h2>
             <div className="space-y-3">
@@ -456,7 +574,12 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleReset}
-              className="w-full flex items-center justify-center gap-2 p-4 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 rounded-xl text-neutral-400 hover:text-white transition-colors"
+              className="w-full flex items-center justify-center gap-2 p-4 rounded-xl transition-colors hover:brightness-110"
+              style={{
+                background: "var(--color-surface1)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text3)",
+              }}
             >
               <ArrowCounterClockwise size={20} />
               Reset to defaults

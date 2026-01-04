@@ -1,17 +1,8 @@
 "use client"
 
-import {
-  FONT_SIZE_STEP,
-  MAX_FONT_SIZE,
-  MIN_FONT_SIZE,
-  type Setlist,
-  preferencesStore,
-  useIsAuthenticated,
-  usePreference,
-  useSetlistsContainingSong,
-} from "@/core"
-import { ListPlus, Minus, MusicNote, Plus, ShareNetwork, TextAa } from "@phosphor-icons/react"
-import { memo, useCallback } from "react"
+import { type Setlist, useIsAuthenticated, useSetlistsContainingSong } from "@/core"
+import { Info, ListPlus, MusicNote, ShareNetwork, Warning } from "@phosphor-icons/react"
+import { memo } from "react"
 
 export interface SongActionBarProps {
   readonly songId: number
@@ -20,6 +11,9 @@ export interface SongActionBarProps {
   readonly albumArt?: string
   readonly onAddToSetlist: () => void
   readonly onShareClick?: () => void
+  readonly onInfoClick?: () => void
+  readonly hasIssue?: boolean
+  readonly onWarningClick?: () => void
 }
 
 function SetlistIcon({ setlist }: { readonly setlist: Setlist }) {
@@ -40,108 +34,120 @@ function SetlistIcon({ setlist }: { readonly setlist: Setlist }) {
 
 export const SongActionBar = memo(function SongActionBar({
   songId,
-  title,
-  artist,
-  albumArt,
   onAddToSetlist,
   onShareClick,
+  onInfoClick,
+  hasIssue,
+  onWarningClick,
 }: SongActionBarProps) {
   const isAuthenticated = useIsAuthenticated()
   const containingSetlists = useSetlistsContainingSong(songId)
   const isInSetlist = containingSetlists.length > 0
-  const fontSize = usePreference("fontSize")
 
-  const isAtMin = fontSize <= MIN_FONT_SIZE
-  const isAtMax = fontSize >= MAX_FONT_SIZE
-
-  const handleDecrease = useCallback(() => {
-    const newSize = Math.max(MIN_FONT_SIZE, fontSize - FONT_SIZE_STEP)
-    preferencesStore.setFontSize(newSize)
-  }, [fontSize])
-
-  const handleIncrease = useCallback(() => {
-    const newSize = Math.min(MAX_FONT_SIZE, fontSize + FONT_SIZE_STEP)
-    preferencesStore.setFontSize(newSize)
-  }, [fontSize])
+  const showInfoOrWarning = onInfoClick || (hasIssue && onWarningClick)
 
   return (
     <div className="flex items-center justify-center gap-3 py-4 px-4">
-      {/* Font size controls */}
-      <div className="flex items-center gap-1 bg-neutral-800/50 rounded-full px-2 py-1.5">
-        <TextAa size={18} weight="fill" className="text-neutral-400 mr-1" />
+      {/* Info/Warning button */}
+      {hasIssue && onWarningClick ? (
         <button
           type="button"
-          onClick={handleDecrease}
-          disabled={isAtMin}
-          className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-300 hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          aria-label="Decrease font size"
+          onClick={onWarningClick}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors"
+          style={{
+            background: "var(--color-warning-soft)",
+            color: "var(--color-warning)",
+          }}
+          aria-label="Report issue"
         >
-          <Minus size={14} weight="bold" />
+          <Warning size={20} />
+          <span className="hidden sm:inline">Report issue</span>
         </button>
+      ) : onInfoClick ? (
         <button
           type="button"
-          onClick={handleIncrease}
-          disabled={isAtMax}
-          className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-300 hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          aria-label="Increase font size"
+          onClick={onInfoClick}
+          className="flex items-center gap-1.5 p-2 rounded-full text-sm font-medium transition-colors hover:bg-white/5"
+          style={{
+            background: "var(--color-surface2)",
+            color: "var(--color-text3)",
+          }}
+          aria-label="Song info"
         >
-          <Plus size={14} weight="bold" />
+          <Info size={20} />
         </button>
-      </div>
+      ) : null}
+
+      {/* Separator - show if info/warning button and other buttons are visible */}
+      {showInfoOrWarning && (isAuthenticated || onShareClick) && (
+        <div className="w-px h-6" style={{ background: "var(--color-border)" }} />
+      )}
 
       {/* Setlist button - icon only on mobile, full on desktop */}
       {isAuthenticated && (
-        <>
-          <div className="w-px h-6 bg-neutral-700" />
-          <button
-            type="button"
-            onClick={onAddToSetlist}
-            className={`relative flex items-center gap-2 rounded-full transition-colors text-sm font-medium ${
-              isInSetlist
-                ? "bg-neutral-800/50 hover:bg-neutral-700/50"
-                : "bg-neutral-800/50 hover:bg-neutral-700/50 text-neutral-400 hover:text-neutral-300"
-            } ${isInSetlist ? "px-2 py-2 sm:px-3" : "p-2 sm:px-3 sm:py-2"}`}
-            aria-label={isInSetlist ? "Manage setlists" : "Add to setlist"}
-          >
-            {isInSetlist ? (
-              <div className="flex items-center gap-2">
-                <span className="hidden sm:inline">Setlists</span>
-                <span className="text-[10px] text-neutral-500 leading-none">
-                  {containingSetlists.length}
-                </span>
-                <div className="flex items-center gap-0.5">
-                  {containingSetlists.slice(0, 2).map(setlist => (
-                    <SetlistIcon key={setlist.id} setlist={setlist} />
-                  ))}
-                  {containingSetlists.length > 2 && (
-                    <div
-                      className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 bg-neutral-700 text-neutral-400 text-[10px] font-medium"
-                      title={`${containingSetlists.length - 2} more`}
-                    >
-                      +{containingSetlists.length - 2}
-                    </div>
-                  )}
-                </div>
+        <button
+          type="button"
+          onClick={onAddToSetlist}
+          className={`relative flex items-center gap-2 rounded-full transition-colors text-sm font-medium hover:bg-white/5 ${
+            isInSetlist ? "px-2 py-2 sm:px-3" : "p-2 sm:px-3 sm:py-2"
+          }`}
+          style={{
+            background: "var(--color-surface2)",
+            color: isInSetlist ? "var(--color-text)" : "var(--color-text3)",
+          }}
+          aria-label={isInSetlist ? "Manage setlists" : "Add to setlist"}
+        >
+          {isInSetlist ? (
+            <div className="flex items-center gap-2">
+              <span className="hidden sm:inline">Setlists</span>
+              <span
+                className="text-[10px] leading-none"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                {containingSetlists.length}
+              </span>
+              <div className="flex items-center gap-0.5">
+                {containingSetlists.slice(0, 2).map(setlist => (
+                  <SetlistIcon key={setlist.id} setlist={setlist} />
+                ))}
+                {containingSetlists.length > 2 && (
+                  <div
+                    className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-[10px] font-medium"
+                    style={{
+                      background: "var(--color-surface3)",
+                      color: "var(--color-text3)",
+                    }}
+                    title={`${containingSetlists.length - 2} more`}
+                  >
+                    +{containingSetlists.length - 2}
+                  </div>
+                )}
               </div>
-            ) : (
-              <>
-                <ListPlus size={20} />
-                <span className="hidden sm:inline">Add to setlist</span>
-              </>
-            )}
-          </button>
-        </>
+            </div>
+          ) : (
+            <>
+              <ListPlus size={20} />
+              <span className="hidden sm:inline">Add to setlist</span>
+            </>
+          )}
+        </button>
       )}
 
-      {/* Separator */}
-      <div className="w-px h-6 bg-neutral-700" />
+      {/* Separator - only show if both setlist button and share button are visible */}
+      {isAuthenticated && onShareClick && (
+        <div className="w-px h-6" style={{ background: "var(--color-border)" }} />
+      )}
 
       {/* Share lyrics */}
       {onShareClick && (
         <button
           type="button"
           onClick={onShareClick}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors bg-neutral-800/50 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-300"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors hover:bg-white/5"
+          style={{
+            background: "var(--color-surface2)",
+            color: "var(--color-text3)",
+          }}
           aria-label="Share lyrics"
         >
           <ShareNetwork size={18} />
