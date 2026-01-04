@@ -2,8 +2,8 @@
 
 import { UserMenu } from "@/components/auth"
 import { LogoMenu } from "@/components/layout"
-import { RecentSongs, SongSearch } from "@/components/search"
-import { AmbientBackground, Attribution } from "@/components/ui"
+import { HomeSetlists, RecentSongs, SongSearch } from "@/components/search"
+import { AmbientBackground, Attribution, Logo } from "@/components/ui"
 import { CaretDown, GearSix } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
@@ -142,20 +142,33 @@ export default function Home() {
       </header>
 
       <main className="pt-16 flex flex-col relative z-10">
-        <div className="flex-1 flex flex-col items-center p-6 pt-24">
-          <h2
-            className="text-2xl font-medium mb-8"
-            style={{ color: "var(--color-text)" }}
+        {/* Hero Section - Search First */}
+        <section className="flex flex-col items-center px-6 pt-20 pb-12">
+          <div className="flex items-center gap-3 mb-3">
+            <Logo size={40} style={{ color: "var(--color-accent)" }} />
+            <h1 className="text-3xl font-semibold" style={{ color: "var(--color-text)" }}>
+              ScrollTunes
+            </h1>
+          </div>
+          <p
+            className="text-lg mb-8 text-center"
+            style={{ color: "var(--color-text3)" }}
           >
-            Find a song
-          </h2>
+            Lyrics that follow your voice
+          </p>
           <SongSearch className="w-full max-w-md" />
           <Attribution
             lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}
             bpm={{ name: "GetSongBPM", url: "https://getsongbpm.com" }}
-            className="mt-3"
+            className="mt-4"
           />
-          <RecentSongs className="w-full max-w-md mt-8" />
+        </section>
+
+        {/* Secondary Content */}
+        <div className="flex-1 px-6 pb-8 max-w-3xl mx-auto w-full space-y-10">
+          <RecentSongs className="w-full" layout="horizontal" />
+
+          <HomeSetlists className="w-full" />
 
           <FAQSection />
         </div>
@@ -172,7 +185,7 @@ function FAQSection() {
   }
 
   return (
-    <section className="w-full max-w-md mt-12">
+    <section className="w-full max-w-md mx-auto">
       <h2
         className="text-sm font-medium uppercase tracking-wider mb-4 px-1"
         style={{ color: "var(--color-text-muted)" }}

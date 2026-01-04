@@ -231,3 +231,40 @@ html {
   color: var(--color-bg);
   box-shadow: var(--shadow-glow-chord);
 }
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Force scrollbar always visible */
+.scrollbar-visible {
+  scrollbar-width: auto;
+  scrollbar-color: var(--scrollbar-thumb) var(--color-surface1);
+}
+
+.scrollbar-visible::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.scrollbar-visible::-webkit-scrollbar-track {
+  background: var(--color-surface1);
+  border-radius: 6px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background: var(--color-surface3);
+  border-radius: 6px;
+  border: 2px solid var(--color-surface1);
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}

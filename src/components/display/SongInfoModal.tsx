@@ -99,8 +99,8 @@ export function SongInfoModal({
               <div className="mb-4 flex gap-4 pr-8">
                 {albumArt && (
                   <div
-                    className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg"
-                    style={{ background: "var(--color-surface2)" }}
+                    className="h-14 w-14 flex-shrink-0 overflow-hidden"
+                    style={{ background: "var(--color-surface2)", borderRadius: "10px" }}
                   >
                     <img src={albumArt} alt="" className="h-full w-full object-cover" />
                   </div>

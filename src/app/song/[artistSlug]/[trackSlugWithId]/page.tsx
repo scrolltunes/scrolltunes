@@ -551,12 +551,13 @@ export default function SongPage() {
             <img
               src={loadState.albumArt}
               alt=""
-              className="w-10 h-10 shrink-0 rounded-lg object-cover"
+              className="w-10 h-10 shrink-0 object-cover"
+              style={{ borderRadius: "8px" }}
             />
           ) : (
             <div
-              className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center"
-              style={{ background: "var(--color-surface2)" }}
+              className="w-10 h-10 shrink-0 flex items-center justify-center"
+              style={{ background: "var(--color-surface2)", borderRadius: "8px" }}
             >
               <MusicNote size={20} weight="fill" style={{ color: "var(--color-text-muted)" }} />
             </div>
