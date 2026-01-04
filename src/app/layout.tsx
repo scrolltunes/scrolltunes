@@ -93,7 +93,7 @@ export default async function RootLayout({
   const session = await auth()
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning style={{ background: "#070A12" }}>
       <head>
         {/* Critical CSS to prevent flash - sets dark background before any CSS loads */}
         <style
@@ -105,7 +105,7 @@ export default async function RootLayout({
         {/* Inline blocking script to set theme class based on user preference */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){let d=true;try{const s=localStorage.getItem("scrolltunes-preferences");const p=s?JSON.parse(s):{};const m=p.themeMode||"system";d=m==="dark"||(m==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches)}catch(e){}document.documentElement.classList.add(d?"dark":"light")})()`,
+            __html: `(function(){let d=true;try{const s=localStorage.getItem("scrolltunes-preferences");const p=s?JSON.parse(s):{};const m=p.themeMode||"system";d=m==="dark"||(m==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches)}catch(e){}document.documentElement.classList.add(d?"dark":"light");document.documentElement.style.background=d?"#070A12":"#FAF7F2"})()`,
           }}
         />
       </head>
