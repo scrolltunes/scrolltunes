@@ -1,7 +1,7 @@
 "use client"
 
 import { useAccount } from "@/core"
-import { SignOut, UserCircle } from "@phosphor-icons/react"
+import { CircleNotch, SignOut, UserCircle } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { signOut } from "next-auth/react"
 import Image from "next/image"
@@ -47,31 +47,35 @@ export const UserMenu = memo(function UserMenu() {
     }
   }, [isOpen])
 
-  // Show sign-in button before mount or when not authenticated
-  const showSignIn = !isMounted || isLoading || !isAuthenticated || !user
+  // Determine which state to show:
+  // 1. Not mounted (SSR) or not authenticated: show sign-in button (default)
+  // 2. Mounted but loading: show spinner
+  // 3. Mounted, not loading, authenticated: show user avatar
+  const showSpinner = isMounted && isLoading
+  const showUser = isMounted && !isLoading && isAuthenticated && user
   const initials = user ? getInitials(user.name, user.email) : ""
 
   return (
     <div ref={menuRef} className="relative w-10 h-10 flex-shrink-0">
       <AnimatePresence mode="wait" initial={false}>
-        {showSignIn ? (
+        {showSpinner ? (
           <motion.div
-            key="sign-in"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
+            key="spinner"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ background: "var(--color-surface2)" }}
           >
-            <Link
-              href="/login"
-              className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
-              style={{ background: "var(--color-surface2)" }}
-              aria-label="Sign in"
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
             >
-              <UserCircle size={20} />
-            </Link>
+              <CircleNotch size={20} style={{ color: "var(--color-text-muted)" }} />
+            </motion.div>
           </motion.div>
-        ) : (
+        ) : showUser ? (
           <motion.button
             key="user-menu"
             type="button"
@@ -86,7 +90,7 @@ export const UserMenu = memo(function UserMenu() {
             aria-expanded={isOpen}
             aria-haspopup="true"
           >
-            {user?.image ? (
+            {user.image ? (
               <Image
                 src={user.image}
                 alt=""
@@ -103,6 +107,23 @@ export const UserMenu = memo(function UserMenu() {
               </div>
             )}
           </motion.button>
+        ) : (
+          <motion.div
+            key="sign-in"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.15 }}
+          >
+            <Link
+              href="/login"
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+              style={{ background: "var(--color-surface2)" }}
+              aria-label="Sign in"
+            >
+              <UserCircle size={20} />
+            </Link>
+          </motion.div>
         )}
       </AnimatePresence>
 
