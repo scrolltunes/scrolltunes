@@ -144,11 +144,11 @@ export default function Home() {
       <main className="pt-16 flex flex-col relative z-10">
         {/* Hero Section - Search First */}
         <section className="flex flex-col items-center px-6 pt-20 pb-12">
-          <div className="flex items-center gap-3 mb-8">
-            <Logo size={40} style={{ color: "var(--color-accent)" }} />
-            <h1 className="text-3xl font-semibold" style={{ color: "var(--color-text)" }}>
-              ScrollTunes
-            </h1>
+          <div
+            className="mb-8 w-24 h-24 rounded-full flex items-center justify-center"
+            style={{ background: "var(--color-surface1)" }}
+          >
+            <Logo size={56} style={{ color: "var(--color-accent)" }} />
           </div>
           <SongSearch className="w-full max-w-md" />
           <Attribution

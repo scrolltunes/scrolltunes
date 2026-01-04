@@ -208,10 +208,7 @@ export function EditSetlistModal({
                           ? "ring-2 ring-white ring-offset-2"
                           : "hover:scale-110"
                       }`}
-                      style={{
-                        backgroundColor: color.value,
-                        ringOffsetColor: "var(--color-surface1)",
-                      }}
+                      style={{ backgroundColor: color.value }}
                       aria-label={color.name}
                       aria-pressed={selectedColor === color.value}
                     />

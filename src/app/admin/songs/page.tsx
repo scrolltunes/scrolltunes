@@ -76,11 +76,12 @@ function formatDuration(ms: number | null): string {
 
 function Header() {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
+    <header className="fixed top-0 left-0 right-0 z-50 h-14 backdrop-blur-lg" style={{ background: "rgba(7, 10, 18, 0.8)", borderBottom: "1px solid var(--color-border)" }}>
       <div className="max-w-6xl mx-auto h-full px-4 flex items-center">
         <Link
           href="/admin"
-          className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
+          className="flex items-center gap-2 transition-colors hover:brightness-125"
+          style={{ color: "var(--color-text3)" }}
         >
           <ArrowLeft size={20} />
           <span>Admin</span>
@@ -92,7 +93,7 @@ function Header() {
 
 function AccessDenied() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header />
       <main className="pt-20 pb-8 px-4 flex items-center justify-center min-h-screen">
         <motion.div
@@ -101,14 +102,15 @@ function AccessDenied() {
           transition={springs.default}
           className="text-center max-w-sm"
         >
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-neutral-900 flex items-center justify-center">
-            <ShieldWarning size={32} className="text-neutral-500" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-surface1)" }}>
+            <ShieldWarning size={32} style={{ color: "var(--color-text-muted)" }} />
           </div>
           <h2 className="text-xl font-semibold mb-2">Access denied</h2>
-          <p className="text-neutral-400 mb-6">You don't have permission to view this page</p>
+          <p className="mb-6" style={{ color: "var(--color-text3)" }}>You don't have permission to view this page</p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors hover:brightness-110"
+            style={{ background: "var(--color-accent)", color: "white" }}
           >
             Go home
           </Link>
@@ -120,13 +122,13 @@ function AccessDenied() {
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="mb-8">
-            <div className="h-8 w-40 bg-neutral-800 rounded animate-pulse mb-2" />
-            <div className="h-5 w-32 bg-neutral-800 rounded animate-pulse" />
+            <div className="h-8 w-40 rounded animate-pulse mb-2" style={{ background: "var(--color-surface2)" }} />
+            <div className="h-5 w-32 rounded animate-pulse" style={{ background: "var(--color-surface2)" }} />
           </div>
         </div>
       </main>
@@ -138,7 +140,7 @@ function LoadingGrid() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="h-48 bg-neutral-900 rounded-xl animate-pulse" />
+        <div key={i} className="h-48 rounded-xl animate-pulse" style={{ background: "var(--color-surface1)" }} />
       ))}
     </div>
   )
@@ -152,13 +154,13 @@ function EmptyState({ hasSearch }: { hasSearch: boolean }) {
       transition={springs.default}
       className="flex flex-col items-center justify-center py-16 text-center"
     >
-      <div className="w-16 h-16 mb-4 rounded-2xl bg-neutral-900 flex items-center justify-center">
-        <MusicNote size={32} className="text-neutral-600" />
+      <div className="w-16 h-16 mb-4 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-surface1)" }}>
+        <MusicNote size={32} style={{ color: "var(--color-text-muted)" }} />
       </div>
-      <h3 className="text-lg font-medium text-neutral-300 mb-2">
+      <h3 className="text-lg font-medium mb-2" style={{ color: "var(--color-text2)" }}>
         {hasSearch ? "No songs found" : "No songs yet"}
       </h3>
-      <p className="text-neutral-500">
+      <p style={{ color: "var(--color-text-muted)" }}>
         {hasSearch ? "Try adjusting your search or filter" : "Songs will appear here once added"}
       </p>
     </motion.div>
@@ -174,9 +176,12 @@ function StatusBadge({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
-        active ? "bg-green-500/20 text-green-400" : "bg-neutral-800 text-neutral-500"
-      }`}
+      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full"
+      style={
+        active
+          ? { background: "var(--color-success-soft)", color: "var(--color-success)" }
+          : { background: "var(--color-surface2)", color: "var(--color-text-muted)" }
+      }
     >
       {active ? <Check size={12} weight="bold" /> : <X size={12} />}
       {label}
@@ -273,32 +278,33 @@ function SongCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...springs.default, delay: index * 0.03 }}
-      className="bg-neutral-900 rounded-xl border border-neutral-800 flex flex-col hover:border-neutral-700 transition-colors"
+      className="rounded-xl flex flex-col transition-colors"
+      style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)" }}
     >
       <Link href={`/admin/songs/${song.id}`} className="p-4 flex gap-3">
-        <div className="flex-shrink-0 w-[60px] h-[60px] rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden">
+        <div className="flex-shrink-0 w-[60px] h-[60px] rounded-lg flex items-center justify-center overflow-hidden" style={{ background: "var(--color-surface2)" }}>
           {isLoadingArt ? (
-            <div className="w-full h-full bg-neutral-800 animate-pulse" />
+            <div className="w-full h-full animate-pulse" style={{ background: "var(--color-surface2)" }} />
           ) : albumArt ? (
             <img src={albumArt} alt="" className="w-full h-full object-cover" />
           ) : (
-            <MusicNote size={24} weight="fill" className="text-neutral-600" />
+            <MusicNote size={24} weight="fill" style={{ color: "var(--color-text-muted)" }} />
           )}
         </div>
 
         <div className="flex-1 min-w-0">
-          <span className="text-white font-medium hover:text-indigo-400 transition-colors line-clamp-1">
+          <span className="font-medium transition-colors line-clamp-1" style={{ color: "var(--color-text)" }}>
             {song.title}
           </span>
-          <p className="text-neutral-400 text-sm line-clamp-1">{song.artist}</p>
+          <p className="text-sm line-clamp-1" style={{ color: "var(--color-text3)" }}>{song.artist}</p>
           {song.album && (
-            <p className="text-neutral-500 text-xs line-clamp-1 mt-0.5">{song.album}</p>
+            <p className="text-xs line-clamp-1 mt-0.5" style={{ color: "var(--color-text-muted)" }}>{song.album}</p>
           )}
         </div>
       </Link>
 
       <div className="px-4 pb-4 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
           {duration && (
             <span className="flex items-center gap-1">
               <Timer size={12} />
@@ -328,12 +334,13 @@ function SongCard({
           <StatusBadge label="Chords" active={song.hasChordEnhancement} />
         </div>
 
-        <div className="flex items-center gap-2 pt-2 border-t border-neutral-800">
+        <div className="flex items-center gap-2 pt-2" style={{ borderTop: "1px solid var(--color-border)" }}>
           {song.lrclibId ? (
             song.hasEnhancement ? (
               <Link
                 href={`/admin/enhance/${song.lrclibId}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-500 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-110"
+                style={{ background: "var(--color-success)", color: "white" }}
               >
                 <PencilSimple size={14} />
                 <span>Edit</span>
@@ -341,7 +348,8 @@ function SongCard({
             ) : (
               <Link
                 href={`/admin/enhance/${song.lrclibId}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-110"
+                style={{ background: "var(--color-accent)", color: "white" }}
               >
                 <Sparkle size={14} />
                 <span>Enhance</span>
@@ -352,7 +360,8 @@ function SongCard({
             type="button"
             onClick={handleDelete}
             disabled={isDeleting}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 text-neutral-400 text-sm rounded-lg hover:bg-red-600/20 hover:text-red-400 transition-colors disabled:opacity-50 ml-auto"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors disabled:opacity-50 ml-auto"
+            style={{ background: "var(--color-surface2)", color: "var(--color-text3)" }}
             title="Delete song permanently"
           >
             <Trash size={14} />
@@ -452,30 +461,31 @@ function SongRow({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ ...springs.default, delay: index * 0.02 }}
-      className="border-b border-neutral-800 last:border-b-0 hover:bg-neutral-800/50 transition-colors"
+      className="last:border-b-0 transition-colors"
+      style={{ borderBottom: "1px solid var(--color-border)" }}
     >
       <td className="px-4 py-3">
         <Link href={`/admin/songs/${song.id}`} className="flex items-center gap-3">
-          <div className="flex-shrink-0 w-10 h-10 rounded bg-neutral-800 flex items-center justify-center overflow-hidden">
+          <div className="flex-shrink-0 w-10 h-10 rounded flex items-center justify-center overflow-hidden" style={{ background: "var(--color-surface2)" }}>
             {isLoadingArt ? (
-              <div className="w-full h-full bg-neutral-800 animate-pulse" />
+              <div className="w-full h-full animate-pulse" style={{ background: "var(--color-surface2)" }} />
             ) : albumArt ? (
               <img src={albumArt} alt="" className="w-full h-full object-cover" />
             ) : (
-              <MusicNote size={16} weight="fill" className="text-neutral-600" />
+              <MusicNote size={16} weight="fill" style={{ color: "var(--color-text-muted)" }} />
             )}
           </div>
           <div className="min-w-0">
-            <span className="text-white font-medium hover:text-indigo-400 transition-colors line-clamp-1">
+            <span className="font-medium transition-colors line-clamp-1" style={{ color: "var(--color-text)" }}>
               {song.title}
             </span>
-            <p className="text-neutral-400 text-sm line-clamp-1">{song.artist}</p>
+            <p className="text-sm line-clamp-1" style={{ color: "var(--color-text3)" }}>{song.artist}</p>
           </div>
         </Link>
       </td>
-      <td className="px-4 py-3 text-neutral-400 hidden md:table-cell">{song.album || "—"}</td>
-      <td className="px-4 py-3 text-neutral-400 hidden lg:table-cell">{duration || "—"}</td>
-      <td className="px-4 py-3 text-neutral-400 hidden lg:table-cell">
+      <td className="px-4 py-3 hidden md:table-cell" style={{ color: "var(--color-text3)" }}>{song.album || "—"}</td>
+      <td className="px-4 py-3 hidden lg:table-cell" style={{ color: "var(--color-text3)" }}>{duration || "—"}</td>
+      <td className="px-4 py-3 hidden lg:table-cell" style={{ color: "var(--color-text3)" }}>
         {song.bpm ? `${song.bpm}` : "—"}
         {song.musicalKey && ` · ${song.musicalKey}`}
       </td>
@@ -494,11 +504,12 @@ function SongRow({
       </td>
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-2">
-          <span className="text-neutral-400">{song.totalPlayCount.toLocaleString()}</span>
+          <span style={{ color: "var(--color-text3)" }}>{song.totalPlayCount.toLocaleString()}</span>
           {song.lrclibId && (
             <Link
               href={`/admin/enhance/${song.lrclibId}`}
-              className="p-1.5 text-neutral-500 hover:text-indigo-400 transition-colors"
+              className="p-1.5 transition-colors hover:brightness-125"
+              style={{ color: "var(--color-text-muted)" }}
               title={song.hasEnhancement ? "Edit enhancement" : "Enhance"}
             >
               {song.hasEnhancement ? <PencilSimple size={16} /> : <Sparkle size={16} />}
@@ -508,7 +519,8 @@ function SongRow({
             type="button"
             onClick={handleDelete}
             disabled={isDeleting}
-            className="p-1.5 text-neutral-500 hover:text-red-400 transition-colors disabled:opacity-50"
+            className="p-1.5 transition-colors disabled:opacity-50"
+            style={{ color: "var(--color-text-muted)" }}
             title="Delete"
           >
             <Trash size={16} />
@@ -607,7 +619,7 @@ export default function AdminSongsPage() {
   const currentPage = Math.floor(offset / LIMIT) + 1
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-6xl mx-auto">
@@ -618,7 +630,7 @@ export default function AdminSongsPage() {
             className="mb-8"
           >
             <h1 className="text-2xl font-semibold mb-1">Songs Catalog</h1>
-            <p className="text-neutral-400">
+            <p style={{ color: "var(--color-text3)" }}>
               {total} song{total !== 1 ? "s" : ""} in database
             </p>
           </motion.div>
@@ -632,25 +644,29 @@ export default function AdminSongsPage() {
             <div className="relative flex-1">
               <MagnifyingGlass
                 size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500"
+                className="absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: "var(--color-text-muted)" }}
               />
               <input
                 type="text"
                 placeholder="Search by artist or title..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg focus:outline-none transition-colors"
+                style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
               />
             </div>
             <div className="relative">
               <FunnelSimple
                 size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none"
+                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: "var(--color-text-muted)" }}
               />
               <select
                 value={filter}
                 onChange={e => setFilter(e.target.value as FilterType)}
-                className="appearance-none pl-10 pr-10 py-2.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                className="appearance-none pl-10 pr-10 py-2.5 rounded-lg focus:outline-none transition-colors cursor-pointer"
+                style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
               >
                 <option value="all">All</option>
                 <option value="synced">Synced</option>
@@ -658,11 +674,12 @@ export default function AdminSongsPage() {
                 <option value="unenhanced">Unenhanced</option>
               </select>
             </div>
-            <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-1">
+            <div className="flex items-center gap-1 rounded-lg p-1" style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)" }}>
               <button
                 type="button"
                 onClick={() => handleViewTypeChange("grid")}
-                className={`p-2 rounded transition-colors ${viewType === "grid" ? "bg-neutral-800 text-white" : "text-neutral-500 hover:text-white"}`}
+                className="p-2 rounded transition-colors"
+                style={viewType === "grid" ? { background: "var(--color-surface2)", color: "var(--color-text)" } : { color: "var(--color-text-muted)" }}
                 title="Grid view"
               >
                 <SquaresFour size={18} />
@@ -670,7 +687,8 @@ export default function AdminSongsPage() {
               <button
                 type="button"
                 onClick={() => handleViewTypeChange("list")}
-                className={`p-2 rounded transition-colors ${viewType === "list" ? "bg-neutral-800 text-white" : "text-neutral-500 hover:text-white"}`}
+                className="p-2 rounded transition-colors"
+                style={viewType === "list" ? { background: "var(--color-surface2)", color: "var(--color-text)" } : { color: "var(--color-text-muted)" }}
                 title="List view"
               >
                 <List size={18} />
@@ -681,7 +699,8 @@ export default function AdminSongsPage() {
                 type="button"
                 onClick={handleDeleteAll}
                 disabled={isDeletingAll}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50"
+                style={{ background: "var(--color-danger-soft)", color: "var(--color-danger)" }}
               >
                 <Trash size={18} />
                 <span>{isDeletingAll ? "Deleting..." : "Delete all"}</span>
@@ -719,11 +738,12 @@ export default function AdminSongsPage() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ ...springs.default, delay: 0.2 }}
-                  className="bg-neutral-900 rounded-xl border border-neutral-800 overflow-hidden"
+                  className="rounded-xl overflow-hidden"
+                  style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)" }}
                 >
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-neutral-800 text-left text-neutral-400">
+                      <tr className="text-left" style={{ borderBottom: "1px solid var(--color-border)", color: "var(--color-text3)" }}>
                         <th className="px-4 py-3 font-medium">Song</th>
                         <th className="px-4 py-3 font-medium hidden md:table-cell">Album</th>
                         <th className="px-4 py-3 font-medium hidden lg:table-cell">Duration</th>
@@ -756,7 +776,7 @@ export default function AdminSongsPage() {
                   transition={{ ...springs.default, delay: 0.3 }}
                   className="flex items-center justify-between mt-6"
                 >
-                  <p className="text-sm text-neutral-400">
+                  <p className="text-sm" style={{ color: "var(--color-text3)" }}>
                     Showing {offset + 1}–{Math.min(offset + LIMIT, total)} of {total}
                   </p>
                   <div className="flex items-center gap-2">
@@ -764,18 +784,20 @@ export default function AdminSongsPage() {
                       type="button"
                       onClick={() => setOffset(Math.max(0, offset - LIMIT))}
                       disabled={offset === 0}
-                      className="p-2 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:brightness-125"
+                      style={{ background: "var(--color-surface1)", color: "var(--color-text3)" }}
                     >
                       <CaretLeft size={18} />
                     </button>
-                    <span className="text-sm text-neutral-400 min-w-[80px] text-center">
+                    <span className="text-sm min-w-[80px] text-center" style={{ color: "var(--color-text3)" }}>
                       Page {currentPage} of {totalPages}
                     </span>
                     <button
                       type="button"
                       onClick={() => setOffset(offset + LIMIT)}
                       disabled={offset + LIMIT >= total}
-                      className="p-2 rounded-lg bg-neutral-900 text-neutral-400 hover:text-white hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:brightness-125"
+                      style={{ background: "var(--color-surface1)", color: "var(--color-text3)" }}
                     >
                       <CaretRight size={18} />
                     </button>

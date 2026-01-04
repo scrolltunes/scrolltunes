@@ -41,11 +41,11 @@ const sections: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
 
 function Header() {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-800">
+    <header className="fixed top-0 left-0 right-0 z-50 h-14 backdrop-blur-lg" style={{ background: "rgba(7, 10, 18, 0.8)", borderBottom: "1px solid var(--color-border)" }}>
       <div className="max-w-4xl mx-auto h-full px-4 flex items-center">
         <Link
           href="/"
-          className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
+          className="flex items-center gap-2 transition-colors hover:brightness-125" style={{ color: "var(--color-text3)" }}
         >
           <ArrowLeft size={20} />
           <span>Back</span>
@@ -57,7 +57,7 @@ function Header() {
 
 function AccessDenied() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header />
       <main className="pt-20 pb-8 px-4 flex items-center justify-center min-h-screen">
         <motion.div
@@ -66,14 +66,14 @@ function AccessDenied() {
           transition={springs.default}
           className="text-center max-w-sm"
         >
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-neutral-900 flex items-center justify-center">
-            <ShieldWarning size={32} className="text-neutral-500" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-surface1)" }}>
+            <ShieldWarning size={32} style={{ color: "var(--color-text-muted)" }} />
           </div>
           <h2 className="text-xl font-semibold mb-2">Access denied</h2>
-          <p className="text-neutral-400 mb-6">You don't have permission to view this page</p>
+          <p className="mb-6" style={{ color: "var(--color-text3)" }}>You don't have permission to view this page</p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors hover:brightness-110" style={{ background: "var(--color-accent)", color: "white" }}
           >
             Go home
           </Link>
@@ -101,16 +101,16 @@ function StatCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...springs.default, delay }}
-      className="p-5 rounded-xl bg-neutral-900"
+      className="p-5 rounded-xl" style={{ background: "var(--color-surface1)" }}
     >
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center text-indigo-400">
+        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "var(--color-surface2)", color: "var(--color-accent)" }}>
           {icon}
         </div>
-        <span className="text-sm text-neutral-400">{label}</span>
+        <span className="text-sm" style={{ color: "var(--color-text3)" }}>{label}</span>
       </div>
-      <p className="text-xl font-semibold text-white">{value}</p>
-      {subtext && <p className="text-sm text-neutral-500 mt-1">{subtext}</p>}
+      <p className="text-xl font-semibold" style={{ color: "var(--color-text)" }}>{value}</p>
+      {subtext && <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>{subtext}</p>}
     </motion.div>
   )
 }
@@ -135,9 +135,9 @@ function AnalyticsSection({ stats, isLoading }: { stats: AdminStats | null; isLo
     return (
       <div className="space-y-4">
         {[1, 2, 3].map(i => (
-          <div key={i} className="p-5 rounded-xl bg-neutral-900 animate-pulse">
-            <div className="h-10 w-32 bg-neutral-800 rounded mb-3" />
-            <div className="h-6 w-48 bg-neutral-800 rounded" />
+          <div key={i} className="p-5 rounded-xl animate-pulse" style={{ background: "var(--color-surface1)" }}>
+            <div className="h-10 w-32 rounded mb-3" style={{ background: "var(--color-surface2)" }} />
+            <div className="h-6 w-48 rounded" style={{ background: "var(--color-surface2)" }} />
           </div>
         ))}
       </div>
@@ -150,33 +150,33 @@ function AnalyticsSection({ stats, isLoading }: { stats: AdminStats | null; isLo
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springs.default, delay: 0.1 }}
-        className="p-5 rounded-xl bg-neutral-900"
+        className="p-5 rounded-xl" style={{ background: "var(--color-surface1)" }}
       >
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center text-indigo-400">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "var(--color-surface2)", color: "var(--color-accent)" }}>
             <Heart size={20} />
           </div>
-          <span className="text-sm text-neutral-400">Top 5 favorite songs</span>
+          <span className="text-sm" style={{ color: "var(--color-text3)" }}>Top 5 favorite songs</span>
         </div>
         {stats?.topFavorites && stats.topFavorites.length > 0 ? (
           <ol className="space-y-3">
             {stats.topFavorites.map((song, index) => (
               <li key={`${song.title}-${song.artist}`} className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-neutral-800 flex items-center justify-center text-xs font-medium text-neutral-400">
+                <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style={{ background: "var(--color-surface2)", color: "var(--color-text3)" }}>
                   {index + 1}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white truncate">{song.title}</p>
-                  <p className="text-sm text-neutral-500 truncate">{song.artist}</p>
+                  <p className="truncate" style={{ color: "var(--color-text)" }}>{song.title}</p>
+                  <p className="text-sm truncate" style={{ color: "var(--color-text-muted)" }}>{song.artist}</p>
                 </div>
-                <span className="text-sm text-neutral-400">
+                <span className="text-sm" style={{ color: "var(--color-text3)" }}>
                   {song.favoriteCount} {song.favoriteCount === 1 ? "fav" : "favs"}
                 </span>
               </li>
             ))}
           </ol>
         ) : (
-          <p className="text-neutral-500">No favorites yet</p>
+          <p style={{ color: "var(--color-text-muted)" }}>No favorites yet</p>
         )}
       </motion.div>
 
@@ -205,11 +205,11 @@ function ComingSoonSection({ title }: { title: string }) {
       transition={springs.default}
       className="flex flex-col items-center justify-center py-16 text-center"
     >
-      <div className="w-16 h-16 mb-4 rounded-2xl bg-neutral-900 flex items-center justify-center">
-        <ListChecks size={32} className="text-neutral-600" />
+      <div className="w-16 h-16 mb-4 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-surface1)" }}>
+        <ListChecks size={32} style={{ color: "var(--color-text-muted)" }} />
       </div>
-      <h3 className="text-lg font-medium text-neutral-300 mb-2">{title}</h3>
-      <p className="text-neutral-500">This section is under development</p>
+      <h3 className="text-lg font-medium mb-2" style={{ color: "var(--color-text2)" }}>{title}</h3>
+      <p style={{ color: "var(--color-text-muted)" }}>This section is under development</p>
     </motion.div>
   )
 }
@@ -229,11 +229,12 @@ function MobileTabs({
             key={section.id}
             type="button"
             onClick={() => onSectionChange(section.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors"
+            style={
               activeSection === section.id
-                ? "bg-indigo-600 text-white"
-                : "bg-neutral-900 text-neutral-400 hover:text-white"
-            }`}
+                ? { background: "var(--color-accent)", color: "white" }
+                : { background: "var(--color-surface1)", color: "var(--color-text3)" }
+            }
           >
             {section.icon}
             <span>{section.label}</span>
@@ -241,7 +242,8 @@ function MobileTabs({
         ))}
         <Link
           href="/admin/songs"
-          className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors bg-neutral-900 text-neutral-400 hover:text-white"
+          className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors hover:brightness-125"
+          style={{ background: "var(--color-surface1)", color: "var(--color-text3)" }}
         >
           <MusicNote size={20} />
           <span>Songs</span>
@@ -266,11 +268,12 @@ function Sidebar({
             <button
               type="button"
               onClick={() => onSectionChange(section.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors"
+              style={
                 activeSection === section.id
-                  ? "bg-indigo-600 text-white"
-                  : "text-neutral-400 hover:bg-neutral-900 hover:text-white"
-              }`}
+                  ? { background: "var(--color-accent)", color: "white" }
+                  : { color: "var(--color-text3)" }
+              }
             >
               {section.icon}
               <span>{section.label}</span>
@@ -278,17 +281,18 @@ function Sidebar({
           </li>
         ))}
       </ul>
-      <div className="mt-6 pt-6 border-t border-neutral-800">
-        <p className="px-4 mb-2 text-xs font-medium text-neutral-500 uppercase tracking-wider">
+      <div className="mt-6 pt-6" style={{ borderTop: "1px solid var(--color-border)" }}>
+        <p className="px-4 mb-2 text-xs font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
           Tools
         </p>
         <Link
           href="/admin/songs"
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors text-neutral-400 hover:bg-neutral-900 hover:text-white"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:brightness-125"
+          style={{ color: "var(--color-text3)" }}
         >
           <MusicNote size={20} />
           <span className="flex-1">Songs Catalog</span>
-          <ArrowSquareOut size={16} className="text-neutral-600" />
+          <ArrowSquareOut size={16} style={{ color: "var(--color-text-muted)" }} />
         </Link>
       </div>
     </nav>
@@ -297,13 +301,13 @@ function Sidebar({
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
-            <div className="h-8 w-40 bg-neutral-800 rounded animate-pulse mb-2" />
-            <div className="h-5 w-32 bg-neutral-800 rounded animate-pulse" />
+            <div className="h-8 w-40 rounded animate-pulse mb-2" style={{ background: "var(--color-surface2)" }} />
+            <div className="h-5 w-32 rounded animate-pulse" style={{ background: "var(--color-surface2)" }} />
           </div>
         </div>
       </main>
@@ -358,13 +362,13 @@ export default function AdminPage() {
   const activeLabel = sections.find(s => s.id === activeSection)?.label ?? "Admin"
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <h1 className="text-2xl font-semibold mb-1">Admin Panel</h1>
-            <p className="text-neutral-400">Manage ScrollTunes</p>
+            <p style={{ color: "var(--color-text3)" }}>Manage ScrollTunes</p>
           </div>
 
           <MobileTabs activeSection={activeSection} onSectionChange={setActiveSection} />
