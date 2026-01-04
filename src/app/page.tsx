@@ -144,18 +144,12 @@ export default function Home() {
       <main className="pt-16 flex flex-col relative z-10">
         {/* Hero Section - Search First */}
         <section className="flex flex-col items-center px-6 pt-20 pb-12">
-          <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-3 mb-8">
             <Logo size={40} style={{ color: "var(--color-accent)" }} />
             <h1 className="text-3xl font-semibold" style={{ color: "var(--color-text)" }}>
               ScrollTunes
             </h1>
           </div>
-          <p
-            className="text-lg mb-8 text-center"
-            style={{ color: "var(--color-text3)" }}
-          >
-            Lyrics that follow your voice
-          </p>
           <SongSearch className="w-full max-w-md" />
           <Attribution
             lyrics={{ name: "LRCLIB", url: "https://lrclib.net" }}

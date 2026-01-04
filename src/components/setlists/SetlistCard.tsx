@@ -35,7 +35,8 @@ export const SetlistCard = memo(function SetlistCard({
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-3 p-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 transition-colors text-left relative overflow-hidden group"
+      className="w-full flex items-center gap-3 p-4 rounded-xl transition-colors text-left relative overflow-hidden group hover:brightness-110"
+      style={{ background: "var(--color-surface1)" }}
       aria-label={`${name}, ${songCount} ${songCount === 1 ? "song" : "songs"}`}
     >
       {color && (
@@ -45,29 +46,38 @@ export const SetlistCard = memo(function SetlistCard({
         />
       )}
 
-      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-800 overflow-hidden">
+      <div
+        className="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden"
+        style={{ background: "var(--color-surface2)" }}
+      >
         {albumArts && albumArts.length > 0 ? (
           <div className="w-full h-full grid grid-cols-2 grid-rows-2">
             {gridItems.map((art, i) => (
-              <div key={i} className="bg-neutral-700">
+              <div key={i} style={{ background: "var(--color-surface3)" }}>
                 {art ? (
                   <img src={art} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-neutral-700" />
+                  <div className="w-full h-full" style={{ background: "var(--color-surface3)" }} />
                 )}
               </div>
             ))}
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <MusicNotesSimple size={20} weight="fill" className="text-neutral-400" />
+            <MusicNotesSimple
+              size={20}
+              weight="fill"
+              style={{ color: "var(--color-text-muted)" }}
+            />
           </div>
         )}
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-white font-medium truncate">{name}</p>
-        <p className="text-sm text-neutral-500">
+        <p className="font-medium truncate" style={{ color: "var(--color-text)" }}>
+          {name}
+        </p>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           {songCount} {songCount === 1 ? "song" : "songs"}
         </p>
       </div>
@@ -83,10 +93,11 @@ export const SetlistCard = memo(function SetlistCard({
               onEdit()
             }
           }}
-          className="flex-shrink-0 w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:brightness-110"
+          style={{ background: "var(--color-surface2)" }}
           aria-label="Edit setlist"
         >
-          <PencilSimple size={16} className="text-neutral-400" />
+          <PencilSimple size={16} style={{ color: "var(--color-text3)" }} />
         </div>
       )}
     </button>

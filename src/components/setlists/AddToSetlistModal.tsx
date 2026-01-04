@@ -129,29 +129,44 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={springs.default}
-              className="relative mx-4 w-full max-w-sm rounded-2xl bg-neutral-900 p-6 shadow-xl"
+              className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-xl"
+              style={{ background: "var(--color-surface1)" }}
             >
               <button
                 type="button"
                 onClick={handleClose}
-                className="absolute right-4 top-4 rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                className="absolute right-4 top-4 rounded-lg p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                style={{ color: "var(--color-text3)" }}
                 aria-label="Close"
               >
                 <X size={20} weight="bold" />
               </button>
 
-              <h2 className="text-xl font-semibold text-white mb-2 pr-8">Add to setlist</h2>
-              <p className="text-sm text-neutral-400 mb-4 truncate">
+              <h2
+                className="text-xl font-semibold mb-2 pr-8"
+                style={{ color: "var(--color-text)" }}
+              >
+                Add to setlist
+              </h2>
+              <p className="text-sm mb-4 truncate" style={{ color: "var(--color-text3)" }}>
                 {displayTitle} — {displayArtist}
               </p>
 
               {!isAuthenticated ? (
                 <div className="text-center py-6">
-                  <MusicNote size={48} weight="fill" className="mx-auto mb-3 text-neutral-600" />
-                  <p className="text-neutral-400 mb-4">Sign in to use setlists</p>
+                  <MusicNote
+                    size={48}
+                    weight="fill"
+                    className="mx-auto mb-3"
+                    style={{ color: "var(--color-text-muted)" }}
+                  />
+                  <p className="mb-4" style={{ color: "var(--color-text3)" }}>
+                    Sign in to use setlists
+                  </p>
                   <Link
                     href="/login"
-                    className="inline-block px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+                    className="inline-block px-6 py-2.5 rounded-lg transition-colors hover:brightness-110"
+                    style={{ background: "var(--color-accent)", color: "white" }}
                     onClick={handleClose}
                   >
                     Sign in
@@ -163,17 +178,25 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
                   >
-                    <SpinnerGap size={32} className="text-indigo-500" />
+                    <SpinnerGap size={32} style={{ color: "var(--color-accent)" }} />
                   </motion.div>
                 </div>
               ) : setlists.length === 0 ? (
                 <div className="text-center py-6">
-                  <MusicNote size={48} weight="fill" className="mx-auto mb-3 text-neutral-600" />
-                  <p className="text-neutral-400 mb-4">Create your first setlist</p>
+                  <MusicNote
+                    size={48}
+                    weight="fill"
+                    className="mx-auto mb-3"
+                    style={{ color: "var(--color-text-muted)" }}
+                  />
+                  <p className="mb-4" style={{ color: "var(--color-text3)" }}>
+                    Create your first setlist
+                  </p>
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(true)}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg transition-colors hover:brightness-110"
+                    style={{ background: "var(--color-accent)", color: "white" }}
                   >
                     <Plus size={20} weight="bold" />
                     Create setlist
@@ -192,15 +215,16 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                         type="button"
                         onClick={() => handleToggleSetlist(setlist.id)}
                         disabled={addingToSetlistId !== null}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed ${
-                          isInSetlist
-                            ? "bg-indigo-600/20 hover:bg-indigo-600/30"
-                            : "bg-neutral-800 hover:bg-neutral-700"
-                        }`}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+                        style={{
+                          background: isInSetlist
+                            ? "var(--color-accent-soft)"
+                            : "var(--color-surface2)",
+                        }}
                       >
                         <div
                           className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: setlist.color ?? "#6366f1" }}
+                          style={{ backgroundColor: setlist.color ?? "var(--color-accent)" }}
                         >
                           {isAdding ? (
                             <motion.div
@@ -211,7 +235,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                                 ease: "linear",
                               }}
                             >
-                              <SpinnerGap size={20} className="text-white" />
+                              <SpinnerGap size={20} style={{ color: "white" }} />
                             </motion.div>
                           ) : isSuccess || isInSetlist ? (
                             <motion.div
@@ -219,15 +243,17 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                               animate={{ scale: 1 }}
                               transition={{ type: "spring", stiffness: 400, damping: 15 }}
                             >
-                              <Check size={20} weight="bold" className="text-white" />
+                              <Check size={20} weight="bold" style={{ color: "white" }} />
                             </motion.div>
                           ) : (
-                            <MusicNote size={20} weight="fill" className="text-white" />
+                            <MusicNote size={20} weight="fill" style={{ color: "white" }} />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-white font-medium truncate">{setlist.name}</p>
-                          <p className="text-sm text-neutral-400">
+                          <p className="font-medium truncate" style={{ color: "var(--color-text)" }}>
+                            {setlist.name}
+                          </p>
+                          <p className="text-sm" style={{ color: "var(--color-text3)" }}>
                             {setlist.songCount} {setlist.songCount === 1 ? "song" : "songs"}
                           </p>
                         </div>
@@ -238,12 +264,16 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                     type="button"
                     onClick={() => setShowCreateModal(true)}
                     disabled={addingToSetlistId !== null}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed border-neutral-700 hover:border-neutral-600 hover:bg-neutral-800/50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+                    style={{ borderColor: "var(--color-border)" }}
                   >
-                    <div className="w-10 h-10 rounded-lg bg-neutral-700 flex items-center justify-center flex-shrink-0">
-                      <Plus size={20} className="text-neutral-400" />
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ background: "var(--color-surface2)" }}
+                    >
+                      <Plus size={20} style={{ color: "var(--color-text3)" }} />
                     </div>
-                    <span className="text-neutral-400">Create new setlist</span>
+                    <span style={{ color: "var(--color-text3)" }}>Create new setlist</span>
                   </button>
                 </div>
               )}

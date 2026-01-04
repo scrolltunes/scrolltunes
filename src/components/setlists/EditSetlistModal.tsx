@@ -118,24 +118,32 @@ export function EditSetlistModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={springs.default}
-            className="relative mx-4 w-full max-w-sm rounded-2xl bg-neutral-900 p-6 shadow-xl"
+            className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-xl"
+            style={{ background: "var(--color-surface1)" }}
           >
             <button
               type="button"
               onClick={handleClose}
-              className="absolute right-4 top-4 rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="absolute right-4 top-4 rounded-lg p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+              style={{ color: "var(--color-text3)" }}
               aria-label="Close"
             >
               <X size={20} weight="bold" />
             </button>
 
-            <h2 className="text-xl font-semibold text-white mb-6 pr-8">Edit setlist</h2>
+            <h2
+              className="text-xl font-semibold mb-6 pr-8"
+              style={{ color: "var(--color-text)" }}
+            >
+              Edit setlist
+            </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label
                   htmlFor="setlist-name"
-                  className="block text-sm font-medium text-neutral-400 mb-1.5"
+                  className="block text-sm font-medium mb-1.5"
+                  style={{ color: "var(--color-text3)" }}
                 >
                   Name
                 </label>
@@ -147,14 +155,20 @@ export function EditSetlistModal({
                   placeholder="My setlist"
                   required
                   maxLength={INPUT_LIMITS.SETLIST_NAME}
-                  className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2"
+                  style={{
+                    background: "var(--color-surface2)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                  }}
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="setlist-description"
-                  className="block text-sm font-medium text-neutral-400 mb-1.5"
+                  className="block text-sm font-medium mb-1.5"
+                  style={{ color: "var(--color-text3)" }}
                 >
                   Description (optional)
                 </label>
@@ -165,12 +179,20 @@ export function EditSetlistModal({
                   placeholder="Add a description"
                   rows={2}
                   maxLength={INPUT_LIMITS.SETLIST_DESCRIPTION}
-                  className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 resize-none"
+                  style={{
+                    background: "var(--color-surface2)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                  }}
                 />
               </div>
 
               <fieldset>
-                <legend className="block text-sm font-medium text-neutral-400 mb-2">
+                <legend
+                  className="block text-sm font-medium mb-2"
+                  style={{ color: "var(--color-text3)" }}
+                >
                   Color (optional)
                 </legend>
                 <div className="flex gap-2">
@@ -183,10 +205,13 @@ export function EditSetlistModal({
                       }
                       className={`w-8 h-8 rounded-full transition-all ${
                         selectedColor === color.value
-                          ? "ring-2 ring-white ring-offset-2 ring-offset-neutral-900"
+                          ? "ring-2 ring-white ring-offset-2"
                           : "hover:scale-110"
                       }`}
-                      style={{ backgroundColor: color.value }}
+                      style={{
+                        backgroundColor: color.value,
+                        ringOffsetColor: "var(--color-surface1)",
+                      }}
                       aria-label={color.name}
                       aria-pressed={selectedColor === color.value}
                     />
@@ -198,14 +223,16 @@ export function EditSetlistModal({
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="flex-1 px-4 py-2.5 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="flex-1 px-4 py-2.5 rounded-lg transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                  style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={!name.trim() || isSubmitting}
-                  className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2.5 rounded-lg transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: "var(--color-accent)", color: "white" }}
                 >
                   {isSubmitting ? "Saving..." : "Save"}
                 </button>
@@ -214,7 +241,11 @@ export function EditSetlistModal({
               <button
                 type="button"
                 onClick={handleDelete}
-                className="w-full px-4 py-2.5 bg-red-900/30 text-red-400 rounded-lg hover:bg-red-900/50 hover:text-red-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                className="w-full px-4 py-2.5 rounded-lg transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                style={{
+                  background: "var(--color-danger-soft)",
+                  color: "var(--color-danger)",
+                }}
               >
                 Delete setlist
               </button>

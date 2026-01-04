@@ -725,30 +725,36 @@ export function LyricsShareModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={springs.default}
-            className="relative mx-0 flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-neutral-900 shadow-xl sm:mx-4 sm:max-w-lg sm:rounded-2xl"
+            className="relative mx-0 flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-2xl shadow-xl sm:mx-4 sm:max-w-lg sm:rounded-2xl"
+            style={{ background: "var(--color-surface1)" }}
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
+            <div
+              className="flex items-center justify-between px-4 py-3"
+              style={{ borderBottom: "1px solid var(--color-border)" }}
+            >
               <div className="flex items-center gap-3">
                 {step === "preview" && (
                   <button
                     type="button"
                     onClick={handleBack}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 transition-colors hover:bg-neutral-700"
+                    className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:brightness-110"
+                    style={{ background: "var(--color-surface2)" }}
                     aria-label="Back"
                   >
                     <ArrowLeft size={18} />
                   </button>
                 )}
-                <h2 className="text-lg font-semibold">
+                <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
                   {step === "select" ? "Select Lyrics" : "Customize Card"}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-neutral-800"
+                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:brightness-110"
+                style={{ color: "var(--color-text3)" }}
                 aria-label="Close"
               >
                 <X size={20} />
@@ -771,7 +777,7 @@ export function LyricsShareModal({
                     transition={{ duration: 0.2 }}
                     className="p-4"
                   >
-                    <p dir="ltr" className="mb-3 text-sm text-neutral-400">
+                    <p dir="ltr" className="mb-3 text-sm" style={{ color: "var(--color-text3)" }}>
                       Tap lines to include in your card
                     </p>
                     <div className="space-y-1">
@@ -785,22 +791,26 @@ export function LyricsShareModal({
                             dir={isRTL ? "rtl" : undefined}
                             className={`relative w-full rounded-lg px-3 py-2 transition-colors ${
                               isRTL ? "text-right" : "text-left"
-                            } ${
-                              isSelected
-                                ? "bg-indigo-600/20 text-white"
-                                : "text-neutral-300 hover:bg-neutral-800"
                             }`}
+                            style={{
+                              background: isSelected
+                                ? "var(--color-accent-soft)"
+                                : "transparent",
+                              color: isSelected ? "var(--color-text)" : "var(--color-text2)",
+                            }}
                           >
                             <div className="flex w-full items-start gap-3">
                               <div
-                                className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition-colors ${
-                                  isSelected
-                                    ? "border-indigo-500 bg-indigo-500"
-                                    : "border-neutral-600"
-                                }`}
+                                className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition-colors"
+                                style={{
+                                  borderColor: isSelected
+                                    ? "var(--color-accent)"
+                                    : "var(--color-border)",
+                                  background: isSelected ? "var(--color-accent)" : "transparent",
+                                }}
                               >
                                 {isSelected && (
-                                  <Check size={12} weight="bold" className="text-white" />
+                                  <Check size={12} weight="bold" style={{ color: "white" }} />
                                 )}
                               </div>
                               <span className="text-sm leading-relaxed">{line.text}</span>
@@ -840,11 +850,11 @@ export function LyricsShareModal({
                             }
                             setIsEditing(prev => !prev)
                           }}
-                          className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-                            isEditing
-                              ? "bg-indigo-600 text-white"
-                              : "bg-black/40 text-white/80 hover:bg-black/60 hover:text-white"
-                          }`}
+                          className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+                          style={{
+                            background: isEditing ? "var(--color-accent)" : "rgba(0,0,0,0.4)",
+                            color: isEditing ? "white" : "rgba(255,255,255,0.8)",
+                          }}
                           aria-label={isEditing ? "Done editing" : "Edit text"}
                         >
                           {isEditing ? (
@@ -857,7 +867,8 @@ export function LyricsShareModal({
                           <button
                             type="button"
                             onClick={() => setEditedLines(new Map())}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white/80 transition-colors hover:bg-black/60 hover:text-white"
+                            className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+                            style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.8)" }}
                             aria-label="Reset text"
                           >
                             <ArrowCounterClockwise size={18} weight="bold" />
@@ -867,7 +878,8 @@ export function LyricsShareModal({
                       <button
                         type="button"
                         onClick={() => setExpandedWidth(prev => !prev)}
-                        className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white/80 transition-colors hover:bg-black/60 hover:text-white"
+                        className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+                        style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.8)" }}
                         aria-label={expandedWidth ? "Shrink width" : "Expand width"}
                       >
                         {expandedWidth ? (
@@ -883,14 +895,16 @@ export function LyricsShareModal({
                     <div className="mt-4 space-y-4">
                       {/* Background color */}
                       <div>
-                        <p className="mb-2 text-sm text-neutral-400">Background</p>
+                        <p className="mb-2 text-sm" style={{ color: "var(--color-text3)" }}>
+                          Background
+                        </p>
                         <div className="share-modal-preserve flex flex-wrap items-center gap-2">
                           {gradientPalette.map(option => (
                             <button
                               key={option.id}
                               type="button"
                               onClick={() => setSelectedGradientId(option.id)}
-                              className="relative h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
+                              className="relative h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2"
                               style={{
                                 background: option.gradient,
                                 borderColor:
@@ -904,7 +918,8 @@ export function LyricsShareModal({
                                 <Check
                                   size={16}
                                   weight="bold"
-                                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white drop-shadow-md"
+                                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 drop-shadow-md"
+                                  style={{ color: "white" }}
                                 />
                               )}
                             </button>
@@ -914,14 +929,16 @@ export function LyricsShareModal({
                           <button
                             type="button"
                             onClick={handleCustomColorClick}
-                            className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
+                            className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2"
                             style={{
                               backgroundColor:
                                 selectedGradientId === CUSTOM_COLOR_ID
                                   ? customColor
                                   : "transparent",
                               borderColor:
-                                selectedGradientId === CUSTOM_COLOR_ID ? "white" : "#525252",
+                                selectedGradientId === CUSTOM_COLOR_ID
+                                  ? "white"
+                                  : "var(--color-border)",
                             }}
                             aria-label="Choose custom color"
                           >
@@ -929,10 +946,11 @@ export function LyricsShareModal({
                               <Check
                                 size={16}
                                 weight="bold"
-                                className="text-white drop-shadow-md"
+                                className="drop-shadow-md"
+                                style={{ color: "white" }}
                               />
                             ) : (
-                              <Palette size={16} className="text-neutral-400" />
+                              <Palette size={16} style={{ color: "var(--color-text3)" }} />
                             )}
                           </button>
 
@@ -953,7 +971,9 @@ export function LyricsShareModal({
 
                       {/* Pattern */}
                       <div>
-                        <p className="mb-2 text-sm text-neutral-400">Pattern</p>
+                        <p className="mb-2 text-sm" style={{ color: "var(--color-text3)" }}>
+                          Pattern
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           {PATTERN_OPTIONS.map(option => (
                             <button
@@ -966,11 +986,15 @@ export function LyricsShareModal({
                                   setPattern(option.id)
                                 }
                               }}
-                              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                                pattern === option.id
-                                  ? "bg-indigo-600 text-white"
-                                  : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
-                              }`}
+                              className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:brightness-110"
+                              style={{
+                                background:
+                                  pattern === option.id
+                                    ? "var(--color-accent)"
+                                    : "var(--color-surface2)",
+                                color:
+                                  pattern === option.id ? "white" : "var(--color-text2)",
+                              }}
                             >
                               {option.label}
                             </button>
@@ -990,9 +1014,12 @@ export function LyricsShareModal({
                               className="sr-only"
                             />
                             <div
-                              className={`h-6 w-11 rounded-full transition-colors ${
-                                showShadow ? "bg-indigo-600" : "bg-neutral-700"
-                              }`}
+                              className="h-6 w-11 rounded-full transition-colors"
+                              style={{
+                                background: showShadow
+                                  ? "var(--color-accent)"
+                                  : "var(--color-surface3)",
+                              }}
                             />
                             <div
                               className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
@@ -1000,7 +1027,9 @@ export function LyricsShareModal({
                               }`}
                             />
                           </div>
-                          <span className="text-sm text-neutral-300">Drop shadow</span>
+                          <span className="text-sm" style={{ color: "var(--color-text2)" }}>
+                            Drop shadow
+                          </span>
                         </label>
 
                         {/* Spotify code toggle */}
@@ -1014,9 +1043,12 @@ export function LyricsShareModal({
                                 className="sr-only"
                               />
                               <div
-                                className={`h-6 w-11 rounded-full transition-colors ${
-                                  showSpotifyCode ? "bg-indigo-600" : "bg-neutral-700"
-                                }`}
+                                className="h-6 w-11 rounded-full transition-colors"
+                                style={{
+                                  background: showSpotifyCode
+                                    ? "var(--color-accent)"
+                                    : "var(--color-surface3)",
+                                }}
                               />
                               <div
                                 className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
@@ -1025,12 +1057,18 @@ export function LyricsShareModal({
                               />
                             </div>
                             <div className="flex items-center gap-1.5">
-                              <span className="text-sm text-neutral-300">Show Spotify Code</span>
+                              <span className="text-sm" style={{ color: "var(--color-text2)" }}>
+                                Show Spotify Code
+                              </span>
                               <a
                                 href="https://www.spotifycodes.com/"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex h-5 w-5 items-center justify-center rounded-full border border-neutral-600 text-neutral-400 transition-colors hover:border-neutral-400 hover:text-neutral-300"
+                                className="flex h-5 w-5 items-center justify-center rounded-full transition-colors hover:brightness-110"
+                                style={{
+                                  border: "1px solid var(--color-border)",
+                                  color: "var(--color-text3)",
+                                }}
                                 aria-label="Learn about Spotify Codes"
                                 onClick={e => e.stopPropagation()}
                               >
@@ -1050,9 +1088,12 @@ export function LyricsShareModal({
                               className="sr-only"
                             />
                             <div
-                              className={`h-6 w-11 rounded-full transition-colors ${
-                                showBranding ? "bg-indigo-600" : "bg-neutral-700"
-                              }`}
+                              className="h-6 w-11 rounded-full transition-colors"
+                              style={{
+                                background: showBranding
+                                  ? "var(--color-accent)"
+                                  : "var(--color-surface3)",
+                              }}
                             />
                             <div
                               className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
@@ -1060,9 +1101,12 @@ export function LyricsShareModal({
                               }`}
                             />
                           </div>
-                          <span className="flex items-center gap-1.5 text-sm text-neutral-300">
+                          <span
+                            className="flex items-center gap-1.5 text-sm"
+                            style={{ color: "var(--color-text2)" }}
+                          >
                             Support us
-                            <Heart size={14} weight="fill" className="text-red-400" />
+                            <Heart size={14} weight="fill" style={{ color: "var(--color-danger)" }} />
                           </span>
                         </label>
                       </div>
@@ -1073,13 +1117,17 @@ export function LyricsShareModal({
             </div>
 
             {/* Footer actions */}
-            <div className="flex gap-3 border-t border-neutral-800 p-4">
+            <div
+              className="flex gap-3 p-4"
+              style={{ borderTop: "1px solid var(--color-border)" }}
+            >
               {step === "select" ? (
                 <button
                   type="button"
                   onClick={handleNext}
                   disabled={selectedIndices.size === 0}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-medium text-white transition-colors hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: "var(--color-accent)", color: "white" }}
                 >
                   Next
                   <ArrowRight size={20} weight="bold" />
@@ -1091,11 +1139,11 @@ export function LyricsShareModal({
                       type="button"
                       onClick={handleCopy}
                       disabled={isGenerating}
-                      className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 ${
-                        copied
-                          ? "bg-emerald-600 text-white"
-                          : "bg-neutral-800 text-white hover:bg-neutral-700"
-                      }`}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors focus:outline-none focus-visible:ring-2 disabled:opacity-50 hover:brightness-110"
+                      style={{
+                        background: copied ? "var(--color-success)" : "var(--color-surface2)",
+                        color: copied ? "white" : "var(--color-text)",
+                      }}
                     >
                       {copied ? (
                         <>
@@ -1113,7 +1161,8 @@ export function LyricsShareModal({
                       type="button"
                       onClick={handleDownload}
                       disabled={isGenerating}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-neutral-800 px-4 py-3 font-medium text-white transition-colors hover:bg-neutral-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:opacity-50"
+                      style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
                     >
                       <DownloadSimple size={20} weight="bold" />
                       Save
@@ -1123,7 +1172,8 @@ export function LyricsShareModal({
                     type="button"
                     onClick={handleShare}
                     disabled={isGenerating}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-medium text-white transition-colors hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:opacity-50"
+                    style={{ background: "var(--color-accent)", color: "white" }}
                   >
                     <ShareNetwork size={20} weight="bold" />
                     Share
