@@ -47,62 +47,67 @@ export const UserMenu = memo(function UserMenu() {
     }
   }, [isOpen])
 
-  // Show skeleton before mount (SSR/hydration) or during loading
-  if (!isMounted || isLoading) {
-    return (
-      <div
-        className="w-10 h-10 rounded-full animate-pulse"
-        style={{ background: "var(--color-surface3)" }}
-      />
-    )
-  }
-
-  if (!isAuthenticated || !user) {
-    return (
-      <Link
-        href="/login"
-        className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
-        style={{ background: "var(--color-surface2)" }}
-        aria-label="Sign in"
-      >
-        <UserCircle size={20} />
-      </Link>
-    )
-  }
-
-  const initials = getInitials(user.name, user.email)
+  // Show sign-in button before mount or when not authenticated
+  const showSignIn = !isMounted || isLoading || !isAuthenticated || !user
+  const initials = user ? getInitials(user.name, user.email) : ""
 
   return (
     <div ref={menuRef} className="relative w-10 h-10 flex-shrink-0">
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden transition-colors focus:outline-none focus:ring-2 hover:brightness-110"
-        style={{ background: "var(--color-surface2)" }}
-        aria-label="User menu"
-        aria-expanded={isOpen}
-        aria-haspopup="true"
-      >
-        {user.image ? (
-          <Image
-            src={user.image}
-            alt=""
-            width={40}
-            height={40}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div
-            className="w-full h-full flex items-center justify-center font-medium text-sm"
-            style={{ background: "var(--color-accent)", color: "white" }}
+      <AnimatePresence mode="wait" initial={false}>
+        {showSignIn ? (
+          <motion.div
+            key="sign-in"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.15 }}
           >
-            {initials}
-          </div>
+            <Link
+              href="/login"
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+              style={{ background: "var(--color-surface2)" }}
+              aria-label="Sign in"
+            >
+              <UserCircle size={20} />
+            </Link>
+          </motion.div>
+        ) : (
+          <motion.button
+            key="user-menu"
+            type="button"
+            onClick={handleToggle}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.15 }}
+            className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden transition-colors focus:outline-none focus:ring-2 hover:brightness-110"
+            style={{ background: "var(--color-surface2)" }}
+            aria-label="User menu"
+            aria-expanded={isOpen}
+            aria-haspopup="true"
+          >
+            {user?.image ? (
+              <Image
+                src={user.image}
+                alt=""
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center font-medium text-sm"
+                style={{ background: "var(--color-accent)", color: "white" }}
+              >
+                {initials}
+              </div>
+            )}
+          </motion.button>
         )}
-      </button>
+      </AnimatePresence>
 
       <AnimatePresence>
-        {isOpen && (
+        {isOpen && user && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
