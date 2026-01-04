@@ -1,7 +1,7 @@
 "use client"
 
 import { type Setlist, useIsAuthenticated, useSetlistsContainingSong } from "@/core"
-import { ListPlus, MusicNote, ShareNetwork } from "@phosphor-icons/react"
+import { Info, ListPlus, MusicNote, ShareNetwork, Warning } from "@phosphor-icons/react"
 import { memo } from "react"
 
 export interface SongActionBarProps {
@@ -11,6 +11,9 @@ export interface SongActionBarProps {
   readonly albumArt?: string
   readonly onAddToSetlist: () => void
   readonly onShareClick?: () => void
+  readonly onInfoClick?: () => void
+  readonly hasIssue?: boolean
+  readonly onWarningClick?: () => void
 }
 
 function SetlistIcon({ setlist }: { readonly setlist: Setlist }) {
@@ -33,13 +36,53 @@ export const SongActionBar = memo(function SongActionBar({
   songId,
   onAddToSetlist,
   onShareClick,
+  onInfoClick,
+  hasIssue,
+  onWarningClick,
 }: SongActionBarProps) {
   const isAuthenticated = useIsAuthenticated()
   const containingSetlists = useSetlistsContainingSong(songId)
   const isInSetlist = containingSetlists.length > 0
 
+  const showInfoOrWarning = onInfoClick || (hasIssue && onWarningClick)
+
   return (
     <div className="flex items-center justify-center gap-3 py-4 px-4">
+      {/* Info/Warning button */}
+      {hasIssue && onWarningClick ? (
+        <button
+          type="button"
+          onClick={onWarningClick}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors"
+          style={{
+            background: "var(--color-warning-soft)",
+            color: "var(--color-warning)",
+          }}
+          aria-label="Report issue"
+        >
+          <Warning size={20} />
+          <span className="hidden sm:inline">Report issue</span>
+        </button>
+      ) : onInfoClick ? (
+        <button
+          type="button"
+          onClick={onInfoClick}
+          className="flex items-center gap-1.5 p-2 rounded-full text-sm font-medium transition-colors hover:bg-white/5"
+          style={{
+            background: "var(--color-surface2)",
+            color: "var(--color-text3)",
+          }}
+          aria-label="Song info"
+        >
+          <Info size={20} />
+        </button>
+      ) : null}
+
+      {/* Separator - show if info/warning button and other buttons are visible */}
+      {showInfoOrWarning && (isAuthenticated || onShareClick) && (
+        <div className="w-px h-6" style={{ background: "var(--color-border)" }} />
+      )}
+
       {/* Setlist button - icon only on mobile, full on desktop */}
       {isAuthenticated && (
         <button

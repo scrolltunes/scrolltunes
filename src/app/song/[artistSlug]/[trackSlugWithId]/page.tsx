@@ -3,7 +3,7 @@
 import { springs } from "@/animations"
 import { FloatingMetronome, VoiceIndicator } from "@/components/audio"
 import { ChordInfoPanel } from "@/components/chords"
-import { FloatingActions, LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
+import { LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
@@ -638,6 +638,9 @@ export default function SongPage() {
                   {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
                   onAddToSetlist={() => setShowAddToSetlist(true)}
                   onShareClick={() => setShowShareModal(true)}
+                  onInfoClick={() => setShowInfo(true)}
+                  hasIssue={loadState.bpm === null || chordsState.status === "error"}
+                  onWarningClick={() => setShowReportModal(true)}
                 />
                 <ChordInfoPanel
                   isOpen={showChordPanel}
@@ -660,17 +663,6 @@ export default function SongPage() {
           onCreateCard={handleCreateCard}
         />
 
-        <FloatingActions
-          songId={lrclibId ?? 0}
-          title={loadState._tag === "Loaded" ? loadState.lyrics.title : ""}
-          artist={loadState._tag === "Loaded" ? loadState.lyrics.artist : ""}
-          {...(loadState._tag === "Loaded" &&
-            loadState.albumArt !== null && { albumArt: loadState.albumArt })}
-          hasIssue={loadState.bpm === null || chordsState.status === "error"}
-          onInfoPress={() => setShowInfo(true)}
-          onWarningPress={() => setShowReportModal(true)}
-          position="bottom-left"
-        />
         <FloatingMetronome bpm={currentBpm} position="bottom-right" />
       </main>
 
