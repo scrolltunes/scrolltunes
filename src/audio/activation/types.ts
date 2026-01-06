@@ -6,6 +6,7 @@
  */
 
 import type { SingingDetectorConfig } from "@/core/PreferencesStore"
+import { Data, type Effect } from "effect"
 
 /**
  * Activation mode - which detector to use
@@ -18,13 +19,24 @@ export type ActivationMode = "vad_energy" | "singing"
 export type DetectorState = "idle" | "listening" | "triggered"
 
 /**
- * Events emitted by detectors
+ * Events emitted by detectors (tagged classes)
  */
-export type DetectorEvent =
-  | { readonly type: "probability"; readonly pSinging: number; readonly pSpeech?: number }
-  | { readonly type: "state"; readonly state: DetectorState }
-  | { readonly type: "trigger" }
-  | { readonly type: "error"; readonly error: string }
+export class ProbabilityEvent extends Data.TaggedClass("ProbabilityEvent")<{
+  readonly pSinging: number
+  readonly pSpeech?: number
+}> {}
+
+export class StateEvent extends Data.TaggedClass("StateEvent")<{
+  readonly state: DetectorState
+}> {}
+
+export class TriggerEvent extends Data.TaggedClass("TriggerEvent")<object> {}
+
+export class ErrorEvent extends Data.TaggedClass("ErrorEvent")<{
+  readonly error: string
+}> {}
+
+export type DetectorEvent = ProbabilityEvent | StateEvent | TriggerEvent | ErrorEvent
 
 /**
  * Callback for detector events
@@ -40,6 +52,23 @@ export interface ActivationDetectorConfig {
 }
 
 /**
+ * Detector errors (tagged classes)
+ */
+export class MicrophonePermissionError extends Data.TaggedClass("MicrophonePermissionError")<{
+  readonly message: string
+}> {}
+
+export class ClassifierInitError extends Data.TaggedClass("ClassifierInitError")<{
+  readonly message: string
+}> {}
+
+export class AudioCaptureError extends Data.TaggedClass("AudioCaptureError")<{
+  readonly message: string
+}> {}
+
+export type DetectorError = MicrophonePermissionError | ClassifierInitError | AudioCaptureError
+
+/**
  * Interface for activation detectors
  *
  * All detectors must implement this interface.
@@ -52,12 +81,12 @@ export interface ActivationDetector {
   /**
    * Start listening for voice/singing
    */
-  start(): Promise<void>
+  start(): Effect.Effect<void, DetectorError>
 
   /**
    * Stop listening and release resources
    */
-  stop(): Promise<void>
+  stop(): Effect.Effect<void>
 
   /**
    * Get current detector state

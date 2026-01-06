@@ -10,8 +10,20 @@ import {
   type SingingDetectorConfig,
 } from "@/core/PreferencesStore"
 import { vadLog } from "@/lib/vad-log"
+import { Effect } from "effect"
 import { type TriggerStateMachine, createTriggerStateMachine } from "./TriggerStateMachine"
-import type { ActivationDetector, DetectorEventCallback, DetectorState } from "./types"
+import {
+  type ActivationDetector,
+  ClassifierInitError,
+  type DetectorError,
+  type DetectorEventCallback,
+  type DetectorState,
+  ErrorEvent,
+  MicrophonePermissionError,
+  ProbabilityEvent,
+  StateEvent,
+  TriggerEvent,
+} from "./types"
 
 // --- Class Sets (from AudioSet/YAMNet ontology) ---
 
@@ -83,36 +95,41 @@ export class MediaPipeSingingDetector implements ActivationDetector {
     this.triggerMachine = createTriggerStateMachine(effectiveConfig)
   }
 
-  async start(): Promise<void> {
-    if (this.state !== "idle") return
+  start(): Effect.Effect<void, DetectorError> {
+    return Effect.gen(this, function* () {
+      if (this.state !== "idle") return
 
-    try {
       // Initialize classifier first
-      await this.initializeClassifier()
+      yield* this.initializeClassifierEffect()
 
       // Get microphone access
-      await this.startAudioCapture()
+      yield* this.startAudioCaptureEffect()
 
       // Start classification loop
       this.startClassificationLoop()
 
       this.updateState("listening")
-    } catch (error) {
-      this.emit({
-        type: "error",
-        error: error instanceof Error ? error.message : "Failed to start singing detection",
-      })
-      throw error
-    }
+    }).pipe(
+      Effect.catchAll(error => {
+        this.emit(
+          new ErrorEvent({
+            error: error instanceof Error ? error.message : "Failed to start singing detection",
+          }),
+        )
+        return Effect.fail(error as DetectorError)
+      }),
+    )
   }
 
-  async stop(): Promise<void> {
-    if (this.state === "idle") return
+  stop(): Effect.Effect<void> {
+    return Effect.sync(() => {
+      if (this.state === "idle") return
 
-    this.stopClassificationLoop()
-    this.stopAudioCapture()
-    this.triggerMachine.reset()
-    this.updateState("idle")
+      this.stopClassificationLoop()
+      this.stopAudioCapture()
+      this.triggerMachine.reset()
+      this.updateState("idle")
+    })
   }
 
   getState(): DetectorState {
@@ -125,7 +142,7 @@ export class MediaPipeSingingDetector implements ActivationDetector {
   }
 
   dispose(): void {
-    this.stop()
+    Effect.runSync(this.stop())
     this.destroyClassifier()
     this.callbacks.clear()
   }
@@ -146,15 +163,30 @@ export class MediaPipeSingingDetector implements ActivationDetector {
 
   // --- Private methods ---
 
-  private async initializeClassifier(): Promise<void> {
-    if (this.classifier) return
-    if (this.initPromise) {
-      await this.initPromise
-      return
-    }
+  private initializeClassifierEffect(): Effect.Effect<void, ClassifierInitError> {
+    return Effect.gen(this, function* () {
+      if (this.classifier) return
 
-    this.initPromise = this.doInitializeClassifier()
-    await this.initPromise
+      // Use local variable to avoid non-null assertions after narrowing
+      const existingPromise = this.initPromise
+      if (existingPromise) {
+        yield* Effect.tryPromise({
+          try: () => existingPromise,
+          catch: () => new ClassifierInitError({ message: "Classifier init already in progress" }),
+        })
+        return
+      }
+
+      const newPromise = this.doInitializeClassifier()
+      this.initPromise = newPromise
+      yield* Effect.tryPromise({
+        try: () => newPromise,
+        catch: e =>
+          new ClassifierInitError({
+            message: e instanceof Error ? e.message : "Failed to initialize classifier",
+          }),
+      })
+    })
   }
 
   private async doInitializeClassifier(): Promise<void> {
@@ -203,45 +235,53 @@ export class MediaPipeSingingDetector implements ActivationDetector {
     }
   }
 
-  private async startAudioCapture(): Promise<void> {
-    // Request microphone access
-    this.mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-        sampleRate: 16000,
+  private startAudioCaptureEffect(): Effect.Effect<void, MicrophonePermissionError> {
+    return Effect.tryPromise({
+      try: async () => {
+        // Request microphone access
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            sampleRate: 16000,
+          },
+        })
+
+        // Create audio context
+        this.audioContext = new AudioContext({ sampleRate: 16000 })
+        this.ringBufferSampleRate = this.audioContext.sampleRate
+
+        // Calculate buffer size for windowMs of audio
+        const bufferSamples = Math.ceil((this.config.windowMs / 1000) * this.ringBufferSampleRate)
+        this.ringBuffer = new Float32Array(bufferSamples)
+        this.ringBufferWriteIndex = 0
+
+        // Create nodes
+        const source = this.audioContext.createMediaStreamSource(this.mediaStream)
+        this.analyserNode = this.audioContext.createAnalyser()
+        this.analyserNode.fftSize = 2048
+
+        // Use ScriptProcessor for continuous audio capture
+        // Note: ScriptProcessor is deprecated but still widely supported
+        // AudioWorklet would be better but adds complexity
+        this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1)
+
+        this.scriptProcessor.onaudioprocess = (event: AudioProcessingEvent) => {
+          const inputData = event.inputBuffer.getChannelData(0)
+          this.writeToRingBuffer(inputData)
+        }
+
+        // Connect: source -> analyser -> scriptProcessor -> destination
+        source.connect(this.analyserNode)
+        this.analyserNode.connect(this.scriptProcessor)
+        this.scriptProcessor.connect(this.audioContext.destination)
       },
+      catch: e =>
+        new MicrophonePermissionError({
+          message: e instanceof Error ? e.message : "Failed to access microphone",
+        }),
     })
-
-    // Create audio context
-    this.audioContext = new AudioContext({ sampleRate: 16000 })
-    this.ringBufferSampleRate = this.audioContext.sampleRate
-
-    // Calculate buffer size for windowMs of audio
-    const bufferSamples = Math.ceil((this.config.windowMs / 1000) * this.ringBufferSampleRate)
-    this.ringBuffer = new Float32Array(bufferSamples)
-    this.ringBufferWriteIndex = 0
-
-    // Create nodes
-    const source = this.audioContext.createMediaStreamSource(this.mediaStream)
-    this.analyserNode = this.audioContext.createAnalyser()
-    this.analyserNode.fftSize = 2048
-
-    // Use ScriptProcessor for continuous audio capture
-    // Note: ScriptProcessor is deprecated but still widely supported
-    // AudioWorklet would be better but adds complexity
-    this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1)
-
-    this.scriptProcessor.onaudioprocess = (event: AudioProcessingEvent) => {
-      const inputData = event.inputBuffer.getChannelData(0)
-      this.writeToRingBuffer(inputData)
-    }
-
-    // Connect: source -> analyser -> scriptProcessor -> destination
-    source.connect(this.analyserNode)
-    this.analyserNode.connect(this.scriptProcessor)
-    this.scriptProcessor.connect(this.audioContext.destination)
   }
 
   private writeToRingBuffer(samples: Float32Array): void {
@@ -328,11 +368,12 @@ export class MediaPipeSingingDetector implements ActivationDetector {
         })
 
         // Emit probability event
-        this.emit({
-          type: "probability",
-          pSinging: effectivePSinging,
-          pSpeech,
-        })
+        this.emit(
+          new ProbabilityEvent({
+            pSinging: effectivePSinging,
+            pSpeech,
+          }),
+        )
 
         // Process through trigger state machine
         const output = this.triggerMachine.process({
@@ -362,7 +403,7 @@ export class MediaPipeSingingDetector implements ActivationDetector {
         // Check for trigger
         if (output.shouldTrigger) {
           this.updateState("triggered")
-          this.emit({ type: "trigger" })
+          this.emit(new TriggerEvent({}))
           vadLog("SINGING", "TRIGGERED", {
             pSinging: pSinging.toFixed(3),
             pSpeech: pSpeech.toFixed(3),
@@ -431,11 +472,11 @@ export class MediaPipeSingingDetector implements ActivationDetector {
   private updateState(newState: DetectorState): void {
     if (this.state !== newState) {
       this.state = newState
-      this.emit({ type: "state", state: newState })
+      this.emit(new StateEvent({ state: newState }))
     }
   }
 
-  private emit(event: Parameters<DetectorEventCallback>[0]): void {
+  private emit(event: ProbabilityEvent | StateEvent | TriggerEvent | ErrorEvent): void {
     for (const callback of this.callbacks) {
       callback(event)
     }

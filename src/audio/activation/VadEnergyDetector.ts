@@ -6,55 +6,77 @@
  */
 
 import { singingDetectionStore } from "@/core/SingingDetectionService"
-import type { ActivationDetector, DetectorEventCallback, DetectorState } from "./types"
+import { Effect } from "effect"
+import {
+  type ActivationDetector,
+  type DetectorError,
+  type DetectorEventCallback,
+  type DetectorState,
+  MicrophonePermissionError,
+  ProbabilityEvent,
+  StateEvent,
+  TriggerEvent,
+} from "./types"
 
 export class VadEnergyDetector implements ActivationDetector {
   private state: DetectorState = "idle"
   private callbacks = new Set<DetectorEventCallback>()
   private unsubscribe: (() => void) | null = null
 
-  async start(): Promise<void> {
-    if (this.state !== "idle") return
+  start(): Effect.Effect<void, DetectorError> {
+    return Effect.gen(this, function* () {
+      if (this.state !== "idle") return
 
-    // Subscribe to singing detection store events
-    this.unsubscribe = singingDetectionStore.subscribe(() => {
-      const snapshot = singingDetectionStore.getSnapshot()
+      // Subscribe to singing detection store events
+      this.unsubscribe = singingDetectionStore.subscribe(() => {
+        const snapshot = singingDetectionStore.getSnapshot()
 
-      // Update state based on store state
-      if (!snapshot.isListening) {
-        this.updateState("idle")
-      } else if (snapshot.isSpeaking) {
-        this.updateState("triggered")
-        this.emitTrigger()
-      } else {
-        this.updateState("listening")
-      }
+        // Update state based on store state
+        if (!snapshot.isListening) {
+          this.updateState("idle")
+        } else if (snapshot.isSpeaking) {
+          this.updateState("triggered")
+          this.emitTrigger()
+        } else {
+          this.updateState("listening")
+        }
 
-      // Emit probability events for UI feedback
-      if (snapshot.isListening) {
-        this.emit({
-          type: "probability",
-          pSinging: snapshot.level,
-        })
-      }
+        // Emit probability events for UI feedback
+        if (snapshot.isListening) {
+          this.emit(
+            new ProbabilityEvent({
+              pSinging: snapshot.level,
+            }),
+          )
+        }
+      })
+
+      // Start the underlying detection
+      yield* Effect.tryPromise({
+        try: () => singingDetectionStore.startListening(),
+        catch: e =>
+          new MicrophonePermissionError({
+            message: e instanceof Error ? e.message : "Failed to start VAD detection",
+          }),
+      })
+
+      this.updateState("listening")
     })
-
-    // Start the underlying detection
-    await singingDetectionStore.startListening()
-    this.updateState("listening")
   }
 
-  async stop(): Promise<void> {
-    if (this.state === "idle") return
+  stop(): Effect.Effect<void> {
+    return Effect.sync(() => {
+      if (this.state === "idle") return
 
-    singingDetectionStore.stopListening()
+      singingDetectionStore.stopListening()
 
-    if (this.unsubscribe) {
-      this.unsubscribe()
-      this.unsubscribe = null
-    }
+      if (this.unsubscribe) {
+        this.unsubscribe()
+        this.unsubscribe = null
+      }
 
-    this.updateState("idle")
+      this.updateState("idle")
+    })
   }
 
   getState(): DetectorState {
@@ -67,22 +89,22 @@ export class VadEnergyDetector implements ActivationDetector {
   }
 
   dispose(): void {
-    this.stop()
+    Effect.runSync(this.stop())
     this.callbacks.clear()
   }
 
   private updateState(newState: DetectorState): void {
     if (this.state !== newState) {
       this.state = newState
-      this.emit({ type: "state", state: newState })
+      this.emit(new StateEvent({ state: newState }))
     }
   }
 
   private emitTrigger(): void {
-    this.emit({ type: "trigger" })
+    this.emit(new TriggerEvent({}))
   }
 
-  private emit(event: Parameters<DetectorEventCallback>[0]): void {
+  private emit(event: ProbabilityEvent | StateEvent | TriggerEvent): void {
     for (const callback of this.callbacks) {
       callback(event)
     }

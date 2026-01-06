@@ -11,10 +11,11 @@
 "use client"
 
 import { type ActivationMode, type SingingDetectorConfig, preferencesStore } from "@/core"
+import { Effect } from "effect"
 import { useSyncExternalStore } from "react"
 import { MediaPipeSingingDetector } from "./MediaPipeSingingDetector"
 import { VadEnergyDetector } from "./VadEnergyDetector"
-import type { ActivationDetector, DetectorEvent, DetectorState } from "./types"
+import type { ActivationDetector, DetectorError, DetectorEvent, DetectorState } from "./types"
 
 export interface ActivationState {
   readonly isListening: boolean
@@ -52,7 +53,7 @@ export class ActivationController {
       const newConfig = preferencesStore.getSingingDetectorConfig()
 
       if (newMode !== this.state.activationMode) {
-        this.handleModeChange(newMode, newConfig)
+        void Effect.runPromise(this.handleModeChangeEffect(newMode, newConfig))
       } else if (this.detector instanceof MediaPipeSingingDetector) {
         // Update config for singing detector
         this.detector.updateConfig(newConfig)
@@ -97,47 +98,62 @@ export class ActivationController {
     this.notify()
   }
 
-  // --- Public methods ---
+  // --- Effect-based methods ---
 
-  async startListening(): Promise<void> {
-    if (this.state.isListening) return
+  startListeningEffect(): Effect.Effect<void, DetectorError> {
+    return Effect.gen(this, function* () {
+      if (this.state.isListening) return
 
-    const mode = preferencesStore.getActivationMode()
-    const config = preferencesStore.getSingingDetectorConfig()
+      const mode = preferencesStore.getActivationMode()
+      const config = preferencesStore.getSingingDetectorConfig()
 
-    this.detector = this.createDetector(mode, config)
-    this.subscribeToDetector()
+      this.detector = this.createDetector(mode, config)
+      this.subscribeToDetector()
 
-    try {
-      await this.detector.start()
+      yield* this.detector.start()
+
       this.setState({
         isListening: true,
         activationMode: mode,
       })
-    } catch (error) {
-      console.error("[ActivationController] Failed to start listening:", error)
+    }).pipe(
+      Effect.catchAll(error => {
+        console.error("[ActivationController] Failed to start listening:", error)
+        this.detector = null
+        return Effect.fail(error)
+      }),
+    )
+  }
+
+  stopListeningEffect(): Effect.Effect<void> {
+    return Effect.gen(this, function* () {
+      if (!this.state.isListening || !this.detector) return
+
+      this.detectorUnsubscribe?.()
+      this.detectorUnsubscribe = null
+
+      yield* this.detector.stop()
+      this.detector.dispose()
       this.detector = null
-      throw error
-    }
+
+      this.setState({
+        isListening: false,
+        isSinging: false,
+        level: 0,
+        detectorState: "idle",
+        lastProbability: null,
+      })
+    })
+  }
+
+  // --- Public convenience methods (async wrappers for boundaries) ---
+
+  async startListening(): Promise<void> {
+    await Effect.runPromise(this.startListeningEffect().pipe(Effect.catchAll(() => Effect.void)))
   }
 
   stopListening(): void {
-    if (!this.state.isListening || !this.detector) return
-
-    this.detectorUnsubscribe?.()
-    this.detectorUnsubscribe = null
-
-    this.detector.stop()
-    this.detector.dispose()
-    this.detector = null
-
-    this.setState({
-      isListening: false,
-      isSinging: false,
-      level: 0,
-      detectorState: "idle",
-      lastProbability: null,
-    })
+    Effect.runSync(this.stopListeningEffect())
   }
 
   getActivationMode(): ActivationMode {
@@ -183,15 +199,15 @@ export class ActivationController {
   }
 
   private handleDetectorEvent(event: DetectorEvent): void {
-    switch (event.type) {
-      case "state":
+    switch (event._tag) {
+      case "StateEvent":
         this.setState({
           detectorState: event.state,
           isSinging: event.state === "triggered",
         })
         break
 
-      case "probability":
+      case "ProbabilityEvent":
         this.setState({
           level: event.pSinging,
           lastProbability:
@@ -201,39 +217,42 @@ export class ActivationController {
         })
         break
 
-      case "trigger":
+      case "TriggerEvent":
         this.setState({ isSinging: true })
         this.notifyTrigger()
         break
 
-      case "error":
+      case "ErrorEvent":
         console.error("[ActivationController] Detector error:", event.error)
         break
     }
   }
 
-  private async handleModeChange(
+  private handleModeChangeEffect(
     newMode: ActivationMode,
     newConfig: SingingDetectorConfig,
-  ): Promise<void> {
-    const wasListening = this.state.isListening
+  ): Effect.Effect<void> {
+    return Effect.gen(this, function* () {
+      const wasListening = this.state.isListening
 
-    // Stop current detector
-    if (wasListening) {
-      this.stopListening()
-    }
-
-    // Update mode
-    this.setState({ activationMode: newMode })
-
-    // Restart with new mode if was listening
-    if (wasListening) {
-      try {
-        await this.startListening()
-      } catch (error) {
-        console.error("[ActivationController] Failed to restart with new mode:", error)
+      // Stop current detector
+      if (wasListening) {
+        yield* this.stopListeningEffect()
       }
-    }
+
+      // Update mode
+      this.setState({ activationMode: newMode })
+
+      // Restart with new mode if was listening
+      if (wasListening) {
+        yield* this.startListeningEffect().pipe(
+          Effect.catchAll(error => {
+            console.error("[ActivationController] Failed to restart with new mode:", error)
+            return Effect.void
+          }),
+        )
+      }
+    })
   }
 }
 

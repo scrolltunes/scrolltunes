@@ -11,6 +11,17 @@ export type {
   DetectorEventCallback,
   ActivationDetectorConfig,
   ActivationDetector,
+  DetectorError,
+} from "./types"
+
+export {
+  ProbabilityEvent,
+  StateEvent,
+  TriggerEvent,
+  ErrorEvent,
+  MicrophonePermissionError,
+  ClassifierInitError,
+  AudioCaptureError,
 } from "./types"
 
 export { VadEnergyDetector } from "./VadEnergyDetector"
