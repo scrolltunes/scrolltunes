@@ -19,8 +19,8 @@ const publicConfig = Config.all({
   gitSha: Config.string("NEXT_PUBLIC_GIT_SHA").pipe(Config.withDefault("dev")),
   sttWsUrl: Config.option(Config.string("NEXT_PUBLIC_STT_WS_URL")),
   audioClassifierEnabled: Config.string("NEXT_PUBLIC_AUDIO_CLASSIFIER").pipe(
-    Config.withDefault("true"), // Enabled: uses SoundSystem ring buffer for audio capture
-    Config.map(v => v !== "false"),
+    Config.withDefault("false"), // Disabled by default - VAD+Energy AND-gate handles guitar filtering
+    Config.map(v => v === "true"),
   ),
 })
 

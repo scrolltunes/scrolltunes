@@ -20,6 +20,14 @@ export type ThemeMode = "system" | "light" | "dark"
 export type ActivationMode = "vad_energy" | "singing"
 
 /**
+ * VAD environment preset for adjusting voice detection sensitivity
+ * - quiet: Lower threshold, faster detection - for quiet rooms
+ * - normal: Balanced settings - for most situations
+ * - noisy: Higher threshold, slower detection - better noise rejection
+ */
+export type VadEnvironment = "quiet" | "normal" | "noisy"
+
+/**
  * Configuration for the singing detector (MediaPipe YAMNet)
  */
 export interface SingingDetectorConfig {
@@ -57,6 +65,7 @@ export interface Preferences {
   readonly metronomeEnabled: boolean
   readonly fontSize: number
   readonly activationMode: ActivationMode
+  readonly vadEnvironment: VadEnvironment
   readonly singingDetectorConfig: SingingDetectorConfig
 }
 
@@ -69,6 +78,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,
   activationMode: "vad_energy",
+  vadEnvironment: "normal",
   singingDetectorConfig: DEFAULT_SINGING_DETECTOR_CONFIG,
 }
 
@@ -218,6 +228,14 @@ export class PreferencesStore {
 
   setActivationMode(value: ActivationMode): void {
     this.setState({ activationMode: value })
+  }
+
+  getVadEnvironment(): VadEnvironment {
+    return this.state.vadEnvironment
+  }
+
+  setVadEnvironment(value: VadEnvironment): void {
+    this.setState({ vadEnvironment: value })
   }
 
   getSingingDetectorConfig(): SingingDetectorConfig {

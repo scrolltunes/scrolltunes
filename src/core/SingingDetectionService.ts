@@ -23,6 +23,7 @@ import { SoundSystemService } from "@/services/sound-system"
 import { type AudioError, soundSystem } from "@/sounds"
 import { Context, Data, Effect, Layer } from "effect"
 import { useSyncExternalStore } from "react"
+import { type VadEnvironment, preferencesStore } from "./PreferencesStore"
 import {
   type AudioClassifierService,
   type ClassifierDecision,
@@ -91,6 +92,19 @@ export class VADError extends Data.TaggedClass("VADError")<{
 // --- Logging ---
 
 import { formatErrorForLog, vadLog } from "@/lib/vad-log"
+
+// --- VadEnvironment to SileroPreset mapping ---
+
+function vadEnvironmentToPreset(env: VadEnvironment): SileroPreset {
+  switch (env) {
+    case "quiet":
+      return "quiet"
+    case "normal":
+      return "guitar"
+    case "noisy":
+      return "loud"
+  }
+}
 
 // --- Singing-specific Service Interface ---
 
@@ -530,8 +544,13 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
       )
 
       // Initialize classifier in background (non-blocking)
-      if (this.classifierEnabled) {
+      // Skip classifier when AND-gate is enabled - the energy gate already filters guitar-only,
+      // and YAMNet can't reliably detect voice when singing with guitar (sees it all as "Music")
+      if (this.classifierEnabled && !this.andGateEnabled) {
         void this.initializeClassifier()
+      } else if (this.andGateEnabled) {
+        // Disable classifier at runtime when AND-gate is used
+        this.classifierEnabled = false
       }
 
       return true
@@ -736,8 +755,15 @@ export class SingingDetectionStore implements SingingDetectionServiceInterface {
     Effect.gen(this, function* (_) {
       if (this.state.isListening) return
 
+      // Apply VAD environment preset from preferences
+      const vadEnvironment = preferencesStore.getVadEnvironment()
+      const preset = vadEnvironmentToPreset(vadEnvironment)
+      this.setSileroPreset(preset)
+
       vadLog("START", "Starting singing detection...", {
         permissionStatus: this.state.permissionStatus,
+        vadEnvironment,
+        preset,
       })
 
       // Try Silero first

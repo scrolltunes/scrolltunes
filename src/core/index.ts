@@ -72,6 +72,7 @@ export {
   type Preferences,
   type ThemeMode,
   type ActivationMode,
+  type VadEnvironment,
   type SingingDetectorConfig,
 } from "./PreferencesStore"
 

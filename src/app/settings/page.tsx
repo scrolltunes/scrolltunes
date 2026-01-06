@@ -9,6 +9,7 @@ import {
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
   type ThemeMode,
+  type VadEnvironment,
   preferencesStore,
   useAccount,
   usePreferences,
@@ -203,17 +204,33 @@ function RadioOption({ selected, onSelect, label, description, icon, badge }: Ra
 
 interface VoiceActivationSectionProps {
   activationMode: ActivationMode
+  vadEnvironment: VadEnvironment
   singingDetectorConfig: import("@/core").SingingDetectorConfig
 }
 
+const VAD_ENVIRONMENT_OPTIONS: Array<{
+  value: VadEnvironment
+  label: string
+  description: string
+}> = [
+  { value: "quiet", label: "Quiet", description: "Lower threshold, faster detection" },
+  { value: "normal", label: "Normal", description: "Balanced for most situations" },
+  { value: "noisy", label: "Noisy", description: "Higher threshold, better noise rejection" },
+]
+
 function VoiceActivationSection({
   activationMode,
+  vadEnvironment,
   singingDetectorConfig,
 }: VoiceActivationSectionProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   const handleActivationModeChange = useCallback((mode: ActivationMode) => {
     preferencesStore.setActivationMode(mode)
+  }, [])
+
+  const handleVadEnvironmentChange = useCallback((env: VadEnvironment) => {
+    preferencesStore.setVadEnvironment(env)
   }, [])
 
   const handleConfigChange = useCallback(
@@ -243,6 +260,45 @@ function VoiceActivationSection({
           description="Reliable voice detection using Silero VAD with energy gating"
           icon={<Microphone size={20} weight="duotone" />}
         />
+
+        {/* Environment selector (only when VAD+Energy mode is selected) */}
+        {activationMode === "vad_energy" && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="p-4 rounded-xl"
+            style={{ background: "var(--color-surface1)" }}
+          >
+            <div className="text-sm font-medium mb-2" style={{ color: "var(--color-text)" }}>
+              Environment
+            </div>
+            <div className="text-xs mb-3" style={{ color: "var(--color-text3)" }}>
+              Adjust sensitivity for your environment
+            </div>
+            <div className="flex gap-2">
+              {VAD_ENVIRONMENT_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleVadEnvironmentChange(option.value)}
+                  className="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+                  style={{
+                    background:
+                      vadEnvironment === option.value
+                        ? "var(--color-accent)"
+                        : "var(--color-surface2)",
+                    color: vadEnvironment === option.value ? "white" : "var(--color-text2)",
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         <RadioOption
           selected={activationMode === "singing"}
           onSelect={() => handleActivationModeChange("singing")}
@@ -868,6 +924,7 @@ export default function SettingsPage() {
           {/* Voice Activation Section */}
           <VoiceActivationSection
             activationMode={preferences.activationMode}
+            vadEnvironment={preferences.vadEnvironment}
             singingDetectorConfig={preferences.singingDetectorConfig}
           />
 

@@ -219,8 +219,8 @@ export class MediaPipeSingingDetector implements ActivationDetector {
         baseOptions: {
           modelAssetPath: YAMNET_MODEL_URL,
         },
-        maxResults: 10,
-        scoreThreshold: 0.1,
+        maxResults: 15,
+        scoreThreshold: 0.05,
       })
 
       // Warm-up classification to trigger TensorFlow Lite delegate creation
@@ -346,7 +346,7 @@ export class MediaPipeSingingDetector implements ActivationDetector {
 
         // Log top categories to VAD log file
         const topCategories = categories
-          .slice(0, 5)
+          .slice(0, 10)
           .map(c => `${c.categoryName}:${c.score.toFixed(2)}`)
           .join(", ")
 
