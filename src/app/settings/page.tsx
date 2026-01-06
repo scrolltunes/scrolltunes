@@ -2,7 +2,9 @@
 
 import { AmbientBackground } from "@/components/ui"
 import {
+  type ActivationMode,
   DEFAULT_FONT_SIZE,
+  DEFAULT_SINGING_DETECTOR_CONFIG,
   FONT_SIZE_STEP,
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
@@ -14,11 +16,15 @@ import {
 import {
   ArrowCounterClockwise,
   ArrowLeft,
+  CaretDown,
   DeviceMobile,
   DownloadSimple,
   Hand,
+  Microphone,
   Moon,
+  MusicNotes,
   SignOut,
+  SlidersHorizontal,
   TextAa,
   Timer,
   Trash,
@@ -136,6 +142,296 @@ function SliderSetting({
   )
 }
 
+interface RadioOptionProps {
+  selected: boolean
+  onSelect: () => void
+  label: string
+  description: string
+  icon: React.ReactNode
+  badge?: string
+}
+
+function RadioOption({ selected, onSelect, label, description, icon, badge }: RadioOptionProps) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="w-full flex items-start gap-4 p-4 rounded-xl text-left transition-colors hover:brightness-110"
+      style={{
+        background: "var(--color-surface1)",
+        border: selected ? "2px solid var(--color-accent)" : "2px solid transparent",
+      }}
+    >
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+        style={{
+          background: selected ? "var(--color-accent)" : "var(--color-surface2)",
+          color: selected ? "white" : "var(--color-accent)",
+        }}
+      >
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium" style={{ color: "var(--color-text)" }}>
+            {label}
+          </span>
+          {badge && (
+            <span
+              className="text-xs px-2 py-0.5 rounded-full"
+              style={{ background: "var(--color-warning-soft)", color: "var(--color-warning)" }}
+            >
+              {badge}
+            </span>
+          )}
+        </div>
+        <div className="text-sm mt-0.5" style={{ color: "var(--color-text3)" }}>
+          {description}
+        </div>
+      </div>
+      <div
+        className="w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center"
+        style={{ borderColor: selected ? "var(--color-accent)" : "var(--color-surface3)" }}
+      >
+        {selected && (
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--color-accent)" }} />
+        )}
+      </div>
+    </button>
+  )
+}
+
+interface VoiceActivationSectionProps {
+  activationMode: ActivationMode
+  singingDetectorConfig: import("@/core").SingingDetectorConfig
+}
+
+function VoiceActivationSection({
+  activationMode,
+  singingDetectorConfig,
+}: VoiceActivationSectionProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
+  const handleActivationModeChange = useCallback((mode: ActivationMode) => {
+    preferencesStore.setActivationMode(mode)
+  }, [])
+
+  const handleConfigChange = useCallback(
+    (key: keyof typeof singingDetectorConfig, value: number | boolean) => {
+      preferencesStore.setSingingDetectorConfig({ [key]: value })
+    },
+    [],
+  )
+
+  const handleResetToDefaults = useCallback(() => {
+    preferencesStore.setSingingDetectorConfig(DEFAULT_SINGING_DETECTOR_CONFIG)
+  }, [])
+
+  return (
+    <section>
+      <h2
+        className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        Voice Activation
+      </h2>
+      <div className="space-y-3">
+        <RadioOption
+          selected={activationMode === "vad_energy"}
+          onSelect={() => handleActivationModeChange("vad_energy")}
+          label="VAD + Energy"
+          description="Reliable voice detection using Silero VAD with energy gating"
+          icon={<Microphone size={20} weight="duotone" />}
+        />
+        <RadioOption
+          selected={activationMode === "singing"}
+          onSelect={() => handleActivationModeChange("singing")}
+          label="Singing detection"
+          description="Detects singing specifically, ignores instruments and speech"
+          icon={<MusicNotes size={20} weight="duotone" />}
+          badge="Experimental"
+        />
+
+        {/* Advanced Settings (only when singing mode is selected) */}
+        {activationMode === "singing" && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full flex items-center justify-between p-4 rounded-xl transition-colors hover:brightness-110"
+              style={{ background: "var(--color-surface1)" }}
+            >
+              <div className="flex items-center gap-3">
+                <SlidersHorizontal size={20} style={{ color: "var(--color-accent)" }} />
+                <span className="font-medium" style={{ color: "var(--color-text)" }}>
+                  Advanced settings
+                </span>
+              </div>
+              <motion.div
+                animate={{ rotate: showAdvanced ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <CaretDown size={20} style={{ color: "var(--color-text3)" }} />
+              </motion.div>
+            </button>
+
+            {showAdvanced && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-3 space-y-3"
+              >
+                {/* Thresholds */}
+                <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
+                  <div className="text-sm font-medium mb-4" style={{ color: "var(--color-text)" }}>
+                    Detection thresholds
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span style={{ color: "var(--color-text3)" }}>Start threshold</span>
+                        <span style={{ color: "var(--color-accent)" }}>
+                          {(singingDetectorConfig.startThreshold * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={50}
+                        max={99}
+                        value={singingDetectorConfig.startThreshold * 100}
+                        onChange={e =>
+                          handleConfigChange("startThreshold", Number(e.target.value) / 100)
+                        }
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                        style={{
+                          background: "var(--color-surface3)",
+                          accentColor: "var(--color-accent)",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span style={{ color: "var(--color-text3)" }}>Stop threshold</span>
+                        <span style={{ color: "var(--color-accent)" }}>
+                          {(singingDetectorConfig.stopThreshold * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={30}
+                        max={90}
+                        value={singingDetectorConfig.stopThreshold * 100}
+                        onChange={e =>
+                          handleConfigChange("stopThreshold", Number(e.target.value) / 100)
+                        }
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                        style={{
+                          background: "var(--color-surface3)",
+                          accentColor: "var(--color-accent)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timing */}
+                <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
+                  <div className="text-sm font-medium mb-4" style={{ color: "var(--color-text)" }}>
+                    Timing
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span style={{ color: "var(--color-text3)" }}>Hold time</span>
+                        <span style={{ color: "var(--color-accent)" }}>
+                          {singingDetectorConfig.holdMs}ms
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={100}
+                        max={1000}
+                        step={50}
+                        value={singingDetectorConfig.holdMs}
+                        onChange={e => handleConfigChange("holdMs", Number(e.target.value))}
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                        style={{
+                          background: "var(--color-surface3)",
+                          accentColor: "var(--color-accent)",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span style={{ color: "var(--color-text3)" }}>Cooldown</span>
+                        <span style={{ color: "var(--color-accent)" }}>
+                          {(singingDetectorConfig.cooldownMs / 1000).toFixed(1)}s
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={500}
+                        max={5000}
+                        step={100}
+                        value={singingDetectorConfig.cooldownMs}
+                        onChange={e => handleConfigChange("cooldownMs", Number(e.target.value))}
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                        style={{
+                          background: "var(--color-surface3)",
+                          accentColor: "var(--color-accent)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Speech rejection toggle */}
+                <Toggle
+                  enabled={singingDetectorConfig.rejectSpeech}
+                  onToggle={() =>
+                    handleConfigChange("rejectSpeech", !singingDetectorConfig.rejectSpeech)
+                  }
+                  label="Reject speech"
+                  description="Treat spoken words as non-singing"
+                  icon={<Microphone size={20} weight="duotone" />}
+                />
+
+                {/* Debug toggle */}
+                <Toggle
+                  enabled={singingDetectorConfig.debug}
+                  onToggle={() => handleConfigChange("debug", !singingDetectorConfig.debug)}
+                  label="Debug mode"
+                  description="Show detection confidence in the UI"
+                  icon={<SlidersHorizontal size={20} weight="duotone" />}
+                />
+
+                {/* Reset to defaults button */}
+                <button
+                  type="button"
+                  onClick={handleResetToDefaults}
+                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-sm transition-colors hover:brightness-110"
+                  style={{
+                    background: "var(--color-surface2)",
+                    color: "var(--color-text3)",
+                  }}
+                >
+                  <ArrowCounterClockwise size={16} />
+                  Reset to defaults
+                </button>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 interface DeleteAccountModalProps {
   isOpen: boolean
   onClose: () => void
@@ -188,8 +484,11 @@ function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
         </p>
 
         <p className="text-sm mb-2" style={{ color: "var(--color-text3)" }}>
-          Type <span className="font-mono" style={{ color: "var(--color-danger)" }}>DELETE</span> to
-          confirm:
+          Type{" "}
+          <span className="font-mono" style={{ color: "var(--color-danger)" }}>
+            DELETE
+          </span>{" "}
+          to confirm:
         </p>
 
         <input
@@ -263,14 +562,8 @@ function AccountSection() {
               style={{ background: "var(--color-surface2)" }}
             />
             <div className="flex-1 space-y-2">
-              <div
-                className="h-4 w-24 rounded"
-                style={{ background: "var(--color-surface2)" }}
-              />
-              <div
-                className="h-3 w-32 rounded"
-                style={{ background: "var(--color-surface2)" }}
-              />
+              <div className="h-4 w-24 rounded" style={{ background: "var(--color-surface2)" }} />
+              <div className="h-3 w-32 rounded" style={{ background: "var(--color-surface2)" }} />
             </div>
           </div>
         </div>
@@ -451,7 +744,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
       <AmbientBackground variant="subtle" />
       <header
         className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
@@ -568,6 +864,12 @@ export default function SettingsPage() {
               />
             </div>
           </section>
+
+          {/* Voice Activation Section */}
+          <VoiceActivationSection
+            activationMode={preferences.activationMode}
+            singingDetectorConfig={preferences.singingDetectorConfig}
+          />
 
           {/* Reset Button */}
           <section className="pt-4">

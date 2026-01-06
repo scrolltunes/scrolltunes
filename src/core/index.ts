@@ -68,8 +68,11 @@ export {
   MAX_FONT_SIZE,
   FONT_SIZE_STEP,
   DEFAULT_FONT_SIZE,
+  DEFAULT_SINGING_DETECTOR_CONFIG,
   type Preferences,
   type ThemeMode,
+  type ActivationMode,
+  type SingingDetectorConfig,
 } from "./PreferencesStore"
 
 export {

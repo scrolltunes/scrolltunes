@@ -1,7 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
-import { FloatingMetronome, VoiceIndicator } from "@/components/audio"
+import { FloatingMetronome, SingingDebugIndicator, VoiceIndicator } from "@/components/audio"
 import { ChordInfoPanel } from "@/components/chords"
 import { LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
 import { ReportIssueModal } from "@/components/feedback"
@@ -35,9 +35,9 @@ import {
 } from "@/hooks"
 import { type LyricsApiResponse, applyEnhancement, isLyricsApiSuccess } from "@/lib"
 import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
-import { userApi } from "@/lib/user-api"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { parseTrackSlugWithId } from "@/lib/slug"
+import { userApi } from "@/lib/user-api"
 import { soundSystem } from "@/sounds"
 import {
   ArrowCounterClockwise,
@@ -413,7 +413,6 @@ export default function SongPage() {
   const songArtist =
     loadState._tag === "Loaded" ? normalizeArtistName(loadState.lyrics.artist) : null
 
-
   if (loadState._tag === "Loading") {
     return (
       <div
@@ -635,6 +634,7 @@ export default function SongPage() {
         />
 
         <FloatingMetronome bpm={currentBpm} position="bottom-right" />
+        <SingingDebugIndicator />
       </main>
 
       {loadState._tag === "Loaded" && (

@@ -12,6 +12,42 @@ export const DEFAULT_FONT_SIZE = 34
 
 export type ThemeMode = "system" | "light" | "dark"
 
+/**
+ * Activation mode for voice detection
+ * - vad_energy: Uses Silero VAD + Energy AND-gate (default, reliable)
+ * - singing: Uses MediaPipe YAMNet singing classifier (experimental, fewer false positives)
+ */
+export type ActivationMode = "vad_energy" | "singing"
+
+/**
+ * Configuration for the singing detector (MediaPipe YAMNet)
+ */
+export interface SingingDetectorConfig {
+  readonly startThreshold: number // Probability threshold to start triggering (default: 0.90)
+  readonly stopThreshold: number // Probability threshold to stop (hysteresis, default: 0.60)
+  readonly holdMs: number // Duration above threshold before triggering (default: 400)
+  readonly cooldownMs: number // Cooldown after trigger before re-triggering (default: 1500)
+  readonly emaAlpha: number // Exponential moving average smoothing factor (default: 0.2)
+  readonly hopMs: number // Hop between classifications (default: 200)
+  readonly windowMs: number // Audio window for classification (default: 975)
+  readonly rejectSpeech: boolean // Treat speech as non-singing (default: true)
+  readonly speechMax: number // Max speech probability to allow singing (default: 0.6)
+  readonly debug: boolean // Show debug info (default: false)
+}
+
+export const DEFAULT_SINGING_DETECTOR_CONFIG: SingingDetectorConfig = {
+  startThreshold: 0.9,
+  stopThreshold: 0.6,
+  holdMs: 400,
+  cooldownMs: 1500,
+  emaAlpha: 0.2,
+  hopMs: 200,
+  windowMs: 975,
+  rejectSpeech: true,
+  speechMax: 0.6,
+  debug: false,
+}
+
 export interface Preferences {
   readonly wakeLockEnabled: boolean
   readonly doubleTapEnabled: boolean
@@ -20,6 +56,8 @@ export interface Preferences {
   readonly themeMode: ThemeMode
   readonly metronomeEnabled: boolean
   readonly fontSize: number
+  readonly activationMode: ActivationMode
+  readonly singingDetectorConfig: SingingDetectorConfig
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -30,6 +68,8 @@ const DEFAULT_PREFERENCES: Preferences = {
   themeMode: "dark",
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,
+  activationMode: "vad_energy",
+  singingDetectorConfig: DEFAULT_SINGING_DETECTOR_CONFIG,
 }
 
 export class PreferencesStore {
@@ -170,6 +210,24 @@ export class PreferencesStore {
 
   setFontSize(value: number): void {
     this.setState({ fontSize: value })
+  }
+
+  getActivationMode(): ActivationMode {
+    return this.state.activationMode
+  }
+
+  setActivationMode(value: ActivationMode): void {
+    this.setState({ activationMode: value })
+  }
+
+  getSingingDetectorConfig(): SingingDetectorConfig {
+    return this.state.singingDetectorConfig
+  }
+
+  setSingingDetectorConfig(config: Partial<SingingDetectorConfig>): void {
+    this.setState({
+      singingDetectorConfig: { ...this.state.singingDetectorConfig, ...config },
+    })
   }
 
   reset(): void {

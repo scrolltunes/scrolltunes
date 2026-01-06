@@ -1,7 +1,14 @@
 "use client"
 
-import { lyricsPlayer, usePlayerState, useVoiceActivity, voiceActivityStore } from "@/core"
-import { useEffect, useRef } from "react"
+import { activationController, useActivationState } from "@/audio/activation"
+import {
+  lyricsPlayer,
+  usePlayerState,
+  usePreference,
+  useVoiceActivity,
+  voiceActivityStore,
+} from "@/core"
+import { useCallback, useEffect, useRef } from "react"
 
 export interface UseVoiceTriggerOptions {
   /** Auto-start playback when voice is first detected */
@@ -19,9 +26,13 @@ const DEFAULT_OPTIONS: UseVoiceTriggerOptions = {
 }
 
 /**
- * Hook that connects voice activity detection to lyrics playback
+ * Hook that connects voice/singing detection to lyrics playback
  *
- * When voice is detected:
+ * Supports two activation modes (configured in Settings):
+ * - VAD + Energy: Uses Silero VAD with energy gating (existing behavior)
+ * - Singing Detection: Uses MediaPipe YAMNet to detect singing specifically
+ *
+ * When voice/singing is detected:
  * - If player is Ready and autoPlay is true, starts playback
  * - If player is Paused and resumeOnVoice is true, resumes playback
  *
@@ -31,21 +42,50 @@ const DEFAULT_OPTIONS: UseVoiceTriggerOptions = {
 export function useVoiceTrigger(options: UseVoiceTriggerOptions = {}) {
   const opts = { ...DEFAULT_OPTIONS, ...options }
   const playerState = usePlayerState()
-  const voiceState = useVoiceActivity()
+  const activationMode = usePreference("activationMode")
+
+  // Use the appropriate detection system based on activation mode
+  const voiceState = useVoiceActivity() // VAD + Energy
+  const activationState = useActivationState() // Singing Detection
+
+  // Determine which state to use based on mode
+  const isListening =
+    activationMode === "singing" ? activationState.isListening : voiceState.isListening
+  const isSpeaking =
+    activationMode === "singing" ? activationState.isSinging : voiceState.isSpeaking
+  const level = activationMode === "singing" ? activationState.level : voiceState.level
 
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const wasPlayingBeforeSilence = useRef(false)
 
-  // Stop listening when entering Playing state
-  useEffect(() => {
-    if (playerState._tag === "Playing" && voiceState.isListening) {
+  // Start listening with the appropriate system
+  const startListening = useCallback(async () => {
+    if (activationMode === "singing") {
+      await activationController.startListening()
+    } else {
+      await voiceActivityStore.startListening()
+    }
+  }, [activationMode])
+
+  // Stop listening with the appropriate system
+  const stopListening = useCallback(() => {
+    if (activationMode === "singing") {
+      activationController.stopListening()
+    } else {
       voiceActivityStore.stopListening()
     }
-  }, [playerState._tag, voiceState.isListening])
+  }, [activationMode])
+
+  // Stop listening when entering Playing state
+  useEffect(() => {
+    if (playerState._tag === "Playing" && isListening) {
+      stopListening()
+    }
+  }, [playerState._tag, isListening, stopListening])
 
   // Handle voice start
   useEffect(() => {
-    if (!voiceState.isSpeaking) return
+    if (!isSpeaking) return
 
     // Clear any pending silence timeout
     if (silenceTimeoutRef.current) {
@@ -64,11 +104,11 @@ export function useVoiceTrigger(options: UseVoiceTriggerOptions = {}) {
       lyricsPlayer.play()
       return
     }
-  }, [voiceState.isSpeaking, playerState._tag, opts.autoPlay, opts.resumeOnVoice])
+  }, [isSpeaking, playerState._tag, opts.autoPlay, opts.resumeOnVoice])
 
   // Handle voice stop (silence)
   useEffect(() => {
-    if (voiceState.isSpeaking) {
+    if (isSpeaking) {
       // Track if we were playing when voice was active
       wasPlayingBeforeSilence.current = playerState._tag === "Playing"
       return
@@ -88,7 +128,7 @@ export function useVoiceTrigger(options: UseVoiceTriggerOptions = {}) {
         clearTimeout(silenceTimeoutRef.current)
       }
     }
-  }, [voiceState.isSpeaking, playerState._tag, opts.pauseOnSilenceMs])
+  }, [isSpeaking, playerState._tag, opts.pauseOnSilenceMs])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -100,10 +140,10 @@ export function useVoiceTrigger(options: UseVoiceTriggerOptions = {}) {
   }, [])
 
   return {
-    isListening: voiceState.isListening,
-    isSpeaking: voiceState.isSpeaking,
-    level: voiceState.level,
-    startListening: () => voiceActivityStore.startListening(),
-    stopListening: () => voiceActivityStore.stopListening(),
+    isListening,
+    isSpeaking,
+    level,
+    startListening,
+    stopListening,
   }
 }
