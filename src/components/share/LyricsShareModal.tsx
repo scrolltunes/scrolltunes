@@ -7,8 +7,6 @@ import {
   ArrowCounterClockwise,
   ArrowLeft,
   ArrowRight,
-  ArrowsIn,
-  ArrowsOut,
   Check,
   CopySimple,
   DownloadSimple,
@@ -18,6 +16,7 @@ import {
   PencilSimple,
   Question,
   ShareNetwork,
+  Sparkle,
   X,
 } from "@phosphor-icons/react"
 import * as htmlToImage from "html-to-image"
@@ -35,20 +34,23 @@ export interface LyricsShareModalProps {
   readonly title: string
   readonly artist: string
   readonly albumArt?: string | null
+  readonly albumArtLarge?: string | null
   readonly spotifyId?: string | null
   readonly lines: readonly LyricLine[]
   readonly initialSelectedIds?: readonly string[]
+  readonly onOpenStudio?: (selectedIds?: readonly string[]) => void
 }
 
 type Step = "select" | "preview"
 
 const CUSTOM_COLOR_ID = "custom"
 
-type PatternVariant = "none" | "dots" | "grid" | "waves"
+type PatternVariant = "none" | "dots" | "grid" | "waves" | "albumArt"
 
 interface PatternOption {
   readonly id: PatternVariant
   readonly label: string
+  readonly requiresAlbumArt?: boolean
 }
 
 const PATTERN_OPTIONS: readonly PatternOption[] = [
@@ -56,6 +58,7 @@ const PATTERN_OPTIONS: readonly PatternOption[] = [
   { id: "dots", label: "Dots" },
   { id: "grid", label: "Grid" },
   { id: "waves", label: "Waves" },
+  { id: "albumArt", label: "Album", requiresAlbumArt: true },
 ] as const
 
 function generateSmokeWaves(seed: number): string {
@@ -127,9 +130,11 @@ export function LyricsShareModal({
   title,
   artist,
   albumArt,
+  albumArtLarge,
   spotifyId,
   lines,
   initialSelectedIds,
+  onOpenStudio,
 }: LyricsShareModalProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const innerCardRef = useRef<HTMLDivElement>(null)
@@ -167,6 +172,7 @@ export function LyricsShareModal({
   const [lastCaretPosition, setLastCaretPosition] = useState<number | null>(null)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
   const [isSharing, setIsSharing] = useState(false)
+  const [showShareMenu, setShowShareMenu] = useState(false)
 
   const currentBackground = useMemo(() => {
     if (selectedGradientId === CUSTOM_COLOR_ID) {
@@ -489,7 +495,9 @@ export function LyricsShareModal({
       pattern === "waves"
         ? { backgroundImage: smokeSvgDataUrl, backgroundSize: "100% 100%" }
         : getPatternStyle(pattern)
-    const hasPattern = pattern !== "none"
+    const hasPattern = pattern !== "none" && pattern !== "albumArt"
+    const isAlbumArtPattern = pattern === "albumArt"
+    const backgroundArtUrl = albumArtLarge ?? albumArt
 
     return (
       <div
@@ -528,6 +536,35 @@ export function LyricsShareModal({
                 overflow: "hidden",
               }}
             >
+              {/* Album art background pattern */}
+              {isAlbumArtPattern && backgroundArtUrl && (
+                <>
+                  <img
+                    src={backgroundArtUrl}
+                    alt=""
+                    crossOrigin="anonymous"
+                    style={{
+                      position: "absolute",
+                      inset: "-20px",
+                      width: "calc(100% + 40px)",
+                      height: "calc(100% + 40px)",
+                      objectFit: "cover",
+                      filter: "blur(20px)",
+                      transform: "scale(1.1)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: "rgba(0, 0, 0, 0.5)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                </>
+              )}
+              {/* Other patterns (dots, grid, waves) */}
               {hasPattern && (
                 <div
                   style={{
@@ -833,7 +870,7 @@ export function LyricsShareModal({
                     {/* Card preview */}
                     <div
                       ref={previewContainerRef}
-                      className="share-modal-preserve relative rounded-2xl bg-neutral-200 p-6"
+                      className="share-modal-preserve relative rounded-2xl bg-neutral-200 p-6 pb-14"
                     >
                       <div className="absolute left-2 top-2 z-10 flex gap-1">
                         <button
@@ -875,86 +912,117 @@ export function LyricsShareModal({
                           </button>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setExpandedWidth(prev => !prev)}
-                        className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full transition-colors"
-                        style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.8)" }}
-                        aria-label={expandedWidth ? "Shrink width" : "Expand width"}
-                      >
-                        {expandedWidth ? (
-                          <ArrowsIn size={18} weight="bold" />
-                        ) : (
-                          <ArrowsOut size={18} weight="bold" />
-                        )}
-                      </button>
-                      {renderCardContent()}
-                    </div>
-
-                    {/* Options */}
-                    <div className="mt-4 space-y-4">
-                      {/* Background color */}
-                      <div>
-                        <p className="mb-2 text-sm" style={{ color: "var(--color-text3)" }}>
-                          Background
-                        </p>
-                        <div className="share-modal-preserve flex flex-wrap items-center gap-2">
-                          {gradientPalette.map(option => (
-                            <button
-                              key={option.id}
-                              type="button"
-                              onClick={() => setSelectedGradientId(option.id)}
-                              className="relative h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2"
+                      {/* Share button with dropdown */}
+                      <div className="absolute right-2 top-2 z-10">
+                        <button
+                          type="button"
+                          onClick={() => setShowShareMenu(prev => !prev)}
+                          disabled={isGenerating}
+                          className="flex h-8 w-8 items-center justify-center rounded-full transition-colors disabled:opacity-50"
+                          style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.8)" }}
+                          aria-label="Share options"
+                        >
+                          <ShareNetwork size={18} weight="bold" />
+                        </button>
+                        <AnimatePresence>
+                          {showShareMenu && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                              transition={{ duration: 0.15 }}
+                              className="absolute right-0 top-full mt-2 w-48 overflow-hidden rounded-xl shadow-lg"
                               style={{
-                                background: option.gradient,
-                                borderColor:
-                                  selectedGradientId === option.id
-                                    ? "white"
-                                    : "rgba(255,255,255,0.2)",
+                                background: "var(--color-surface2)",
+                                border: "1px solid var(--color-border)",
                               }}
-                              aria-label={`Select gradient ${option.id}`}
                             >
-                              {selectedGradientId === option.id && (
-                                <Check
-                                  size={16}
-                                  weight="bold"
-                                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 drop-shadow-md"
-                                  style={{ color: "white" }}
-                                />
-                              )}
-                            </button>
-                          ))}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleCopy()
+                                  setShowShareMenu(false)
+                                }}
+                                disabled={isGenerating}
+                                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:brightness-110 disabled:opacity-50"
+                                style={{ color: "var(--color-text)" }}
+                              >
+                                {copied ? (
+                                  <Check size={18} style={{ color: "var(--color-success)" }} />
+                                ) : (
+                                  <CopySimple size={18} />
+                                )}
+                                <span>{copied ? "Copied!" : "Copy to clipboard"}</span>
+                              </button>
+                              <div style={{ height: 1, background: "var(--color-border)" }} />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleDownload()
+                                  setShowShareMenu(false)
+                                }}
+                                disabled={isGenerating}
+                                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:brightness-110 disabled:opacity-50"
+                                style={{ color: "var(--color-text)" }}
+                              >
+                                <DownloadSimple size={18} />
+                                <span>Save to device</span>
+                              </button>
+                              <div style={{ height: 1, background: "var(--color-border)" }} />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleShare()
+                                  setShowShareMenu(false)
+                                }}
+                                disabled={isGenerating || isSharing}
+                                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:brightness-110 disabled:opacity-50"
+                                style={{ color: "var(--color-text)" }}
+                              >
+                                <ShareNetwork size={18} />
+                                <span>Share...</span>
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                      {renderCardContent()}
 
-                          {/* Custom color button */}
+                      {/* Gradient Selection - inside preview at bottom (hidden in album art mode) */}
+                      {pattern !== "albumArt" && (
+                        <div className="absolute bottom-2 left-2 right-2 flex justify-center">
+                          <div className="flex items-center gap-1.5 rounded-full px-2 py-1.5" style={{ background: "rgba(0,0,0,0.5)" }}>
+                            {gradientPalette.map(option => (
+                              <button
+                                key={option.id}
+                                type="button"
+                                onClick={() => setSelectedGradientId(option.id)}
+                                className="h-6 w-6 rounded-full transition-transform hover:scale-110 focus:outline-none"
+                                style={{
+                                  background: option.gradient,
+                                  boxShadow: selectedGradientId === option.id
+                                    ? "0 0 0 2px white"
+                                    : "inset 0 0 0 1px rgba(255,255,255,0.2)",
+                                }}
+                                aria-label={`Select gradient ${option.id}`}
+                              />
+                            ))}
                           <button
                             type="button"
                             onClick={handleCustomColorClick}
-                            className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2"
+                            className="flex h-6 w-6 items-center justify-center rounded-full transition-transform hover:scale-110 focus:outline-none"
                             style={{
-                              backgroundColor:
-                                selectedGradientId === CUSTOM_COLOR_ID
-                                  ? customColor
-                                  : "transparent",
-                              borderColor:
-                                selectedGradientId === CUSTOM_COLOR_ID
-                                  ? "white"
-                                  : "var(--color-border)",
+                              background: selectedGradientId === CUSTOM_COLOR_ID ? customColor : "rgba(255,255,255,0.1)",
+                              boxShadow: selectedGradientId === CUSTOM_COLOR_ID
+                                ? "0 0 0 2px white"
+                                : "inset 0 0 0 1px rgba(255,255,255,0.2)",
                             }}
                             aria-label="Choose custom color"
                           >
-                            {selectedGradientId === CUSTOM_COLOR_ID ? (
-                              <Check
-                                size={16}
-                                weight="bold"
-                                className="drop-shadow-md"
-                                style={{ color: "white" }}
-                              />
-                            ) : (
-                              <Palette size={16} style={{ color: "var(--color-text3)" }} />
+                            {selectedGradientId !== CUSTOM_COLOR_ID && (
+                              <Palette size={14} style={{ color: "rgba(255,255,255,0.7)" }} />
                             )}
                           </button>
-
-                          {/* Hidden color input */}
                           <input
                             ref={colorInputRef}
                             type="color"
@@ -966,16 +1034,22 @@ export function LyricsShareModal({
                             className="sr-only"
                             aria-label="Custom color picker"
                           />
+                          </div>
                         </div>
-                      </div>
+                      )}
+                    </div>
 
+                    {/* Options */}
+                    <div className="mt-4 space-y-4">
                       {/* Pattern */}
                       <div>
                         <p className="mb-2 text-sm" style={{ color: "var(--color-text3)" }}>
                           Pattern
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {PATTERN_OPTIONS.map(option => (
+                          {PATTERN_OPTIONS.filter(
+                            option => !option.requiresAlbumArt || albumArt
+                          ).map(option => (
                             <button
                               key={option.id}
                               type="button"
@@ -1133,52 +1207,20 @@ export function LyricsShareModal({
                   <ArrowRight size={20} weight="bold" />
                 </button>
               ) : (
-                <div className="flex w-full flex-col gap-2">
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCopy}
-                      disabled={isGenerating}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors focus:outline-none focus-visible:ring-2 disabled:opacity-50 hover:brightness-110"
-                      style={{
-                        background: copied ? "var(--color-success)" : "var(--color-surface2)",
-                        color: copied ? "white" : "var(--color-text)",
-                      }}
-                    >
-                      {copied ? (
-                        <>
-                          <Check size={20} weight="bold" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <CopySimple size={20} weight="bold" />
-                          Copy
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDownload}
-                      disabled={isGenerating}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:opacity-50"
-                      style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
-                    >
-                      <DownloadSimple size={20} weight="bold" />
-                      Save
-                    </button>
-                  </div>
+                onOpenStudio && (
                   <button
                     type="button"
-                    onClick={handleShare}
-                    disabled={isGenerating}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:opacity-50"
+                    onClick={() => {
+                      const selectedLineIds = Array.from(selectedIndices).map(i => lines[i]?.id).filter((id): id is string => id !== undefined)
+                      onOpenStudio(selectedLineIds)
+                    }}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                     style={{ background: "var(--color-accent)", color: "white" }}
                   >
-                    <ShareNetwork size={20} weight="bold" />
-                    Share
+                    <Sparkle size={20} weight="bold" />
+                    Open in Studio
                   </button>
-                </div>
+                )
               )}
             </div>
           </motion.div>

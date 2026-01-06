@@ -99,6 +99,7 @@ interface SpotifyLookupResult {
   readonly artistName: string
   readonly albumName?: string
   readonly albumArt: string | null
+  readonly albumArtLarge: string | null
 }
 
 function lookupSpotifyById(
@@ -111,6 +112,7 @@ function lookupSpotifyById(
       artistName: normalizeArtistName(formatArtists(track.artists)),
       albumName: normalizeAlbumName(track.album.name),
       albumArt: getAlbumImageUrl(track.album, "medium"),
+      albumArtLarge: getAlbumImageUrl(track.album, "large"),
     })),
     Effect.catchAll(() => Effect.succeed(null)),
   )
@@ -142,6 +144,7 @@ function lookupSpotifyBySearch(
         artistName: normalizeArtistName(formatArtists(match.artists)),
         albumName: normalizeAlbumName(match.album.name),
         albumArt: getAlbumImageUrl(match.album, "medium"),
+        albumArtLarge: getAlbumImageUrl(match.album, "large"),
       }
     }),
     Effect.catchAll(() => Effect.succeed(null)),
@@ -184,6 +187,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const spotifyArtistName = spotifyResult?.artistName ?? null
         const spotifyAlbumName = spotifyResult?.albumName
         const spotifyAlbumArt = spotifyResult?.albumArt ?? null
+        const spotifyAlbumArtLarge = spotifyResult?.albumArtLarge ?? null
 
         // Use cached BPM from catalog if available, otherwise fetch from external providers
         const bpmEffect: Effect.Effect<BPMResult | null, never, BpmProviders> = cachedBpm
@@ -236,6 +240,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           spotifyArtistName,
           spotifyAlbumName,
           spotifyAlbumArt,
+          spotifyAlbumArtLarge,
           resolvedSpotifyId,
         }))
       })
@@ -278,10 +283,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     spotifyArtistName,
     spotifyAlbumName,
     spotifyAlbumArt,
+    spotifyAlbumArtLarge,
     resolvedSpotifyId,
   } = result.value
 
   const albumArt = spotifyAlbumArt ?? (await getAlbumArt(lyrics.artist, lyrics.title, "medium"))
+  // Deezer uses "xl" for large size, Spotify uses "large"
+  const albumArtLarge = spotifyAlbumArtLarge ?? (await getAlbumArt(lyrics.artist, lyrics.title, "xl"))
 
   // Extract actual LRCLIB ID from lyrics (may differ from URL id if fallback occurred)
   const actualLrclibId = lyrics.songId.startsWith("lrclib-")
@@ -412,6 +420,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     bpm: bpmResult?.bpm ?? null,
     key: bpmResult?.key ?? null,
     albumArt: albumArt ?? null,
+    albumArtLarge: albumArtLarge ?? null,
     spotifyId: resolvedSpotifyId ?? null,
     attribution: {
       lyrics: { name: "LRCLIB", url: "https://lrclib.net" },

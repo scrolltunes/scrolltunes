@@ -50,7 +50,7 @@ import {
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
 
 type ErrorType = "invalid-url" | "not-found" | "network" | "invalid-lyrics"
@@ -71,6 +71,7 @@ type LoadState =
       readonly bpm: number | null
       readonly key: string | null
       readonly albumArt: string | null
+      readonly albumArtLarge: string | null
       readonly spotifyId: string | null
       readonly bpmSource: AttributionSource | null
       readonly lyricsSource: AttributionSource | null
@@ -97,6 +98,7 @@ const errorMessages: Record<ErrorType, { title: string; description: string }> =
 
 export default function SongPage() {
   const params = useParams<{ artistSlug: string; trackSlugWithId: string }>()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const spotifyId = searchParams.get("spotifyId")
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
@@ -109,6 +111,23 @@ export default function SongPage() {
   // Share lyrics modal state
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareInitialIds, setShareInitialIds] = useState<readonly string[]>([])
+
+  // Navigate to full-page share designer (Studio mode)
+  const navigateToStudio = useCallback(
+    (selectedIds?: readonly string[]) => {
+      setShowShareModal(false)
+      const baseUrl = `/song/${params.artistSlug}/${params.trackSlugWithId}/share`
+      const queryParams = new URLSearchParams()
+      if (selectedIds && selectedIds.length > 0) {
+        queryParams.set("lines", selectedIds.join(","))
+        queryParams.set("step", "customize")
+      } else {
+        queryParams.set("step", "select")
+      }
+      router.push(`${baseUrl}?${queryParams.toString()}`)
+    },
+    [router, params.artistSlug, params.trackSlugWithId],
+  )
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
@@ -235,6 +254,7 @@ export default function SongPage() {
           bpm: cached.bpm,
           key: cached.key ?? null,
           albumArt: cached.albumArt ?? null,
+          albumArtLarge: cached.albumArtLarge ?? null,
           spotifyId: cached.spotifyId ?? null,
           bpmSource: cached.bpmSource ?? null,
           lyricsSource: cached.lyricsSource ?? null,
@@ -286,6 +306,7 @@ export default function SongPage() {
           bpm: data.bpm,
           key: data.key,
           albumArt: data.albumArt ?? null,
+          albumArtLarge: data.albumArtLarge ?? null,
           spotifyId: data.spotifyId ?? spotifyId ?? null,
           bpmSource: data.attribution?.bpm ?? null,
           lyricsSource: data.attribution?.lyrics ?? null,
@@ -297,6 +318,7 @@ export default function SongPage() {
           bpm: data.bpm,
           key: data.key,
           albumArt: data.albumArt ?? undefined,
+          albumArtLarge: data.albumArtLarge ?? undefined,
           spotifyId: data.spotifyId ?? spotifyId ?? undefined,
           bpmSource: data.attribution?.bpm ?? undefined,
           lyricsSource: data.attribution?.lyrics ?? undefined,
@@ -697,9 +719,11 @@ export default function SongPage() {
           title={loadState.lyrics.title}
           artist={loadState.lyrics.artist}
           albumArt={loadState.albumArt}
+          albumArtLarge={loadState.albumArtLarge}
           spotifyId={loadState.spotifyId}
           lines={loadState.lyrics.lines}
           initialSelectedIds={shareInitialIds}
+          onOpenStudio={navigateToStudio}
         />
       )}
     </div>

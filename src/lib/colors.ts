@@ -346,7 +346,7 @@ const DARK_GRADIENTS: GradientOption[] = [
 
 /**
  * Build a gradient palette from a base color (hex) for shareable cards.
- * Ensures good contrast - dark album art gets vibrant backgrounds.
+ * First 2 swatches use complementary colors that contrast with the album art.
  */
 export function buildGradientPalette(baseColor: string | null): GradientOption[] {
   const rgb = baseColor ? hexToRgb(baseColor) : null
@@ -358,75 +358,71 @@ export function buildGradientPalette(baseColor: string | null): GradientOption[]
 
   const brightness = getBrightness(rgb)
   const saturation = getSaturation(rgb)
-  const isDark = brightness < 0.35
   const isGrayish = saturation < 0.2
 
   // For grayish album art, prioritize vibrant presets since album-derived colors
   // will all look similar (gray on gray)
   if (isGrayish) {
-    return [
-      // Vibrant presets first - these will provide the needed variety
-      ...VIBRANT_GRADIENTS,
-      // Dark presets last
-      ...DARK_GRADIENTS,
-    ]
+    return [...VIBRANT_GRADIENTS, ...DARK_GRADIENTS]
   }
 
-  if (isDark) {
-    // Dark album art: create lighter/more vibrant versions and prioritize vibrant presets
-    const lightened = lightenRgb(rgb, 0.5)
-    const saturated = saturateRgb(lightened, 0.8)
-    const hueShifted = shiftHueRgb(saturated, 30)
+  // Create complementary colors that contrast with the album art
+  // These won't get "swallowed" by the album background
 
-    const lightenedHex = rgbToHex(lightened)
-    const saturatedHex = rgbToHex(saturated)
-    const hueShiftedHex = rgbToHex(hueShifted)
-    const hueShiftedLight = rgbToHex(lightenRgb(hueShifted, 0.3))
+  // Complementary: 180 degrees opposite on color wheel
+  const complementary = shiftHueRgb(rgb, 180)
+  // Split-complementary: 150 degrees (next to complementary)
+  const splitComplementary = shiftHueRgb(rgb, 150)
 
-    return [
-      // Vibrant presets first for dark album art
-      ...VIBRANT_GRADIENTS.slice(0, 3),
-      // Then album-derived lighter gradients
-      {
-        id: "album-lightened",
-        gradient: `linear-gradient(135deg, ${saturatedHex} 0%, ${lightenedHex} 100%)`,
-        previewColors: [saturatedHex, lightenedHex],
-      },
-      {
-        id: "album-shifted",
-        gradient: `linear-gradient(135deg, ${hueShiftedHex} 0%, ${hueShiftedLight} 100%)`,
-        previewColors: [hueShiftedHex, hueShiftedLight],
-      },
-      // More vibrant presets
-      ...VIBRANT_GRADIENTS.slice(3),
-      // Dark presets last (may not contrast well)
-      ...DARK_GRADIENTS,
-    ]
+  // Adjust brightness/saturation for good contrast
+  // If album is dark, make gradients vibrant; if light, make them rich
+  const adjustColor = (color: RGB): RGB => {
+    let adjusted = color
+
+    // Ensure good saturation
+    adjusted = saturateRgb(adjusted, 0.5)
+
+    // Adjust brightness for contrast
+    if (brightness < 0.4) {
+      // Dark album: lighten the complementary colors
+      adjusted = lightenRgb(adjusted, 0.3)
+    } else if (brightness > 0.6) {
+      // Light album: darken the complementary colors
+      adjusted = darkenRgb(adjusted, 0.3)
+    }
+
+    // Ensure minimum brightness for visibility
+    if (getBrightness(adjusted) < 0.25) {
+      adjusted = lightenRgb(adjusted, 0.2)
+    }
+
+    return adjusted
   }
 
-  // Normal/light album art: create darker versions
-  const darkened = darkenRgb(rgb, 0.4)
-  const hueShifted = shiftHueRgb(rgb, 60) // Larger hue shift for more distinction
-  const hueShiftedDark = darkenRgb(hueShifted, 0.3)
+  const comp1 = adjustColor(complementary)
+  const comp1Dark = darkenRgb(comp1, 0.3)
+  const comp2 = adjustColor(splitComplementary)
+  const comp2Dark = darkenRgb(comp2, 0.3)
 
-  const baseHex = rgbToHex(rgb)
-  const darkHex = rgbToHex(darkened)
-  const shiftedDarkHex = rgbToHex(hueShiftedDark)
+  const comp1Hex = rgbToHex(comp1)
+  const comp1DarkHex = rgbToHex(comp1Dark)
+  const comp2Hex = rgbToHex(comp2)
+  const comp2DarkHex = rgbToHex(comp2Dark)
 
   return [
-    // Album-derived gradients first for normal album art
+    // First 2: Complementary gradients that contrast with album art
     {
-      id: "album-primary",
-      gradient: `linear-gradient(135deg, ${baseHex} 0%, ${darkHex} 100%)`,
-      previewColors: [baseHex, darkHex],
+      id: "album-complementary",
+      gradient: `linear-gradient(135deg, ${comp1Hex} 0%, ${comp1DarkHex} 100%)`,
+      previewColors: [comp1Hex, comp1DarkHex],
     },
     {
-      id: "album-shifted",
-      gradient: `linear-gradient(135deg, ${baseHex} 0%, ${shiftedDarkHex} 100%)`,
-      previewColors: [baseHex, shiftedDarkHex],
+      id: "album-split-complementary",
+      gradient: `linear-gradient(135deg, ${comp2Hex} 0%, ${comp2DarkHex} 100%)`,
+      previewColors: [comp2Hex, comp2DarkHex],
     },
     // Vibrant presets
-    ...VIBRANT_GRADIENTS.slice(0, 3),
+    ...VIBRANT_GRADIENTS.slice(0, 4),
     // Dark presets
     ...DARK_GRADIENTS,
   ]

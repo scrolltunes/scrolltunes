@@ -38,6 +38,7 @@ export interface CachedLyrics {
   readonly bpm: number | null
   readonly key: string | null
   readonly albumArt?: string | undefined
+  readonly albumArtLarge?: string | undefined
   readonly spotifyId?: string | undefined
   readonly bpmSource?: AttributionSource | undefined
   readonly lyricsSource?: AttributionSource | undefined
