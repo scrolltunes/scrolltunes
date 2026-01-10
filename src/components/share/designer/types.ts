@@ -204,7 +204,13 @@ export interface ExportSettings {
 // Editor State (Transient - Not part of undo/redo)
 // ============================================================================
 
-export type EditMode = "select" | "customize" | "text"
+export type EditMode = "select" | "customize" | "text" | "image"
+
+export interface ImageEditState {
+  readonly offsetX: number // -100 to 100 (percentage)
+  readonly offsetY: number // -100 to 100 (percentage)
+  readonly scale: number // 1.0 to 3.0
+}
 
 export interface EditorState {
   readonly mode: EditMode
@@ -212,6 +218,7 @@ export interface EditorState {
   readonly zoom: number
   readonly isPanning: boolean
   readonly isExporting: boolean
+  readonly imageEdit: ImageEditState
 }
 
 // ============================================================================
@@ -359,12 +366,19 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   pixelRatio: 3,
 }
 
+export const DEFAULT_IMAGE_EDIT: ImageEditState = {
+  offsetX: 0,
+  offsetY: 0,
+  scale: 1,
+}
+
 export const DEFAULT_EDITOR_STATE: EditorState = {
   mode: "select",
   selectedElementId: null,
   zoom: 1,
   isPanning: false,
   isExporting: false,
+  imageEdit: DEFAULT_IMAGE_EDIT,
 }
 
 export const DEFAULT_ASPECT_RATIO: AspectRatioConfig = {

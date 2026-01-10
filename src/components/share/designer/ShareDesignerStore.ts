@@ -9,6 +9,7 @@ import {
   type AspectRatioConfig,
   type BackgroundConfig,
   DEFAULT_EDITOR_STATE,
+  DEFAULT_IMAGE_EDIT,
   DEFAULT_SHARE_DESIGNER_STATE,
   DEFAULT_TYPOGRAPHY,
   type EditMode,
@@ -19,6 +20,7 @@ import {
   type GradientBackground,
   type HistoryEntry,
   type HistoryState,
+  type ImageEditState,
   type LyricLineSelection,
   type LyricsSelectionConfig,
   type PatternBackground,
@@ -113,6 +115,17 @@ export class SetIsPanning extends Data.TaggedClass("SetIsPanning")<{
   readonly isPanning: boolean
 }> {}
 
+export class SetImageOffset extends Data.TaggedClass("SetImageOffset")<{
+  readonly offsetX: number
+  readonly offsetY: number
+}> {}
+
+export class SetImageScale extends Data.TaggedClass("SetImageScale")<{
+  readonly scale: number
+}> {}
+
+export class ResetImagePosition extends Data.TaggedClass("ResetImagePosition")<object> {}
+
 // --- History Events ---
 
 export class Undo extends Data.TaggedClass("Undo")<object> {}
@@ -145,6 +158,9 @@ export type ShareDesignerEvent =
   | SetZoom
   | SetIsExporting
   | SetIsPanning
+  | SetImageOffset
+  | SetImageScale
+  | ResetImagePosition
   | Undo
   | Redo
   | ResetHistory
@@ -403,6 +419,36 @@ export class ShareDesignerStore {
       case "SetIsPanning":
         return Effect.sync(() => {
           store.editor = { ...store.editor, isPanning: event.isPanning }
+          store.notify()
+        })
+
+      case "SetImageOffset":
+        return Effect.sync(() => {
+          const offsetX = Math.max(-100, Math.min(100, event.offsetX))
+          const offsetY = Math.max(-100, Math.min(100, event.offsetY))
+          store.editor = {
+            ...store.editor,
+            imageEdit: { ...store.editor.imageEdit, offsetX, offsetY },
+          }
+          store.notify()
+        })
+
+      case "SetImageScale":
+        return Effect.sync(() => {
+          const scale = Math.max(1, Math.min(3, event.scale))
+          store.editor = {
+            ...store.editor,
+            imageEdit: { ...store.editor.imageEdit, scale },
+          }
+          store.notify()
+        })
+
+      case "ResetImagePosition":
+        return Effect.sync(() => {
+          store.editor = {
+            ...store.editor,
+            imageEdit: DEFAULT_IMAGE_EDIT,
+          }
           store.notify()
         })
 
@@ -830,6 +876,22 @@ export class ShareDesignerStore {
     Effect.runSync(this.dispatch(new SetIsPanning({ isPanning })))
   }
 
+  setImageOffset(offsetX: number, offsetY: number): void {
+    Effect.runSync(this.dispatch(new SetImageOffset({ offsetX, offsetY })))
+  }
+
+  setImageScale(scale: number): void {
+    Effect.runSync(this.dispatch(new SetImageScale({ scale })))
+  }
+
+  resetImagePosition(): void {
+    Effect.runSync(this.dispatch(new ResetImagePosition({})))
+  }
+
+  isImageEditing(): boolean {
+    return this.editor.mode === "image"
+  }
+
   undo(): void {
     Effect.runSync(this.dispatch(new Undo({})))
   }
@@ -899,6 +961,11 @@ export function useShareDesignerLyrics(store: ShareDesignerStore): LyricsSelecti
 export function useShareDesignerEditor(store: ShareDesignerStore): EditorState {
   const state = useShareDesignerState(store)
   return state.editor
+}
+
+export function useShareDesignerImageEdit(store: ShareDesignerStore): ImageEditState {
+  const state = useShareDesignerState(store)
+  return state.editor.imageEdit
 }
 
 export function useShareDesignerHistory(store: ShareDesignerStore): {
