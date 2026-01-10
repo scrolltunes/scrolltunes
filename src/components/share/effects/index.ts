@@ -173,3 +173,7 @@ export function getEffectName(id: EffectType): string {
 export { applyEffect, type EffectStyles } from "./applyEffect"
 export { EffectSelector, type EffectSelectorProps } from "./EffectSelector"
 export { EffectThumbnail, type EffectThumbnailProps } from "./EffectThumbnail"
+export {
+  AlbumArtEffectControls,
+  type AlbumArtEffectControlsProps,
+} from "./AlbumArtEffectControls"

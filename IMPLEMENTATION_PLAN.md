@@ -162,7 +162,7 @@ Generated from specs. Tasks sorted by priority.
 - [x] Completed
 
 ### Task 16: Create EffectControls component
-- **File**: `src/components/share/effects/EffectControls.tsx` (new)
+- **File**: `src/components/share/effects/AlbumArtEffectControls.tsx` (new)
 - **Description**: Dynamic controls panel for selected effect
 - **Details**:
   - Render different controls based on effect type
@@ -171,7 +171,7 @@ Generated from specs. Tasks sorted by priority.
   - Darken: amount slider
   - Desaturate: amount slider
   - Update store settings on change
-- [ ] Not started
+- [x] Completed
 
 ### Task 17: Integrate effect UI into share designer
 - **File**: `src/components/share/ShareDesigner.tsx` (modify)
@@ -196,13 +196,13 @@ Generated from specs. Tasks sorted by priority.
 - [ ] Not started
 
 ### Task 19: Add Tint controls
-- **File**: `src/components/share/effects/EffectControls.tsx` (modify)
+- **File**: `src/components/share/effects/AlbumArtEffectControls.tsx` (already included)
 - **Description**: Color picker and intensity slider for tint
 - **Details**:
   - Color picker with palette presets
   - Intensity slider 0-100%
   - Live preview updates
-- [ ] Not started
+- [x] Completed (included in Task 16)
 
 ### Task 20: Implement Gradient Overlay effect
 - **File**: `src/components/share/effects/applyEffect.ts` (modify)
@@ -214,13 +214,13 @@ Generated from specs. Tasks sorted by priority.
 - [ ] Not started
 
 ### Task 21: Add Gradient controls
-- **File**: `src/components/share/effects/EffectControls.tsx` (modify)
+- **File**: `src/components/share/effects/AlbumArtEffectControls.tsx` (already included)
 - **Description**: Direction selector, color picker, opacity slider
 - **Details**:
   - Direction buttons: top, bottom, left, right, radial
   - Color picker with palette
   - Opacity slider 0-80%
-- [ ] Not started
+- [x] Completed (included in Task 16)
 
 ### Task 22: Implement Duotone effect
 - **File**: `src/components/share/effects/applyEffect.ts` (modify)
@@ -232,13 +232,13 @@ Generated from specs. Tasks sorted by priority.
 - [ ] Not started
 
 ### Task 23: Add Duotone controls
-- **File**: `src/components/share/effects/EffectControls.tsx` (modify)
+- **File**: `src/components/share/effects/AlbumArtEffectControls.tsx` (already included)
 - **Description**: Two color pickers and contrast slider
 - **Details**:
   - Shadow color picker
   - Highlight color picker
   - Contrast slider 0-100%
-- [ ] Not started
+- [x] Completed (included in Task 16)
 
 ---
 
@@ -436,6 +436,22 @@ Generated from specs. Tasks sorted by priority.
 - Selected indicator dot absolutely positioned at bottom
 - Proper ARIA attributes (radio, aria-checked) and keyboard support via motion.button
 - Refactored `EffectSelector` to use `EffectThumbnail` component
+- Exported from `effects/index.ts`
+
+### Task 16: Create EffectControls component
+- Created `src/components/share/effects/AlbumArtEffectControls.tsx` for dynamic effect controls
+- Renders different controls based on `effectType` prop via switch statement
+- Vignette: strength slider (0-100%)
+- Blur: amount slider (0-30px)
+- Darken: amount slider (0-80%)
+- Desaturate: amount slider (0-100%)
+- Tint: color picker + intensity slider (0-100%)
+- Gradient: direction selector (5 buttons: top/bottom/left/right/radial) + color picker + opacity slider (0-80%)
+- Duotone: shadow color picker + highlight color picker + contrast slider (0-100%)
+- Uses existing `Slider` and `ColorPicker` components from `@/components/share/designer/controls`
+- Created `DirectionButton` and `DirectionSelector` internal components for gradient direction
+- Uses phosphor-icons for direction buttons (ArrowUp, ArrowDown, ArrowLeft, ArrowRight, CircleDashed)
+- All handlers memoized with `useCallback`
 - Exported from `effects/index.ts`
 
 ---
