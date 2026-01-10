@@ -165,3 +165,9 @@ export function getEffectDefinition(id: EffectType): EffectDefinition | undefine
 export function getEffectName(id: EffectType): string {
   return getEffectDefinition(id)?.name ?? "Unknown"
 }
+
+// ============================================================================
+// Re-exports
+// ============================================================================
+
+export { applyEffect, type EffectStyles } from "./applyEffect"

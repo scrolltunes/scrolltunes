@@ -130,7 +130,7 @@ Generated from specs. Tasks sorted by priority.
   - Handle blur (filter: blur)
   - Handle darken (filter: brightness)
   - Handle desaturate (filter: grayscale)
-- [ ] Not started
+- [x] Completed
 
 ### Task 13: Apply effects to preview background
 - **File**: `src/components/share/ShareDesignerPreview.tsx` (modify)
@@ -390,6 +390,20 @@ Generated from specs. Tasks sorted by priority.
 - Added hook: `useShareDesignerAlbumArtEffect()`
 - Updated `handleApplyTemplate()` to preserve `albumArtEffect` state
 - Re-exported `EffectType`, `EffectSettings`, `GradientDirection` from types.ts for convenience
+
+### Task 12: Create applyEffect utility
+- Created `src/components/share/effects/applyEffect.ts` with CSS style generation for all effects
+- Defined `EffectStyles` interface with `filter`, `overlay`, and `secondaryOverlay` properties
+- Implemented `applyEffect()` function with exhaustive switch on EffectType
+- Vignette: radial gradient overlay with strength-based opacity
+- Blur: CSS `filter: blur(Npx)` with amount mapping
+- Darken: CSS `filter: brightness(N)` converting 0-80 amount to 1.0-0.2 brightness
+- Desaturate: CSS `filter: grayscale(N%)` with direct percentage mapping
+- Tint: color overlay with `mix-blend-mode: color` and intensity-based opacity
+- Gradient: directional linear/radial gradients with color and opacity
+- Duotone: grayscale + contrast filter with multiply/screen blend mode overlays
+- Added `hexToRgb()` helper for color parsing
+- Exported `applyEffect` and `EffectStyles` from effects index
 
 ---
 
