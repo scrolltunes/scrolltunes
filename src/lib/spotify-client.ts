@@ -208,9 +208,18 @@ const spotifyFetch = <T>(path: string, params?: Record<string, string>) =>
 
 // --- Public API (Effect-based) ---
 
+/**
+ * Format query with Spotify field filters for better matching.
+ * If query contains no colons (field filters), add track: prefix.
+ */
+const formatSearchQuery = (query: string): string => {
+  if (query.includes(":")) return query
+  return `track:${query}`
+}
+
 const searchTracksRaw = (query: string, limit = 20) =>
   spotifyFetch<SpotifySearchResult>("/search", {
-    q: query,
+    q: formatSearchQuery(query),
     type: "track",
     limit: String(Math.min(50, Math.max(1, limit))),
   })

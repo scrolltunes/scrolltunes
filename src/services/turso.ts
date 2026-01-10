@@ -1,4 +1,5 @@
 import { type Client, createClient } from "@libsql/client/web"
+import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { Context, Data, Effect, Layer } from "effect"
 import { ServerConfig } from "./server-config"
 
@@ -123,10 +124,14 @@ const findByTitleArtist = (title: string, artist: string, targetDurationSec?: nu
   Effect.gen(function* () {
     const client = yield* getClient
 
+    // Normalize title/artist to strip remaster suffixes, live tags, featured artists, etc.
+    const cleanTitle = normalizeTrackName(title)
+    const cleanArtist = normalizeArtistName(artist)
+
     // Use column-specific FTS matching to ensure artist phrase matches artist column
     // This prevents compilation tracks with "Artist - Song" titles from matching
-    const escapedTitle = title.replace(/"/g, '""')
-    const escapedArtist = artist.replace(/"/g, '""')
+    const escapedTitle = cleanTitle.replace(/"/g, '""')
+    const escapedArtist = cleanArtist.replace(/"/g, '""')
     const ftsQuery = `title:"${escapedTitle}" artist:"${escapedArtist}"`
 
     const result = yield* Effect.tryPromise({
