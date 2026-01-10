@@ -97,7 +97,7 @@ Generated from specs. Tasks sorted by priority.
   - Call `resetImagePosition` method on store
   - Position next to Done button
   - Disabled when already at default values
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -110,7 +110,7 @@ Generated from specs. Tasks sorted by priority.
   - Export EffectType union and EffectSettings interface
   - Define DEFAULT_EFFECT_SETTINGS for each effect type
   - Export EFFECT_DEFINITIONS array with metadata (name, icon, defaults)
-- [ ] Not started
+- [x] Completed
 
 ### Task 11: Add effects state to ShareDesignerStore
 - **File**: `src/components/share/ShareDesignerStore.ts` (modify)
@@ -361,6 +361,24 @@ Generated from specs. Tasks sorted by priority.
 - Border uses pulsing opacity animation (0.4 to 1.0) via styled-jsx
 - Content div opacity reduced to 0.5 when in image edit mode
 - Border inset by 4px from card edge with matching border radius
+
+### Task 9: Add reset button
+- Already implemented as part of Task 2 (ImageEditMode component)
+- Reset button (ArrowCounterClockwise icon) shows when in edit mode and changes exist
+- Calls `onReset` callback which triggers `resetImagePosition` on store
+- Button hidden when at default values via `hasChanges` check
+- Positioned next to Done button in the edit mode UI
+
+### Task 10: Define effect types and defaults
+- Created `src/components/share/effects/index.ts` with complete effects system types
+- Defined `EffectType` union: "none" | "vignette" | "blur" | "darken" | "desaturate" | "tint" | "gradient" | "duotone"
+- Defined `GradientDirection` type for gradient overlay directions
+- Defined `EffectSettings` interface with all effect parameters (strength, amounts, colors, etc.)
+- Exported `DEFAULT_EFFECT_SETTINGS` with sensible defaults for all effects
+- Defined `EffectDefinition` interface with id, name, description, icon
+- Exported `EFFECT_DEFINITIONS` array with metadata for all 8 effects
+- Added helper functions: `getEffectDefinition()`, `getEffectName()`
+- Uses phosphor-icons for effect icons (CircleHalf, Drop, Gradient, Moon, Palette, SunDim, Textbox)
 
 ---
 
