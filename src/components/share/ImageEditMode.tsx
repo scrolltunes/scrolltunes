@@ -1,7 +1,8 @@
 "use client"
 
+import { useHaptic } from "@/hooks/useHaptic"
 import { ArrowCounterClockwise, Check, Image } from "@phosphor-icons/react"
-import { memo } from "react"
+import { memo, useCallback } from "react"
 import { DEFAULT_IMAGE_EDIT } from "./designer/types"
 
 interface ImageEditModeProps {
@@ -25,16 +26,28 @@ export const ImageEditMode = memo(function ImageEditMode({
   onToggle,
   onReset,
 }: ImageEditModeProps) {
+  const { haptic } = useHaptic()
+
   const hasChanges =
     offsetX !== DEFAULT_IMAGE_EDIT.offsetX ||
     offsetY !== DEFAULT_IMAGE_EDIT.offsetY ||
     scale !== DEFAULT_IMAGE_EDIT.scale
 
+  const handleToggle = useCallback(() => {
+    haptic("light")
+    onToggle()
+  }, [haptic, onToggle])
+
+  const handleReset = useCallback(() => {
+    haptic("medium")
+    onReset()
+  }, [haptic, onReset])
+
   return (
     <>
       <button
         type="button"
-        onClick={onToggle}
+        onClick={handleToggle}
         className="flex h-8 w-8 items-center justify-center rounded-full transition-colors lg:h-9 lg:w-9"
         style={{
           background: isEditing ? "var(--color-accent)" : "rgba(0,0,0,0.5)",
@@ -47,7 +60,7 @@ export const ImageEditMode = memo(function ImageEditMode({
       {isEditing && hasChanges && (
         <button
           type="button"
-          onClick={onReset}
+          onClick={handleReset}
           className="flex h-8 w-8 items-center justify-center rounded-full transition-colors lg:h-9 lg:w-9"
           style={{
             background: "rgba(0,0,0,0.5)",

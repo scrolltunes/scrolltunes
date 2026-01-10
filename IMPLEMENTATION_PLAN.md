@@ -193,7 +193,7 @@ Generated from specs. Tasks sorted by priority.
   - Add tint case to applyEffect
   - Use mix-blend-mode: color with opacity
   - Support custom color from settings
-- [ ] Not started
+- [x] Completed (already implemented in applyEffect.ts)
 
 ### Task 19: Add Tint controls
 - **File**: `src/components/share/effects/AlbumArtEffectControls.tsx` (already included)
@@ -211,7 +211,7 @@ Generated from specs. Tasks sorted by priority.
   - Support linear gradients (top/bottom/left/right)
   - Support radial gradient
   - Apply with specified color and opacity
-- [ ] Not started
+- [x] Completed (already implemented in applyEffect.ts)
 
 ### Task 21: Add Gradient controls
 - **File**: `src/components/share/effects/AlbumArtEffectControls.tsx` (already included)
@@ -229,7 +229,7 @@ Generated from specs. Tasks sorted by priority.
   - Use SVG filter for duotone
   - Or CSS filter chain: grayscale + sepia + hue-rotate
   - Map shadows to color 1, highlights to color 2
-- [ ] Not started
+- [x] Completed (already implemented in applyEffect.ts)
 
 ### Task 23: Add Duotone controls
 - **File**: `src/components/share/effects/AlbumArtEffectControls.tsx` (already included)
@@ -251,7 +251,7 @@ Generated from specs. Tasks sorted by priority.
   - Use navigator.vibrate API if available
   - Short vibration on mode toggle
   - Subtle feedback on zoom limits
-- [ ] Not started
+- [x] Completed
 
 ### Task 25: Add screen reader announcements
 - **File**: `src/components/share/ImageEditMode.tsx` (modify)
@@ -464,6 +464,18 @@ Generated from specs. Tasks sorted by priority.
   - Added `handleAlbumArtEffectChange` callback to call `store.setAlbumArtEffect()`
   - Added `handleAlbumArtEffectSettingChange` callback to call `store.setAlbumArtEffectSetting()`
   - Passed all album art effect props to `EffectsControls` in both mobile and desktop layouts
+
+### Task 24: Add haptic feedback
+- Modified `src/components/share/ImageEditMode.tsx`:
+  - Added `useHaptic` hook import
+  - Added `handleToggle` callback with light haptic on mode toggle
+  - Added `handleReset` callback with medium haptic on reset
+- Modified `src/components/share/designer/ShareDesignerPreview.tsx`:
+  - Added `useHaptic` hook import
+  - Added `zoomLimitHapticRef` to track zoom limit haptic state
+  - Added haptic feedback in `handleTouchMove` when hitting min/max zoom (1.0 or 3.0)
+  - Added haptic feedback in `handleWheel` when crossing zoom limits
+  - Reset haptic ref when pinch ends
 
 ---
 

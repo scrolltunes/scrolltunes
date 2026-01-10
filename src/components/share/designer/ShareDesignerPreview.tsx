@@ -1,5 +1,6 @@
 "use client"
 
+import { useHaptic } from "@/hooks/useHaptic"
 import { MusicNote } from "@phosphor-icons/react"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { applyEffect } from "../effects"
@@ -192,6 +193,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
   onResetImagePosition,
 }: ShareDesignerPreviewProps) {
   const isRTL = lyrics.direction === "rtl"
+  const { haptic } = useHaptic()
 
   // Drag state for image panning
   const isDraggingRef = useRef(false)
@@ -285,6 +287,9 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     [isImageEditing, onImageScaleChange, imageEdit, getTouchDistance],
   )
 
+  // Track if we already provided haptic feedback for current zoom limit hit
+  const zoomLimitHapticRef = useRef<"min" | "max" | null>(null)
+
   // Handle touch move for pinch-to-zoom
   const handleTouchMove = useCallback(
     (e: React.TouchEvent<HTMLDivElement>) => {
@@ -298,14 +303,27 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
         if (touch1 && touch2) {
           const currentDistance = getTouchDistance(touch1, touch2)
           const scaleFactor = currentDistance / initialPinchDistanceRef.current
+          const rawScale = initialScaleRef.current * scaleFactor
 
           // Calculate new scale, clamped to 1.0-3.0 range
-          const newScale = Math.max(1, Math.min(3, initialScaleRef.current * scaleFactor))
+          const newScale = Math.max(1, Math.min(3, rawScale))
+
+          // Provide haptic feedback when hitting zoom limits (once per limit hit)
+          if (rawScale <= 1 && zoomLimitHapticRef.current !== "min") {
+            haptic("light")
+            zoomLimitHapticRef.current = "min"
+          } else if (rawScale >= 3 && zoomLimitHapticRef.current !== "max") {
+            haptic("light")
+            zoomLimitHapticRef.current = "max"
+          } else if (rawScale > 1 && rawScale < 3) {
+            zoomLimitHapticRef.current = null
+          }
+
           onImageScaleChange(newScale)
         }
       }
     },
-    [onImageScaleChange, imageEdit, getTouchDistance],
+    [onImageScaleChange, imageEdit, getTouchDistance, haptic],
   )
 
   // Handle touch end for pinch-to-zoom
@@ -313,6 +331,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     // End pinch when less than 2 fingers remain
     if (e.touches.length < 2) {
       isPinchingRef.current = false
+      zoomLimitHapticRef.current = null
     }
   }, [])
 
@@ -328,11 +347,19 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
       // Negative deltaY = scroll up = zoom in, positive = scroll down = zoom out
       const zoomSensitivity = 0.001
       const delta = -e.deltaY * zoomSensitivity
-      const newScale = Math.max(1, Math.min(3, imageEdit.scale + delta))
+      const rawScale = imageEdit.scale + delta
+      const newScale = Math.max(1, Math.min(3, rawScale))
+
+      // Provide haptic feedback when hitting zoom limits
+      if (rawScale <= 1 && imageEdit.scale > 1) {
+        haptic("light")
+      } else if (rawScale >= 3 && imageEdit.scale < 3) {
+        haptic("light")
+      }
 
       onImageScaleChange(newScale)
     },
-    [isImageEditing, onImageScaleChange, imageEdit],
+    [isImageEditing, onImageScaleChange, imageEdit, haptic],
   )
 
   // Keyboard navigation for image edit mode
