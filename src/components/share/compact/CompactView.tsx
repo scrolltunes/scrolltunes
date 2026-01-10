@@ -33,6 +33,7 @@ import {
   useShareExperienceTypography,
 } from "../ShareExperienceStore"
 import { ShareDesignerPreview } from "../designer/ShareDesignerPreview"
+import { ZoomSlider } from "../designer/controls"
 import { useShareExport } from "../designer/useShareExport"
 import type { EffectSettings } from "../effects"
 import { CUSTOM_COLOR_ID, GradientPalette } from "./GradientPalette"
@@ -519,6 +520,13 @@ export const CompactView = memo(
               onGradientSelect={handleGradientSelect}
               onCustomColorChange={handleCustomColorChange}
             />
+          )}
+
+          {/* Zoom Slider - shown when image edit mode is active */}
+          {isImageEditing && (
+            <div className="absolute inset-x-4 bottom-2">
+              <ZoomSlider value={imageEdit.scale} onChange={handleImageScaleChange} />
+            </div>
           )}
         </div>
 

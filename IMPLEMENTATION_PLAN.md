@@ -149,7 +149,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Minus button, slider, plus button
   - Display current zoom level (e.g., "120%")
   - Reset button to restore defaults
-- [ ] Not started
+- [x] Completed (discovered: already exists at `designer/controls/ZoomSlider.tsx`)
 
 ### Task 14: Integrate image edit into CompactView
 - **File**: `src/components/share/compact/CompactView.tsx` (modify)
@@ -158,7 +158,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Show image edit button (🖼️) when Album pattern selected
   - Apply gesture handlers to preview when editing
   - Show zoom slider when editing
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -390,6 +390,23 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Haptic feedback at zoom limits (min 1.0, max 3.0)
 - Returns element ref, isDragging state, event handlers object, and gesture styles
 - Exports constants: MIN_SCALE, MAX_SCALE, MIN_OFFSET, MAX_OFFSET, PAN_STEP, ZOOM_STEP
+
+### Task 13: Create ZoomSlider component
+- Discovered: Component already exists at `src/components/share/designer/controls/ZoomSlider.tsx`
+- Full implementation with minus/plus buttons, slider, and zoom percentage display
+- Range: 100% to 300% (MIN_SCALE=1, MAX_SCALE=3)
+- Step: 0.1x (10%), Button step: 0.1x
+- Accessibility: ARIA labels and value text
+- Exported from `designer/controls/index.ts`
+- Can be imported directly: `import { ZoomSlider } from "@/components/share/designer/controls"`
+
+### Task 14: Integrate image edit into CompactView
+- Modified `src/components/share/compact/CompactView.tsx`
+- Image edit button (🖼️) already present when Album pattern selected (via ImageEditMode component)
+- Gesture handlers already integrated via ShareDesignerPreview props (pointer, touch, wheel, keyboard)
+- Added ZoomSlider component showing when `isImageEditing` is true
+- ZoomSlider appears at bottom of preview area, absolutely positioned
+- Connected to `imageEdit.scale` state and `handleImageScaleChange` callback
 
 ---
 
