@@ -88,7 +88,7 @@ Generated from specs. Tasks sorted by priority.
   - Animated dashed border around card when editing
   - Reduce lyrics opacity to 0.5
   - Cursor changes: default → grab → grabbing
-- [ ] Not started
+- [x] Completed
 
 ### Task 9: Add reset button
 - **File**: `src/components/share/ImageEditMode.tsx` (modify)
@@ -351,6 +351,16 @@ Generated from specs. Tasks sorted by priority.
 - Added `onExitImageEdit` and `onResetImagePosition` props to `ShareDesignerPreview`
 - Ignores keypresses when user is typing in input/textarea/contentEditable
 - Event listener properly cleaned up on unmount
+
+### Task 8: Add visual affordances for edit mode
+- Added `isDragging` state via `useState` to track active drag operations
+- Updated `handlePointerDown` to set `isDragging` to true on drag start
+- Updated `handlePointerUp` to set `isDragging` to false on drag end
+- Cursor changes: `grab` when in image edit mode, `grabbing` while dragging
+- Added animated dashed border overlay when `isImageEditing` is true
+- Border uses pulsing opacity animation (0.4 to 1.0) via styled-jsx
+- Content div opacity reduced to 0.5 when in image edit mode
+- Border inset by 4px from card edge with matching border radius
 
 ---
 

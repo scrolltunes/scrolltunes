@@ -1,7 +1,7 @@
 "use client"
 
 import { MusicNote } from "@phosphor-icons/react"
-import { memo, useCallback, useEffect, useMemo, useRef } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type {
   AlbumArtElementConfig,
   BackgroundConfig,
@@ -191,6 +191,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
 
   // Drag state for image panning
   const isDraggingRef = useRef(false)
+  const [isDragging, setIsDragging] = useState(false)
   const dragStartRef = useRef({ x: 0, y: 0 })
   const offsetStartRef = useRef({ x: 0, y: 0 })
   const cardElementRef = useRef<HTMLDivElement | null>(null)
@@ -207,6 +208,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
 
       e.preventDefault()
       isDraggingRef.current = true
+      setIsDragging(true)
       dragStartRef.current = { x: e.clientX, y: e.clientY }
       offsetStartRef.current = { x: imageEdit.offsetX, y: imageEdit.offsetY }
       e.currentTarget.setPointerCapture(e.pointerId)
@@ -244,6 +246,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (isDraggingRef.current) {
       isDraggingRef.current = false
+      setIsDragging(false)
       e.currentTarget.releasePointerCapture(e.pointerId)
     }
   }, [])
@@ -667,7 +670,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
           position: "relative",
           overflow: "hidden",
           fontFamily: getFontFamily(typography.fontFamily),
-          cursor: isImageEditing ? "grab" : undefined,
+          cursor: isImageEditing ? (isDragging ? "grabbing" : "grab") : undefined,
           touchAction: isImageEditing ? "none" : undefined,
           userSelect: isImageEditing ? "none" : undefined,
         }}
@@ -677,8 +680,22 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
         {albumArtOverlay}
         {vignetteOverlay}
 
+        {/* Image edit mode border indicator */}
+        {isImageEditing && (
+          <div
+            className="image-edit-border"
+            style={{
+              position: "absolute",
+              inset: 4,
+              border: "2px dashed rgba(255,255,255,0.6)",
+              borderRadius: Math.max(0, effects.border.radius - 4),
+              pointerEvents: "none",
+            }}
+          />
+        )}
+
         {/* Content */}
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", opacity: isImageEditing ? 0.5 : 1 }}>
           {/* Header: Album Art + Metadata */}
           {(albumArtElement.visible || metadataElement.visible) && (
             <div
@@ -854,6 +871,20 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
           )}
         </div>
       </div>
+      <style jsx>{`
+        .image-edit-border {
+          animation: borderPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes borderPulse {
+          0%,
+          100% {
+            opacity: 0.4;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   )
 })
