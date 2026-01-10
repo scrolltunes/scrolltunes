@@ -159,7 +159,7 @@ Generated from specs. Tasks sorted by priority.
   - Effect name label below
   - Selected indicator dot
   - 60x80px size
-- [ ] Not started
+- [x] Completed
 
 ### Task 16: Create EffectControls component
 - **File**: `src/components/share/effects/EffectControls.tsx` (new)
@@ -424,6 +424,18 @@ Generated from specs. Tasks sorted by priority.
 - Selected state indicated with `var(--color-accent)` border
 - Uses framer-motion for hover/tap feedback
 - Proper ARIA attributes (radiogroup, radio, aria-checked)
+- Exported from `effects/index.ts`
+
+### Task 15: Create EffectThumbnail component
+- Created `src/components/share/effects/EffectThumbnail.tsx` as a separate component
+- Shows album art with actual effect applied using `applyEffect()` utility
+- Effect previewed at 52x52px size inside 60px wide button
+- Uses `DEFAULT_EFFECT_SETTINGS` for consistent effect preview across all thumbnails
+- Renders filter layer, primary overlay, and secondary overlay for full effect support
+- Effect name label below thumbnail with selected state color
+- Selected indicator dot absolutely positioned at bottom
+- Proper ARIA attributes (radio, aria-checked) and keyboard support via motion.button
+- Refactored `EffectSelector` to use `EffectThumbnail` component
 - Exported from `effects/index.ts`
 
 ---
