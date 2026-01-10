@@ -33,6 +33,8 @@ import {
 } from "../ShareExperienceStore"
 import { ShareDesignerPreview } from "../designer/ShareDesignerPreview"
 import { useShareExport } from "../designer/useShareExport"
+import type { EffectSettings } from "../effects"
+import { QuickControls } from "./QuickControls"
 
 // ============================================================================
 // Types
@@ -294,6 +296,49 @@ export const CompactView = memo(
     // Background art URL
     const backgroundArtUrl = albumArtLarge ?? albumArt
 
+    // QuickControls handlers
+    const handlePatternChange = useCallback(
+      (pattern: typeof compactPattern) => {
+        store.setCompactPattern(pattern)
+      },
+      [store],
+    )
+
+    const handleEffectTypeChange = useCallback(
+      (effect: typeof albumArtEffect.effect) => {
+        store.setAlbumArtEffect(effect)
+      },
+      [store],
+    )
+
+    const handleEffectSettingChange = useCallback(
+      <K extends keyof EffectSettings>(setting: K, value: EffectSettings[K]) => {
+        store.setAlbumArtEffectSetting(setting, value)
+      },
+      [store],
+    )
+
+    const handleShadowToggle = useCallback(
+      (enabled: boolean) => {
+        store.setShadow({ enabled })
+      },
+      [store],
+    )
+
+    const handleSpotifyCodeToggle = useCallback(
+      (visible: boolean) => {
+        store.setElementConfig("spotifyCode", { visible })
+      },
+      [store],
+    )
+
+    const handleBrandingToggle = useCallback(
+      (visible: boolean) => {
+        store.setElementConfig("branding", { visible })
+      },
+      [store],
+    )
+
     return (
       <div className="flex flex-col">
         {/* Preview Area */}
@@ -453,20 +498,23 @@ export const CompactView = memo(
             </div>
           </div>
 
-          {/* Quick Controls - placeholder for Task 7 */}
-          <div>
-            <p className="mb-2 text-sm" style={{ color: "var(--color-text3)" }}>
-              Pattern & Effects
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <span
-                className="rounded-lg px-3 py-1.5 text-sm"
-                style={{ background: "var(--color-surface2)", color: "var(--color-text3)" }}
-              >
-                Coming in Task 7
-              </span>
-            </div>
-          </div>
+          {/* Quick Controls */}
+          <QuickControls
+            compactPattern={compactPattern}
+            onPatternChange={handlePatternChange}
+            hasAlbumArt={Boolean(albumArt)}
+            albumArt={albumArt}
+            effectType={albumArtEffect.effect}
+            effectSettings={albumArtEffect.settings}
+            onEffectTypeChange={handleEffectTypeChange}
+            onEffectSettingChange={handleEffectSettingChange}
+            effects={effects}
+            elements={elements}
+            onShadowToggle={handleShadowToggle}
+            onSpotifyCodeToggle={handleSpotifyCodeToggle}
+            onBrandingToggle={handleBrandingToggle}
+            spotifyId={spotifyId}
+          />
 
           {/* More Options Button */}
           <button

@@ -83,7 +83,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Effect selector (reuse EffectSelector when Album)
   - Effect strength slider (reuse AlbumArtEffectControls)
   - Three toggles: Shadow, Spotify code, Branding
-- [ ] Not started
+- [x] Completed
 
 ### Task 8: Create GradientPalette component
 - **File**: `src/components/share/compact/GradientPalette.tsx` (new)
@@ -337,6 +337,16 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Placeholders for Quick Styles (Task 11), Pattern & Effects controls (Task 7), and Gradient Palette (Task 8)
 - "More options" button to expand to studio mode
 - Footer "Share Image" button integrated in ShareExperience.tsx
+
+### Task 7: Create QuickControls component
+- Created `src/components/share/compact/QuickControls.tsx`
+- PatternSelector component with 5 pattern options (None, Dots, Grid, Waves, Album)
+- Album option conditionally shown when album art is available
+- EffectSelector and AlbumArtEffectControls integration when Album pattern selected
+- Three toggle switches: Drop shadow, Spotify code (conditional), Support us (branding)
+- ToggleSwitch component with accessible label and aria attributes
+- All state connected to ShareExperienceStore via callback props
+- Integrated into CompactView replacing placeholder
 
 ---
 
