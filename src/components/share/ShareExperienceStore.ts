@@ -44,11 +44,21 @@ export type ShareExperienceStep = "select" | "customize"
  */
 export type QuickPreset = "clean" | "vibrant" | "dark" | "vintage"
 
+/**
+ * Pattern variants for compact mode.
+ * Extends the base PatternVariant with "albumArt" option for full-bleed album art backgrounds.
+ * In compact mode, patterns (dots/grid/waves) are overlays on gradient backgrounds,
+ * while "albumArt" switches to album art as the background.
+ */
+export type CompactPatternVariant = "none" | "dots" | "grid" | "waves" | "albumArt"
+
 export interface ShareExperienceEditorState extends ShareDesignerState {
   readonly editor: EditorState
   readonly experienceMode: ShareExperienceMode
   readonly experienceStep: ShareExperienceStep
   readonly activePreset: QuickPreset | null
+  readonly compactPattern: CompactPatternVariant
+  readonly compactPatternSeed: number
 }
 
 // ============================================================================
@@ -81,6 +91,16 @@ export class SetActivePreset extends Data.TaggedClass("SetActivePreset")<{
 export class ApplyQuickPreset extends Data.TaggedClass("ApplyQuickPreset")<{
   readonly preset: QuickPreset
 }> {}
+
+// --- Compact Pattern Events ---
+
+export class SetCompactPattern extends Data.TaggedClass("SetCompactPattern")<{
+  readonly pattern: CompactPatternVariant
+}> {}
+
+export class RegenerateCompactPatternSeed extends Data.TaggedClass(
+  "RegenerateCompactPatternSeed",
+)<object> {}
 
 // --- State Events (with undo history) ---
 
@@ -190,6 +210,8 @@ export type ShareExperienceEvent =
   | SetExperienceStep
   | SetActivePreset
   | ApplyQuickPreset
+  | SetCompactPattern
+  | RegenerateCompactPatternSeed
   | SetAspectRatio
   | SetPadding
   | SetBackground
@@ -266,6 +288,8 @@ export class ShareExperienceStore {
   private experienceMode: ShareExperienceMode = "compact"
   private experienceStep: ShareExperienceStep = "select"
   private activePreset: QuickPreset | null = null
+  private compactPattern: CompactPatternVariant = "none"
+  private compactPatternSeed: number = Date.now()
   private history: HistoryState = { past: [], future: [] }
   private lastChangeTimestamp = 0
   private context: ShareDesignerSongContext
@@ -297,6 +321,8 @@ export class ShareExperienceStore {
         experienceMode: this.experienceMode,
         experienceStep: this.experienceStep,
         activePreset: this.activePreset,
+        compactPattern: this.compactPattern,
+        compactPatternSeed: this.compactPatternSeed,
       }
     }
     return this.cachedSnapshot
@@ -345,6 +371,20 @@ export class ShareExperienceStore {
 
       case "ApplyQuickPreset":
         return store.handleApplyQuickPreset(event.preset)
+
+      // --- Compact Pattern Events ---
+      case "SetCompactPattern":
+        return Effect.sync(() => {
+          store.compactPattern = event.pattern
+          store.activePreset = null
+          store.notify()
+        })
+
+      case "RegenerateCompactPatternSeed":
+        return Effect.sync(() => {
+          store.compactPatternSeed = Date.now()
+          store.notify()
+        })
 
       // --- State Events ---
       case "SetAspectRatio":
@@ -563,6 +603,8 @@ export class ShareExperienceStore {
           store.experienceStep = "select"
           store.currentTemplateId = null
           store.activePreset = null
+          store.compactPattern = "none"
+          store.compactPatternSeed = Date.now()
           store.history = { past: [], future: [] }
           store.lastChangeTimestamp = 0
           yield* store.handleInitializeBackground()
@@ -938,6 +980,14 @@ export class ShareExperienceStore {
     return this.activePreset
   }
 
+  getCompactPattern(): CompactPatternVariant {
+    return this.compactPattern
+  }
+
+  getCompactPatternSeed(): number {
+    return this.compactPatternSeed
+  }
+
   // -------------------------------------------------------------------------
   // Convenience Methods (wrap dispatch)
   // -------------------------------------------------------------------------
@@ -956,6 +1006,14 @@ export class ShareExperienceStore {
 
   applyQuickPreset(preset: QuickPreset): void {
     Effect.runSync(this.dispatch(new ApplyQuickPreset({ preset })))
+  }
+
+  setCompactPattern(pattern: CompactPatternVariant): void {
+    Effect.runSync(this.dispatch(new SetCompactPattern({ pattern })))
+  }
+
+  regenerateCompactPatternSeed(): void {
+    Effect.runSync(this.dispatch(new RegenerateCompactPatternSeed({})))
   }
 
   setAspectRatio(config: AspectRatioConfig): void {
@@ -1156,6 +1214,18 @@ export function useShareExperienceStep(store: ShareExperienceStore): ShareExperi
 export function useShareExperienceActivePreset(store: ShareExperienceStore): QuickPreset | null {
   const state = useShareExperienceState(store)
   return state.activePreset
+}
+
+export function useShareExperienceCompactPattern(
+  store: ShareExperienceStore,
+): CompactPatternVariant {
+  const state = useShareExperienceState(store)
+  return state.compactPattern
+}
+
+export function useShareExperienceCompactPatternSeed(store: ShareExperienceStore): number {
+  const state = useShareExperienceState(store)
+  return state.compactPatternSeed
 }
 
 export function useShareExperienceBackground(store: ShareExperienceStore): BackgroundConfig {

@@ -40,7 +40,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Add `pattern: PatternVariant` to state
   - Add `patternSeed: number` for waves pattern
   - Ensure pattern state integrates with existing background types
-- [ ] Not started
+- [x] Completed
 
 ### Task 4: Add image edit state to store
 - **File**: `src/components/share/ShareExperienceStore.ts` (modify)
@@ -293,6 +293,17 @@ Tasks sorted by priority (P0 → P1 → P2).
 - All manual edits (background, typography, elements, effects, albumArtEffect) clear activePreset
 - Added convenience methods: `setActivePreset()`, `applyQuickPreset()`
 - Added React hook: `useShareExperienceActivePreset()`
+
+### Task 3: Add pattern background state to store
+- Added `CompactPatternVariant` type: `"none" | "dots" | "grid" | "waves" | "albumArt"`
+- Added `compactPattern: CompactPatternVariant` and `compactPatternSeed: number` to state
+- Added `SetCompactPattern` and `RegenerateCompactPatternSeed` tagged events
+- Setting compact pattern clears activePreset (custom styling)
+- Pattern seed regenerates with `Date.now()` for waves pattern variation
+- State resets to defaults (`"none"`, fresh seed) on store reset
+- Added convenience methods: `setCompactPattern()`, `regenerateCompactPatternSeed()`
+- Added getters: `getCompactPattern()`, `getCompactPatternSeed()`
+- Added React hooks: `useShareExperienceCompactPattern()`, `useShareExperienceCompactPatternSeed()`
 
 ---
 
