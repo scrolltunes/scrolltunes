@@ -49,7 +49,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Add `imageEdit: { offsetX, offsetY, scale }` to state
   - Add `isImageEditing: boolean` flag
   - Implement `setImageOffset()`, `setImageScale()`, `resetImageEdit()` methods
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -304,6 +304,14 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Added convenience methods: `setCompactPattern()`, `regenerateCompactPatternSeed()`
 - Added getters: `getCompactPattern()`, `getCompactPatternSeed()`
 - Added React hooks: `useShareExperienceCompactPattern()`, `useShareExperienceCompactPatternSeed()`
+
+### Task 4: Add image edit state to store
+- Image edit state already existed via `EditorState.imageEdit` from ShareDesignerStore patterns
+- `SetImageOffset`, `SetImageScale`, `ResetImagePosition` tagged events at lines 184-193
+- State handling with clamping: offsets -100 to 100, scale 1.0 to 3.0 (lines 547-575)
+- Convenience methods: `setImageOffset()`, `setImageScale()`, `resetImagePosition()`
+- `isImageEditing()` returns `this.editor.mode === "image"`
+- React hook: `useShareExperienceImageEdit(store)`
 
 ---
 
