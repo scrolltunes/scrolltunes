@@ -123,7 +123,11 @@ const findByTitleArtist = (title: string, artist: string, targetDurationSec?: nu
   Effect.gen(function* () {
     const client = yield* getClient
 
-    const ftsQuery = `"${title.replace(/"/g, '""')}" "${artist.replace(/"/g, '""')}"`
+    // Use column-specific FTS matching to ensure artist phrase matches artist column
+    // This prevents compilation tracks with "Artist - Song" titles from matching
+    const escapedTitle = title.replace(/"/g, '""')
+    const escapedArtist = artist.replace(/"/g, '""')
+    const ftsQuery = `title:"${escapedTitle}" artist:"${escapedArtist}"`
 
     const result = yield* Effect.tryPromise({
       try: async () => {

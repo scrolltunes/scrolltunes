@@ -91,8 +91,8 @@ static LIVE_REMIX_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
 // Patterns for garbage titles (track numbers, artist name in title, etc.)
 static GARBAGE_TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
-        // Track numbers at start: "01. Song", "01 - Song", "0958 - Artist - Song"
-        Regex::new(r"(?i)^\d{1,4}\s*[-–—.]\s*").unwrap(),
+        // Track numbers at start: "01. Song", "01 - Song", "0958 - Artist - Song", "93_34 Artist - Song"
+        Regex::new(r"(?i)^\d{1,4}\s*[-–—._]\s*").unwrap(),
         // Artist name embedded in title: "Artist - Song"
         Regex::new(r"(?i)^[^-–—]+ - [^-–—]+ - ").unwrap(),
         // Numbered prefixes like "01.", "12 -"
