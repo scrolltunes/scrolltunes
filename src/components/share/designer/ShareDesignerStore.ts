@@ -4,8 +4,10 @@ import { detectLyricsDirection } from "@/lib"
 import { type GradientOption, buildGradientPalette, extractDominantColor } from "@/lib/colors"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
+import type { EffectSettings, EffectType } from "../effects"
 import { type Template, getTemplateById } from "./templates"
 import {
+  type AlbumArtEffectConfig,
   type AspectRatioConfig,
   type BackgroundConfig,
   DEFAULT_EDITOR_STATE,
@@ -93,6 +95,15 @@ export class ApplyTemplate extends Data.TaggedClass("ApplyTemplate")<{
 
 export class RegeneratePatternSeed extends Data.TaggedClass("RegeneratePatternSeed")<object> {}
 
+export class SetAlbumArtEffect extends Data.TaggedClass("SetAlbumArtEffect")<{
+  readonly effect: EffectType
+}> {}
+
+export class SetAlbumArtEffectSetting extends Data.TaggedClass("SetAlbumArtEffectSetting")<{
+  readonly setting: keyof EffectSettings
+  readonly value: EffectSettings[keyof EffectSettings]
+}> {}
+
 // --- Editor Events (no history) ---
 
 export class SetEditMode extends Data.TaggedClass("SetEditMode")<{
@@ -153,6 +164,8 @@ export type ShareDesignerEvent =
   | SetExportSettings
   | ApplyTemplate
   | RegeneratePatternSeed
+  | SetAlbumArtEffect
+  | SetAlbumArtEffectSetting
   | SetEditMode
   | SetSelectedElement
   | SetZoom
@@ -391,6 +404,37 @@ export class ShareDesignerStore {
           }
         })
 
+      case "SetAlbumArtEffect":
+        return Effect.sync(() => {
+          store.updateState(
+            {
+              albumArtEffect: {
+                ...store.state.albumArtEffect,
+                effect: event.effect,
+              },
+            },
+            "Change effect",
+          )
+          store.currentTemplateId = null
+        })
+
+      case "SetAlbumArtEffectSetting":
+        return Effect.sync(() => {
+          store.updateState(
+            {
+              albumArtEffect: {
+                ...store.state.albumArtEffect,
+                settings: {
+                  ...store.state.albumArtEffect.settings,
+                  [event.setting]: event.value,
+                },
+              },
+            },
+            "Change effect setting",
+          )
+          store.currentTemplateId = null
+        })
+
       // --- Editor Events (no history) ---
       case "SetEditMode":
         return Effect.sync(() => {
@@ -577,6 +621,7 @@ export class ShareDesignerStore {
           border: { ...this.state.effects.border, ...template.effects.border },
           vignette: { ...this.state.effects.vignette, ...template.effects.vignette },
         },
+        albumArtEffect: this.state.albumArtEffect,
         lyrics: this.state.lyrics,
         exportSettings: this.state.exportSettings,
       }
@@ -824,6 +869,17 @@ export class ShareDesignerStore {
     this.setEffects({ vignette: { ...this.state.effects.vignette, ...config } })
   }
 
+  setAlbumArtEffect(effect: EffectType): void {
+    Effect.runSync(this.dispatch(new SetAlbumArtEffect({ effect })))
+  }
+
+  setAlbumArtEffectSetting<K extends keyof EffectSettings>(
+    setting: K,
+    value: EffectSettings[K],
+  ): void {
+    Effect.runSync(this.dispatch(new SetAlbumArtEffectSetting({ setting, value })))
+  }
+
   setSelectedLines(lineIds: readonly string[]): void {
     Effect.runSync(this.dispatch(new SetSelectedLines({ lineIds })))
   }
@@ -951,6 +1007,11 @@ export function useShareDesignerElements(store: ShareDesignerStore): ElementsCon
 export function useShareDesignerEffects(store: ShareDesignerStore): EffectsConfig {
   const state = useShareDesignerState(store)
   return state.effects
+}
+
+export function useShareDesignerAlbumArtEffect(store: ShareDesignerStore): AlbumArtEffectConfig {
+  const state = useShareDesignerState(store)
+  return state.albumArtEffect
 }
 
 export function useShareDesignerLyrics(store: ShareDesignerStore): LyricsSelectionConfig {

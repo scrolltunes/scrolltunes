@@ -5,6 +5,8 @@
  * Follows project patterns with readonly modifiers throughout.
  */
 
+import { DEFAULT_EFFECT_SETTINGS, type EffectSettings, type EffectType } from "../effects"
+
 // ============================================================================
 // Aspect Ratio Types
 // ============================================================================
@@ -172,6 +174,18 @@ export interface EffectsConfig {
 }
 
 // ============================================================================
+// Album Art Effect Types (New Effects System)
+// ============================================================================
+
+// Re-export from effects module for convenience
+export type { EffectSettings, EffectType, GradientDirection } from "../effects"
+
+export interface AlbumArtEffectConfig {
+  readonly effect: EffectType
+  readonly settings: EffectSettings
+}
+
+// ============================================================================
 // Lyrics Selection Types
 // ============================================================================
 
@@ -233,6 +247,7 @@ export interface ShareDesignerState {
   readonly typography: TypographyConfig
   readonly elements: ElementsConfig
   readonly effects: EffectsConfig
+  readonly albumArtEffect: AlbumArtEffectConfig
   readonly exportSettings: ExportSettings
 }
 
@@ -360,6 +375,11 @@ export const DEFAULT_EFFECTS: EffectsConfig = {
   vignette: DEFAULT_VIGNETTE,
 }
 
+export const DEFAULT_ALBUM_ART_EFFECT: AlbumArtEffectConfig = {
+  effect: "none",
+  settings: DEFAULT_EFFECT_SETTINGS,
+}
+
 export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   format: "png",
   quality: "high",
@@ -404,5 +424,6 @@ export const DEFAULT_SHARE_DESIGNER_STATE: ShareDesignerState = {
   typography: DEFAULT_TYPOGRAPHY,
   elements: DEFAULT_ELEMENTS,
   effects: DEFAULT_EFFECTS,
+  albumArtEffect: DEFAULT_ALBUM_ART_EFFECT,
   exportSettings: DEFAULT_EXPORT_SETTINGS,
 }

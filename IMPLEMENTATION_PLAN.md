@@ -119,7 +119,7 @@ Generated from specs. Tasks sorted by priority.
   - Add `effect` and `effectSettings` properties
   - Add `setEffect`, `setEffectSetting` methods
   - Migrate existing vignette to new system
-- [ ] Not started
+- [x] Completed
 
 ### Task 12: Create applyEffect utility
 - **File**: `src/components/share/effects/applyEffect.ts` (new)
@@ -379,6 +379,17 @@ Generated from specs. Tasks sorted by priority.
 - Exported `EFFECT_DEFINITIONS` array with metadata for all 8 effects
 - Added helper functions: `getEffectDefinition()`, `getEffectName()`
 - Uses phosphor-icons for effect icons (CircleHalf, Drop, Gradient, Moon, Palette, SunDim, Textbox)
+
+### Task 11: Add effects state to ShareDesignerStore
+- Added `AlbumArtEffectConfig` interface to `types.ts` with `effect: EffectType` and `settings: EffectSettings`
+- Added `albumArtEffect` property to `ShareDesignerState` interface
+- Created `DEFAULT_ALBUM_ART_EFFECT` with effect: "none" and DEFAULT_EFFECT_SETTINGS
+- Added tagged events: `SetAlbumArtEffect`, `SetAlbumArtEffectSetting`
+- Added dispatch handlers for new events with history support
+- Added convenience methods: `setAlbumArtEffect()`, `setAlbumArtEffectSetting()`
+- Added hook: `useShareDesignerAlbumArtEffect()`
+- Updated `handleApplyTemplate()` to preserve `albumArtEffect` state
+- Re-exported `EffectType`, `EffectSettings`, `GradientDirection` from types.ts for convenience
 
 ---
 
