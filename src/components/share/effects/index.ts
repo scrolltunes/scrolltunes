@@ -171,3 +171,4 @@ export function getEffectName(id: EffectType): string {
 // ============================================================================
 
 export { applyEffect, type EffectStyles } from "./applyEffect"
+export { EffectSelector, type EffectSelectorProps } from "./EffectSelector"

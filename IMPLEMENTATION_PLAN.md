@@ -149,7 +149,7 @@ Generated from specs. Tasks sorted by priority.
   - Horizontal scroll with snap on mobile
   - Selected state with accent border
   - Call setEffect on thumbnail click
-- [ ] Not started
+- [x] Completed
 
 ### Task 15: Create EffectThumbnail component
 - **File**: `src/components/share/effects/EffectThumbnail.tsx` (new)
@@ -415,6 +415,16 @@ Generated from specs. Tasks sorted by priority.
   - Renders primary and secondary overlay divs for overlay-based effects
 - Added `albumArtEffectOverlay` to render tree after `albumArtOverlay` and before `vignetteOverlay`
 - Updated `CustomizeView.tsx` to pass `albumArtEffect={state.albumArtEffect}` to both desktop and mobile `ShareDesignerPreview` instances
+
+### Task 14: Create EffectSelector component
+- Created `src/components/share/effects/EffectSelector.tsx` with horizontal scrollable effect thumbnails
+- Maps `EFFECT_DEFINITIONS` to render each effect option as a button
+- Each thumbnail shows: icon overlay on small album art preview, effect name below
+- Horizontal scroll with `scrollSnapType: "x mandatory"` for mobile
+- Selected state indicated with `var(--color-accent)` border
+- Uses framer-motion for hover/tap feedback
+- Proper ARIA attributes (radiogroup, radio, aria-checked)
+- Exported from `effects/index.ts`
 
 ---
 
