@@ -272,14 +272,14 @@ Generated from specs. Tasks sorted by priority.
 - [x] Completed
 
 ### Task 27: Add color picker component
-- **File**: `src/components/share/controls/ColorPicker.tsx` (new)
+- **File**: `src/components/share/designer/controls/ColorPicker.tsx` (already exists)
 - **Description**: Reusable color picker with presets
 - **Details**:
   - Palette of common colors
   - Hex input field
   - Optional: HSL picker
   - Used by Tint, Duotone, Gradient effects
-- [ ] Not started
+- [x] Completed (already implemented)
 
 ---
 
@@ -511,6 +511,17 @@ Generated from specs. Tasks sorted by priority.
   - Updated `albumArtEffectOverlay` to only render overlay-based effects (vignette, tint, gradient, duotone colors)
   - Filter-based effects (blur, darken, desaturate, duotone grayscale+contrast) now work in export
   - Overlay-based effects (vignette, tint, gradient, duotone color blends) use `mixBlendMode` which works in canvas
+
+### Task 27: Add color picker component
+- Component already existed at `src/components/share/designer/controls/ColorPicker.tsx`
+- Features:
+  - 15 color presets (grayscale + rainbow colors)
+  - Hex input field with validation
+  - Light/dark color detection for checkmark visibility
+  - Framer Motion animations for hover/tap feedback
+  - Proper ARIA attributes (aria-label, aria-pressed)
+- Already integrated in `AlbumArtEffectControls.tsx` for Tint, Gradient, and Duotone effects
+- No code changes needed - task was already complete
 
 ---
 
