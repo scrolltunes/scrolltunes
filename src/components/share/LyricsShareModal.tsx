@@ -159,6 +159,7 @@ export function LyricsShareModal({
   const [expandedWidth, setExpandedWidth] = useState(true)
   const [pattern, setPattern] = useState<PatternVariant>("none")
   const [patternSeed, setPatternSeed] = useState(() => Date.now())
+  const [vignetteStrength, setVignetteStrength] = useState(50)
   const [isGenerating, setIsGenerating] = useState(false)
   const [shareSupported, setShareSupported] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -209,6 +210,7 @@ export function LyricsShareModal({
       setShowShadow(true)
       setExpandedWidth(true)
       setPattern("none")
+      setVignetteStrength(50)
       setIsEditing(false)
       setEditedLines(new Map())
       setEditModeWidth(null)
@@ -235,27 +237,32 @@ export function LyricsShareModal({
   }, [isEditing, lastFocusedIndex, lastCaretPosition])
 
   // Calculate scale to fit card within preview container with small margins
-  const calculateScale = useCallback(() => {
-    const container = previewContainerRef.current
-    const card = cardRef.current
-    if (!container || !card) return
+  const calculateScale = useCallback(
+    (skipIfEditing = false) => {
+      if (skipIfEditing && isEditing) return
 
-    // 4% margin on each side = 92% of container width available
-    const availableWidth = container.clientWidth * 0.92
-    const cardWidth = card.scrollWidth
-    const cardHeight = card.scrollHeight
+      const container = previewContainerRef.current
+      const card = cardRef.current
+      if (!container || !card) return
 
-    if (cardWidth > availableWidth) {
-      const scale = Math.max(0.5, availableWidth / cardWidth)
-      // Round to 3 decimal places to avoid sub-pixel jitter
-      const roundedScale = Math.round(scale * 1000) / 1000
-      setPreviewScale(roundedScale)
-      setScaledHeight(Math.round(cardHeight * roundedScale))
-    } else {
-      setPreviewScale(1)
-      setScaledHeight(null)
-    }
-  }, [expandedWidth])
+      // 4% margin on each side = 92% of container width available
+      const availableWidth = container.clientWidth * 0.92
+      const cardWidth = card.scrollWidth
+      const cardHeight = card.scrollHeight
+
+      if (cardWidth > availableWidth) {
+        const scale = Math.max(0.5, availableWidth / cardWidth)
+        // Round to 3 decimal places to avoid sub-pixel jitter
+        const roundedScale = Math.round(scale * 1000) / 1000
+        setPreviewScale(roundedScale)
+        setScaledHeight(Math.round(cardHeight * roundedScale))
+      } else {
+        setPreviewScale(1)
+        setScaledHeight(null)
+      }
+    },
+    [expandedWidth, isEditing],
+  )
 
   // Use layout effect to calculate scale before paint
   useLayoutEffect(() => {
@@ -263,7 +270,7 @@ export function LyricsShareModal({
       return
     }
     calculateScale()
-  }, [step, calculateScale, selectedIndices.size, cardElement, isEditing, showShadow])
+  }, [step, calculateScale, selectedIndices.size, cardElement, showShadow])
 
   // Use ResizeObserver to recalculate when card size changes
   useEffect(() => {
@@ -272,16 +279,16 @@ export function LyricsShareModal({
     const card = cardRef.current
     if (!card) return
 
-    const observer = new ResizeObserver(() => {
-      calculateScale()
-    })
+    const handleResize = () => calculateScale(true)
+
+    const observer = new ResizeObserver(handleResize)
     observer.observe(card)
 
-    window.addEventListener("resize", calculateScale)
+    window.addEventListener("resize", handleResize)
 
     return () => {
       observer.disconnect()
-      window.removeEventListener("resize", calculateScale)
+      window.removeEventListener("resize", handleResize)
     }
   }, [step, calculateScale])
 
@@ -519,7 +526,6 @@ export function LyricsShareModal({
             ref={cardCallbackRef}
             style={{
               padding: showShadow ? "16px 16px 50px 16px" : "0",
-              background: "transparent",
             }}
           >
             <div
@@ -531,34 +537,64 @@ export function LyricsShareModal({
                 padding: "24px",
                 maxWidth: expandedWidth ? "600px" : "384px",
                 width: isEditing && editModeWidth ? `${editModeWidth}px` : undefined,
-                boxShadow: showShadow ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "none",
+                boxShadow: showShadow
+                  ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
+                  : "none",
                 position: "relative",
                 overflow: "hidden",
+                isolation: "isolate",
               }}
             >
-              {/* Album art background pattern */}
+              {/* Album art background pattern with vignette effect */}
               {isAlbumArtPattern && backgroundArtUrl && (
                 <>
+                  {/* Base album art - visible in center */}
                   <img
                     src={backgroundArtUrl}
                     alt=""
                     crossOrigin="anonymous"
                     style={{
                       position: "absolute",
-                      inset: "-20px",
-                      width: "calc(100% + 40px)",
-                      height: "calc(100% + 40px)",
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
                       objectFit: "cover",
-                      filter: "blur(20px)",
-                      transform: "scale(1.1)",
                       pointerEvents: "none",
                     }}
                   />
+                  {/* Blurred layer with radial mask - clear center, blurred edges */}
                   <div
                     style={{
                       position: "absolute",
                       inset: 0,
-                      background: "rgba(0, 0, 0, 0.5)",
+                      overflow: "hidden",
+                      borderRadius: "24px",
+                    }}
+                  >
+                    <img
+                      src={backgroundArtUrl}
+                      alt=""
+                      crossOrigin="anonymous"
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        transform: "scale(1.1)",
+                        filter: `blur(${Math.round(vignetteStrength * 0.24)}px)`,
+                        pointerEvents: "none",
+                        maskImage: `radial-gradient(ellipse at center, transparent ${Math.round(40 - vignetteStrength * 0.3)}%, black ${Math.round(80 - vignetteStrength * 0.3)}%)`,
+                        WebkitMaskImage: `radial-gradient(ellipse at center, transparent ${Math.round(40 - vignetteStrength * 0.3)}%, black ${Math.round(80 - vignetteStrength * 0.3)}%)`,
+                      }}
+                    />
+                  </div>
+                  {/* Vignette darkening - transparent center, dark edges */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: `radial-gradient(ellipse at center, transparent ${Math.round(35 - vignetteStrength * 0.25)}%, rgba(0, 0, 0, ${(vignetteStrength * 0.007).toFixed(2)}) ${Math.round(90 - vignetteStrength * 0.3)}%)`,
                       pointerEvents: "none",
                     }}
                   />
@@ -875,7 +911,7 @@ export function LyricsShareModal({
                           type="button"
                           onClick={() => {
                             if (!isEditing && innerCardRef.current) {
-                              setEditModeWidth(innerCardRef.current.offsetWidth)
+                              setEditModeWidth(innerCardRef.current.scrollWidth)
                             } else {
                               const activeInput = inputRefs.current[lastFocusedIndex]
                               if (activeInput) {
@@ -1042,6 +1078,34 @@ export function LyricsShareModal({
                               }}
                               className="sr-only"
                               aria-label="Custom color picker"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {/* Vignette strength slider - shown in album art mode */}
+                      {pattern === "albumArt" && (
+                        <div className="absolute bottom-2 left-2 right-2 flex justify-center">
+                          <div
+                            className="flex items-center gap-3 rounded-full px-4 py-2"
+                            style={{ background: "rgba(0,0,0,0.5)" }}
+                          >
+                            <span
+                              className="text-xs font-medium whitespace-nowrap"
+                              style={{ color: "rgba(255,255,255,0.7)" }}
+                            >
+                              Vignette
+                            </span>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={vignetteStrength}
+                              onChange={e => setVignetteStrength(Number(e.target.value))}
+                              className="h-1.5 w-32 cursor-pointer appearance-none rounded-full"
+                              style={{
+                                background: `linear-gradient(to right, white ${vignetteStrength}%, rgba(255,255,255,0.3) ${vignetteStrength}%)`,
+                              }}
+                              aria-label="Vignette strength"
                             />
                           </div>
                         </div>
