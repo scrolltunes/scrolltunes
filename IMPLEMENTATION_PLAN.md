@@ -139,7 +139,7 @@ Generated from specs. Tasks sorted by priority.
   - Import and call applyEffect with current state
   - Apply returned styles to background element
   - Ensure effects work with position/zoom transforms
-- [ ] Not started
+- [x] Completed
 
 ### Task 14: Create EffectSelector component
 - **File**: `src/components/share/effects/EffectSelector.tsx` (new)
@@ -404,6 +404,17 @@ Generated from specs. Tasks sorted by priority.
 - Duotone: grayscale + contrast filter with multiply/screen blend mode overlays
 - Added `hexToRgb()` helper for color parsing
 - Exported `applyEffect` and `EffectStyles` from effects index
+
+### Task 13: Apply effects to preview background
+- Added `AlbumArtEffectConfig` import and `applyEffect` import to `ShareDesignerPreview.tsx`
+- Added `albumArtEffect?: AlbumArtEffectConfig` prop to `ShareDesignerPreviewProps`
+- Created `albumArtEffectOverlay` memoized value that:
+  - Returns null if background is not albumArt or effect is "none"
+  - Calls `applyEffect()` with current effect type and settings
+  - Renders filter layer via `backdropFilter` for CSS filter effects
+  - Renders primary and secondary overlay divs for overlay-based effects
+- Added `albumArtEffectOverlay` to render tree after `albumArtOverlay` and before `vignetteOverlay`
+- Updated `CustomizeView.tsx` to pass `albumArtEffect={state.albumArtEffect}` to both desktop and mobile `ShareDesignerPreview` instances
 
 ---
 

@@ -231,6 +231,7 @@ export const CustomizeView = memo(function CustomizeView({
               spotifyCodeElement={state.elements.spotifyCode}
               brandingElement={state.elements.branding}
               effects={state.effects}
+              albumArtEffect={state.albumArtEffect}
               getDisplayText={lineId => store.getDisplayText(lineId)}
               cardRef={cardRef}
               isImageEditing={store.isImageEditing()}
@@ -354,6 +355,7 @@ export const CustomizeView = memo(function CustomizeView({
               spotifyCodeElement={state.elements.spotifyCode}
               brandingElement={state.elements.branding}
               effects={state.effects}
+              albumArtEffect={state.albumArtEffect}
               getDisplayText={lineId => store.getDisplayText(lineId)}
               cardRef={cardRef}
               isImageEditing={store.isImageEditing()}

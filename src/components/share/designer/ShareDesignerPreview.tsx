@@ -2,7 +2,9 @@
 
 import { MusicNote } from "@phosphor-icons/react"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { applyEffect } from "../effects"
 import type {
+  AlbumArtEffectConfig,
   AlbumArtElementConfig,
   BackgroundConfig,
   BrandingElementConfig,
@@ -131,6 +133,7 @@ export interface ShareDesignerPreviewProps {
   readonly spotifyCodeElement: SpotifyCodeElementConfig
   readonly brandingElement: BrandingElementConfig
   readonly effects: EffectsConfig
+  readonly albumArtEffect?: AlbumArtEffectConfig
   readonly getDisplayText: (lineId: string) => string
   readonly previewRef?: React.RefObject<HTMLDivElement | null>
   readonly cardRef?: React.RefObject<HTMLDivElement | null>
@@ -175,6 +178,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
   spotifyCodeElement,
   brandingElement,
   effects,
+  albumArtEffect,
   getDisplayText,
   previewRef,
   cardRef,
@@ -592,6 +596,35 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     )
   }, [background])
 
+  // Album art effect overlay (from effects system)
+  const albumArtEffectOverlay = useMemo(() => {
+    if (background.type !== "albumArt" || !albumArtEffect) return null
+    if (albumArtEffect.effect === "none") return null
+
+    const effectStyles = applyEffect(albumArtEffect.effect, albumArtEffect.settings)
+
+    return (
+      <>
+        {/* Filter layer - applies CSS filters to the background */}
+        {effectStyles.filter && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backdropFilter: effectStyles.filter,
+              WebkitBackdropFilter: effectStyles.filter,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+        {/* Primary overlay */}
+        {effectStyles.overlay && <div style={effectStyles.overlay} />}
+        {/* Secondary overlay (for effects like duotone) */}
+        {effectStyles.secondaryOverlay && <div style={effectStyles.secondaryOverlay} />}
+      </>
+    )
+  }, [background.type, albumArtEffect])
+
   // -------------------------------------------------------------------------
   // Spotify Code URL
   // -------------------------------------------------------------------------
@@ -678,6 +711,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
         {/* Background overlays */}
         {patternOverlay}
         {albumArtOverlay}
+        {albumArtEffectOverlay}
         {vignetteOverlay}
 
         {/* Image edit mode border indicator */}
