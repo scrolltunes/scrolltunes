@@ -139,11 +139,31 @@ const prefetchLyricsImpl = (
       return null
     }
 
+    // Fetch enhancements separately if available
+    let enhancement = null
+    let chordEnhancement = null
+    if (data.hasEnhancement || data.hasChordEnhancement) {
+      const enhResponse = yield* fetchSvc
+        .fetch(`/api/lyrics/${id}/enhancements`)
+        .pipe(Effect.catchAll(() => Effect.succeed(null)))
+
+      if (enhResponse?.ok) {
+        const enhData = yield* Effect.tryPromise({
+          try: () => enhResponse.json(),
+          catch: () => null,
+        }).pipe(Effect.catchAll(() => Effect.succeed(null)))
+
+        if (enhData) {
+          enhancement = enhData.enhancement ?? null
+          chordEnhancement = enhData.chordEnhancement ?? null
+        }
+      }
+    }
+
     // Apply enhancement to lyrics if available
-    const enhancedLyrics =
-      data.enhancement && data.hasEnhancement
-        ? applyEnhancement(data.lyrics, data.enhancement)
-        : data.lyrics
+    const enhancedLyrics = enhancement
+      ? applyEnhancement(data.lyrics, enhancement)
+      : data.lyrics
 
     return {
       id,
@@ -153,9 +173,9 @@ const prefetchLyricsImpl = (
       key: data.key ?? null,
       spotifyId: data.spotifyId ?? undefined,
       hasEnhancement: data.hasEnhancement ?? false,
-      enhancement: data.enhancement,
+      enhancement,
       hasChordEnhancement: data.hasChordEnhancement ?? false,
-      chordEnhancement: data.chordEnhancement,
+      chordEnhancement,
       bpmSource: data.attribution?.bpm ?? undefined,
       lyricsSource: data.attribution?.lyrics ?? undefined,
     }

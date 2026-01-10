@@ -340,11 +340,26 @@ class RecentSongsStore {
 
         const albumArt = data.albumArt ?? undefined
 
+        // Fetch enhancements separately if available
+        let enhancement = null
+        let chordEnhancement = null
+        if (data.hasEnhancement || data.hasChordEnhancement) {
+          try {
+            const enhResponse = await fetch(`/api/lyrics/${id}/enhancements`)
+            if (enhResponse.ok) {
+              const enhData = await enhResponse.json()
+              enhancement = enhData.enhancement ?? null
+              chordEnhancement = enhData.chordEnhancement ?? null
+            }
+          } catch {
+            // Ignore enhancement fetch errors
+          }
+        }
+
         // Apply enhancement to lyrics if available before caching
-        const enhancedLyrics =
-          data.enhancement && data.hasEnhancement
-            ? applyEnhancement(data.lyrics, data.enhancement)
-            : data.lyrics
+        const enhancedLyrics = enhancement
+          ? applyEnhancement(data.lyrics, enhancement)
+          : data.lyrics
 
         saveCachedLyrics(id, {
           lyrics: enhancedLyrics,
@@ -355,9 +370,9 @@ class RecentSongsStore {
           bpmSource: data.attribution?.bpm ?? undefined,
           lyricsSource: data.attribution?.lyrics ?? undefined,
           hasEnhancement: data.hasEnhancement ?? undefined,
-          enhancement: data.enhancement ?? undefined,
+          enhancement: enhancement ?? undefined,
           hasChordEnhancement: data.hasChordEnhancement ?? undefined,
-          chordEnhancement: data.chordEnhancement ?? undefined,
+          chordEnhancement: chordEnhancement ?? undefined,
         })
 
         if (albumArt) {

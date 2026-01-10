@@ -256,6 +256,10 @@ export const songs = pgTable(
     bpmSource: text("bpm_source"),
     bpmSourceUrl: text("bpm_source_url"),
 
+    // Album art (cached from Spotify or Deezer)
+    albumArtUrl: text("album_art_url"),
+    albumArtLargeUrl: text("album_art_large_url"),
+
     // Lyrics status
     hasSyncedLyrics: boolean("has_synced_lyrics").notNull().default(false),
     hasEnhancement: boolean("has_enhancement").notNull().default(false),
