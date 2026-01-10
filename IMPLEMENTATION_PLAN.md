@@ -236,7 +236,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Find all imports of LyricsShareModal
   - Replace with ShareExperience
   - Update props as needed
-- [ ] Not started
+- [x] Completed
 
 ### Task 22: Remove /share route and ShareDesignerPage
 - **File**: `src/app/share/page.tsx` (delete)
@@ -489,6 +489,15 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Added `role="dialog"`, `aria-modal`, and `aria-label` for accessibility
 - Implemented focus management after transition completes
 - Respects `prefers-reduced-motion` media query (instant transitions when enabled)
+
+### Task 21: Replace LyricsShareModal usage
+- Modified `src/app/song/[artistSlug]/[trackSlugWithId]/SongPageClient.tsx`
+- Replaced `LyricsShareModal` import with `ShareExperience` from `@/components/share`
+- Updated component usage from `<LyricsShareModal>` to `<ShareExperience>`
+- Removed `onOpenStudio` prop (no longer needed - ShareExperience has built-in studio mode)
+- Removed unused `navigateToStudio` callback and `useRouter` import
+- Updated `src/components/share/index.ts` to export `ShareExperience` and `ShareExperienceProps`
+- LyricsShareModal export kept for now (will be removed in Task 23)
 
 ---
 
