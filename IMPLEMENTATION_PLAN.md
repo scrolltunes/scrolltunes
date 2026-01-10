@@ -200,7 +200,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - StylePanel: background, typography
   - ElementsPanel: visibility toggles
   - EffectsPanel: shadow, border, album effects
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -440,6 +440,26 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Updated `ExpandedView.tsx` to use TemplatesPanel in both mobile and desktop views
 - Replaced direct TemplateGallery usage with TemplatesPanel component
 - Updated `expanded/index.ts` to export TemplatesPanel and TemplatesPanelProps
+
+### Task 18: Create remaining panels (Layout, Style, Elements, Effects)
+- Created `src/components/share/expanded/panels/LayoutPanel.tsx`
+  - Wraps LayoutControls with consistent panel styling
+  - Props: `aspectRatio`, `padding`, `onAspectRatioChange`, `onPaddingChange`
+- Created `src/components/share/expanded/panels/StylePanel.tsx`
+  - Combines BackgroundControls and TypographyControls
+  - Props: `background`, `typography`, `gradientPalette`, `hasAlbumArt`, callbacks
+  - Uses conditional spread for optional `onRegeneratePattern` prop (exactOptionalPropertyTypes)
+- Created `src/components/share/expanded/panels/ElementsPanel.tsx`
+  - Wraps ElementsControls with consistent panel styling
+  - Props: `elements`, `hasAlbumArt`, `hasSpotifyId`, `onElementChange`, `onToggleVisibility`
+- Created `src/components/share/expanded/panels/EffectsPanel.tsx`
+  - Combines EffectsControls and ExportControls
+  - Props: `effects`, `exportSettings`, shadow/border/vignette/export callbacks, album art effect props
+  - Uses conditional spread for optional album art effect props (exactOptionalPropertyTypes)
+- Updated `panels/index.ts` to export all panel components and their prop types
+- Updated `expanded/index.ts` to re-export all panels
+- Refactored `ExpandedView.tsx` mobile `renderMobileTabContent()` to use new panel components
+- Desktop ControlPanel already uses individual control components directly (unchanged)
 
 ---
 

@@ -50,7 +50,7 @@ import {
 import { useShareExport } from "../designer/useShareExport"
 import type { EffectSettings, EffectType } from "../effects"
 import { type ControlTabId, ControlTabs } from "./ControlTabs"
-import { TemplatesPanel } from "./panels"
+import { EffectsPanel, ElementsPanel, LayoutPanel, StylePanel, TemplatesPanel } from "./panels"
 
 // ============================================================================
 // Types
@@ -384,8 +384,8 @@ export const ExpandedView = memo(
           )
         case "layout":
           return (
-            <div className="space-y-4 p-4">
-              <LayoutControls
+            <div className="p-4">
+              <LayoutPanel
                 aspectRatio={aspectRatio}
                 padding={state.padding}
                 onAspectRatioChange={config => store.setAspectRatio(config)}
@@ -395,26 +395,22 @@ export const ExpandedView = memo(
           )
         case "style":
           return (
-            <div className="space-y-4 p-4">
-              <BackgroundControls
+            <div className="p-4">
+              <StylePanel
                 background={background}
+                typography={typography}
                 gradientPalette={gradientPalette}
                 hasAlbumArt={hasAlbumArt}
                 onBackgroundChange={config => store.setBackground(config)}
+                onTypographyChange={config => store.setTypography(config)}
                 onRegeneratePattern={() => store.regeneratePatternSeed()}
               />
-              <div className="pt-2">
-                <TypographyControls
-                  typography={typography}
-                  onTypographyChange={config => store.setTypography(config)}
-                />
-              </div>
             </div>
           )
         case "elements":
           return (
-            <div className="space-y-4 p-4">
-              <ElementsControls
+            <div className="p-4">
+              <ElementsPanel
                 elements={elements}
                 hasAlbumArt={hasAlbumArt}
                 hasSpotifyId={hasSpotifyId}
@@ -425,12 +421,14 @@ export const ExpandedView = memo(
           )
         case "effects":
           return (
-            <div className="space-y-4 p-4">
-              <EffectsControls
+            <div className="p-4">
+              <EffectsPanel
                 effects={effects}
+                exportSettings={exportSettings}
                 onShadowChange={config => store.setShadow(config)}
                 onBorderChange={config => store.setBorder(config)}
                 onVignetteChange={config => store.setVignette(config)}
+                onExportSettingsChange={config => store.setExportSettings(config)}
                 isAlbumArtBackground={isAlbumArtBackground}
                 albumArt={albumArt}
                 albumArtEffect={albumArtEffect.effect}
@@ -438,12 +436,6 @@ export const ExpandedView = memo(
                 onAlbumArtEffectChange={handleAlbumArtEffectChange}
                 onAlbumArtEffectSettingChange={handleAlbumArtEffectSettingChange}
               />
-              <div className="pt-2">
-                <ExportControls
-                  settings={exportSettings}
-                  onChange={config => store.setExportSettings(config)}
-                />
-              </div>
             </div>
           )
       }

@@ -1,1 +1,5 @@
+export { EffectsPanel, type EffectsPanelProps } from "./EffectsPanel"
+export { ElementsPanel, type ElementsPanelProps } from "./ElementsPanel"
+export { LayoutPanel, type LayoutPanelProps } from "./LayoutPanel"
+export { StylePanel, type StylePanelProps } from "./StylePanel"
 export { TemplatesPanel, type TemplatesPanelProps } from "./TemplatesPanel"
