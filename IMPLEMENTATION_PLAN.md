@@ -29,7 +29,7 @@ Generated from specs. Tasks sorted by priority.
   - Only visible when album pattern is selected
   - Toggle `isImageEditing` state on click
   - Show "Done" button when in edit mode
-- [ ] Not started
+- [x] Completed
 
 ### Task 3: Implement drag-to-pan on preview
 - **File**: `src/components/share/ShareDesignerPreview.tsx` (modify)
@@ -298,6 +298,15 @@ Generated from specs. Tasks sorted by priority.
 - Added tagged events: `SetImageOffset`, `SetImageScale`, `ResetImagePosition`
 - Added convenience methods: `setImageOffset()`, `setImageScale()`, `resetImagePosition()`, `isImageEditing()`
 - Added hook: `useShareDesignerImageEdit()`
+
+### Task 2: Create ImageEditMode toggle button
+- Created `src/components/share/ImageEditMode.tsx` with toggle button component
+- Added image icon (Image from phosphor-icons) next to existing pencil button
+- Button only visible when albumArt background type is selected
+- Toggles between Image icon and Check icon based on edit state
+- Shows reset button (ArrowCounterClockwise) when in edit mode and changes exist
+- Integrated into PreviewCanvas via `imageEditMode` prop
+- Updated CustomizeView to pass image edit config to PreviewCanvas
 
 ---
 

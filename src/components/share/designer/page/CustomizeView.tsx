@@ -1,8 +1,12 @@
 "use client"
 
-import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ShareDesignerPreview } from "../ShareDesignerPreview"
-import { type ShareDesignerStore, useShareDesignerState } from "../ShareDesignerStore"
+import {
+  type ShareDesignerStore,
+  useShareDesignerImageEdit,
+  useShareDesignerState,
+} from "../ShareDesignerStore"
 import { TemplateGallery } from "../TemplateGallery"
 import {
   BackgroundControls,
@@ -65,6 +69,32 @@ export const CustomizeView = memo(function CustomizeView({
 
   const handleEditToggle = useCallback(() => setIsEditing(prev => !prev), [])
   const handleWidthToggle = useCallback(() => setExpandedWidth(prev => !prev), [])
+
+  // Image edit mode (only when album art background is selected)
+  const imageEdit = useShareDesignerImageEdit(store)
+  const isAlbumArtBackground = state.background.type === "albumArt"
+
+  const handleImageEditToggle = useCallback(() => {
+    if (store.isImageEditing()) {
+      store.setEditMode("customize")
+    } else {
+      store.setEditMode("image")
+    }
+  }, [store])
+
+  const handleImageEditReset = useCallback(() => {
+    store.resetImagePosition()
+  }, [store])
+
+  const imageEditModeConfig = useMemo(() => {
+    if (!isAlbumArtBackground) return undefined
+    return {
+      isEditing: store.isImageEditing(),
+      imageEdit,
+      onToggle: handleImageEditToggle,
+      onReset: handleImageEditReset,
+    }
+  }, [isAlbumArtBackground, store, imageEdit, handleImageEditToggle, handleImageEditReset])
 
   // Render control content based on active tab (mobile)
   const renderMobileTabContent = () => {
@@ -170,6 +200,7 @@ export const CustomizeView = memo(function CustomizeView({
             onEditToggle={handleEditToggle}
             onWidthToggle={handleWidthToggle}
             hasShadow={state.effects.shadow.enabled}
+            imageEditMode={imageEditModeConfig}
           >
             <ShareDesignerPreview
               title={title}
@@ -286,6 +317,7 @@ export const CustomizeView = memo(function CustomizeView({
             onEditToggle={handleEditToggle}
             onWidthToggle={handleWidthToggle}
             hasShadow={state.effects.shadow.enabled}
+            imageEditMode={imageEditModeConfig}
           >
             <ShareDesignerPreview
               title={title}

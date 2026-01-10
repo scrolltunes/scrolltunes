@@ -2,6 +2,15 @@
 
 import { ArrowsIn, ArrowsOut, Check, PencilSimple } from "@phosphor-icons/react"
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from "react"
+import { ImageEditMode } from "../../ImageEditMode"
+import type { ImageEditState } from "../types"
+
+interface ImageEditModeConfig {
+  readonly isEditing: boolean
+  readonly imageEdit: ImageEditState
+  readonly onToggle: () => void
+  readonly onReset: () => void
+}
 
 interface PreviewCanvasProps {
   readonly children: React.ReactNode
@@ -10,7 +19,8 @@ interface PreviewCanvasProps {
   readonly expandedWidth: boolean
   readonly onEditToggle: () => void
   readonly onWidthToggle: () => void
-  readonly hasShadow?: boolean
+  readonly hasShadow?: boolean | undefined
+  readonly imageEditMode?: ImageEditModeConfig | undefined
 }
 
 export const PreviewCanvas = memo(function PreviewCanvas({
@@ -21,6 +31,7 @@ export const PreviewCanvas = memo(function PreviewCanvas({
   onEditToggle,
   onWidthToggle,
   hasShadow = true,
+  imageEditMode,
 }: PreviewCanvasProps) {
   const [previewScale, setPreviewScale] = useState(1)
   const [scaledHeight, setScaledHeight] = useState<number | null>(null)
@@ -82,6 +93,16 @@ export const PreviewCanvas = memo(function PreviewCanvas({
         >
           {isEditing ? <Check size={18} weight="bold" /> : <PencilSimple size={18} weight="bold" />}
         </button>
+        {imageEditMode && (
+          <ImageEditMode
+            isEditing={imageEditMode.isEditing}
+            offsetX={imageEditMode.imageEdit.offsetX}
+            offsetY={imageEditMode.imageEdit.offsetY}
+            scale={imageEditMode.imageEdit.scale}
+            onToggle={imageEditMode.onToggle}
+            onReset={imageEditMode.onReset}
+          />
+        )}
       </div>
 
       <button
