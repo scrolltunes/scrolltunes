@@ -69,7 +69,7 @@ Generated from specs. Tasks sorted by priority.
   - Calculate zoom delta from wheel deltaY
   - Prevent page scroll when zooming
   - Apply scale clamped to valid range
-- [ ] Not started
+- [x] Completed
 
 ### Task 7: Add keyboard navigation
 - **File**: `src/components/share/ShareDesignerPreview.tsx` (modify)
@@ -333,6 +333,14 @@ Generated from specs. Tasks sorted by priority.
 - Plus/minus buttons at ends for fine-grained control
 - Follows existing Slider component patterns with styled-jsx
 - Exported from `controls/index.ts`
+
+### Task 6: Add scroll-wheel zoom for desktop
+- Added `handleWheel` callback to `ShareDesignerPreview`
+- Listens for wheel events on card element when in image edit mode
+- Calculates zoom delta from wheel deltaY with 0.001 sensitivity
+- Inverts deltaY so scroll up = zoom in, scroll down = zoom out
+- Prevents default to stop page scroll when zooming
+- Clamps scale to 1.0-3.0 range
 
 ---
 

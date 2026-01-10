@@ -305,6 +305,25 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     }
   }, [])
 
+  // Handle wheel for desktop zoom
+  const handleWheel = useCallback(
+    (e: React.WheelEvent<HTMLDivElement>) => {
+      if (!isImageEditing || !onImageScaleChange || !imageEdit) return
+
+      // Prevent page scroll when zooming
+      e.preventDefault()
+
+      // Calculate zoom delta from wheel movement
+      // Negative deltaY = scroll up = zoom in, positive = scroll down = zoom out
+      const zoomSensitivity = 0.001
+      const delta = -e.deltaY * zoomSensitivity
+      const newScale = Math.max(1, Math.min(3, imageEdit.scale + delta))
+
+      onImageScaleChange(newScale)
+    },
+    [isImageEditing, onImageScaleChange, imageEdit],
+  )
+
   // Store caret position when switching out of edit mode
   const savedCaretRef = useRef<{ lineId: string; offset: number } | null>(null)
   const lyricsContainerRef = useRef<HTMLDivElement>(null)
@@ -545,6 +564,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
         onTouchMove={isImageEditing ? handleTouchMove : undefined}
         onTouchEnd={isImageEditing ? handleTouchEnd : undefined}
         onTouchCancel={isImageEditing ? handleTouchEnd : undefined}
+        onWheel={isImageEditing ? handleWheel : undefined}
         style={{
           ...cardBaseStyles,
           ...backgroundStyle,
