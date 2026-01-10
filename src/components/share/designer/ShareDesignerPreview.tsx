@@ -7,6 +7,7 @@ import type {
   BackgroundConfig,
   BrandingElementConfig,
   EffectsConfig,
+  ImageEditState,
   LyricsElementConfig,
   LyricsSelectionConfig,
   MetadataElementConfig,
@@ -135,6 +136,9 @@ export interface ShareDesignerPreviewProps {
   readonly cardRef?: React.RefObject<HTMLDivElement | null>
   readonly isEditing?: boolean
   readonly onTextChange?: (lineId: string, text: string) => void
+  readonly isImageEditing?: boolean
+  readonly imageEdit?: ImageEditState
+  readonly onImageOffsetChange?: (offsetX: number, offsetY: number) => void
 }
 
 // ============================================================================
@@ -173,8 +177,65 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
   cardRef,
   isEditing = false,
   onTextChange,
+  isImageEditing = false,
+  imageEdit,
+  onImageOffsetChange,
 }: ShareDesignerPreviewProps) {
   const isRTL = lyrics.direction === "rtl"
+
+  // Drag state for image panning
+  const isDraggingRef = useRef(false)
+  const dragStartRef = useRef({ x: 0, y: 0 })
+  const offsetStartRef = useRef({ x: 0, y: 0 })
+  const cardElementRef = useRef<HTMLDivElement | null>(null)
+
+  // Handle pointer down for drag start
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isImageEditing || !onImageOffsetChange || !imageEdit) return
+
+      e.preventDefault()
+      isDraggingRef.current = true
+      dragStartRef.current = { x: e.clientX, y: e.clientY }
+      offsetStartRef.current = { x: imageEdit.offsetX, y: imageEdit.offsetY }
+      e.currentTarget.setPointerCapture(e.pointerId)
+    },
+    [isImageEditing, onImageOffsetChange, imageEdit],
+  )
+
+  // Handle pointer move for dragging
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isDraggingRef.current || !onImageOffsetChange || !imageEdit) return
+
+      const element = cardElementRef.current
+      if (!element) return
+
+      // Calculate movement as percentage of element dimensions
+      const rect = element.getBoundingClientRect()
+      const deltaX = e.clientX - dragStartRef.current.x
+      const deltaY = e.clientY - dragStartRef.current.y
+
+      // Convert pixel movement to percentage offset (scaled by zoom level)
+      const scale = imageEdit.scale
+      const offsetDeltaX = ((deltaX / rect.width) * 100) / scale
+      const offsetDeltaY = ((deltaY / rect.height) * 100) / scale
+
+      const newOffsetX = Math.max(-100, Math.min(100, offsetStartRef.current.x + offsetDeltaX))
+      const newOffsetY = Math.max(-100, Math.min(100, offsetStartRef.current.y + offsetDeltaY))
+
+      onImageOffsetChange(newOffsetX, newOffsetY)
+    },
+    [onImageOffsetChange, imageEdit],
+  )
+
+  // Handle pointer up for drag end
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
+  }, [])
 
   // Store caret position when switching out of edit mode
   const savedCaretRef = useRef<{ lineId: string; offset: number } | null>(null)
@@ -254,12 +315,26 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
       case "gradient":
         return { background: background.gradient }
 
-      case "albumArt":
+      case "albumArt": {
+        // Apply offset and scale transforms when image edit state is available
+        const scale = imageEdit?.scale ?? 1
+        const offsetX = imageEdit?.offsetX ?? 0
+        const offsetY = imageEdit?.offsetY ?? 0
+
+        // Calculate background position based on offset
+        // offset of 0 = center (50%), offset of -100 = 0%, offset of 100 = 100%
+        const posX = 50 + offsetX * 0.5
+        const posY = 50 + offsetY * 0.5
+
+        // Scale the background size (100% * scale)
+        const sizePercent = 100 * scale
+
         return {
           background: albumArt ? `url(${albumArt})` : "#1a1a2e",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
+          backgroundSize: `${sizePercent}%`,
+          backgroundPosition: `${posX}% ${posY}%`,
         }
+      }
 
       case "pattern":
         return { background: background.baseColor }
@@ -267,7 +342,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
       default:
         return { background: "#1a1a2e" }
     }
-  }, [background, albumArt])
+  }, [background, albumArt, imageEdit])
 
   // Pattern overlay for pattern backgrounds
   const patternOverlay = useMemo(() => {
@@ -387,7 +462,17 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
       }}
     >
       <div
-        ref={cardRef}
+        ref={el => {
+          cardElementRef.current = el
+          if (cardRef && "current" in cardRef) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ;(cardRef as React.MutableRefObject<HTMLDivElement | null>).current = el
+          }
+        }}
+        onPointerDown={isImageEditing ? handlePointerDown : undefined}
+        onPointerMove={isImageEditing ? handlePointerMove : undefined}
+        onPointerUp={isImageEditing ? handlePointerUp : undefined}
+        onPointerCancel={isImageEditing ? handlePointerUp : undefined}
         style={{
           ...cardBaseStyles,
           ...backgroundStyle,
@@ -398,6 +483,9 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
           position: "relative",
           overflow: "hidden",
           fontFamily: getFontFamily(typography.fontFamily),
+          cursor: isImageEditing ? "grab" : undefined,
+          touchAction: isImageEditing ? "none" : undefined,
+          userSelect: isImageEditing ? "none" : undefined,
         }}
       >
         {/* Background overlays */}

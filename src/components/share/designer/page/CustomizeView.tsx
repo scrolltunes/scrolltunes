@@ -86,6 +86,13 @@ export const CustomizeView = memo(function CustomizeView({
     store.resetImagePosition()
   }, [store])
 
+  const handleImageOffsetChange = useCallback(
+    (offsetX: number, offsetY: number) => {
+      store.setImageOffset(offsetX, offsetY)
+    },
+    [store],
+  )
+
   const imageEditModeConfig = useMemo(() => {
     if (!isAlbumArtBackground) return undefined
     return {
@@ -219,6 +226,9 @@ export const CustomizeView = memo(function CustomizeView({
               effects={state.effects}
               getDisplayText={lineId => store.getDisplayText(lineId)}
               cardRef={cardRef}
+              isImageEditing={store.isImageEditing()}
+              imageEdit={imageEdit}
+              onImageOffsetChange={handleImageOffsetChange}
             />
           </PreviewCanvas>
         </div>
@@ -336,6 +346,9 @@ export const CustomizeView = memo(function CustomizeView({
               effects={state.effects}
               getDisplayText={lineId => store.getDisplayText(lineId)}
               cardRef={cardRef}
+              isImageEditing={store.isImageEditing()}
+              imageEdit={imageEdit}
+              onImageOffsetChange={handleImageOffsetChange}
             />
           </PreviewCanvas>
         </div>

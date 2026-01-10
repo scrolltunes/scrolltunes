@@ -32,14 +32,14 @@ Generated from specs. Tasks sorted by priority.
 - [x] Completed
 
 ### Task 3: Implement drag-to-pan on preview
-- **File**: `src/components/share/ShareDesignerPreview.tsx` (modify)
+- **File**: `src/components/share/designer/ShareDesignerPreview.tsx` (modify)
 - **Description**: Add mouse/touch drag handling for image repositioning
 - **Details**:
   - Track pointer events when `isImageEditing` is true
   - Calculate offset as percentage of image dimensions
   - Clamp offset to -100/+100 range
   - Apply CSS transform based on offset values
-- [ ] Not started
+- [x] Completed
 
 ### Task 4: Implement pinch-to-zoom
 - **File**: `src/components/share/ShareDesignerPreview.tsx` (modify)
@@ -307,6 +307,14 @@ Generated from specs. Tasks sorted by priority.
 - Shows reset button (ArrowCounterClockwise) when in edit mode and changes exist
 - Integrated into PreviewCanvas via `imageEditMode` prop
 - Updated CustomizeView to pass image edit config to PreviewCanvas
+
+### Task 3: Implement drag-to-pan on preview
+- Added `isImageEditing`, `imageEdit`, and `onImageOffsetChange` props to `ShareDesignerPreview`
+- Implemented pointer event handlers (`onPointerDown`, `onPointerMove`, `onPointerUp`) for drag tracking
+- Applied background positioning via `backgroundPosition` CSS property based on offset values
+- Applied zoom via `backgroundSize` CSS property based on scale value
+- Added cursor, touchAction, and userSelect styles for proper drag UX
+- Updated `CustomizeView` to pass image edit props to both desktop and mobile preview instances
 
 ---
 
