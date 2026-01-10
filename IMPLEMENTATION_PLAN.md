@@ -223,7 +223,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Animate modal size change
   - Coordinate element animations (fade, slide)
   - Manage focus during transition
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -476,6 +476,19 @@ Tasks sorted by priority (P0 → P1 → P2).
   - `staggerContainerVariants` / `staggerChildVariants`: Staggered list animations
 - Created utility functions: `createReducedMotionVariants()`, `getModeAnimationState()`, `getModalClasses()`
 - All variants include proper easing (ease-out for expand, ease-in for collapse)
+
+### Task 20: Implement mode transition in ShareExperience
+- Modified `src/components/share/ShareExperience.tsx`
+- Imported transition utilities from `transitions.ts`: `COLLAPSE_DURATION`, `EXPAND_DURATION`, `getModalClasses`, `prefersReducedMotion`
+- Added mode transition tracking via `prevModeRef` to detect expand/collapse direction
+- Added `modeTransitionDuration` and `contentTransitionDuration` memos based on direction
+- Added `layout` prop to modal container for smooth height/width CSS transitions
+- Configured layout transition with proper duration and easing based on expand/collapse
+- Updated content animations (select/compact/expanded views) to use coordinated durations
+- Content slides in/out with direction-aware x-offset and proper easing
+- Added `role="dialog"`, `aria-modal`, and `aria-label` for accessibility
+- Implemented focus management after transition completes
+- Respects `prefers-reduced-motion` media query (instant transitions when enabled)
 
 ---
 

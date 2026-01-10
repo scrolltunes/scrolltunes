@@ -13,6 +13,12 @@ import {
 import { CompactView, type CompactViewRef } from "./compact"
 import type { LyricLine, ShareDesignerSongContext } from "./designer/types"
 import { ExpandedView, type ExpandedViewRef } from "./expanded"
+import {
+  COLLAPSE_DURATION,
+  EXPAND_DURATION,
+  getModalClasses,
+  prefersReducedMotion,
+} from "./transitions"
 
 // ============================================================================
 // Types
@@ -122,8 +128,33 @@ export const ShareExperience = memo(function ShareExperience({
   const mode = store ? useShareExperienceMode(store) : "compact"
   const step = store ? useShareExperienceStep(store) : "select"
 
+  // Track previous mode for transition direction
+  const prevModeRef = useRef(mode)
+  const isExpanding = mode === "expanded" && prevModeRef.current === "compact"
+  const isCollapsing = mode === "compact" && prevModeRef.current === "expanded"
+
+  // Update previous mode after render
+  useEffect(() => {
+    prevModeRef.current = mode
+  }, [mode])
+
   // Determine if we're in select step (before store exists) or with store
   const isSelectStep = !store || step === "select"
+
+  // Check reduced motion preference once
+  const reducedMotion = useMemo(() => prefersReducedMotion(), [])
+
+  // Calculate transition duration based on direction
+  const modeTransitionDuration = useMemo(() => {
+    if (reducedMotion) return 0
+    return isExpanding ? EXPAND_DURATION : COLLAPSE_DURATION
+  }, [reducedMotion, isExpanding])
+
+  // Content transition duration (slightly shorter than container)
+  const contentTransitionDuration = useMemo(() => {
+    if (reducedMotion) return 0
+    return modeTransitionDuration * 0.6
+  }, [reducedMotion, modeTransitionDuration])
 
   // Initialize state when modal opens
   useEffect(() => {
@@ -166,6 +197,27 @@ export const ShareExperience = memo(function ShareExperience({
   useEffect(() => {
     scrollContainerRef.current?.scrollTo({ top: 0 })
   }, [step])
+
+  // Focus management after mode transitions
+  useEffect(() => {
+    if (!store) return
+
+    // Wait for transition to complete before managing focus
+    const transitionDuration = reducedMotion ? 0 : modeTransitionDuration * 1000
+    const timer = setTimeout(() => {
+      // Focus the modal container for keyboard accessibility
+      const container = scrollContainerRef.current?.closest('[role="dialog"]') as HTMLElement | null
+      if (container && document.activeElement !== container) {
+        // Find first focusable element in the new content
+        const focusable = container.querySelector<HTMLElement>(
+          'button:not([disabled]), [tabindex="0"]',
+        )
+        focusable?.focus()
+      }
+    }, transitionDuration + 50) // Small delay after transition completes
+
+    return () => clearTimeout(timer)
+  }, [mode, store, reducedMotion, modeTransitionDuration])
 
   // Toggle line selection
   const toggleLine = useCallback((id: string) => {
@@ -272,15 +324,21 @@ export const ShareExperience = memo(function ShareExperience({
           }}
         >
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={headerTitle}
+            layout
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={springs.default}
-            className={`relative mx-0 flex w-full flex-col overflow-hidden shadow-xl ${
-              mode === "expanded"
-                ? "h-[100dvh] max-h-[100dvh] sm:mx-4 sm:h-[90dvh] sm:max-h-[90dvh] sm:max-w-5xl sm:rounded-2xl"
-                : "max-h-[90dvh] rounded-t-2xl sm:mx-4 sm:max-w-xl sm:rounded-2xl"
-            }`}
+            transition={{
+              ...springs.default,
+              layout: {
+                duration: modeTransitionDuration,
+                ease: isExpanding ? "easeOut" : "easeIn",
+              },
+            }}
+            className={`relative mx-0 flex w-full flex-col overflow-hidden shadow-xl ${getModalClasses(mode)}`}
             style={{ background: "var(--color-surface1)" }}
             onClick={e => e.stopPropagation()}
           >
@@ -329,7 +387,10 @@ export const ShareExperience = memo(function ShareExperience({
                     initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: isRTL ? 20 : -20 }}
-                    transition={{ duration: 0.2 }}
+                    transition={{
+                      duration: contentTransitionDuration,
+                      ease: "easeOut",
+                    }}
                     className="p-4"
                   >
                     <p dir="ltr" className="mb-3 text-sm" style={{ color: "var(--color-text3)" }}>
@@ -346,10 +407,13 @@ export const ShareExperience = memo(function ShareExperience({
                   <motion.div
                     key="compact"
                     dir="ltr"
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: isCollapsing ? -20 : 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.2 }}
+                    exit={{ opacity: 0, x: isExpanding ? -20 : 20 }}
+                    transition={{
+                      duration: contentTransitionDuration,
+                      ease: isCollapsing ? "easeOut" : "easeIn",
+                    }}
                     className="p-4"
                   >
                     <CompactView
@@ -367,10 +431,13 @@ export const ShareExperience = memo(function ShareExperience({
                   <motion.div
                     key="expanded"
                     dir="ltr"
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: isExpanding ? 20 : -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.2 }}
+                    exit={{ opacity: 0, x: isCollapsing ? 20 : -20 }}
+                    transition={{
+                      duration: contentTransitionDuration,
+                      ease: isExpanding ? "easeOut" : "easeIn",
+                    }}
                     className="h-full"
                   >
                     <ExpandedView
