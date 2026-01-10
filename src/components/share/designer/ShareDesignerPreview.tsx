@@ -119,6 +119,15 @@ function getShapeBorderRadius(shape: "square" | "rounded" | "circle", size: numb
 // Types
 // ============================================================================
 
+/**
+ * Pattern overlay configuration for compact mode.
+ * Allows rendering a pattern on top of any background type (gradient, solid, etc.)
+ */
+export interface PatternOverlayConfig {
+  readonly pattern: PatternVariant
+  readonly seed: number
+}
+
 export interface ShareDesignerPreviewProps {
   readonly title: string
   readonly artist: string
@@ -146,6 +155,8 @@ export interface ShareDesignerPreviewProps {
   readonly onImageScaleChange?: (scale: number) => void
   readonly onExitImageEdit?: () => void
   readonly onResetImagePosition?: () => void
+  /** Optional pattern overlay to render on top of any background (used in compact mode) */
+  readonly patternOverlay?: PatternOverlayConfig | undefined
 }
 
 // ============================================================================
@@ -191,6 +202,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
   onImageScaleChange,
   onExitImageEdit,
   onResetImagePosition,
+  patternOverlay,
 }: ShareDesignerPreviewProps) {
   const isRTL = lyrics.direction === "rtl"
   const { haptic } = useHaptic()
@@ -592,8 +604,8 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     )
   }, [background, albumArt, imageEdit, albumArtEffect])
 
-  // Pattern overlay for pattern backgrounds
-  const patternOverlay = useMemo(() => {
+  // Pattern overlay for pattern backgrounds (when background.type is "pattern")
+  const backgroundPatternOverlay = useMemo(() => {
     if (background.type !== "pattern" || background.pattern === "none") {
       return null
     }
@@ -627,6 +639,42 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
       />
     )
   }, [background])
+
+  // Compact pattern overlay (renders pattern on top of any background type)
+  const compactPatternOverlayElement = useMemo(() => {
+    if (!patternOverlay || patternOverlay.pattern === "none") {
+      return null
+    }
+
+    if (patternOverlay.pattern === "waves") {
+      const paths = generateSmokeWaves(patternOverlay.seed)
+      const svg = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`
+      const dataUrl = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+
+      return (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: dataUrl,
+            backgroundSize: "100% 100%",
+            pointerEvents: "none",
+          }}
+        />
+      )
+    }
+
+    return (
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          ...getPatternStyle(patternOverlay.pattern),
+          pointerEvents: "none",
+        }}
+      />
+    )
+  }, [patternOverlay])
 
   // Album art color overlay (blur is now applied directly to the img element)
   const albumArtOverlay = useMemo(() => {
@@ -755,7 +803,8 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
         {/* Album art background layer - rendered as img for export compatibility */}
         {albumArtBackgroundLayer}
         {/* Background overlays */}
-        {patternOverlay}
+        {backgroundPatternOverlay}
+        {compactPatternOverlayElement}
         {albumArtOverlay}
         {albumArtEffectOverlay}
         {vignetteOverlay}

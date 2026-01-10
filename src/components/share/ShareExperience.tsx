@@ -1,7 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
-import { ArrowLeft, ArrowRight, Check, ShareNetwork, X } from "@phosphor-icons/react"
+import { ArrowLeft, ArrowRight, Check, SlidersHorizontal, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -124,9 +124,9 @@ export const ShareExperience = memo(function ShareExperience({
     return lines.some(line => rtlRegex.test(line.text))
   }, [lines])
 
-  // Get mode and step from store (or default to compact/select)
-  const mode = store ? useShareExperienceMode(store) : "compact"
-  const step = store ? useShareExperienceStep(store) : "select"
+  // Get mode and step from store (hooks handle null store safely)
+  const mode = useShareExperienceMode(store)
+  const step = useShareExperienceStep(store)
 
   // Track previous mode for transition direction
   const prevModeRef = useRef(mode)
@@ -272,11 +272,6 @@ export const ShareExperience = memo(function ShareExperience({
       store.setMode("compact")
     }
   }, [store])
-
-  // Trigger share from footer button
-  const handleShareFromFooter = useCallback(() => {
-    compactViewRef.current?.triggerShare()
-  }, [])
 
   // Close modal on backdrop click
   const handleBackdropClick = useCallback(
@@ -424,7 +419,6 @@ export const ShareExperience = memo(function ShareExperience({
                       albumArt={albumArt}
                       albumArtLarge={albumArtLarge ?? null}
                       spotifyId={spotifyId}
-                      onExpandToStudio={handleExpandToStudio}
                     />
                   </motion.div>
                 ) : store && mode === "expanded" ? (
@@ -475,13 +469,13 @@ export const ShareExperience = memo(function ShareExperience({
                 ) : (
                   <button
                     type="button"
-                    onClick={handleShareFromFooter}
+                    onClick={handleExpandToStudio}
                     className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                     style={{ background: "var(--color-accent)", color: "white" }}
-                    aria-label="Share image"
+                    aria-label="Customize"
                   >
-                    <ShareNetwork size={20} weight="bold" />
-                    Share Image
+                    <SlidersHorizontal size={20} weight="bold" />
+                    Customize
                   </button>
                 )}
               </div>

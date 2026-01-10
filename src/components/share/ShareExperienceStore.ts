@@ -60,6 +60,11 @@ export interface ShareExperienceEditorState extends ShareDesignerState {
   readonly activePreset: QuickPreset | null
   readonly compactPattern: CompactPatternVariant
   readonly compactPatternSeed: number
+  readonly gradientPalette: readonly GradientOption[]
+  // Selected color state (persists across pattern changes)
+  readonly selectedGradientId: string | null
+  readonly isCustomColor: boolean
+  readonly customColor: string
 }
 
 // ============================================================================
@@ -334,6 +339,12 @@ export class ShareExperienceStore {
   private gradientPalette: readonly GradientOption[] = []
   private currentTemplateId: string | null = null
   private cachedSnapshot: ShareExperienceEditorState | null = null
+  // The user's selected gradient - persists across all pattern changes
+  private selectedGradient: GradientBackground | null = null
+  // Custom color for the color picker
+  private customColor = "#4f46e5"
+  // Whether using custom color (true) or gradient (false)
+  private isCustomColor = false
 
   constructor(context: ShareDesignerSongContext) {
     this.context = context
@@ -361,6 +372,10 @@ export class ShareExperienceStore {
         activePreset: this.activePreset,
         compactPattern: this.compactPattern,
         compactPatternSeed: this.compactPatternSeed,
+        gradientPalette: this.gradientPalette,
+        selectedGradientId: this.isCustomColor ? null : (this.selectedGradient?.gradientId ?? null),
+        isCustomColor: this.isCustomColor,
+        customColor: this.customColor,
       }
     }
     return this.cachedSnapshot
@@ -413,9 +428,8 @@ export class ShareExperienceStore {
       // --- Compact Pattern Events ---
       case "SetCompactPattern":
         return Effect.sync(() => {
-          store.compactPattern = event.pattern
-          store.activePreset = null
-          store.notify()
+          // Delegate to convenience method which has the full logic
+          store.setCompactPattern(event.pattern)
         })
 
       case "RegenerateCompactPatternSeed":
@@ -910,18 +924,21 @@ export class ShareExperienceStore {
 
       const first = store.gradientPalette[0]
       if (first) {
-        store.updateState(
-          {
-            background: {
-              type: "gradient",
-              gradient: first.gradient,
-              gradientId: first.id,
-            },
-          },
-          "Initialize background",
-          { skipHistory: true },
-        )
+        const gradientBg: GradientBackground = {
+          type: "gradient",
+          gradient: first.gradient,
+          gradientId: first.id,
+        }
+        // Initialize selected gradient
+        store.selectedGradient = gradientBg
+        store.isCustomColor = false
+        store.updateState({ background: gradientBg }, "Initialize background", {
+          skipHistory: true,
+        })
       }
+
+      // Always notify to update gradient palette in UI
+      store.notify()
     })
   }
 
@@ -1075,6 +1092,19 @@ export class ShareExperienceStore {
     return this.compactPatternSeed
   }
 
+  getSelectedGradientId(): string | null {
+    if (this.isCustomColor) return null
+    return this.selectedGradient?.gradientId ?? null
+  }
+
+  getIsCustomColor(): boolean {
+    return this.isCustomColor
+  }
+
+  getCustomColor(): string {
+    return this.customColor
+  }
+
   // -------------------------------------------------------------------------
   // Convenience Methods (wrap dispatch)
   // -------------------------------------------------------------------------
@@ -1096,7 +1126,35 @@ export class ShareExperienceStore {
   }
 
   setCompactPattern(pattern: CompactPatternVariant): void {
-    Effect.runSync(this.dispatch(new SetCompactPattern({ pattern })))
+    // If clicking the same pattern (waves), regenerate the seed
+    if (pattern === this.compactPattern && pattern === "waves") {
+      this.compactPatternSeed = Date.now()
+      this.notify()
+      return
+    }
+
+    this.compactPattern = pattern
+    this.activePreset = null
+
+    // Only change background for albumArt mode
+    // For none/dots/grid/waves, background stays as gradient (overlay handled by patternOverlay prop)
+    if (pattern === "albumArt") {
+      this.updateState(
+        {
+          background: {
+            type: "albumArt",
+            blur: 0,
+            overlayOpacity: 0,
+            overlayColor: "#000000",
+          },
+        },
+        "Change pattern",
+        { skipHistory: true },
+      )
+    } else {
+      // Just notify - CompactView will compute the effective background
+      this.notify()
+    }
   }
 
   regenerateCompactPatternSeed(): void {
@@ -1120,12 +1178,20 @@ export class ShareExperienceStore {
   }
 
   setSolidColor(color: string): void {
-    Effect.runSync(this.dispatch(new SetBackground({ config: { type: "solid", color } })))
+    // Save the custom color - this persists across pattern changes
+    this.customColor = color
+    this.isCustomColor = true
+    // CompactView will use this to compute effective background
+    this.notify()
   }
 
   setGradient(gradientId: string, gradient: string): void {
     const bg: GradientBackground = { type: "gradient", gradientId, gradient }
-    Effect.runSync(this.dispatch(new SetBackground({ config: bg })))
+    // Save the selected gradient - this persists across pattern changes
+    this.selectedGradient = bg
+    this.isCustomColor = false
+    // CompactView will use this to compute effective background
+    this.notify()
   }
 
   setAlbumArtBackground(config: Omit<BackgroundConfig & { type: "albumArt" }, "type">): void {
@@ -1288,18 +1354,27 @@ export function createShareExperienceStore(
 // React Hooks
 // ============================================================================
 
+// Stable no-op subscribe for null store case
+const noopSubscribe = (): (() => void) => () => {}
+
 export function useShareExperienceState(store: ShareExperienceStore): ShareExperienceEditorState {
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 }
 
-export function useShareExperienceMode(store: ShareExperienceStore): ShareExperienceMode {
-  const state = useShareExperienceState(store)
-  return state.experienceMode
+export function useShareExperienceMode(store: ShareExperienceStore | null): ShareExperienceMode {
+  return useSyncExternalStore(
+    store?.subscribe ?? noopSubscribe,
+    () => store?.getSnapshot().experienceMode ?? "compact",
+    () => store?.getSnapshot().experienceMode ?? "compact",
+  )
 }
 
-export function useShareExperienceStep(store: ShareExperienceStore): ShareExperienceStep {
-  const state = useShareExperienceState(store)
-  return state.experienceStep
+export function useShareExperienceStep(store: ShareExperienceStore | null): ShareExperienceStep {
+  return useSyncExternalStore(
+    store?.subscribe ?? noopSubscribe,
+    () => store?.getSnapshot().experienceStep ?? "select",
+    () => store?.getSnapshot().experienceStep ?? "select",
+  )
 }
 
 export function useShareExperienceActivePreset(store: ShareExperienceStore): QuickPreset | null {

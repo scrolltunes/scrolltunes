@@ -3,7 +3,6 @@
 import {
   ArrowCounterClockwise,
   Check,
-  Gear,
   PencilSimple,
   ShareNetwork,
 } from "@phosphor-icons/react"
@@ -19,9 +18,8 @@ import {
   useState,
 } from "react"
 import { ImageEditMode } from "../ImageEditMode"
-import type { QuickPreset, ShareExperienceStore } from "../ShareExperienceStore"
+import type { ShareExperienceStore } from "../ShareExperienceStore"
 import {
-  useShareExperienceActivePreset,
   useShareExperienceAlbumArtEffect,
   useShareExperienceBackground,
   useShareExperienceCompactPattern,
@@ -38,7 +36,6 @@ import { useShareExport } from "../designer/useShareExport"
 import type { EffectSettings } from "../effects"
 import { CUSTOM_COLOR_ID, GradientPalette } from "./GradientPalette"
 import { QuickControls } from "./QuickControls"
-import { QuickStylePresets } from "./QuickStylePresets"
 
 // ============================================================================
 // Types
@@ -55,7 +52,6 @@ export interface CompactViewProps {
   readonly albumArt: string | null
   readonly albumArtLarge?: string | null
   readonly spotifyId: string | null
-  readonly onExpandToStudio: () => void
 }
 
 // ============================================================================
@@ -166,7 +162,7 @@ const ShareMenu = memo(function ShareMenu({
 
 export const CompactView = memo(
   forwardRef<CompactViewRef, CompactViewProps>(function CompactView(
-    { store, title, artist, albumArt, albumArtLarge, spotifyId, onExpandToStudio },
+    { store, title, artist, albumArt, albumArtLarge, spotifyId },
     ref,
   ) {
     const previewContainerRef = useRef<HTMLDivElement>(null)
@@ -177,7 +173,6 @@ export const CompactView = memo(
     const [previewScale, setPreviewScale] = useState(1)
     const [scaledHeight, setScaledHeight] = useState<number | null>(null)
     const [isTextEditing, setIsTextEditing] = useState(false)
-    const [customColor, setCustomColor] = useState("#4f46e5")
 
     // Store state subscriptions
     const state = useShareExperienceState(store)
@@ -189,26 +184,46 @@ export const CompactView = memo(
     const albumArtEffect = useShareExperienceAlbumArtEffect(store)
     const imageEdit = useShareExperienceImageEdit(store)
     const compactPattern = useShareExperienceCompactPattern(store)
-    const activePreset = useShareExperienceActivePreset(store)
 
-    // Gradient palette from store
-    const gradientPalette = useMemo(() => store.getGradientPalette(), [store])
-
-    // Derive selected gradient ID from background state
-    const selectedGradientId = useMemo(() => {
-      if (background.type === "gradient") {
-        return background.gradientId
-      }
-      if (background.type === "solid") {
-        // Check if solid color matches customColor - treat as custom
-        return CUSTOM_COLOR_ID
-      }
-      return null
-    }, [background])
+    // Gradient palette and selection from store state (reactive, persists across pattern changes)
+    const gradientPalette = state.gradientPalette
+    const selectedGradientId = state.isCustomColor ? CUSTOM_COLOR_ID : state.selectedGradientId
 
     // Determine if image editing is available
-    const isAlbumArtBackground = background.type === "albumArt" || compactPattern === "albumArt"
+    const isAlbumArtBackground = compactPattern === "albumArt"
     const isImageEditing = state.editor.mode === "image"
+
+    // Compute effective background: always show gradient (unless albumArt mode)
+    // Pattern is rendered as overlay via patternOverlay prop
+    const effectiveBackground = useMemo(() => {
+      if (compactPattern === "albumArt") {
+        return background // albumArt background from store
+      }
+      // For none/dots/grid/waves, use the selected gradient or solid color
+      if (state.isCustomColor) {
+        return { type: "solid" as const, color: state.customColor }
+      }
+      if (state.selectedGradientId) {
+        const gradient = gradientPalette.find(g => g.id === state.selectedGradientId)
+        if (gradient) {
+          return { type: "gradient" as const, gradientId: gradient.id, gradient: gradient.gradient }
+        }
+      }
+      // Fallback to first gradient
+      const first = gradientPalette[0]
+      if (first) {
+        return { type: "gradient" as const, gradientId: first.id, gradient: first.gradient }
+      }
+      return { type: "solid" as const, color: "#4f46e5" }
+    }, [compactPattern, background, state.isCustomColor, state.customColor, state.selectedGradientId, gradientPalette])
+
+    // Pattern overlay for dots/grid/waves (not for none or albumArt)
+    const patternOverlayConfig = useMemo(() => {
+      if (compactPattern === "none" || compactPattern === "albumArt") {
+        return undefined
+      }
+      return { pattern: compactPattern, seed: state.compactPatternSeed }
+    }, [compactPattern, state.compactPatternSeed])
 
     // Export hook
     const { isGenerating, isSharing, isCopied, handleDownload, handleCopy, handleShare } =
@@ -370,16 +385,7 @@ export const CompactView = memo(
 
     const handleCustomColorChange = useCallback(
       (color: string) => {
-        setCustomColor(color)
         store.setSolidColor(color)
-      },
-      [store],
-    )
-
-    // Quick preset handler
-    const handlePresetSelect = useCallback(
-      (preset: QuickPreset) => {
-        store.applyQuickPreset(preset)
       },
       [store],
     )
@@ -487,7 +493,7 @@ export const CompactView = memo(
                 albumArt={backgroundArtUrl}
                 spotifyId={spotifyId}
                 lyrics={lyrics}
-                background={background}
+                background={effectiveBackground}
                 typography={typography}
                 padding={state.padding}
                 albumArtElement={elements.albumArt}
@@ -507,6 +513,7 @@ export const CompactView = memo(
                 onImageScaleChange={handleImageScaleChange}
                 onExitImageEdit={() => store.setEditMode("customize")}
                 onResetImagePosition={handleResetImagePosition}
+                patternOverlay={patternOverlayConfig}
               />
             </div>
           </div>
@@ -516,7 +523,7 @@ export const CompactView = memo(
             <GradientPalette
               gradientPalette={gradientPalette}
               selectedGradientId={selectedGradientId}
-              customColor={customColor}
+              customColor={state.customColor}
               onGradientSelect={handleGradientSelect}
               onCustomColorChange={handleCustomColorChange}
             />
@@ -532,9 +539,6 @@ export const CompactView = memo(
 
         {/* Controls Section */}
         <div className="mt-4 space-y-4">
-          {/* Quick Style Presets */}
-          <QuickStylePresets activePreset={activePreset} onPresetSelect={handlePresetSelect} />
-
           {/* Quick Controls */}
           <QuickControls
             compactPattern={compactPattern}
@@ -552,17 +556,6 @@ export const CompactView = memo(
             onBrandingToggle={handleBrandingToggle}
             spotifyId={spotifyId}
           />
-
-          {/* More Options Button */}
-          <button
-            type="button"
-            onClick={onExpandToStudio}
-            className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors hover:brightness-110"
-            style={{ background: "var(--color-surface2)", color: "var(--color-text2)" }}
-          >
-            <Gear size={18} />
-            More options...
-          </button>
         </div>
       </div>
     )
