@@ -233,10 +233,9 @@ export const SongSearch = memo(function SongSearch({
       return true
     })
 
-    const highConfidenceLocals = enrichedLocalMatches.filter(m => m.score >= 0.85)
-    const lowerConfidenceLocals = enrichedLocalMatches.filter(m => m.score < 0.85)
-
-    return [...highConfidenceLocals, ...filteredApiResults, ...lowerConfidenceLocals]
+    // Keep all local matches at top (sorted by score), then append API-only results below
+    // This ensures initial results remain stable when API results arrive
+    return [...enrichedLocalMatches, ...filteredApiResults]
   }, [localMatches, apiResults])
 
   // Persist enriched album info to stores when API results provide missing data
