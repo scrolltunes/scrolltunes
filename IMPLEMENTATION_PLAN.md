@@ -214,7 +214,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Collapse animation: 250ms ease-in
   - Element fade/slide variants
   - Respect prefers-reduced-motion
-- [ ] Not started
+- [x] Completed
 
 ### Task 20: Implement mode transition in ShareExperience
 - **File**: `src/components/share/ShareExperience.tsx` (modify)
@@ -460,6 +460,22 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Updated `expanded/index.ts` to re-export all panels
 - Refactored `ExpandedView.tsx` mobile `renderMobileTabContent()` to use new panel components
 - Desktop ControlPanel already uses individual control components directly (unchanged)
+
+### Task 19: Create transition animations
+- Created `src/components/share/transitions.ts`
+- Defined animation duration constants: EXPAND_DURATION (300ms), COLLAPSE_DURATION (250ms)
+- Created `prefersReducedMotion()` utility following existing pattern in `@/lib/haptics.ts`
+- Created `getTransition()` helper that respects reduced motion preference
+- Defined transition presets: `expandTransition`, `collapseTransition`, `instantTransition`
+- Created framer-motion variants for all animated elements:
+  - `modalContainerVariants`: Modal height/maxHeight changes between modes
+  - `quickControlsVariants`: Quick controls fade out during expand
+  - `tabBarVariants`: Tab bar fade in during expand with staggered delay
+  - `undoRedoVariants`: Undo/redo buttons scale and fade in
+  - `controlPanelVariants`: Desktop side panel slide from right
+  - `staggerContainerVariants` / `staggerChildVariants`: Staggered list animations
+- Created utility functions: `createReducedMotionVariants()`, `getModeAnimationState()`, `getModalClasses()`
+- All variants include proper easing (ease-out for expand, ease-in for collapse)
 
 ---
 
