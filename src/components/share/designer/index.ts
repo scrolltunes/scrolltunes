@@ -151,20 +151,6 @@ export {
 export { TemplateCard, type TemplateCardProps } from "./TemplateCard"
 export { TemplateGallery, type TemplateGalleryProps } from "./TemplateGallery"
 export { ShareDesignerPreview, type ShareDesignerPreviewProps } from "./ShareDesignerPreview"
-export { ShareDesigner, type ShareDesignerProps } from "./ShareDesigner"
-
-// Page Components
-export {
-  BottomSheet,
-  CustomizeView,
-  ExportActionBar,
-  LineSelectionView,
-  MobileTabBar,
-  type TabId,
-  PreviewCanvas,
-  ShareDesignerHeader,
-  type ExportActions,
-} from "./page"
 
 // Hooks
 export {

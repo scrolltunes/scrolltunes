@@ -254,8 +254,9 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Delete LyricsShareModal.tsx
   - Delete ShareDesigner.tsx (modal version)
   - ~~Delete ShareDesignerPage.tsx~~ (done in Task 22)
+  - Delete designer/page/ directory (orphaned after ShareDesignerPage removal)
   - Update exports in index files
-- [ ] Not started
+- [x] Completed
 
 ### Task 24: Update documentation
 - **File**: `docs/ux-unified-share-experience.md` (modify)
@@ -505,6 +506,15 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Removed `ShareDesignerPage` and `ShareDesignerPageProps` export from `designer/index.ts`
 - No links to `/share` route existed in runtime code (only docs)
 - Page subcomponents in `designer/page/` were only used by ShareDesignerPage, will be cleaned up in Task 23
+
+### Task 23: Remove deprecated components
+- Deleted `src/components/share/LyricsShareModal.tsx`
+- Deleted `src/components/share/designer/ShareDesigner.tsx`
+- Deleted `src/components/share/designer/page/` directory (8 files: BottomSheet, CustomizeView, ExportActionBar, LineSelectionView, MobileTabBar, PreviewCanvas, ShareDesignerHeader, index)
+- Removed `LyricsShareModal` and `LyricsShareModalProps` exports from `share/index.ts`
+- Removed `ShareDesigner` and `ShareDesignerProps` exports from `designer/index.ts`
+- Removed page component exports from `designer/index.ts`
+- Verified no remaining imports of deprecated components in codebase
 
 ---
 
