@@ -198,7 +198,11 @@ export const QuickControls = memo(function QuickControls({
           <p className="text-sm" style={{ color: "var(--color-text3)" }}>
             Effect
           </p>
-          <EffectSelector value={effectType} onChange={onEffectTypeChange} albumArt={albumArt ?? null} />
+          <EffectSelector
+            value={effectType}
+            onChange={onEffectTypeChange}
+            albumArt={albumArt ?? null}
+          />
           <AlbumArtEffectControls
             effectType={effectType}
             settings={effectSettings}

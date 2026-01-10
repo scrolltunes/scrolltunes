@@ -608,9 +608,7 @@ function SongRow({
           {song.hasChordEnhancement && (
             <span className="w-2 h-2 rounded-full bg-amber-500" title="Chords" />
           )}
-          {hasEdits && (
-            <span className="w-2 h-2 rounded-full bg-purple-500" title="Has edits" />
-          )}
+          {hasEdits && <span className="w-2 h-2 rounded-full bg-purple-500" title="Has edits" />}
         </div>
       </td>
       <td className="px-4 py-3 text-right">

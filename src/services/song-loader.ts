@@ -3,8 +3,8 @@
  * Eliminates duplicate fetching and provides consistent data loading.
  */
 
-import { getBpmRace, getBpmWithFallback } from "@/lib/bpm"
 import type { Lyrics } from "@/core"
+import { getBpmRace, getBpmWithFallback } from "@/lib/bpm"
 import { db } from "@/lib/db"
 import { chordEnhancements, lrcWordEnhancements, songLrclibIds, songs } from "@/lib/db/schema"
 import { getAlbumArt } from "@/lib/deezer-client"
@@ -204,10 +204,7 @@ async function fetchAlbumArt(artist: string, title: string) {
   return { albumArt, albumArtLarge }
 }
 
-function getBpmAttribution(
-  source: string,
-  sourceUrl?: string | null,
-): AttributionSource {
+function getBpmAttribution(source: string, sourceUrl?: string | null): AttributionSource {
   if (sourceUrl) {
     return { name: source, url: sourceUrl }
   }
@@ -443,7 +440,8 @@ export async function loadSongData(
     : lrclibId
 
   // Use cached data if available
-  const hasCachedBpm = cachedSong !== null && cachedSong.bpm !== null && cachedSong.bpmSource !== null
+  const hasCachedBpm =
+    cachedSong !== null && cachedSong.bpm !== null && cachedSong.bpmSource !== null
   const hasCachedAlbumArt = cachedSong !== null && cachedSong.albumArtUrl !== null
   const cachedSpotifyId = cachedSong?.spotifyId ?? null
   const resolvedSpotifyIdParam = spotifyId ?? cachedSpotifyId
@@ -498,12 +496,7 @@ export async function loadSongData(
     bpmSource = getBpmAttribution(cachedSong.bpmSource, cachedSong.bpmSourceUrl)
   } else if (cachedSong) {
     // Defer BPM fetching to background - return null for now
-    fireAndForgetBpmFetch(
-      cachedSong.songId,
-      lyrics.title,
-      lyrics.artist,
-      resolvedSpotifyId,
-    )
+    fireAndForgetBpmFetch(cachedSong.songId, lyrics.title, lyrics.artist, resolvedSpotifyId)
   }
 
   // Fire-and-forget catalog update (with album art)
