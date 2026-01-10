@@ -34,6 +34,7 @@ import {
 import { ShareDesignerPreview } from "../designer/ShareDesignerPreview"
 import { useShareExport } from "../designer/useShareExport"
 import type { EffectSettings } from "../effects"
+import { CUSTOM_COLOR_ID, GradientPalette } from "./GradientPalette"
 import { QuickControls } from "./QuickControls"
 
 // ============================================================================
@@ -173,6 +174,7 @@ export const CompactView = memo(
     const [previewScale, setPreviewScale] = useState(1)
     const [scaledHeight, setScaledHeight] = useState<number | null>(null)
     const [isTextEditing, setIsTextEditing] = useState(false)
+    const [customColor, setCustomColor] = useState("#4f46e5")
 
     // Store state subscriptions
     const state = useShareExperienceState(store)
@@ -184,6 +186,21 @@ export const CompactView = memo(
     const albumArtEffect = useShareExperienceAlbumArtEffect(store)
     const imageEdit = useShareExperienceImageEdit(store)
     const compactPattern = useShareExperienceCompactPattern(store)
+
+    // Gradient palette from store
+    const gradientPalette = useMemo(() => store.getGradientPalette(), [store])
+
+    // Derive selected gradient ID from background state
+    const selectedGradientId = useMemo(() => {
+      if (background.type === "gradient") {
+        return background.gradientId
+      }
+      if (background.type === "solid") {
+        // Check if solid color matches customColor - treat as custom
+        return CUSTOM_COLOR_ID
+      }
+      return null
+    }, [background])
 
     // Determine if image editing is available
     const isAlbumArtBackground = background.type === "albumArt" || compactPattern === "albumArt"
@@ -339,6 +356,22 @@ export const CompactView = memo(
       [store],
     )
 
+    // Gradient palette handlers
+    const handleGradientSelect = useCallback(
+      (gradientId: string, gradient: string) => {
+        store.setGradient(gradientId, gradient)
+      },
+      [store],
+    )
+
+    const handleCustomColorChange = useCallback(
+      (color: string) => {
+        setCustomColor(color)
+        store.setSolidColor(color)
+      },
+      [store],
+    )
+
     return (
       <div className="flex flex-col">
         {/* Preview Area */}
@@ -466,18 +499,15 @@ export const CompactView = memo(
             </div>
           </div>
 
-          {/* Gradient Palette - placeholder for Task 8 */}
+          {/* Gradient Palette - shown when not using album art background */}
           {!isAlbumArtBackground && (
-            <div className="absolute bottom-2 left-2 right-2 flex justify-center">
-              <div
-                className="flex items-center gap-1.5 rounded-full px-2 py-1.5"
-                style={{ background: "rgba(0,0,0,0.5)" }}
-              >
-                <span className="px-2 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
-                  Gradient palette (Task 8)
-                </span>
-              </div>
-            </div>
+            <GradientPalette
+              gradientPalette={gradientPalette}
+              selectedGradientId={selectedGradientId}
+              customColor={customColor}
+              onGradientSelect={handleGradientSelect}
+              onCustomColorChange={handleCustomColorChange}
+            />
           )}
         </div>
 

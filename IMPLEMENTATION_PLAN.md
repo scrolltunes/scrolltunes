@@ -93,7 +93,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Display as horizontal row of color swatches
   - Custom color picker option
   - Show only when not using Album pattern
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -347,6 +347,17 @@ Tasks sorted by priority (P0 → P1 → P2).
 - ToggleSwitch component with accessible label and aria attributes
 - All state connected to ShareExperienceStore via callback props
 - Integrated into CompactView replacing placeholder
+
+### Task 8: Create GradientPalette component
+- Created `src/components/share/compact/GradientPalette.tsx`
+- Displays album-derived gradient swatches from `store.getGradientPalette()`
+- Horizontal row of circular color buttons with selection ring indicator
+- Custom color picker option using hidden `<input type="color">`
+- Positioned absolutely at bottom of preview area (same pattern as LyricsShareModal)
+- Conditionally hidden when using Album pattern background
+- Integrated into CompactView with handlers for gradient and custom color selection
+- State management: gradient selection via `store.setGradient()`, custom color via `store.setSolidColor()`
+- Exported `CUSTOM_COLOR_ID` constant for custom color identification
 
 ---
 
