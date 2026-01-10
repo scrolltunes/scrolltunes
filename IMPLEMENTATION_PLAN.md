@@ -140,7 +140,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Touch events for pinch (zoom)
   - Wheel events for scroll zoom
   - Keyboard events for arrow keys and +/-
-- [ ] Not started
+- [x] Completed
 
 ### Task 13: Create ZoomSlider component
 - **File**: `src/components/share/shared/ZoomSlider.tsx` (new)
@@ -379,6 +379,17 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Accessible button styling with aria-label and aria-pressed attributes
 - Integrated into CompactView replacing placeholder
 - Exported from `compact/index.ts`
+
+### Task 12: Create useShareGestures hook
+- Created `src/components/share/hooks/useShareGestures.ts` and `index.ts`
+- Extracted gesture handling from ShareDesignerPreview.tsx into reusable hook
+- Pointer events: drag/pan with pointer capture and release
+- Touch events: pinch-to-zoom with two-finger gesture detection
+- Wheel events: scroll zoom with sensitivity scaling
+- Keyboard events: arrow keys for pan, +/- for zoom, R for reset, Escape for exit
+- Haptic feedback at zoom limits (min 1.0, max 3.0)
+- Returns element ref, isDragging state, event handlers object, and gesture styles
+- Exports constants: MIN_SCALE, MAX_SCALE, MIN_OFFSET, MAX_OFFSET, PAN_STEP, ZOOM_STEP
 
 ---
 
