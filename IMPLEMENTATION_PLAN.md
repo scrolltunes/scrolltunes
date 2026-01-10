@@ -189,7 +189,7 @@ Tasks sorted by priority (P0 → P1 → P2).
 - **Details**:
   - Reuse existing TemplateGallery component
   - Wrap with panel styling
-- [ ] Not started
+- [x] Completed
 
 ### Task 18: Create remaining panels (Layout, Style, Elements, Effects)
 - **File**: `src/components/share/expanded/panels/*.tsx` (new)
@@ -431,6 +431,15 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Proper ARIA attributes (`role="tablist"`, `role="tab"`, `aria-selected`)
 - Updated `ExpandedView.tsx` to import and use the extracted component
 - Updated `expanded/index.ts` to export `ControlTabs`, `CONTROL_TABS`, `ControlTabId`, and `ControlTabsProps`
+
+### Task 17: Create TemplatesPanel
+- Created `src/components/share/expanded/panels/TemplatesPanel.tsx`
+- Created `src/components/share/expanded/panels/index.ts` for exports
+- Wraps TemplateGallery component with consistent panel styling
+- Props: `selectedTemplateId`, `onSelect` callback
+- Updated `ExpandedView.tsx` to use TemplatesPanel in both mobile and desktop views
+- Replaced direct TemplateGallery usage with TemplatesPanel component
+- Updated `expanded/index.ts` to export TemplatesPanel and TemplatesPanelProps
 
 ---
 

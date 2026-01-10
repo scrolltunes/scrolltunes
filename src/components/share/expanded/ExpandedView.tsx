@@ -36,7 +36,6 @@ import {
   useShareExperienceTypography,
 } from "../ShareExperienceStore"
 import { ShareDesignerPreview } from "../designer/ShareDesignerPreview"
-import { TemplateGallery } from "../designer/TemplateGallery"
 import {
   BackgroundControls,
   ControlPanel,
@@ -51,6 +50,7 @@ import {
 import { useShareExport } from "../designer/useShareExport"
 import type { EffectSettings, EffectType } from "../effects"
 import { type ControlTabId, ControlTabs } from "./ControlTabs"
+import { TemplatesPanel } from "./panels"
 
 // ============================================================================
 // Types
@@ -376,7 +376,7 @@ export const ExpandedView = memo(
         case "templates":
           return (
             <div className="p-4">
-              <TemplateGallery
+              <TemplatesPanel
                 selectedTemplateId={store.getCurrentTemplateId()}
                 onSelect={id => store.applyTemplate(id)}
               />
@@ -769,7 +769,7 @@ export const ExpandedView = memo(
                 {{
                   templates: (
                     <ControlSectionContent>
-                      <TemplateGallery
+                      <TemplatesPanel
                         selectedTemplateId={store.getCurrentTemplateId()}
                         onSelect={id => store.applyTemplate(id)}
                       />
