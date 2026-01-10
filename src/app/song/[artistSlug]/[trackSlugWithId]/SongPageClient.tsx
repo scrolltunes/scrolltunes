@@ -394,7 +394,12 @@ export default function SongPageClient({
     hasFetchedEnhancements.current = true
     setEnhancements(prev => ({ ...prev, loading: true }))
 
-    fetch(`/api/lyrics/${lrclibId}/enhancements`)
+    // Use actual lrclib ID from lyrics (may differ from URL if redirected)
+    const actualLrclibId = loadState.lyrics.songId.startsWith("lrclib-")
+      ? Number.parseInt(loadState.lyrics.songId.slice(7), 10)
+      : lrclibId
+
+    fetch(`/api/lyrics/${actualLrclibId}/enhancements`)
       .then(res => res.json())
       .then(data => {
         setEnhancements({

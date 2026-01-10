@@ -443,8 +443,8 @@ export async function loadSongData(
     : lrclibId
 
   // Use cached data if available
-  const hasCachedBpm = cachedSong?.bpm !== null && cachedSong?.bpmSource !== null
-  const hasCachedAlbumArt = cachedSong?.albumArtUrl !== null
+  const hasCachedBpm = cachedSong !== null && cachedSong.bpm !== null && cachedSong.bpmSource !== null
+  const hasCachedAlbumArt = cachedSong !== null && cachedSong.albumArtUrl !== null
   const cachedSpotifyId = cachedSong?.spotifyId ?? null
   const resolvedSpotifyIdParam = spotifyId ?? cachedSpotifyId
 
