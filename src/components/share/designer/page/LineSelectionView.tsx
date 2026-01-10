@@ -38,10 +38,7 @@ export const LineSelectionView = memo(function LineSelectionView({
       </div>
 
       {/* Line list */}
-      <div
-        className="flex-1 overflow-y-auto p-4"
-        dir={isRTL ? "rtl" : undefined}
-      >
+      <div className="flex-1 overflow-y-auto p-4" dir={isRTL ? "rtl" : undefined}>
         <div className="space-y-1">
           {selectableLines.map(line => {
             const isSelected = selectedIds.has(line.id)
@@ -78,10 +75,7 @@ export const LineSelectionView = memo(function LineSelectionView({
       </div>
 
       {/* Continue button */}
-      <div
-        className="shrink-0 p-4 pb-safe"
-        style={{ borderTop: "1px solid var(--color-border)" }}
-      >
+      <div className="shrink-0 p-4 pb-safe" style={{ borderTop: "1px solid var(--color-border)" }}>
         <motion.button
           type="button"
           onClick={onContinue}

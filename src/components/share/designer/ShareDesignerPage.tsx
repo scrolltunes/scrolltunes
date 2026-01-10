@@ -2,20 +2,15 @@
 
 import { detectLyricsDirection } from "@/lib"
 import { memo, useCallback, useEffect, useMemo, useState } from "react"
-import { createShareDesignerStore, type ShareDesignerStore } from "./ShareDesignerStore"
+import { useRef } from "react"
+import { ShareDesignerPreview } from "./ShareDesignerPreview"
+import { type ShareDesignerStore, createShareDesignerStore } from "./ShareDesignerStore"
 import { CustomizeView } from "./page/CustomizeView"
 import { LineSelectionView } from "./page/LineSelectionView"
-import { type ExportActions, ShareDesignerHeader } from "./page/ShareDesignerHeader"
 import { PreviewCanvas } from "./page/PreviewCanvas"
-import { ShareDesignerPreview } from "./ShareDesignerPreview"
+import { type ExportActions, ShareDesignerHeader } from "./page/ShareDesignerHeader"
 import type { LyricLine, ShareDesignerSongContext } from "./types"
-import { useRef } from "react"
-import {
-  DEFAULT_BACKGROUND,
-  DEFAULT_EFFECTS,
-  DEFAULT_ELEMENTS,
-  DEFAULT_TYPOGRAPHY,
-} from "./types"
+import { DEFAULT_BACKGROUND, DEFAULT_EFFECTS, DEFAULT_ELEMENTS, DEFAULT_TYPOGRAPHY } from "./types"
 
 type Step = "select" | "customize"
 
@@ -118,22 +113,19 @@ export const ShareDesignerPage = memo(function ShareDesignerPage({
 
     return {
       selectedLines,
-      direction: isRTL ? "rtl" as const : "ltr" as const,
+      direction: isRTL ? ("rtl" as const) : ("ltr" as const),
     }
   }, [selectedIds, lines, isRTL])
 
   return (
-    <div
-      className="flex min-h-screen flex-col"
-      style={{ background: "var(--color-bg)" }}
-    >
+    <div className="flex min-h-screen flex-col" style={{ background: "var(--color-bg)" }}>
       {/* Header */}
       <ShareDesignerHeader
         step={step}
         title={title}
         artist={artist}
         onBack={handleBack}
-        exportActions={step === "customize" ? exportActions ?? undefined : undefined}
+        exportActions={step === "customize" ? (exportActions ?? undefined) : undefined}
       />
 
       {/* Main content */}
@@ -168,9 +160,7 @@ export const ShareDesignerPage = memo(function ShareDesignerPage({
                   spotifyCodeElement={DEFAULT_ELEMENTS.spotifyCode}
                   brandingElement={DEFAULT_ELEMENTS.branding}
                   effects={DEFAULT_EFFECTS}
-                  getDisplayText={lineId =>
-                    lines.find(l => l.id === lineId)?.text ?? ""
-                  }
+                  getDisplayText={lineId => lines.find(l => l.id === lineId)?.text ?? ""}
                   cardRef={previewCardRef}
                 />
               </PreviewCanvas>

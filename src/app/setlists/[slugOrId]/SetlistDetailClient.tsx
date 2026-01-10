@@ -162,7 +162,10 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
   }, [])
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
       <Header setlistName={currentSetlist.name} shortUrl={shortUrl} onEdit={handleEditClick} />
 
       <main className="pt-20 pb-8 px-4">
@@ -182,7 +185,9 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl font-semibold truncate">{currentSetlist.name}</h1>
                 {currentSetlist.description && (
-                  <p className="mt-1" style={{ color: "var(--color-text3)" }}>{currentSetlist.description}</p>
+                  <p className="mt-1" style={{ color: "var(--color-text3)" }}>
+                    {currentSetlist.description}
+                  </p>
                 )}
                 <p className="text-sm mt-2" style={{ color: "var(--color-text-muted)" }}>
                   {songs.length} {songs.length === 1 ? "song" : "songs"}
@@ -229,9 +234,14 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
           >
             <div
               className="flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg"
-              style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)" }}
+              style={{
+                background: "var(--color-surface1)",
+                border: "1px solid var(--color-border)",
+              }}
             >
-              <span className="text-sm" style={{ color: "var(--color-text3)" }}>Removed</span>
+              <span className="text-sm" style={{ color: "var(--color-text3)" }}>
+                Removed
+              </span>
               <button
                 type="button"
                 onClick={handleUndo}
@@ -278,7 +288,9 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
               style={{ background: "var(--color-surface1)" }}
               onClick={e => e.stopPropagation()}
             >
-              <h2 className="text-xl font-semibold mb-2" style={{ color: "var(--color-text)" }}>Delete setlist?</h2>
+              <h2 className="text-xl font-semibold mb-2" style={{ color: "var(--color-text)" }}>
+                Delete setlist?
+              </h2>
               <p className="mb-6" style={{ color: "var(--color-text3)" }}>
                 This will permanently delete "{currentSetlist.name}" and remove all songs from it.
               </p>
@@ -340,7 +352,9 @@ const SetlistSongItem = memo(function SetlistSongItem({
           style={{ background: "var(--color-surface1)" }}
         >
           <p className="font-medium truncate">{song.songTitle}</p>
-          <p className="text-sm truncate" style={{ color: "var(--color-text3)" }}>{song.songArtist}</p>
+          <p className="text-sm truncate" style={{ color: "var(--color-text3)" }}>
+            {song.songArtist}
+          </p>
         </div>
       </motion.li>
     )
@@ -408,12 +422,18 @@ function Header({ setlistName, shortUrl, onEdit }: HeaderProps) {
   return (
     <header
       className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
-      style={{ background: "var(--color-header-bg)", borderBottom: "1px solid var(--color-border)" }}
+      style={{
+        background: "var(--color-header-bg)",
+        borderBottom: "1px solid var(--color-border)",
+      }}
     >
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
         <BackButton fallbackHref="/setlists" ariaLabel="Back to setlists" />
 
-        <span className="flex-1 text-lg font-semibold flex items-center gap-2 truncate" style={{ color: "var(--color-text)" }}>
+        <span
+          className="flex-1 text-lg font-semibold flex items-center gap-2 truncate"
+          style={{ color: "var(--color-text)" }}
+        >
           <Logo size={24} className="flex-shrink-0" />
           <span className="truncate">{setlistName}</span>
         </span>
@@ -442,9 +462,14 @@ function Header({ setlistName, shortUrl, onEdit }: HeaderProps) {
           {showShareMenu && (
             <div
               className="absolute right-0 top-12 w-72 p-3 rounded-xl shadow-xl"
-              style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)" }}
+              style={{
+                background: "var(--color-surface1)",
+                border: "1px solid var(--color-border)",
+              }}
             >
-              <p className="text-xs mb-2" style={{ color: "var(--color-text-muted)" }}>Share link</p>
+              <p className="text-xs mb-2" style={{ color: "var(--color-text-muted)" }}>
+                Share link
+              </p>
               <div className="flex items-center gap-2">
                 <span
                   className="text-sm truncate flex-1 font-mono px-2 py-1.5 rounded"

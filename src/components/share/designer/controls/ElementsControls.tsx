@@ -51,10 +51,7 @@ const ElementSection = memo(function ElementSection<T>({
   children,
 }: ElementSectionProps<T>) {
   return (
-    <div
-      className="rounded-lg overflow-hidden"
-      style={{ background: "var(--color-surface2)" }}
-    >
+    <div className="rounded-lg overflow-hidden" style={{ background: "var(--color-surface2)" }}>
       {/* Header */}
       <button
         type="button"

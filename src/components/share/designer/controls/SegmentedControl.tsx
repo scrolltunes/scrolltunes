@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "motion/react"
-import { memo, type ReactNode, useId } from "react"
+import { type ReactNode, memo, useId } from "react"
 
 export interface SegmentedOption<T extends string> {
   readonly value: T
@@ -36,10 +36,7 @@ function SegmentedControlInner<T extends string>({
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <span
-          className="text-xs font-medium"
-          style={{ color: "var(--color-text2)" }}
-        >
+        <span className="text-xs font-medium" style={{ color: "var(--color-text2)" }}>
           {label}
         </span>
       )}

@@ -211,7 +211,10 @@ export const HomeSetlists = memo(function HomeSetlists({ className = "" }: HomeS
                               draggable={false}
                             />
                           ) : (
-                            <div className="w-full h-full" style={{ background: "var(--color-surface2)" }} />
+                            <div
+                              className="w-full h-full"
+                              style={{ background: "var(--color-surface2)" }}
+                            />
                           )}
                         </div>
                       ))}
@@ -230,10 +233,7 @@ export const HomeSetlists = memo(function HomeSetlists({ className = "" }: HomeS
                 >
                   {setlist.name}
                 </p>
-                <p
-                  className="text-xs truncate"
-                  style={{ color: "var(--color-text3)" }}
-                >
+                <p className="text-xs truncate" style={{ color: "var(--color-text3)" }}>
                   {setlist.songCount} {setlist.songCount === 1 ? "song" : "songs"}
                 </p>
               </Link>

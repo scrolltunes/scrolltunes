@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, useMotionValue, useTransform, type PanInfo } from "motion/react"
+import { type PanInfo, motion, useMotionValue, useTransform } from "motion/react"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 
 type SheetState = "peek" | "half" | "full"
@@ -115,10 +115,7 @@ export const BottomSheet = memo(function BottomSheet({
       >
         {/* Drag handle */}
         <div className="flex shrink-0 items-center justify-center py-3">
-          <div
-            className="h-1 w-10 rounded-full"
-            style={{ background: "var(--color-surface3)" }}
-          />
+          <div className="h-1 w-10 rounded-full" style={{ background: "var(--color-surface3)" }} />
         </div>
 
         {/* Content */}

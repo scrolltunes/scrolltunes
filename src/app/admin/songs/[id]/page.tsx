@@ -11,6 +11,7 @@ import {
   FloppyDisk,
   Metronome,
   MusicNote,
+  NotePencil,
   PencilSimple,
   ShieldWarning,
   Sparkle,
@@ -69,9 +70,29 @@ function formatDate(isoString: string): string {
   })
 }
 
+const EDITS_CACHE_KEY_PREFIX = "scrolltunes:song-edits:"
+
+function checkHasEdits(lrclibId: number | null): boolean {
+  if (!lrclibId || typeof window === "undefined") return false
+  try {
+    const stored = localStorage.getItem(`${EDITS_CACHE_KEY_PREFIX}${lrclibId}`)
+    if (!stored) return false
+    const cached = JSON.parse(stored)
+    return cached?.payload?.linePatches?.length > 0
+  } catch {
+    return false
+  }
+}
+
 function Header() {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-14 backdrop-blur-lg" style={{ background: "var(--color-header-bg)", borderBottom: "1px solid var(--color-border)" }}>
+    <header
+      className="fixed top-0 left-0 right-0 z-50 h-14 backdrop-blur-lg"
+      style={{
+        background: "var(--color-header-bg)",
+        borderBottom: "1px solid var(--color-border)",
+      }}
+    >
       <div className="max-w-4xl mx-auto h-full px-4 flex items-center">
         <Link
           href="/admin/songs"
@@ -88,7 +109,10 @@ function Header() {
 
 function AccessDenied() {
   return (
-    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
       <Header />
       <main className="pt-20 pb-8 px-4 flex items-center justify-center min-h-screen">
         <motion.div
@@ -97,11 +121,16 @@ function AccessDenied() {
           transition={springs.default}
           className="text-center max-w-sm"
         >
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-surface1)" }}>
+          <div
+            className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+            style={{ background: "var(--color-surface1)" }}
+          >
             <ShieldWarning size={32} style={{ color: "var(--color-text-muted)" }} />
           </div>
           <h2 className="text-xl font-semibold mb-2">Access denied</h2>
-          <p className="mb-6" style={{ color: "var(--color-text3)" }}>You don't have permission to view this page</p>
+          <p className="mb-6" style={{ color: "var(--color-text3)" }}>
+            You don't have permission to view this page
+          </p>
           <Link
             href="/"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors hover:brightness-110"
@@ -117,17 +146,32 @@ function AccessDenied() {
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="rounded-xl p-6" style={{ background: "var(--color-surface1)" }}>
             <div className="flex gap-6">
-              <div className="w-32 h-32 rounded-lg animate-pulse shrink-0" style={{ background: "var(--color-surface2)" }} />
+              <div
+                className="w-32 h-32 rounded-lg animate-pulse shrink-0"
+                style={{ background: "var(--color-surface2)" }}
+              />
               <div className="flex-1 space-y-3">
-                <div className="h-8 w-64 rounded animate-pulse" style={{ background: "var(--color-surface2)" }} />
-                <div className="h-5 w-48 rounded animate-pulse" style={{ background: "var(--color-surface2)" }} />
-                <div className="h-5 w-32 rounded animate-pulse" style={{ background: "var(--color-surface2)" }} />
+                <div
+                  className="h-8 w-64 rounded animate-pulse"
+                  style={{ background: "var(--color-surface2)" }}
+                />
+                <div
+                  className="h-5 w-48 rounded animate-pulse"
+                  style={{ background: "var(--color-surface2)" }}
+                />
+                <div
+                  className="h-5 w-32 rounded animate-pulse"
+                  style={{ background: "var(--color-surface2)" }}
+                />
               </div>
             </div>
           </div>
@@ -139,7 +183,10 @@ function LoadingScreen() {
 
 function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
       <Header />
       <main className="pt-20 pb-8 px-4 flex items-center justify-center min-h-screen">
         <motion.div
@@ -148,11 +195,16 @@ function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => voi
           transition={springs.default}
           className="text-center max-w-sm"
         >
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-surface1)" }}>
+          <div
+            className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+            style={{ background: "var(--color-surface1)" }}
+          >
             <X size={32} style={{ color: "var(--color-danger)" }} />
           </div>
           <h2 className="text-xl font-semibold mb-2">Failed to load song</h2>
-          <p className="mb-6" style={{ color: "var(--color-text3)" }}>{message}</p>
+          <p className="mb-6" style={{ color: "var(--color-text3)" }}>
+            {message}
+          </p>
           <button
             type="button"
             onClick={onRetry}
@@ -185,8 +237,13 @@ function StatusBadge({ label, active }: { label: string; active: boolean }) {
 
 function MetadataRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-4 py-2 last:border-b-0" style={{ borderBottom: "1px solid var(--color-border)" }}>
-      <span className="w-28 shrink-0" style={{ color: "var(--color-text-muted)" }}>{label}</span>
+    <div
+      className="flex items-start gap-4 py-2 last:border-b-0"
+      style={{ borderBottom: "1px solid var(--color-border)" }}
+    >
+      <span className="w-28 shrink-0" style={{ color: "var(--color-text-muted)" }}>
+        {label}
+      </span>
       <span style={{ color: "var(--color-text)" }}>{value ?? "—"}</span>
     </div>
   )
@@ -278,7 +335,10 @@ function BpmEditorModal({
         className="relative z-10 w-full max-w-md mx-4 rounded-xl shadow-xl"
         style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)" }}
       >
-        <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
+        <div
+          className="flex items-center justify-between p-4"
+          style={{ borderBottom: "1px solid var(--color-border)" }}
+        >
           <h2 className="text-lg font-medium flex items-center gap-2">
             <Metronome size={20} />
             Edit BPM
@@ -296,7 +356,9 @@ function BpmEditorModal({
         <div className="p-4 space-y-4">
           <div className="grid grid-cols-1 gap-4">
             <label className="block">
-              <span className="text-sm mb-1.5 block" style={{ color: "var(--color-text3)" }}>BPM</span>
+              <span className="text-sm mb-1.5 block" style={{ color: "var(--color-text3)" }}>
+                BPM
+              </span>
               <input
                 type="number"
                 value={bpm}
@@ -304,11 +366,17 @@ function BpmEditorModal({
                 min={1}
                 max={300}
                 className="w-full px-3 py-2.5 rounded-lg focus:outline-none"
-                style={{ background: "var(--color-surface2)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                style={{
+                  background: "var(--color-surface2)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text)",
+                }}
               />
             </label>
             <label className="block">
-              <span className="text-sm mb-1.5 block" style={{ color: "var(--color-text3)" }}>Musical Key</span>
+              <span className="text-sm mb-1.5 block" style={{ color: "var(--color-text3)" }}>
+                Musical Key
+              </span>
               <input
                 type="text"
                 value={musicalKey}
@@ -316,11 +384,17 @@ function BpmEditorModal({
                 placeholder="e.g. C major, Am, F# minor"
                 maxLength={20}
                 className="w-full px-3 py-2.5 rounded-lg focus:outline-none"
-                style={{ background: "var(--color-surface2)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                style={{
+                  background: "var(--color-surface2)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text)",
+                }}
               />
             </label>
             <label className="block">
-              <span className="text-sm mb-1.5 block" style={{ color: "var(--color-text3)" }}>Source</span>
+              <span className="text-sm mb-1.5 block" style={{ color: "var(--color-text3)" }}>
+                Source
+              </span>
               <input
                 type="text"
                 value={source}
@@ -328,19 +402,34 @@ function BpmEditorModal({
                 placeholder="Manual"
                 maxLength={50}
                 className="w-full px-3 py-2.5 rounded-lg focus:outline-none"
-                style={{ background: "var(--color-surface2)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                style={{
+                  background: "var(--color-surface2)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text)",
+                }}
               />
             </label>
           </div>
 
           {error && (
-            <div className="p-3 rounded-lg" style={{ background: "var(--color-danger-soft)", border: "1px solid var(--color-danger)" }}>
-              <p className="text-sm" style={{ color: "var(--color-danger)" }}>{error}</p>
+            <div
+              className="p-3 rounded-lg"
+              style={{
+                background: "var(--color-danger-soft)",
+                border: "1px solid var(--color-danger)",
+              }}
+            >
+              <p className="text-sm" style={{ color: "var(--color-danger)" }}>
+                {error}
+              </p>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3 p-4" style={{ borderTop: "1px solid var(--color-border)" }}>
+        <div
+          className="flex items-center justify-end gap-3 p-4"
+          style={{ borderTop: "1px solid var(--color-border)" }}
+        >
           <button
             type="button"
             onClick={onClose}
@@ -373,8 +462,14 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
   const [isLoadingArt, setIsLoadingArt] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isBpmModalOpen, setIsBpmModalOpen] = useState(false)
+  const [hasEdits, setHasEdits] = useState(false)
 
   const primaryLrclibId = song.lrclibIds.find(l => l.isPrimary)?.id ?? song.lrclibIds[0]?.id
+
+  // Check for cached edits on mount
+  useEffect(() => {
+    setHasEdits(checkHasEdits(primaryLrclibId ?? null))
+  }, [primaryLrclibId])
 
   useEffect(() => {
     if (!primaryLrclibId) {
@@ -461,7 +556,10 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
     : null
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-4xl mx-auto space-y-6">
@@ -473,9 +571,15 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
             style={{ background: "var(--color-surface1)" }}
           >
             <div className="flex gap-6">
-              <div className="w-32 h-32 rounded-lg shrink-0 overflow-hidden flex items-center justify-center" style={{ background: "var(--color-surface2)" }}>
+              <div
+                className="w-32 h-32 rounded-lg shrink-0 overflow-hidden flex items-center justify-center"
+                style={{ background: "var(--color-surface2)" }}
+              >
                 {isLoadingArt ? (
-                  <div className="w-full h-full animate-pulse" style={{ background: "var(--color-surface2)" }} />
+                  <div
+                    className="w-full h-full animate-pulse"
+                    style={{ background: "var(--color-surface2)" }}
+                  />
                 ) : albumArt ? (
                   <Image
                     src={albumArt}
@@ -490,19 +594,27 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
               </div>
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl font-semibold truncate">{song.title}</h1>
-                <p className="text-lg truncate" style={{ color: "var(--color-text3)" }}>{song.artist}</p>
+                <p className="text-lg truncate" style={{ color: "var(--color-text3)" }}>
+                  {song.artist}
+                </p>
                 {song.album && (
-                  <p className="text-sm truncate mt-1" style={{ color: "var(--color-text-muted)" }}>{song.album}</p>
+                  <p className="text-sm truncate mt-1" style={{ color: "var(--color-text-muted)" }}>
+                    {song.album}
+                  </p>
                 )}
                 <div className="flex flex-wrap gap-2 mt-3">
                   <StatusBadge label="Synced Lyrics" active={song.hasSyncedLyrics} />
                   <StatusBadge label="Word Timing" active={song.hasEnhancement} />
                   <StatusBadge label="Chords" active={song.hasChordEnhancement} />
+                  <StatusBadge label="Edits" active={hasEdits} />
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 mt-5 pt-5" style={{ borderTop: "1px solid var(--color-border)" }}>
+            <div
+              className="flex flex-wrap gap-2 mt-5 pt-5"
+              style={{ borderTop: "1px solid var(--color-border)" }}
+            >
               {songPath && (
                 <Link
                   href={songPath}
@@ -514,27 +626,41 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
                 </Link>
               )}
               {primaryLrclibId && (
-                <Link
-                  href={`/admin/enhance/${primaryLrclibId}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-110"
-                  style={
-                    song.hasEnhancement
-                      ? { background: "var(--color-success)", color: "white" }
-                      : { background: "var(--color-warning)", color: "white" }
-                  }
-                >
-                  {song.hasEnhancement ? (
-                    <>
-                      <PencilSimple size={16} />
-                      <span>Edit Enhancement</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkle size={16} />
-                      <span>Enhance</span>
-                    </>
-                  )}
-                </Link>
+                <>
+                  <Link
+                    href={`/admin/enhance/${primaryLrclibId}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-110"
+                    style={
+                      song.hasEnhancement
+                        ? { background: "var(--color-success)", color: "white" }
+                        : { background: "var(--color-warning)", color: "white" }
+                    }
+                  >
+                    {song.hasEnhancement ? (
+                      <>
+                        <PencilSimple size={16} />
+                        <span>Edit Enhancement</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkle size={16} />
+                        <span>Enhance</span>
+                      </>
+                    )}
+                  </Link>
+                  <Link
+                    href={`${makeCanonicalPath({ id: primaryLrclibId, title: song.title, artist: song.artist })}?edit=1`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-110"
+                    style={
+                      hasEdits
+                        ? { background: "var(--color-accent-soft)", color: "var(--color-accent)" }
+                        : { background: "var(--color-surface2)", color: "var(--color-text2)" }
+                    }
+                  >
+                    <NotePencil size={16} />
+                    <span>{hasEdits ? "Edit Lyrics (Modified)" : "Edit Lyrics"}</span>
+                  </Link>
+                </>
               )}
               <button
                 type="button"
@@ -593,7 +719,9 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
                     <span>
                       {song.bpm}
                       {song.musicalKey && (
-                        <span className="ml-2" style={{ color: "var(--color-text3)" }}>({song.musicalKey})</span>
+                        <span className="ml-2" style={{ color: "var(--color-text3)" }}>
+                          ({song.musicalKey})
+                        </span>
                       )}
                       {song.bpmSource && (
                         <span className="text-sm ml-2" style={{ color: "var(--color-text-muted)" }}>
@@ -641,7 +769,7 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...springs.default, delay: 0.2 }}
               className="rounded-xl p-6"
-            style={{ background: "var(--color-surface1)" }}
+              style={{ background: "var(--color-surface1)" }}
             >
               <h2 className="text-lg font-medium mb-4">LRCLIB IDs</h2>
               <div className="space-y-2">
@@ -658,7 +786,13 @@ function SongDetailContent({ song: initialSong }: { song: Song }) {
                       <ArrowSquareOut size={14} />
                     </a>
                     {lrclib.isPrimary && (
-                      <span className="px-2 py-0.5 text-xs rounded-full" style={{ background: "var(--color-accent-soft)", color: "var(--color-accent)" }}>
+                      <span
+                        className="px-2 py-0.5 text-xs rounded-full"
+                        style={{
+                          background: "var(--color-accent-soft)",
+                          color: "var(--color-accent)",
+                        }}
+                      >
                         Primary
                       </span>
                     )}

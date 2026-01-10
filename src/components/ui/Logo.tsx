@@ -1,4 +1,4 @@
-import { useId, type ComponentProps } from "react"
+import { type ComponentProps, useId } from "react"
 
 interface LogoProps extends ComponentProps<"svg"> {
   size?: number
@@ -48,11 +48,50 @@ export function Logo({ size = 24, className, colorful = false, ...props }: LogoP
           />
 
           {/* Lyrics lines */}
-          <rect x="-25" y="-25" width="50" height="4" rx="2" fill={`url(#${gradientId})`} opacity="0.6" />
-          <rect x="-25" y="-14" width="40" height="4" rx="2" fill={`url(#${gradientId})`} opacity="0.6" />
-          <rect x="-25" y="-3" width="45" height="4" rx="2" style={{ fill: "var(--color-accent-bright)" }} />
-          <rect x="-25" y="8" width="35" height="4" rx="2" fill={`url(#${gradientId})`} opacity="0.6" />
-          <rect x="-25" y="19" width="42" height="4" rx="2" fill={`url(#${gradientId})`} opacity="0.5" />
+          <rect
+            x="-25"
+            y="-25"
+            width="50"
+            height="4"
+            rx="2"
+            fill={`url(#${gradientId})`}
+            opacity="0.6"
+          />
+          <rect
+            x="-25"
+            y="-14"
+            width="40"
+            height="4"
+            rx="2"
+            fill={`url(#${gradientId})`}
+            opacity="0.6"
+          />
+          <rect
+            x="-25"
+            y="-3"
+            width="45"
+            height="4"
+            rx="2"
+            style={{ fill: "var(--color-accent-bright)" }}
+          />
+          <rect
+            x="-25"
+            y="8"
+            width="35"
+            height="4"
+            rx="2"
+            fill={`url(#${gradientId})`}
+            opacity="0.6"
+          />
+          <rect
+            x="-25"
+            y="19"
+            width="42"
+            height="4"
+            rx="2"
+            fill={`url(#${gradientId})`}
+            opacity="0.5"
+          />
 
           {/* Music note accent */}
           <g transform="translate(28, -22)">
@@ -85,12 +124,7 @@ export function Logo({ size = 24, className, colorful = false, ...props }: LogoP
         />
 
         {/* Scroll curl at top */}
-        <path
-          d="M-30 -40 Q-20 -50 -10 -40"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3.5"
-        />
+        <path d="M-30 -40 Q-20 -50 -10 -40" fill="none" stroke="currentColor" strokeWidth="3.5" />
 
         {/* Lyrics lines */}
         <rect x="-25" y="-25" width="50" height="4" rx="2" opacity="0.8" />

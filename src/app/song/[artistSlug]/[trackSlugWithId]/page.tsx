@@ -4,6 +4,7 @@ import { springs } from "@/animations"
 import { FloatingMetronome, SingingDebugIndicator, VoiceIndicator } from "@/components/audio"
 import { ChordInfoPanel } from "@/components/chords"
 import { LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
+import { EditModeProvider, EditToolbar, EditableLyricsDisplay } from "@/components/edit-mode"
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
@@ -15,8 +16,11 @@ import {
   chordsStore,
   metronomeStore,
   recentSongsStore,
+  songEditsStore,
   useChordsState,
   useDetailedActivityStatus,
+  useEditPayload,
+  useIsEditMode,
   usePlayerControls,
   usePlayerState,
   usePreferences,
@@ -34,6 +38,8 @@ import {
   useWakeLock,
 } from "@/hooks"
 import { type LyricsApiResponse, applyEnhancement, isLyricsApiSuccess } from "@/lib"
+import { computeLrcHashSync } from "@/lib/lrc-hash"
+import { applyEditPatches } from "@/lib/song-edits"
 import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { parseTrackSlugWithId } from "@/lib/slug"
@@ -66,6 +72,7 @@ type LoadState =
   | {
       readonly _tag: "Loaded"
       readonly lyrics: Lyrics // Original lyrics (without enhancement applied)
+      readonly lrcHash: string // Hash for edit patches validation
       readonly enhancement: import("@/lib/db/schema").EnhancementPayload | null
       readonly chordEnhancement: import("@/lib/gp/chord-types").ChordEnhancementPayloadV1 | null
       readonly bpm: number | null
@@ -101,6 +108,7 @@ export default function SongPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const spotifyId = searchParams.get("spotifyId")
+  const shouldEnterEditMode = searchParams.get("edit") === "1"
   const [loadState, setLoadState] = useState<LoadState>({ _tag: "Loading" })
   const [showInfo, setShowInfo] = useState(false)
   const [showAddToSetlist, setShowAddToSetlist] = useState(false)
@@ -136,6 +144,8 @@ export default function SongPage() {
   const chordsState = useChordsState()
   const showChords = useShowChords()
   const transpose = useTranspose()
+  const isEditMode = useIsEditMode()
+  const editPayload = useEditPayload()
 
   const { isListening, isSpeaking, level, startListening, stopListening } = useVoiceTrigger({
     autoPlay: true,
@@ -216,6 +226,17 @@ export default function SongPage() {
     setShowShareModal(true)
   }, [])
 
+  const handleEnterEditMode = useCallback(() => {
+    if (loadState._tag !== "Loaded" || lrclibId === null) return
+    // Load edits first (will use lrcHash from state)
+    songEditsStore.loadEdits(lrclibId, loadState.lrcHash)
+    songEditsStore.enterEditMode()
+  }, [loadState, lrclibId])
+
+  const handleExitEditMode = useCallback(() => {
+    songEditsStore.exitEditMode()
+  }, [])
+
   const doubleTapRef = useDoubleTap<HTMLDivElement>({
     onDoubleTap: handleTogglePlayPause,
     enabled: isLoaded && preferences.doubleTapEnabled,
@@ -246,9 +267,14 @@ export default function SongPage() {
 
       // Use cache if it has BPM data, otherwise refetch to get BPM
       if (cached && cached.bpm !== null) {
+        // Compute lrcHash from lyrics lines for edit patches validation
+        const lrcContent = cached.lyrics.lines.map(l => l.text).join("\n")
+        const lrcHash = computeLrcHashSync(lrcContent)
+
         setLoadState({
           _tag: "Loaded",
           lyrics: cached.lyrics,
+          lrcHash,
           enhancement: cached.enhancement ?? null,
           chordEnhancement: cached.chordEnhancement ?? null,
           bpm: cached.bpm,
@@ -298,9 +324,14 @@ export default function SongPage() {
           return
         }
 
+        // Compute lrcHash from lyrics lines for edit patches validation
+        const lrcContent = data.lyrics.lines.map(l => l.text).join("\n")
+        const lrcHash = computeLrcHashSync(lrcContent)
+
         setLoadState({
           _tag: "Loaded",
           lyrics: data.lyrics,
+          lrcHash,
           enhancement: data.enhancement ?? null,
           chordEnhancement: data.chordEnhancement ?? null,
           bpm: data.bpm,
@@ -376,15 +407,22 @@ export default function SongPage() {
 
   // Load lyrics into player when loadState changes
   // Apply enhancement if available (provides better timing data for word-by-word mode)
+  // Apply edit patches when not in edit mode (filters skipped lines, applies text mods)
   useEffect(() => {
     if (loadState._tag !== "Loaded") return
 
-    const lyricsToLoad = loadState.enhancement
+    // Start with base lyrics, apply enhancement for timing
+    let lyricsToLoad = loadState.enhancement
       ? applyEnhancement(loadState.lyrics, loadState.enhancement)
       : loadState.lyrics
 
+    // Apply edit patches (skip lines, text modifications) when not in edit mode
+    if (!isEditMode && editPayload) {
+      lyricsToLoad = applyEditPatches(lyricsToLoad, editPayload)
+    }
+
     load(lyricsToLoad)
-  }, [loadState, load])
+  }, [loadState, load, isEditMode, editPayload])
 
   // Mark song as played when playback starts (moves to top of recents)
   const hasMarkedAsPlayed = useRef(false)
@@ -407,6 +445,34 @@ export default function SongPage() {
     // Preload sound system in background (requires user gesture, but sets up deferred init)
     soundSystem.initialize()
   }, [loadState._tag])
+
+  // Load song edits on page load to apply patches during playback
+  const hasLoadedEdits = useRef(false)
+  useEffect(() => {
+    if (loadState._tag !== "Loaded" || lrclibId === null || hasLoadedEdits.current) return
+    hasLoadedEdits.current = true
+    songEditsStore.loadEdits(lrclibId, loadState.lrcHash)
+  }, [loadState, lrclibId])
+
+  // Auto-enter edit mode if ?edit=1 query param is present
+  const hasAutoEnteredEditMode = useRef(false)
+  useEffect(() => {
+    if (
+      !shouldEnterEditMode ||
+      loadState._tag !== "Loaded" ||
+      lrclibId === null ||
+      hasAutoEnteredEditMode.current ||
+      isEditMode
+    ) {
+      return
+    }
+    hasAutoEnteredEditMode.current = true
+    // Give edits time to load first
+    const timer = setTimeout(() => {
+      songEditsStore.enterEditMode()
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [shouldEnterEditMode, loadState, lrclibId, isEditMode])
 
   useEffect(() => {
     if (!showChords) {
@@ -631,6 +697,7 @@ export default function SongPage() {
                   onAddToSetlist={() => setShowAddToSetlist(true)}
                   onShareClick={() => setShowShareModal(true)}
                   onInfoClick={() => setShowInfo(true)}
+                  onEditClick={handleEnterEditMode}
                   hasIssue={loadState.bpm === null || chordsState.status === "error"}
                   onWarningClick={() => setShowReportModal(true)}
                 />
@@ -649,14 +716,29 @@ export default function SongPage() {
             )}
           </AnimatePresence>
         )}
-        <LyricsDisplay
-          className="flex-1 pb-12"
-          chordEnhancement={loadState._tag === "Loaded" ? loadState.chordEnhancement : null}
-          onCreateCard={handleCreateCard}
-        />
+        {/* Edit mode UI */}
+        {isEditMode && loadState._tag === "Loaded" ? (
+          <EditModeProvider>
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <EditToolbar
+                allLineIds={loadState.lyrics.lines.map(l => l.id)}
+                onExitEditMode={handleExitEditMode}
+              />
+              <div className="flex-1 overflow-y-auto">
+                <EditableLyricsDisplay lines={loadState.lyrics.lines} className="pb-12 px-4" />
+              </div>
+            </div>
+          </EditModeProvider>
+        ) : (
+          <LyricsDisplay
+            className="flex-1 pb-12"
+            chordEnhancement={loadState._tag === "Loaded" ? loadState.chordEnhancement : null}
+            onCreateCard={handleCreateCard}
+          />
+        )}
 
-        <FloatingMetronome bpm={currentBpm} position="bottom-right" />
-        <SingingDebugIndicator />
+        {!isEditMode && <FloatingMetronome bpm={currentBpm} position="bottom-right" />}
+        {!isEditMode && <SingingDebugIndicator />}
       </main>
 
       {loadState._tag === "Loaded" && (

@@ -86,11 +86,7 @@ export const ColorPicker = memo(function ColorPicker({
   return (
     <div className="flex flex-col gap-2">
       {label && (
-        <label
-          htmlFor={id}
-          className="text-xs font-medium"
-          style={{ color: "var(--color-text2)" }}
-        >
+        <label htmlFor={id} className="text-xs font-medium" style={{ color: "var(--color-text2)" }}>
           {label}
         </label>
       )}

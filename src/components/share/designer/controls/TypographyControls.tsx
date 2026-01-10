@@ -94,11 +94,7 @@ export const TypographyControls = memo(function TypographyControls({
       />
 
       {/* Text Color */}
-      <ColorPicker
-        label="Text Color"
-        value={typography.color}
-        onChange={handleColorChange}
-      />
+      <ColorPicker label="Text Color" value={typography.color} onChange={handleColorChange} />
 
       {/* Text Alignment */}
       <SegmentedControl
@@ -122,10 +118,7 @@ export const TypographyControls = memo(function TypographyControls({
 
       {/* Text Shadow Toggle */}
       <div className="flex items-center justify-between">
-        <span
-          className="text-xs font-medium"
-          style={{ color: "var(--color-text2)" }}
-        >
+        <span className="text-xs font-medium" style={{ color: "var(--color-text2)" }}>
           Text Shadow
         </span>
         <button
@@ -135,9 +128,7 @@ export const TypographyControls = memo(function TypographyControls({
           onClick={() => handleTextShadowChange(!typography.textShadow)}
           className="relative w-10 h-5 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent"
           style={{
-            background: typography.textShadow
-              ? "var(--color-accent)"
-              : "var(--color-surface3)",
+            background: typography.textShadow ? "var(--color-accent)" : "var(--color-surface3)",
           }}
         >
           <span

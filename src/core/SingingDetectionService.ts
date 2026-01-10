@@ -23,13 +23,13 @@ import { SoundSystemService } from "@/services/sound-system"
 import { type AudioError, soundSystem } from "@/sounds"
 import { Context, Data, Effect, Layer } from "effect"
 import { useSyncExternalStore } from "react"
-import { type VadEnvironment, preferencesStore } from "./PreferencesStore"
 import {
   type AudioClassifierService,
   type ClassifierDecision,
   getAudioClassifier,
   getAudioClassifierIfReady,
 } from "./AudioClassifierService"
+import { type VadEnvironment, preferencesStore } from "./PreferencesStore"
 import { type SileroLoadError, SileroVADEngine } from "./SileroVADEngine"
 
 const publicConfig = loadPublicConfig()

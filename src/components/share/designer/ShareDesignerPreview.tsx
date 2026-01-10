@@ -380,7 +380,9 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     <div
       ref={previewRef}
       style={{
-        padding: effects.shadow.enabled ? `16px 16px ${effects.shadow.offsetY + effects.shadow.blur}px 16px` : "0",
+        padding: effects.shadow.enabled
+          ? `16px 16px ${effects.shadow.offsetY + effects.shadow.blur}px 16px`
+          : "0",
         background: "transparent",
       }}
     >
@@ -499,9 +501,10 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
                 textAlign: typography.alignment,
                 direction: isRTL ? "rtl" : "ltr",
                 opacity: lyricsElement.opacity,
-                maxWidth: lyricsElement.wrapText && lyricsElement.maxWidth
-                  ? `${lyricsElement.maxWidth}px`
-                  : undefined,
+                maxWidth:
+                  lyricsElement.wrapText && lyricsElement.maxWidth
+                    ? `${lyricsElement.maxWidth}px`
+                    : undefined,
               }}
             >
               {lyrics.selectedLines.map(line => (
@@ -524,9 +527,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
                     color: typography.color,
                     margin: "4px 0",
                     whiteSpace: lyricsElement.wrapText ? "normal" : "nowrap",
-                    textShadow: typography.textShadow
-                      ? "0 2px 4px rgba(0,0,0,0.3)"
-                      : "none",
+                    textShadow: typography.textShadow ? "0 2px 4px rgba(0,0,0,0.3)" : "none",
                     outline: "none",
                     cursor: isEditing ? "text" : "default",
                     minWidth: isEditing ? "20px" : undefined,

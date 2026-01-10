@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "motion/react"
-import { forwardRef, type ReactNode } from "react"
+import { type ReactNode, forwardRef } from "react"
 
 export interface IconButtonProps {
   readonly children: ReactNode

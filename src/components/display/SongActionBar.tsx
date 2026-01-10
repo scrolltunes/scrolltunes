@@ -1,7 +1,22 @@
 "use client"
 
-import { favoritesStore, type Setlist, useIsAuthenticated, useIsFavorite, useSetlistsContainingSong } from "@/core"
-import { Heart, Info, ListPlus, MusicNote, ShareNetwork, Warning } from "@phosphor-icons/react"
+import {
+  type Setlist,
+  favoritesStore,
+  useHasEdits,
+  useIsAuthenticated,
+  useIsFavorite,
+  useSetlistsContainingSong,
+} from "@/core"
+import {
+  Heart,
+  Info,
+  ListPlus,
+  MusicNote,
+  PencilSimple,
+  ShareNetwork,
+  Warning,
+} from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { memo, useCallback } from "react"
 
@@ -13,6 +28,7 @@ export interface SongActionBarProps {
   readonly onAddToSetlist: () => void
   readonly onShareClick?: () => void
   readonly onInfoClick?: () => void
+  readonly onEditClick?: () => void
   readonly hasIssue?: boolean
   readonly onWarningClick?: () => void
 }
@@ -41,6 +57,7 @@ export const SongActionBar = memo(function SongActionBar({
   onAddToSetlist,
   onShareClick,
   onInfoClick,
+  onEditClick,
   hasIssue,
   onWarningClick,
 }: SongActionBarProps) {
@@ -48,6 +65,7 @@ export const SongActionBar = memo(function SongActionBar({
   const containingSetlists = useSetlistsContainingSong(songId)
   const isInSetlist = containingSetlists.length > 0
   const isFavorite = useIsFavorite(songId)
+  const hasEdits = useHasEdits()
 
   const handleToggleFavorite = useCallback(() => {
     favoritesStore.toggle({
@@ -169,6 +187,23 @@ export const SongActionBar = memo(function SongActionBar({
               <span className="hidden sm:inline">Add to setlist</span>
             </>
           )}
+        </button>
+      )}
+
+      {/* Edit button - desktop only, authenticated users */}
+      {isAuthenticated && onEditClick && (
+        <button
+          type="button"
+          onClick={onEditClick}
+          className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors hover:bg-white/5"
+          style={{
+            background: hasEdits ? "var(--color-accent-soft)" : "var(--color-surface2)",
+            color: hasEdits ? "var(--color-accent)" : "var(--color-text3)",
+          }}
+          aria-label="Edit lyrics"
+        >
+          <PencilSimple size={18} />
+          <span>{hasEdits ? "Modified" : "Edit"}</span>
         </button>
       )}
 

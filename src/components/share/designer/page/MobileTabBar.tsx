@@ -23,10 +23,7 @@ interface MobileTabBarProps {
   readonly onChange: (tab: TabId) => void
 }
 
-export const MobileTabBar = memo(function MobileTabBar({
-  activeTab,
-  onChange,
-}: MobileTabBarProps) {
+export const MobileTabBar = memo(function MobileTabBar({ activeTab, onChange }: MobileTabBarProps) {
   return (
     <div
       className="flex h-12 shrink-0"

@@ -41,16 +41,10 @@ export function Footer() {
           ·
         </span>
 
-        <Link
-          href="/terms"
-          className="hidden sm:inline transition-colors hover:brightness-125"
-        >
+        <Link href="/terms" className="hidden sm:inline transition-colors hover:brightness-125">
           Terms
         </Link>
-        <Link
-          href="/privacy"
-          className="hidden sm:inline transition-colors hover:brightness-125"
-        >
+        <Link href="/privacy" className="hidden sm:inline transition-colors hover:brightness-125">
           Privacy
         </Link>
 

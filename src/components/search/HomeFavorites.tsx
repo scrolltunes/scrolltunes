@@ -40,7 +40,11 @@ export const HomeFavorites = memo(function HomeFavorites({ className = "" }: Hom
 
       <ul className="space-y-2" aria-label="Favorite songs">
         {displayFavorites.map(song => {
-          const songPath = makeCanonicalPath({ id: song.id, title: song.title, artist: song.artist })
+          const songPath = makeCanonicalPath({
+            id: song.id,
+            title: song.title,
+            artist: song.artist,
+          })
           return (
             <li key={song.id}>
               <Link
@@ -59,7 +63,11 @@ export const HomeFavorites = memo(function HomeFavorites({ className = "" }: Hom
                   {song.albumArt ? (
                     <img src={song.albumArt} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <MusicNote size={20} weight="fill" style={{ color: "var(--color-text-muted)" }} />
+                    <MusicNote
+                      size={20}
+                      weight="fill"
+                      style={{ color: "var(--color-text-muted)" }}
+                    />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">

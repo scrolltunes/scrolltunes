@@ -1,9 +1,9 @@
 "use client"
 
+import type { GradientOption } from "@/lib/colors"
 import { ArrowsClockwise, CircleHalf, Gradient, Image, Palette } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import { memo, useCallback } from "react"
-import type { GradientOption } from "@/lib/colors"
 import type {
   AlbumArtBackground,
   BackgroundConfig,
@@ -147,10 +147,7 @@ export const BackgroundControls = memo(function BackgroundControls({
 
       {background.type === "gradient" && (
         <div className="flex flex-col gap-2">
-          <span
-            className="text-xs font-medium"
-            style={{ color: "var(--color-text2)" }}
-          >
+          <span className="text-xs font-medium" style={{ color: "var(--color-text2)" }}>
             Gradient
           </span>
           <div className="flex flex-wrap gap-2">

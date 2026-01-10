@@ -123,14 +123,8 @@ export const ExportControls = memo(function ExportControls({
           color: "var(--color-text3)",
         }}
       >
-        <p>
-          Higher pixel ratios produce sharper images but larger file sizes.
-        </p>
-        {settings.format === "jpeg" && (
-          <p className="mt-1">
-            JPEG does not support transparency.
-          </p>
-        )}
+        <p>Higher pixel ratios produce sharper images but larger file sizes.</p>
+        {settings.format === "jpeg" && <p className="mt-1">JPEG does not support transparency.</p>}
       </div>
     </div>
   )

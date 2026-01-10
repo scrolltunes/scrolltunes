@@ -4,10 +4,10 @@ import { memo, useMemo, useState } from "react"
 import { TemplateCard } from "./TemplateCard"
 import {
   ALL_TEMPLATES,
-  getTemplatesByCategory,
   TEMPLATE_CATEGORIES,
   TEMPLATE_CATEGORY_LABELS,
   type TemplateCategory,
+  getTemplatesByCategory,
 } from "./templates"
 
 export interface TemplateGalleryProps {

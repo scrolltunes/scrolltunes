@@ -162,3 +162,14 @@ export {
   useUniqueChords,
   type ChordsState,
 } from "./ChordsStore"
+
+export {
+  songEditsStore,
+  useSongEditsState,
+  useIsEditMode,
+  useHasEdits,
+  useIsDirty,
+  useEditPayload,
+  useLinePatch,
+  type SongEditsState,
+} from "./SongEditsStore"

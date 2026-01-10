@@ -38,17 +38,10 @@ export const Slider = memo(function Slider({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
-        <label
-          htmlFor={id}
-          className="text-xs font-medium"
-          style={{ color: "var(--color-text2)" }}
-        >
+        <label htmlFor={id} className="text-xs font-medium" style={{ color: "var(--color-text2)" }}>
           {label}
         </label>
-        <span
-          className="text-xs tabular-nums"
-          style={{ color: "var(--color-text3)" }}
-        >
+        <span className="text-xs tabular-nums" style={{ color: "var(--color-text3)" }}>
           {displayValue}
         </span>
       </div>

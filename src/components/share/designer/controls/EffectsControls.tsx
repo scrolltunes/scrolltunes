@@ -15,20 +15,12 @@ interface ToggleSwitchProps {
   readonly onChange: (checked: boolean) => void
 }
 
-const ToggleSwitch = memo(function ToggleSwitch({
-  label,
-  checked,
-  onChange,
-}: ToggleSwitchProps) {
+const ToggleSwitch = memo(function ToggleSwitch({ label, checked, onChange }: ToggleSwitchProps) {
   const id = `toggle-${label.toLowerCase().replace(/\s+/g, "-")}`
 
   return (
     <div className="flex items-center justify-between">
-      <span
-        id={id}
-        className="text-xs font-medium"
-        style={{ color: "var(--color-text2)" }}
-      >
+      <span id={id} className="text-xs font-medium" style={{ color: "var(--color-text2)" }}>
         {label}
       </span>
       <button
@@ -141,11 +133,7 @@ export const EffectsControls = memo(function EffectsControls({
   return (
     <div className="flex flex-col gap-3">
       {/* Shadow */}
-      <EffectSection
-        title="Shadow"
-        enabled={effects.shadow.enabled}
-        onToggle={handleShadowToggle}
-      >
+      <EffectSection title="Shadow" enabled={effects.shadow.enabled} onToggle={handleShadowToggle}>
         <Slider
           label="Blur"
           value={effects.shadow.blur}
@@ -188,11 +176,7 @@ export const EffectsControls = memo(function EffectsControls({
       </EffectSection>
 
       {/* Border */}
-      <EffectSection
-        title="Border"
-        enabled={effects.border.enabled}
-        onToggle={handleBorderToggle}
-      >
+      <EffectSection title="Border" enabled={effects.border.enabled} onToggle={handleBorderToggle}>
         <Slider
           label="Width"
           value={effects.border.width}

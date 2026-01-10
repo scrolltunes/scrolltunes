@@ -1,6 +1,9 @@
 "use client"
 
 import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { ShareDesignerPreview } from "../ShareDesignerPreview"
+import { type ShareDesignerStore, useShareDesignerState } from "../ShareDesignerStore"
+import { TemplateGallery } from "../TemplateGallery"
 import {
   BackgroundControls,
   ControlPanel,
@@ -11,9 +14,6 @@ import {
   LayoutControls,
   TypographyControls,
 } from "../controls"
-import { ShareDesignerPreview } from "../ShareDesignerPreview"
-import { type ShareDesignerStore, useShareDesignerState } from "../ShareDesignerStore"
-import { TemplateGallery } from "../TemplateGallery"
 import { useShareExport } from "../useShareExport"
 import { BottomSheet } from "./BottomSheet"
 import { ExportActionBar } from "./ExportActionBar"
@@ -309,11 +309,7 @@ export const CustomizeView = memo(function CustomizeView({
         </div>
 
         {/* Bottom sheet with tabs */}
-        <BottomSheet
-          state={sheetState}
-          onStateChange={setSheetState}
-          peekHeight={260}
-        >
+        <BottomSheet state={sheetState} onStateChange={setSheetState} peekHeight={260}>
           <MobileTabBar activeTab={activeTab} onChange={setActiveTab} />
           <div className="flex-1 overflow-y-auto">{renderMobileTabContent()}</div>
           <ExportActionBar

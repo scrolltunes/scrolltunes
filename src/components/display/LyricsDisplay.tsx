@@ -726,7 +726,13 @@ export function LyricsDisplay({
       window.addEventListener("touchend", handleEnd)
       window.addEventListener("touchcancel", handleEnd)
     },
-    [getScrollBounds, handleTouchEndInternal, handleTouchMoveInternal, scrollY, stopScrollAnimation],
+    [
+      getScrollBounds,
+      handleTouchEndInternal,
+      handleTouchMoveInternal,
+      scrollY,
+      stopScrollAnimation,
+    ],
   )
 
   // No-op handlers for React props (actual handling is via document listeners)

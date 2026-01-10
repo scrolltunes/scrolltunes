@@ -11,9 +11,16 @@ import {
   TextT,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
-import { memo, type ReactNode, useCallback, useState } from "react"
+import { type ReactNode, memo, useCallback, useState } from "react"
 
-export type ControlSection = "templates" | "layout" | "background" | "typography" | "elements" | "effects" | "export"
+export type ControlSection =
+  | "templates"
+  | "layout"
+  | "background"
+  | "typography"
+  | "elements"
+  | "effects"
+  | "export"
 
 interface SectionConfig {
   readonly id: ControlSection
@@ -40,9 +47,7 @@ export const ControlPanel = memo(function ControlPanel({
   children,
   defaultExpanded = "templates",
 }: ControlPanelProps) {
-  const [expandedSection, setExpandedSection] = useState<ControlSection | null>(
-    defaultExpanded,
-  )
+  const [expandedSection, setExpandedSection] = useState<ControlSection | null>(defaultExpanded)
 
   const toggleSection = useCallback((section: ControlSection) => {
     setExpandedSection(prev => (prev === section ? null : section))
@@ -74,9 +79,7 @@ export const ControlPanel = memo(function ControlPanel({
               <div className="flex items-center gap-2">
                 <span
                   style={{
-                    color: isExpanded
-                      ? "var(--color-accent)"
-                      : "var(--color-text3)",
+                    color: isExpanded ? "var(--color-accent)" : "var(--color-text3)",
                   }}
                 >
                   {section.icon}
@@ -103,10 +106,7 @@ export const ControlPanel = memo(function ControlPanel({
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <div
-                    className="px-4 py-3"
-                    style={{ background: "var(--color-surface1)" }}
-                  >
+                  <div className="px-4 py-3" style={{ background: "var(--color-surface1)" }}>
                     {content}
                   </div>
                 </motion.div>

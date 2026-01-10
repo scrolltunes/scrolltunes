@@ -68,7 +68,8 @@ function EnhancedLrcView({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={springs.default}
-      className="rounded-xl p-5" style={{ background: "var(--color-surface1)" }}
+      className="rounded-xl p-5"
+      style={{ background: "var(--color-surface1)" }}
     >
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-medium">LRC Preview</h2>
@@ -121,7 +122,13 @@ function EnhancedLrcView({
 
 function Header() {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-14 backdrop-blur-lg" style={{ background: "var(--color-header-bg)", borderBottom: "1px solid var(--color-border)" }}>
+    <header
+      className="fixed top-0 left-0 right-0 z-50 h-14 backdrop-blur-lg"
+      style={{
+        background: "var(--color-header-bg)",
+        borderBottom: "1px solid var(--color-border)",
+      }}
+    >
       <div className="max-w-7xl mx-auto h-full px-4 flex items-center">
         <Link
           href="/admin/songs"
@@ -138,7 +145,10 @@ function Header() {
 
 function AccessDenied() {
   return (
-    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
       <Header />
       <main className="pt-20 pb-8 px-4 flex items-center justify-center min-h-screen">
         <motion.div
@@ -147,11 +157,16 @@ function AccessDenied() {
           transition={springs.default}
           className="text-center max-w-sm"
         >
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-surface1)" }}>
+          <div
+            className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+            style={{ background: "var(--color-surface1)" }}
+          >
             <ShieldWarning size={32} style={{ color: "var(--color-text-muted)" }} />
           </div>
           <h2 className="text-xl font-semibold mb-2">Access denied</h2>
-          <p className="mb-6" style={{ color: "var(--color-text3)" }}>You don't have permission to view this page</p>
+          <p className="mb-6" style={{ color: "var(--color-text3)" }}>
+            You don't have permission to view this page
+          </p>
           <Link
             href="/"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg transition-colors hover:brightness-110"
@@ -167,13 +182,22 @@ function AccessDenied() {
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
-            <div className="h-8 w-40 rounded animate-pulse mb-2" style={{ background: "var(--color-surface2)" }} />
-            <div className="h-5 w-32 rounded animate-pulse" style={{ background: "var(--color-surface2)" }} />
+            <div
+              className="h-8 w-40 rounded animate-pulse mb-2"
+              style={{ background: "var(--color-surface2)" }}
+            />
+            <div
+              className="h-5 w-32 rounded animate-pulse"
+              style={{ background: "var(--color-surface2)" }}
+            />
           </div>
         </div>
       </main>
@@ -694,7 +718,10 @@ export default function EnhancePage({
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-7xl mx-auto">
@@ -705,7 +732,9 @@ export default function EnhancePage({
             className="mb-8"
           >
             <h1 className="text-2xl font-semibold mb-1">Enhance Lyrics</h1>
-            <p style={{ color: "var(--color-text3)" }}>Add word-level timing and chords from Guitar Pro</p>
+            <p style={{ color: "var(--color-text3)" }}>
+              Add word-level timing and chords from Guitar Pro
+            </p>
           </motion.div>
 
           {pageState === "error" && (
@@ -714,11 +743,16 @@ export default function EnhancePage({
               animate={{ opacity: 1, y: 0 }}
               transition={springs.default}
               className="rounded-xl p-6 mb-6"
-              style={{ background: "var(--color-danger-soft)", border: "1px solid var(--color-danger)" }}
+              style={{
+                background: "var(--color-danger-soft)",
+                border: "1px solid var(--color-danger)",
+              }}
             >
               <div className="flex items-center gap-3 mb-2">
                 <Warning size={24} weight="fill" style={{ color: "var(--color-danger)" }} />
-                <h2 className="text-lg font-medium" style={{ color: "var(--color-danger)" }}>Error</h2>
+                <h2 className="text-lg font-medium" style={{ color: "var(--color-danger)" }}>
+                  Error
+                </h2>
               </div>
               <p style={{ color: "var(--color-text2)" }}>{error}</p>
               <Link
@@ -738,14 +772,22 @@ export default function EnhancePage({
               animate={{ opacity: 1, scale: 1 }}
               transition={springs.default}
               className="rounded-xl p-6"
-              style={{ background: "var(--color-success-soft)", border: "1px solid var(--color-success)" }}
+              style={{
+                background: "var(--color-success-soft)",
+                border: "1px solid var(--color-success)",
+              }}
             >
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--color-success-soft)" }}>
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                  style={{ background: "var(--color-success-soft)" }}
+                >
                   <Check size={24} weight="bold" style={{ color: "var(--color-success)" }} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-medium" style={{ color: "var(--color-success)" }}>Enhancement Saved</h2>
+                  <h2 className="text-lg font-medium" style={{ color: "var(--color-success)" }}>
+                    Enhancement Saved
+                  </h2>
                   <p style={{ color: "var(--color-text2)" }}>
                     {hasChords
                       ? `Word timings + chords for "${songInfo?.title}" have been saved`
@@ -784,12 +826,22 @@ export default function EnhancePage({
               animate={{ opacity: 1, y: 0 }}
               transition={springs.default}
               className="rounded-xl p-6"
-              style={{ background: "var(--color-warning-soft)", border: "1px solid var(--color-warning)" }}
+              style={{
+                background: "var(--color-warning-soft)",
+                border: "1px solid var(--color-warning)",
+              }}
             >
               <div className="flex items-start gap-3 mb-4">
-                <Warning size={24} weight="fill" className="flex-shrink-0 mt-0.5" style={{ color: "var(--color-warning)" }} />
+                <Warning
+                  size={24}
+                  weight="fill"
+                  className="flex-shrink-0 mt-0.5"
+                  style={{ color: "var(--color-warning)" }}
+                />
                 <div>
-                  <h2 className="text-lg font-medium" style={{ color: "var(--color-warning)" }}>Metadata Mismatch</h2>
+                  <h2 className="text-lg font-medium" style={{ color: "var(--color-warning)" }}>
+                    Metadata Mismatch
+                  </h2>
                   <p className="mt-1" style={{ color: "var(--color-text2)" }}>
                     The GP file metadata doesn't match this song. Are you sure you want to continue?
                   </p>
@@ -797,13 +849,21 @@ export default function EnhancePage({
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                 <div className="rounded-lg p-3" style={{ background: "var(--color-surface1)" }}>
-                  <p className="text-xs mb-1" style={{ color: "var(--color-text3)" }}>Page</p>
-                  <p className="font-medium" style={{ color: "var(--color-text)" }}>{songInfo.title}</p>
+                  <p className="text-xs mb-1" style={{ color: "var(--color-text3)" }}>
+                    Page
+                  </p>
+                  <p className="font-medium" style={{ color: "var(--color-text)" }}>
+                    {songInfo.title}
+                  </p>
                   <p style={{ color: "var(--color-text2)" }}>{songInfo.artist}</p>
                 </div>
                 <div className="rounded-lg p-3" style={{ background: "var(--color-surface1)" }}>
-                  <p className="text-xs mb-1" style={{ color: "var(--color-text3)" }}>GP File</p>
-                  <p className="font-medium" style={{ color: "var(--color-text)" }}>{pendingGpData.meta.title}</p>
+                  <p className="text-xs mb-1" style={{ color: "var(--color-text3)" }}>
+                    GP File
+                  </p>
+                  <p className="font-medium" style={{ color: "var(--color-text)" }}>
+                    {pendingGpData.meta.title}
+                  </p>
                   <p style={{ color: "var(--color-text2)" }}>{pendingGpData.meta.artist}</p>
                 </div>
               </div>
@@ -835,13 +895,16 @@ export default function EnhancePage({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ ...springs.default, delay: 0.1 }}
-                className="rounded-xl p-5" style={{ background: "var(--color-surface1)" }}
+                className="rounded-xl p-5"
+                style={{ background: "var(--color-surface1)" }}
               >
                 <h2 className="text-lg font-medium mb-3">Song Info</h2>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span style={{ color: "var(--color-text3)" }}>Title</span>
-                    <span className="font-medium" style={{ color: "var(--color-text)" }}>{songInfo.title}</span>
+                    <span className="font-medium" style={{ color: "var(--color-text)" }}>
+                      {songInfo.title}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span style={{ color: "var(--color-text3)" }}>Artist</span>
@@ -862,7 +925,10 @@ export default function EnhancePage({
                   <div className="flex items-center justify-between">
                     <span style={{ color: "var(--color-text3)" }}>Word Timing</span>
                     {songInfo.hasEnhancement ? (
-                      <span className="inline-flex items-center gap-1.5" style={{ color: "var(--color-success)" }}>
+                      <span
+                        className="inline-flex items-center gap-1.5"
+                        style={{ color: "var(--color-success)" }}
+                      >
                         <Check size={16} weight="bold" />
                         Has enhancement
                       </span>
@@ -873,7 +939,10 @@ export default function EnhancePage({
                   <div className="flex items-center justify-between">
                     <span style={{ color: "var(--color-text3)" }}>Chords</span>
                     {songInfo.hasChordEnhancement ? (
-                      <span className="inline-flex items-center gap-1.5" style={{ color: "var(--color-success)" }}>
+                      <span
+                        className="inline-flex items-center gap-1.5"
+                        style={{ color: "var(--color-success)" }}
+                      >
                         <Check size={16} weight="bold" />
                         Has chords
                       </span>
@@ -930,8 +999,16 @@ export default function EnhancePage({
                   className="flex flex-col gap-3"
                 >
                   {error && (
-                    <div className="rounded-lg p-3" style={{ background: "var(--color-danger-soft)", border: "1px solid var(--color-danger)" }}>
-                      <p className="text-sm" style={{ color: "var(--color-text2)" }}>{error}</p>
+                    <div
+                      className="rounded-lg p-3"
+                      style={{
+                        background: "var(--color-danger-soft)",
+                        border: "1px solid var(--color-danger)",
+                      }}
+                    >
+                      <p className="text-sm" style={{ color: "var(--color-text2)" }}>
+                        {error}
+                      </p>
                     </div>
                   )}
                   <button
@@ -972,23 +1049,34 @@ export default function EnhancePage({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={springs.default}
-                  className="rounded-xl p-5" style={{ background: "var(--color-surface1)" }}
+                  className="rounded-xl p-5"
+                  style={{ background: "var(--color-surface1)" }}
                 >
                   <h2 className="text-lg font-medium mb-3">GP File Metadata</h2>
                   <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
-                      <span className="block" style={{ color: "var(--color-text3)" }}>BPM</span>
-                      <span className="font-medium" style={{ color: "var(--color-text)" }}>{gpData.bpm}</span>
+                      <span className="block" style={{ color: "var(--color-text3)" }}>
+                        BPM
+                      </span>
+                      <span className="font-medium" style={{ color: "var(--color-text)" }}>
+                        {gpData.bpm}
+                      </span>
                     </div>
                     <div>
-                      <span className="block" style={{ color: "var(--color-text3)" }}>Key</span>
+                      <span className="block" style={{ color: "var(--color-text3)" }}>
+                        Key
+                      </span>
                       <span className="font-medium" style={{ color: "var(--color-text)" }}>
                         {gpData.keySignature ?? "Unknown"}
                       </span>
                     </div>
                     <div>
-                      <span className="block" style={{ color: "var(--color-text3)" }}>Tuning</span>
-                      <span className="font-medium" style={{ color: "var(--color-text)" }}>{gpData.tuning ?? "Unknown"}</span>
+                      <span className="block" style={{ color: "var(--color-text3)" }}>
+                        Tuning
+                      </span>
+                      <span className="font-medium" style={{ color: "var(--color-text)" }}>
+                        {gpData.tuning ?? "Unknown"}
+                      </span>
                     </div>
                   </div>
                 </motion.div>
@@ -1051,13 +1139,18 @@ export default function EnhancePage({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={springs.default}
-                  className="rounded-xl p-5" style={{ background: "var(--color-surface1)" }}
+                  className="rounded-xl p-5"
+                  style={{ background: "var(--color-surface1)" }}
                 >
                   <div className="flex items-center gap-3">
                     <MusicNote size={24} style={{ color: "var(--color-text-muted)" }} />
                     <div>
-                      <p style={{ color: "var(--color-text2)" }}>No chord markers in this GP file</p>
-                      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Only word timing will be saved</p>
+                      <p style={{ color: "var(--color-text2)" }}>
+                        No chord markers in this GP file
+                      </p>
+                      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+                        Only word timing will be saved
+                      </p>
                     </div>
                   </div>
                 </motion.div>
@@ -1072,8 +1165,16 @@ export default function EnhancePage({
                   className="flex flex-col gap-3"
                 >
                   {error && (
-                    <div className="rounded-lg p-3" style={{ background: "var(--color-danger-soft)", border: "1px solid var(--color-danger)" }}>
-                      <p className="text-sm" style={{ color: "var(--color-text2)" }}>{error}</p>
+                    <div
+                      className="rounded-lg p-3"
+                      style={{
+                        background: "var(--color-danger-soft)",
+                        border: "1px solid var(--color-danger)",
+                      }}
+                    >
+                      <p className="text-sm" style={{ color: "var(--color-text2)" }}>
+                        {error}
+                      </p>
                     </div>
                   )}
                   <button

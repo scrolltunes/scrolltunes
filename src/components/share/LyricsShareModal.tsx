@@ -830,9 +830,7 @@ export function LyricsShareModal({
                               isRTL ? "text-right" : "text-left"
                             }`}
                             style={{
-                              background: isSelected
-                                ? "var(--color-accent-soft)"
-                                : "transparent",
+                              background: isSelected ? "var(--color-accent-soft)" : "transparent",
                               color: isSelected ? "var(--color-text)" : "var(--color-text2)",
                             }}
                           >
@@ -905,7 +903,10 @@ export function LyricsShareModal({
                             type="button"
                             onClick={() => setEditedLines(new Map())}
                             className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
-                            style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.8)" }}
+                            style={{
+                              background: "rgba(0,0,0,0.4)",
+                              color: "rgba(255,255,255,0.8)",
+                            }}
                             aria-label="Reset text"
                           >
                             <ArrowCounterClockwise size={18} weight="bold" />
@@ -991,7 +992,10 @@ export function LyricsShareModal({
                       {/* Gradient Selection - inside preview at bottom (hidden in album art mode) */}
                       {pattern !== "albumArt" && (
                         <div className="absolute bottom-2 left-2 right-2 flex justify-center">
-                          <div className="flex items-center gap-1.5 rounded-full px-2 py-1.5" style={{ background: "rgba(0,0,0,0.5)" }}>
+                          <div
+                            className="flex items-center gap-1.5 rounded-full px-2 py-1.5"
+                            style={{ background: "rgba(0,0,0,0.5)" }}
+                          >
                             {gradientPalette.map(option => (
                               <button
                                 key={option.id}
@@ -1000,40 +1004,45 @@ export function LyricsShareModal({
                                 className="h-6 w-6 rounded-full transition-transform hover:scale-110 focus:outline-none"
                                 style={{
                                   background: option.gradient,
-                                  boxShadow: selectedGradientId === option.id
-                                    ? "0 0 0 2px white"
-                                    : "inset 0 0 0 1px rgba(255,255,255,0.2)",
+                                  boxShadow:
+                                    selectedGradientId === option.id
+                                      ? "0 0 0 2px white"
+                                      : "inset 0 0 0 1px rgba(255,255,255,0.2)",
                                 }}
                                 aria-label={`Select gradient ${option.id}`}
                               />
                             ))}
-                          <button
-                            type="button"
-                            onClick={handleCustomColorClick}
-                            className="flex h-6 w-6 items-center justify-center rounded-full transition-transform hover:scale-110 focus:outline-none"
-                            style={{
-                              background: selectedGradientId === CUSTOM_COLOR_ID ? customColor : "rgba(255,255,255,0.1)",
-                              boxShadow: selectedGradientId === CUSTOM_COLOR_ID
-                                ? "0 0 0 2px white"
-                                : "inset 0 0 0 1px rgba(255,255,255,0.2)",
-                            }}
-                            aria-label="Choose custom color"
-                          >
-                            {selectedGradientId !== CUSTOM_COLOR_ID && (
-                              <Palette size={14} style={{ color: "rgba(255,255,255,0.7)" }} />
-                            )}
-                          </button>
-                          <input
-                            ref={colorInputRef}
-                            type="color"
-                            value={customColor}
-                            onChange={e => {
-                              setCustomColor(e.target.value)
-                              setSelectedGradientId(CUSTOM_COLOR_ID)
-                            }}
-                            className="sr-only"
-                            aria-label="Custom color picker"
-                          />
+                            <button
+                              type="button"
+                              onClick={handleCustomColorClick}
+                              className="flex h-6 w-6 items-center justify-center rounded-full transition-transform hover:scale-110 focus:outline-none"
+                              style={{
+                                background:
+                                  selectedGradientId === CUSTOM_COLOR_ID
+                                    ? customColor
+                                    : "rgba(255,255,255,0.1)",
+                                boxShadow:
+                                  selectedGradientId === CUSTOM_COLOR_ID
+                                    ? "0 0 0 2px white"
+                                    : "inset 0 0 0 1px rgba(255,255,255,0.2)",
+                              }}
+                              aria-label="Choose custom color"
+                            >
+                              {selectedGradientId !== CUSTOM_COLOR_ID && (
+                                <Palette size={14} style={{ color: "rgba(255,255,255,0.7)" }} />
+                              )}
+                            </button>
+                            <input
+                              ref={colorInputRef}
+                              type="color"
+                              value={customColor}
+                              onChange={e => {
+                                setCustomColor(e.target.value)
+                                setSelectedGradientId(CUSTOM_COLOR_ID)
+                              }}
+                              className="sr-only"
+                              aria-label="Custom color picker"
+                            />
                           </div>
                         </div>
                       )}
@@ -1048,7 +1057,7 @@ export function LyricsShareModal({
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {PATTERN_OPTIONS.filter(
-                            option => !option.requiresAlbumArt || albumArt
+                            option => !option.requiresAlbumArt || albumArt,
                           ).map(option => (
                             <button
                               key={option.id}
@@ -1066,8 +1075,7 @@ export function LyricsShareModal({
                                   pattern === option.id
                                     ? "var(--color-accent)"
                                     : "var(--color-surface2)",
-                                color:
-                                  pattern === option.id ? "white" : "var(--color-text2)",
+                                color: pattern === option.id ? "white" : "var(--color-text2)",
                               }}
                             >
                               {option.label}
@@ -1180,7 +1188,11 @@ export function LyricsShareModal({
                             style={{ color: "var(--color-text2)" }}
                           >
                             Support us
-                            <Heart size={14} weight="fill" style={{ color: "var(--color-favorite)" }} />
+                            <Heart
+                              size={14}
+                              weight="fill"
+                              style={{ color: "var(--color-favorite)" }}
+                            />
                           </span>
                         </label>
                       </div>
@@ -1191,10 +1203,7 @@ export function LyricsShareModal({
             </div>
 
             {/* Footer actions */}
-            <div
-              className="flex gap-3 p-4"
-              style={{ borderTop: "1px solid var(--color-border)" }}
-            >
+            <div className="flex gap-3 p-4" style={{ borderTop: "1px solid var(--color-border)" }}>
               {step === "select" ? (
                 <button
                   type="button"
@@ -1211,7 +1220,9 @@ export function LyricsShareModal({
                   <button
                     type="button"
                     onClick={() => {
-                      const selectedLineIds = Array.from(selectedIndices).map(i => lines[i]?.id).filter((id): id is string => id !== undefined)
+                      const selectedLineIds = Array.from(selectedIndices)
+                        .map(i => lines[i]?.id)
+                        .filter((id): id is string => id !== undefined)
                       onOpenStudio(selectedLineIds)
                     }}
                     className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"

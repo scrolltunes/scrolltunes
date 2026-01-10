@@ -74,10 +74,7 @@ export default function LoginPage() {
           transition={springs.default}
           className="w-full max-w-sm"
         >
-          <div
-            className="p-6 rounded-xl space-y-6"
-            style={{ background: "var(--color-surface1)" }}
-          >
+          <div className="p-6 rounded-xl space-y-6" style={{ background: "var(--color-surface1)" }}>
             <div className="text-center">
               <h1 className="text-2xl font-semibold">Sign in to ScrollTunes</h1>
             </div>

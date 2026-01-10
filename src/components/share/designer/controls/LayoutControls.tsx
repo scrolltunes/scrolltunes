@@ -41,10 +41,7 @@ export const LayoutControls = memo(function LayoutControls({
     <div className="flex flex-col gap-4">
       {/* Aspect Ratio */}
       <div className="flex flex-col gap-2">
-        <span
-          className="text-xs font-medium"
-          style={{ color: "var(--color-text2)" }}
-        >
+        <span className="text-xs font-medium" style={{ color: "var(--color-text2)" }}>
           Aspect Ratio
         </span>
         <div className="flex gap-2">
@@ -63,12 +60,8 @@ export const LayoutControls = memo(function LayoutControls({
                 onClick={() => handlePresetSelect(option.preset)}
                 className="flex flex-col items-center gap-1 p-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent"
                 style={{
-                  background: isSelected
-                    ? "var(--color-accent-soft)"
-                    : "var(--color-surface2)",
-                  border: isSelected
-                    ? "1px solid var(--color-accent)"
-                    : "1px solid transparent",
+                  background: isSelected ? "var(--color-accent-soft)" : "var(--color-surface2)",
+                  border: isSelected ? "1px solid var(--color-accent)" : "1px solid transparent",
                 }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -80,18 +73,14 @@ export const LayoutControls = memo(function LayoutControls({
                   style={{
                     width: previewWidth,
                     height: previewHeight,
-                    background: isSelected
-                      ? "var(--color-accent)"
-                      : "var(--color-text3)",
+                    background: isSelected ? "var(--color-accent)" : "var(--color-text3)",
                     opacity: isSelected ? 1 : 0.5,
                   }}
                 />
                 <span
                   className="text-xs font-medium"
                   style={{
-                    color: isSelected
-                      ? "var(--color-accent)"
-                      : "var(--color-text3)",
+                    color: isSelected ? "var(--color-accent)" : "var(--color-text3)",
                   }}
                 >
                   {option.label}

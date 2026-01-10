@@ -160,10 +160,7 @@ export const RecentSongs = memo(function RecentSongs({
                   style={{ background: "var(--color-border)" }}
                 />
                 <div className="flex-1 space-y-2">
-                  <div
-                    className="h-4 w-32 rounded"
-                    style={{ background: "var(--color-border)" }}
-                  />
+                  <div className="h-4 w-32 rounded" style={{ background: "var(--color-border)" }} />
                   <div
                     className="h-3 w-24 rounded"
                     style={{ background: "var(--color-surface3)" }}
@@ -187,7 +184,11 @@ export const RecentSongs = memo(function RecentSongs({
             onClickCapture={handleClickCapture}
           >
             {displayRecents.map(song => {
-              const songPath = makeCanonicalPath({ id: song.id, title: song.title, artist: song.artist })
+              const songPath = makeCanonicalPath({
+                id: song.id,
+                title: song.title,
+                artist: song.artist,
+              })
               return (
                 <Link
                   key={song.id}
@@ -221,10 +222,7 @@ export const RecentSongs = memo(function RecentSongs({
                   >
                     {song.title}
                   </p>
-                  <p
-                    className="text-xs truncate"
-                    style={{ color: "var(--color-text3)" }}
-                  >
+                  <p className="text-xs truncate" style={{ color: "var(--color-text3)" }}>
                     {song.artist}
                   </p>
                 </Link>
@@ -234,7 +232,11 @@ export const RecentSongs = memo(function RecentSongs({
         ) : (
           <ul className="space-y-2" aria-label="Recently played songs">
             {displayRecents.map(song => {
-              const songPath = makeCanonicalPath({ id: song.id, title: song.title, artist: song.artist })
+              const songPath = makeCanonicalPath({
+                id: song.id,
+                title: song.title,
+                artist: song.artist,
+              })
               return (
                 <li key={song.id}>
                   <Link
@@ -253,7 +255,11 @@ export const RecentSongs = memo(function RecentSongs({
                       {song.albumArt ? (
                         <img src={song.albumArt} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <MusicNote size={20} weight="fill" style={{ color: "var(--color-text-muted)" }} />
+                        <MusicNote
+                          size={20}
+                          weight="fill"
+                          style={{ color: "var(--color-text-muted)" }}
+                        />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

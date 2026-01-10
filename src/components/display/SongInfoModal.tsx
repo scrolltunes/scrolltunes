@@ -106,10 +106,7 @@ export function SongInfoModal({
                   </div>
                 )}
                 <div className="min-w-0">
-                  <h2
-                    className="text-xl font-semibold"
-                    style={{ color: "var(--color-text)" }}
-                  >
+                  <h2 className="text-xl font-semibold" style={{ color: "var(--color-text)" }}>
                     {displayTitle}
                   </h2>
                   <p style={{ color: "var(--color-text3)" }}>{displayArtist}</p>
@@ -150,10 +147,7 @@ export function SongInfoModal({
                 )}
 
                 {spotifyId !== null && (
-                  <div
-                    className="mt-4 pt-4"
-                    style={{ borderTop: "1px solid var(--color-border)" }}
-                  >
+                  <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
                     <a
                       href={`https://open.spotify.com/track/${spotifyId}`}
                       target="_blank"
@@ -171,10 +165,7 @@ export function SongInfoModal({
                 )}
 
                 {(lyricsSource || bpmSource) && (
-                  <div
-                    className="mt-4 pt-4"
-                    style={{ borderTop: "1px solid var(--color-border)" }}
-                  >
+                  <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
                     <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                       {lyricsSource && (
                         <>
@@ -209,10 +200,7 @@ export function SongInfoModal({
                   </div>
                 )}
 
-                <div
-                  className="mt-4 pt-4"
-                  style={{ borderTop: "1px solid var(--color-border)" }}
-                >
+                <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
                   <button
                     type="button"
                     onClick={() => setShowReportModal(true)}

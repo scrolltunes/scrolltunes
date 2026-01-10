@@ -289,7 +289,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const albumArt = spotifyAlbumArt ?? (await getAlbumArt(lyrics.artist, lyrics.title, "medium"))
   // Deezer uses "xl" for large size, Spotify uses "large"
-  const albumArtLarge = spotifyAlbumArtLarge ?? (await getAlbumArt(lyrics.artist, lyrics.title, "xl"))
+  const albumArtLarge =
+    spotifyAlbumArtLarge ?? (await getAlbumArt(lyrics.artist, lyrics.title, "xl"))
 
   // Extract actual LRCLIB ID from lyrics (may differ from URL id if fallback occurred)
   const actualLrclibId = lyrics.songId.startsWith("lrclib-")

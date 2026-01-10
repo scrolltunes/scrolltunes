@@ -60,7 +60,10 @@ export default function RoadmapPage() {
             >
               Now
             </h2>
-            <div className="p-4 rounded-xl space-y-3" style={{ background: "var(--color-surface1)" }}>
+            <div
+              className="p-4 rounded-xl space-y-3"
+              style={{ background: "var(--color-surface1)" }}
+            >
               {nowFeatures.map(feature => {
                 const title = typeof feature === "string" ? feature : feature.title
                 const isBeta = typeof feature === "object" && feature.beta
@@ -76,7 +79,10 @@ export default function RoadmapPage() {
                     {isBeta && (
                       <span
                         className="px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded"
-                        style={{ background: "var(--color-warning-soft)", color: "var(--color-warning)" }}
+                        style={{
+                          background: "var(--color-warning-soft)",
+                          color: "var(--color-warning)",
+                        }}
                       >
                         Beta
                       </span>
@@ -170,7 +176,10 @@ export default function RoadmapPage() {
               className="block p-4 rounded-xl transition-colors hover:brightness-110"
               style={{ background: "var(--color-surface1)" }}
             >
-              <div className="font-medium flex items-center gap-2" style={{ color: "var(--color-text)" }}>
+              <div
+                className="font-medium flex items-center gap-2"
+                style={{ color: "var(--color-text)" }}
+              >
                 <XLogo size={18} />
                 @ScrollTunes
               </div>
@@ -180,7 +189,10 @@ export default function RoadmapPage() {
               className="block p-4 rounded-xl transition-colors hover:brightness-110 mt-3"
               style={{ background: "var(--color-surface1)" }}
             >
-              <div className="font-medium flex items-center gap-2" style={{ color: "var(--color-text)" }}>
+              <div
+                className="font-medium flex items-center gap-2"
+                style={{ color: "var(--color-text)" }}
+              >
                 <EnvelopeSimple size={18} />
                 contact@scrolltunes.com
               </div>

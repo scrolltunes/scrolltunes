@@ -7,7 +7,10 @@ import Link from "next/link"
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)" }}>
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
+    >
       <header
         className="fixed top-0 left-0 right-0 z-20 backdrop-blur-lg"
         style={{
@@ -82,7 +85,10 @@ export default function AboutPage() {
             >
               How it works
             </h2>
-            <div className="p-4 rounded-xl space-y-4" style={{ background: "var(--color-surface1)" }}>
+            <div
+              className="p-4 rounded-xl space-y-4"
+              style={{ background: "var(--color-surface1)" }}
+            >
               <div>
                 <h3 className="text-sm font-medium mb-2" style={{ color: "var(--color-text3)" }}>
                   Voice Detection
@@ -114,7 +120,10 @@ export default function AboutPage() {
             >
               Features
             </h2>
-            <div className="p-4 rounded-xl space-y-3" style={{ background: "var(--color-surface1)" }}>
+            <div
+              className="p-4 rounded-xl space-y-3"
+              style={{ background: "var(--color-surface1)" }}
+            >
               <div className="flex items-start gap-3">
                 <div
                   className="w-2 h-2 rounded-full mt-2 shrink-0"
@@ -159,7 +168,10 @@ export default function AboutPage() {
                   Guitar chords with transpose
                   <span
                     className="ml-2 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide rounded"
-                    style={{ background: "var(--color-warning-soft)", color: "var(--color-warning)" }}
+                    style={{
+                      background: "var(--color-warning-soft)",
+                      color: "var(--color-warning)",
+                    }}
                   >
                     Coming soon
                   </span>
@@ -178,7 +190,10 @@ export default function AboutPage() {
             </h2>
             <div className="space-y-4">
               {/* Without an account */}
-              <div className="p-4 rounded-xl space-y-3" style={{ background: "var(--color-surface1)" }}>
+              <div
+                className="p-4 rounded-xl space-y-3"
+                style={{ background: "var(--color-surface1)" }}
+              >
                 <h3 className="text-sm font-medium" style={{ color: "var(--color-text3)" }}>
                   Without an account
                 </h3>
@@ -213,7 +228,10 @@ export default function AboutPage() {
               </div>
 
               {/* With an account */}
-              <div className="p-4 rounded-xl space-y-3" style={{ background: "var(--color-surface1)" }}>
+              <div
+                className="p-4 rounded-xl space-y-3"
+                style={{ background: "var(--color-surface1)" }}
+              >
                 <h3 className="text-sm font-medium" style={{ color: "var(--color-text3)" }}>
                   With an account
                 </h3>
@@ -257,7 +275,10 @@ export default function AboutPage() {
               </div>
 
               {/* Always */}
-              <div className="p-4 rounded-xl space-y-3" style={{ background: "var(--color-surface1)" }}>
+              <div
+                className="p-4 rounded-xl space-y-3"
+                style={{ background: "var(--color-surface1)" }}
+              >
                 <h3 className="text-sm font-medium" style={{ color: "var(--color-text3)" }}>
                   Always
                 </h3>
@@ -266,7 +287,9 @@ export default function AboutPage() {
                     className="w-2 h-2 rounded-full mt-2 shrink-0"
                     style={{ background: "var(--color-success)" }}
                   />
-                  <p style={{ color: "var(--color-text2)" }}>No advertising or marketing trackers</p>
+                  <p style={{ color: "var(--color-text2)" }}>
+                    No advertising or marketing trackers
+                  </p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div
@@ -360,7 +383,10 @@ export default function AboutPage() {
               className="block p-4 rounded-xl transition-colors hover:brightness-110"
               style={{ background: "var(--color-surface1)" }}
             >
-              <div className="font-medium flex items-center gap-2" style={{ color: "var(--color-text)" }}>
+              <div
+                className="font-medium flex items-center gap-2"
+                style={{ color: "var(--color-text)" }}
+              >
                 <XLogo size={18} />
                 @ScrollTunes
               </div>
@@ -370,7 +396,10 @@ export default function AboutPage() {
               className="block p-4 rounded-xl transition-colors hover:brightness-110 mt-3"
               style={{ background: "var(--color-surface1)" }}
             >
-              <div className="font-medium flex items-center gap-2" style={{ color: "var(--color-text)" }}>
+              <div
+                className="font-medium flex items-center gap-2"
+                style={{ color: "var(--color-text)" }}
+              >
                 <EnvelopeSimple size={18} />
                 contact@scrolltunes.com
               </div>

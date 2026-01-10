@@ -250,7 +250,10 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate" style={{ color: "var(--color-text)" }}>
+                          <p
+                            className="font-medium truncate"
+                            style={{ color: "var(--color-text)" }}
+                          >
                             {setlist.name}
                           </p>
                           <p className="text-sm" style={{ color: "var(--color-text3)" }}>

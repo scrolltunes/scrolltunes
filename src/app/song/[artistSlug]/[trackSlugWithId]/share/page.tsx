@@ -49,10 +49,11 @@ export default function SharePage() {
         const data = await response.json()
 
         // Transform lyrics lines to the format we need
-        const lines = data.lyrics?.lines?.map((line: { id?: string; text: string }, index: number) => ({
-          id: line.id ?? `line-${index}`,
-          text: line.text,
-        })) ?? []
+        const lines =
+          data.lyrics?.lines?.map((line: { id?: string; text: string }, index: number) => ({
+            id: line.id ?? `line-${index}`,
+            text: line.text,
+          })) ?? []
 
         setSongData({
           id: songId,
@@ -83,11 +84,7 @@ export default function SharePage() {
         className="flex min-h-screen items-center justify-center"
         style={{ background: "var(--color-bg)" }}
       >
-        <SpinnerGap
-          size={32}
-          className="animate-spin"
-          style={{ color: "var(--color-accent)" }}
-        />
+        <SpinnerGap size={32} className="animate-spin" style={{ color: "var(--color-accent)" }} />
       </div>
     )
   }

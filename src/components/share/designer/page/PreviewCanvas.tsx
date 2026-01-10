@@ -80,11 +80,7 @@ export const PreviewCanvas = memo(function PreviewCanvas({
           }}
           aria-label={isEditing ? "Done editing" : "Edit text"}
         >
-          {isEditing ? (
-            <Check size={18} weight="bold" />
-          ) : (
-            <PencilSimple size={18} weight="bold" />
-          )}
+          {isEditing ? <Check size={18} weight="bold" /> : <PencilSimple size={18} weight="bold" />}
         </button>
       </div>
 

@@ -44,7 +44,9 @@ export default function TermsOfService() {
             <p className="mb-4 leading-relaxed" style={{ color: "var(--color-text2)" }}>
               ScrollTunes operates with a two-tier privacy model:
             </p>
-            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>Anonymous Use</h3>
+            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>
+              Anonymous Use
+            </h3>
             <p className="mb-4 leading-relaxed" style={{ color: "var(--color-text2)" }}>
               You can use ScrollTunes without creating an account. When used anonymously:
             </p>
@@ -66,7 +68,9 @@ export default function TermsOfService() {
                 audio is never recorded, transmitted, or stored
               </li>
             </ul>
-            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>Voice Features</h3>
+            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>
+              Voice Features
+            </h3>
             <p className="mb-4 leading-relaxed" style={{ color: "var(--color-text2)" }}>
               ScrollTunes offers two distinct voice features with different privacy characteristics:
             </p>
@@ -82,18 +86,28 @@ export default function TermsOfService() {
                 transcription
               </li>
             </ul>
-            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>Account Holders</h3>
+            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>
+              Account Holders
+            </h3>
             <p className="mb-4 leading-relaxed" style={{ color: "var(--color-text2)" }}>
               If you choose to create an account, you consent to the collection and processing of
               your data as described in our{" "}
-              <Link href="/privacy" className="underline hover:brightness-110" style={{ color: "var(--color-accent)" }}>
+              <Link
+                href="/privacy"
+                className="underline hover:brightness-110"
+                style={{ color: "var(--color-accent)" }}
+              >
                 Privacy Policy
               </Link>
               , including server-side storage, analytics, and third-party processing.
             </p>
             <p className="leading-relaxed" style={{ color: "var(--color-text2)" }}>
               For complete details, see our{" "}
-              <Link href="/privacy" className="underline hover:brightness-110" style={{ color: "var(--color-accent)" }}>
+              <Link
+                href="/privacy"
+                className="underline hover:brightness-110"
+                style={{ color: "var(--color-accent)" }}
+              >
                 Privacy Policy
               </Link>
               .
@@ -106,7 +120,9 @@ export default function TermsOfService() {
               You are not required to create an account to use ScrollTunes. The core functionality
               is available to all users without registration.
             </p>
-            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>Creating an Account</h3>
+            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>
+              Creating an Account
+            </h3>
             <p className="mb-4 leading-relaxed" style={{ color: "var(--color-text2)" }}>
               By creating an account, you agree to:
             </p>
@@ -119,7 +135,9 @@ export default function TermsOfService() {
               You are responsible for maintaining the confidentiality of your login credentials and
               for any activity that occurs under your account.
             </p>
-            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>Account Termination</h3>
+            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>
+              Account Termination
+            </h3>
             <p className="mb-4 leading-relaxed" style={{ color: "var(--color-text2)" }}>
               We may suspend or terminate your account if you:
             </p>
@@ -131,12 +149,18 @@ export default function TermsOfService() {
             <p className="mb-4 leading-relaxed" style={{ color: "var(--color-text2)" }}>
               You may delete your account at any time from the app&apos;s settings. Deleting your
               account will remove your personal data from our systems, as described in our{" "}
-              <Link href="/privacy" className="underline hover:brightness-110" style={{ color: "var(--color-accent)" }}>
+              <Link
+                href="/privacy"
+                className="underline hover:brightness-110"
+                style={{ color: "var(--color-accent)" }}
+              >
                 Privacy Policy
               </Link>
               .
             </p>
-            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>Data and Privacy</h3>
+            <h3 className="mb-2 text-lg font-medium" style={{ color: "var(--color-text)" }}>
+              Data and Privacy
+            </h3>
             <p className="leading-relaxed" style={{ color: "var(--color-text2)" }}>
               Account creation requires explicit consent to our data collection practices. Anonymous
               use of ScrollTunes does not require any such consent and involves no server-side data
@@ -190,7 +214,8 @@ export default function TermsOfService() {
                 href="https://x.com/ScrollTunes"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline hover:brightness-110" style={{ color: "var(--color-accent)" }}
+                className="underline hover:brightness-110"
+                style={{ color: "var(--color-accent)" }}
               >
                 @ScrollTunes
               </a>
@@ -215,7 +240,8 @@ export default function TermsOfService() {
                   href="https://lrclib.net"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline hover:brightness-110" style={{ color: "var(--color-accent)" }}
+                  className="underline hover:brightness-110"
+                  style={{ color: "var(--color-accent)" }}
                 >
                   LRCLIB
                 </a>{" "}
@@ -226,7 +252,8 @@ export default function TermsOfService() {
                   href="https://getsongbpm.com/terms"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline hover:brightness-110" style={{ color: "var(--color-accent)" }}
+                  className="underline hover:brightness-110"
+                  style={{ color: "var(--color-accent)" }}
                 >
                   GetSongBPM
                 </a>{" "}
@@ -237,7 +264,8 @@ export default function TermsOfService() {
                   href="https://www.songsterr.com/a/wa/terms"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline hover:brightness-110" style={{ color: "var(--color-accent)" }}
+                  className="underline hover:brightness-110"
+                  style={{ color: "var(--color-accent)" }}
                 >
                   Songsterr
                 </a>{" "}
@@ -307,7 +335,8 @@ export default function TermsOfService() {
                 href="https://x.com/ScrollTunes"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline hover:brightness-110" style={{ color: "var(--color-accent)" }}
+                className="underline hover:brightness-110"
+                style={{ color: "var(--color-accent)" }}
               >
                 @ScrollTunes
               </a>

@@ -100,7 +100,8 @@ export default async function RootLayout({
         {/* Critical CSS for theme - no media query to avoid flash before JS checks preferences */}
         <style
           dangerouslySetInnerHTML={{
-            __html: "html,body{background:#070A12!important}html.light,html.light body{background:#FAF7F2!important}",
+            __html:
+              "html,body{background:#070A12!important}html.light,html.light body{background:#FAF7F2!important}",
           }}
         />
         {/* Inline blocking script to set theme class based on user preference */}

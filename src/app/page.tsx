@@ -95,11 +95,7 @@ const faqItems: { question: string; answer: React.ReactNode }[] = [
           @ScrollTunes
         </a>{" "}
         or by email at{" "}
-        <a
-          href="mailto:contact@scrolltunes.com"
-          className="hover:brightness-110"
-          style={linkStyle}
-        >
+        <a href="mailto:contact@scrolltunes.com" className="hover:brightness-110" style={linkStyle}>
           contact@scrolltunes.com
         </a>
         .

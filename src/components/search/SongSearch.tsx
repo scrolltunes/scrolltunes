@@ -89,14 +89,8 @@ function SearchSkeleton() {
             style={{ background: "var(--color-surface2)" }}
           />
           <div className="flex-1 min-w-0 space-y-2">
-            <div
-              className="h-4 w-3/5 rounded"
-              style={{ background: "var(--color-surface2)" }}
-            />
-            <div
-              className="h-3 w-4/5 rounded"
-              style={{ background: "var(--color-surface2)" }}
-            />
+            <div className="h-4 w-3/5 rounded" style={{ background: "var(--color-surface2)" }} />
+            <div className="h-3 w-4/5 rounded" style={{ background: "var(--color-surface2)" }} />
           </div>
           <div
             className="flex-shrink-0 h-4 w-10 rounded"
@@ -593,10 +587,7 @@ export const SongSearch = memo(function SongSearch({
               style={{ background: "var(--color-surface1)" }}
             >
               {voiceSearch.isProcessing ? (
-                <span
-                  className="truncate block"
-                  style={{ color: "var(--color-success)" }}
-                >
+                <span className="truncate block" style={{ color: "var(--color-success)" }}>
                   Processing...
                 </span>
               ) : streamingText ? (
@@ -606,10 +597,7 @@ export const SongSearch = memo(function SongSearch({
                   style={{ color: "var(--color-accent)" }}
                 />
               ) : (
-                <span
-                  className="truncate block"
-                  style={{ color: "var(--color-accent)" }}
-                >
+                <span className="truncate block" style={{ color: "var(--color-accent)" }}>
                   Listening...
                 </span>
               )}

@@ -1,13 +1,16 @@
 "use client"
 
-import { Data, Effect } from "effect"
-import { useSyncExternalStore } from "react"
 import { detectLyricsDirection } from "@/lib"
 import { type GradientOption, buildGradientPalette, extractDominantColor } from "@/lib/colors"
-import { getTemplateById, type Template } from "./templates"
+import { Data, Effect } from "effect"
+import { useSyncExternalStore } from "react"
+import { type Template, getTemplateById } from "./templates"
 import {
   type AspectRatioConfig,
   type BackgroundConfig,
+  DEFAULT_EDITOR_STATE,
+  DEFAULT_SHARE_DESIGNER_STATE,
+  DEFAULT_TYPOGRAPHY,
   type EditMode,
   type EditorState,
   type EffectsConfig,
@@ -23,9 +26,6 @@ import {
   type ShareDesignerSongContext,
   type ShareDesignerState,
   type TypographyConfig,
-  DEFAULT_EDITOR_STATE,
-  DEFAULT_SHARE_DESIGNER_STATE,
-  DEFAULT_TYPOGRAPHY,
 } from "./types"
 
 // ============================================================================
@@ -444,9 +444,7 @@ export class ShareDesignerStore {
   // Event Handlers (Private)
   // -------------------------------------------------------------------------
 
-  private handleSetSelectedLines(
-    lineIds: readonly string[],
-  ): Effect.Effect<void> {
+  private handleSetSelectedLines(lineIds: readonly string[]): Effect.Effect<void> {
     return Effect.sync(() => {
       const selectedLines: readonly LyricLineSelection[] = lineIds
         .map(id => {
@@ -464,10 +462,7 @@ export class ShareDesignerStore {
         })
         .filter((line): line is LyricLineSelection => line !== null)
 
-      this.updateState(
-        { lyrics: { ...this.state.lyrics, selectedLines } },
-        "Update selection",
-      )
+      this.updateState({ lyrics: { ...this.state.lyrics, selectedLines } }, "Update selection")
     })
   }
 
@@ -479,10 +474,7 @@ export class ShareDesignerStore {
         return { ...line, editedText }
       })
 
-      this.updateState(
-        { lyrics: { ...this.state.lyrics, selectedLines } },
-        "Edit text",
-      )
+      this.updateState({ lyrics: { ...this.state.lyrics, selectedLines } }, "Edit text")
     })
   }
 
@@ -493,10 +485,7 @@ export class ShareDesignerStore {
         return { ...line, editedText: null }
       })
 
-      this.updateState(
-        { lyrics: { ...this.state.lyrics, selectedLines } },
-        "Reset text",
-      )
+      this.updateState({ lyrics: { ...this.state.lyrics, selectedLines } }, "Reset text")
     })
   }
 
@@ -507,10 +496,7 @@ export class ShareDesignerStore {
         editedText: null,
       }))
 
-      this.updateState(
-        { lyrics: { ...this.state.lyrics, selectedLines } },
-        "Reset all text",
-      )
+      this.updateState({ lyrics: { ...this.state.lyrics, selectedLines } }, "Reset all text")
     })
   }
 
@@ -873,9 +859,7 @@ export class ShareDesignerStore {
 // Factory Function
 // ============================================================================
 
-export function createShareDesignerStore(
-  context: ShareDesignerSongContext,
-): ShareDesignerStore {
+export function createShareDesignerStore(context: ShareDesignerSongContext): ShareDesignerStore {
   return new ShareDesignerStore(context)
 }
 
@@ -883,9 +867,7 @@ export function createShareDesignerStore(
 // React Hooks
 // ============================================================================
 
-export function useShareDesignerState(
-  store: ShareDesignerStore,
-): ShareDesignerEditorState {
+export function useShareDesignerState(store: ShareDesignerStore): ShareDesignerEditorState {
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 }
 

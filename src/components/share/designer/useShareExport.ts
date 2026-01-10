@@ -99,11 +99,7 @@ export function useShareExport({
               return
             }
             ctx.drawImage(img, 0, 0)
-            canvas.toBlob(
-              webpBlob => resolve(webpBlob ?? blob),
-              "image/webp",
-              0.95,
-            )
+            canvas.toBlob(webpBlob => resolve(webpBlob ?? blob), "image/webp", 0.95)
           }
           img.onerror = () => resolve(blob)
           img.src = dataUrl
@@ -191,9 +187,7 @@ export function useShareExport({
       )
 
       const shareSupported =
-        typeof navigator !== "undefined" &&
-        "share" in navigator &&
-        "canShare" in navigator
+        typeof navigator !== "undefined" && "share" in navigator && "canShare" in navigator
 
       if (shareSupported && navigator.canShare({ files: [file] })) {
         await navigator.share({

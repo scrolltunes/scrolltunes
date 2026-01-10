@@ -15,22 +15,14 @@ import {
   X,
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { ShareDesignerPreview } from "./ShareDesignerPreview"
 import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
-import { TemplateGallery } from "./TemplateGallery"
-import {
-  createShareDesignerStore,
   type ShareDesignerStore,
+  createShareDesignerStore,
   useShareDesignerState,
 } from "./ShareDesignerStore"
-import { ShareDesignerPreview } from "./ShareDesignerPreview"
+import { TemplateGallery } from "./TemplateGallery"
 import type { LyricLine, ShareDesignerSongContext } from "./types"
 import { useShareExport } from "./useShareExport"
 
@@ -175,7 +167,8 @@ const CustomizeView = memo(function CustomizeView({
   )
 
   // Get current gradient ID for selection highlight
-  const currentGradientId = state.background.type === "gradient" ? state.background.gradientId : null
+  const currentGradientId =
+    state.background.type === "gradient" ? state.background.gradientId : null
 
   // Calculate scale to fit preview
   const calculateScale = useCallback(() => {
@@ -219,10 +212,7 @@ const CustomizeView = memo(function CustomizeView({
   return (
     <div className="flex flex-col gap-4 p-4">
       {/* Preview */}
-      <div
-        ref={previewContainerRef}
-        className="relative rounded-2xl bg-neutral-200 p-4 pb-14"
-      >
+      <div ref={previewContainerRef} className="relative rounded-2xl bg-neutral-200 p-4 pb-14">
         {/* Edit button */}
         <div className="absolute left-2 top-2 z-10 flex gap-1">
           <button
@@ -295,7 +285,10 @@ const CustomizeView = memo(function CustomizeView({
 
         {/* Gradient Selection - inside preview at bottom */}
         <div className="absolute bottom-2 left-2 right-2 flex justify-center">
-          <div className="flex gap-1.5 rounded-full px-2 py-1.5" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div
+            className="flex gap-1.5 rounded-full px-2 py-1.5"
+            style={{ background: "rgba(0,0,0,0.5)" }}
+          >
             {gradientPalette.map(option => {
               const isSelected = currentGradientId === option.id
               return (

@@ -2,48 +2,48 @@
 
 :root {
   /* Studio Pro Dark theme tokens */
-  --color-bg: #070A12;
-  --color-surface1: #0C1220;
-  --color-surface2: #111A2C;
-  --color-surface3: #151F33;
-  --color-surface-elevated: #1A2540;
+  --color-bg: #070a12;
+  --color-surface1: #0c1220;
+  --color-surface2: #111a2c;
+  --color-surface3: #151f33;
+  --color-surface-elevated: #1a2540;
 
   /* Text hierarchy */
-  --color-text: #F3F5F7;
+  --color-text: #f3f5f7;
   --color-text2: rgba(243, 245, 247, 0.72);
   --color-text3: rgba(243, 245, 247, 0.46);
   --color-text-muted: rgba(243, 245, 247, 0.28);
   --color-text-ghost: rgba(243, 245, 247, 0.12);
 
   /* Accent colors */
-  --color-accent: #5B6CFF;
-  --color-accent-hover: #6F7DFF;
-  --color-accent-bright: #818CF8;
+  --color-accent: #5b6cff;
+  --color-accent-hover: #6f7dff;
+  --color-accent-bright: #818cf8;
   --color-accent-soft: rgba(91, 108, 255, 0.14);
   --color-accent-glow: rgba(91, 108, 255, 0.25);
 
   /* Semantic colors */
-  --color-success: #22C55E;
+  --color-success: #22c55e;
   --color-success-soft: rgba(34, 197, 94, 0.14);
-  --color-warning: #FBBF24;
+  --color-warning: #fbbf24;
   --color-warning-soft: rgba(251, 191, 36, 0.14);
-  --color-danger: #FB7185;
+  --color-danger: #fb7185;
   --color-danger-soft: rgba(251, 113, 133, 0.14);
-  --color-favorite: #EF4444;
+  --color-favorite: #ef4444;
 
   /* Chord display */
-  --color-chord: #FBBF24;
+  --color-chord: #fbbf24;
   --color-chord-soft: rgba(251, 191, 36, 0.14);
 
   /* Spotify brand */
-  --color-spotify: #1DB954;
+  --color-spotify: #1db954;
   --color-spotify-soft: rgba(29, 185, 84, 0.14);
 
   /* Header */
   --color-header-bg: rgba(7, 10, 18, 0.8);
 
   /* Borders */
-  --color-border: rgba(255, 255, 255, 0.10);
+  --color-border: rgba(255, 255, 255, 0.1);
   --color-border-strong: rgba(255, 255, 255, 0.16);
 
   /* Shadows */
@@ -62,31 +62,31 @@
   --radius-full: 9999px;
 
   /* Legacy variables (for backward compatibility) */
-  --background: #070A12;
-  --foreground: #F3F5F7;
+  --background: #070a12;
+  --foreground: #f3f5f7;
   --scrollbar-thumb: #404040;
   --scrollbar-thumb-hover: #525252;
 
   /* Active line highlight tokens (legacy) */
-  --stage-accent: #5B6CFF;
+  --stage-accent: #5b6cff;
   --stage-border-strong: rgba(255, 255, 255, 0.16);
 }
 
 /* Light mode overrides */
 :root.light {
-  --color-bg: #FAF7F2;
-  --color-surface1: #FFFFFF;
-  --color-surface2: #F5F1EA;
-  --color-surface3: #EBE6DC;
-  --color-surface-elevated: #FFFFFF;
+  --color-bg: #faf7f2;
+  --color-surface1: #ffffff;
+  --color-surface2: #f5f1ea;
+  --color-surface3: #ebe6dc;
+  --color-surface-elevated: #ffffff;
 
-  --color-text: #1A1A1A;
+  --color-text: #1a1a1a;
   --color-text2: rgba(26, 26, 26, 0.72);
   --color-text3: rgba(26, 26, 26, 0.48);
   --color-text-muted: rgba(26, 26, 26, 0.32);
   --color-text-ghost: rgba(26, 26, 26, 0.12);
 
-  --color-accent: #5B6CFF;
+  --color-accent: #5b6cff;
   --color-accent-soft: rgba(91, 108, 255, 0.12);
 
   --color-border: rgba(26, 26, 26, 0.08);
@@ -94,16 +94,16 @@
 
   --color-header-bg: rgba(250, 247, 242, 0.85);
 
-  --background: #FAF7F2;
-  --foreground: #1A1A1A;
+  --background: #faf7f2;
+  --foreground: #1a1a1a;
   --scrollbar-thumb: #d4d4d4;
   --scrollbar-thumb-hover: #a3a3a3;
 }
 
 /* Dark mode via class */
 :root.dark {
-  --background: #070A12;
-  --foreground: #F3F5F7;
+  --background: #070a12;
+  --foreground: #f3f5f7;
   --scrollbar-thumb: #404040;
   --scrollbar-thumb-hover: #525252;
 }
@@ -187,9 +187,11 @@ html {
 
 /* Ambient background gradient utility */
 .ambient-bg {
-  background:
-    radial-gradient(ellipse 80% 50% at 20% -10%, var(--color-accent-glow), transparent 50%),
-    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(139, 92, 246, 0.05), transparent 45%);
+  background: radial-gradient(
+      ellipse 80% 50% at 20% -10%,
+      var(--color-accent-glow),
+      transparent 50%
+    ), radial-gradient(ellipse 60% 40% at 80% 110%, rgba(139, 92, 246, 0.05), transparent 45%);
 }
 
 /* Reading rail gradient for performance view */

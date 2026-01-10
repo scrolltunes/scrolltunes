@@ -1,6 +1,13 @@
 "use client"
 
-import { ArrowLeft, Check, CopySimple, DotsThree, DownloadSimple, ShareNetwork } from "@phosphor-icons/react"
+import {
+  ArrowLeft,
+  Check,
+  CopySimple,
+  DotsThree,
+  DownloadSimple,
+  ShareNetwork,
+} from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useState } from "react"
 
@@ -76,11 +83,17 @@ export const ShareDesignerHeader = memo(function ShareDesignerHeader({
                 disabled={exportActions.isGenerating}
                 className="flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors hover:brightness-110 disabled:opacity-50"
                 style={{
-                  background: exportActions.isCopied ? "var(--color-success)" : "var(--color-surface2)",
+                  background: exportActions.isCopied
+                    ? "var(--color-success)"
+                    : "var(--color-surface2)",
                   color: exportActions.isCopied ? "white" : "var(--color-text)",
                 }}
               >
-                {exportActions.isCopied ? <Check size={18} weight="bold" /> : <CopySimple size={18} />}
+                {exportActions.isCopied ? (
+                  <Check size={18} weight="bold" />
+                ) : (
+                  <CopySimple size={18} />
+                )}
                 {exportActions.isCopied ? "Copied" : "Copy"}
               </button>
               <button
