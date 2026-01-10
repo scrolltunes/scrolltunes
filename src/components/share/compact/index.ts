@@ -5,3 +5,4 @@ export {
   type GradientPaletteProps,
 } from "./GradientPalette"
 export { QuickControls, type QuickControlsProps } from "./QuickControls"
+export { QuickStylePresets, type QuickStylePresetsProps } from "./QuickStylePresets"

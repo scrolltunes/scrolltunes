@@ -19,8 +19,9 @@ import {
   useState,
 } from "react"
 import { ImageEditMode } from "../ImageEditMode"
-import type { ShareExperienceStore } from "../ShareExperienceStore"
+import type { QuickPreset, ShareExperienceStore } from "../ShareExperienceStore"
 import {
+  useShareExperienceActivePreset,
   useShareExperienceAlbumArtEffect,
   useShareExperienceBackground,
   useShareExperienceCompactPattern,
@@ -36,6 +37,7 @@ import { useShareExport } from "../designer/useShareExport"
 import type { EffectSettings } from "../effects"
 import { CUSTOM_COLOR_ID, GradientPalette } from "./GradientPalette"
 import { QuickControls } from "./QuickControls"
+import { QuickStylePresets } from "./QuickStylePresets"
 
 // ============================================================================
 // Types
@@ -186,6 +188,7 @@ export const CompactView = memo(
     const albumArtEffect = useShareExperienceAlbumArtEffect(store)
     const imageEdit = useShareExperienceImageEdit(store)
     const compactPattern = useShareExperienceCompactPattern(store)
+    const activePreset = useShareExperienceActivePreset(store)
 
     // Gradient palette from store
     const gradientPalette = useMemo(() => store.getGradientPalette(), [store])
@@ -372,6 +375,14 @@ export const CompactView = memo(
       [store],
     )
 
+    // Quick preset handler
+    const handlePresetSelect = useCallback(
+      (preset: QuickPreset) => {
+        store.applyQuickPreset(preset)
+      },
+      [store],
+    )
+
     return (
       <div className="flex flex-col">
         {/* Preview Area */}
@@ -513,20 +524,8 @@ export const CompactView = memo(
 
         {/* Controls Section */}
         <div className="mt-4 space-y-4">
-          {/* Quick Style Presets - placeholder for Task 11 */}
-          <div>
-            <p className="mb-2 text-sm" style={{ color: "var(--color-text3)" }}>
-              Quick Styles
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <span
-                className="rounded-lg px-3 py-1.5 text-sm"
-                style={{ background: "var(--color-surface2)", color: "var(--color-text3)" }}
-              >
-                Coming in Task 11
-              </span>
-            </div>
-          </div>
+          {/* Quick Style Presets */}
+          <QuickStylePresets activePreset={activePreset} onPresetSelect={handlePresetSelect} />
 
           {/* Quick Controls */}
           <QuickControls
