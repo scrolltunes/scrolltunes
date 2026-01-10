@@ -180,7 +180,7 @@ Generated from specs. Tasks sorted by priority.
   - Show EffectSelector when album pattern selected
   - Show EffectControls below selector
   - Replace existing vignette-only slider
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -453,6 +453,17 @@ Generated from specs. Tasks sorted by priority.
 - Uses phosphor-icons for direction buttons (ArrowUp, ArrowDown, ArrowLeft, ArrowRight, CircleDashed)
 - All handlers memoized with `useCallback`
 - Exported from `effects/index.ts`
+
+### Task 17: Integrate effect UI into share designer
+- Modified `src/components/share/designer/controls/EffectsControls.tsx`:
+  - Added imports for `AlbumArtEffectControls`, `EffectSelector`, `EffectSettings`, `EffectType` from `../../effects`
+  - Extended `EffectsControlsProps` with album art effect props: `isAlbumArtBackground`, `albumArt`, `albumArtEffect`, `albumArtEffectSettings`, `onAlbumArtEffectChange`, `onAlbumArtEffectSettingChange`
+  - Added album art effects section that renders `EffectSelector` and `AlbumArtEffectControls` when album art background is selected
+  - Hid the existing vignette section when album art background is selected (album art effects include vignette)
+- Modified `src/components/share/designer/page/CustomizeView.tsx`:
+  - Added `handleAlbumArtEffectChange` callback to call `store.setAlbumArtEffect()`
+  - Added `handleAlbumArtEffectSettingChange` callback to call `store.setAlbumArtEffectSetting()`
+  - Passed all album art effect props to `EffectsControls` in both mobile and desktop layouts
 
 ---
 

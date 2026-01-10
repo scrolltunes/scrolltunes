@@ -1,6 +1,12 @@
 "use client"
 
 import { memo, useCallback } from "react"
+import {
+  AlbumArtEffectControls,
+  EffectSelector,
+  type EffectSettings,
+  type EffectType,
+} from "../../effects"
 import type { BorderConfig, EffectsConfig, ShadowConfig, VignetteConfig } from "../types"
 import { ColorPicker } from "./ColorPicker"
 import { Slider } from "./Slider"
@@ -89,6 +95,16 @@ export interface EffectsControlsProps {
   readonly onShadowChange: (config: Partial<ShadowConfig>) => void
   readonly onBorderChange: (config: Partial<BorderConfig>) => void
   readonly onVignetteChange: (config: Partial<VignetteConfig>) => void
+  // Album art effect props (only used when album art background is selected)
+  readonly isAlbumArtBackground?: boolean
+  readonly albumArt?: string | null
+  readonly albumArtEffect?: EffectType
+  readonly albumArtEffectSettings?: EffectSettings
+  readonly onAlbumArtEffectChange?: (effect: EffectType) => void
+  readonly onAlbumArtEffectSettingChange?: <K extends keyof EffectSettings>(
+    setting: K,
+    value: EffectSettings[K],
+  ) => void
 }
 
 export const EffectsControls = memo(function EffectsControls({
@@ -96,6 +112,12 @@ export const EffectsControls = memo(function EffectsControls({
   onShadowChange,
   onBorderChange,
   onVignetteChange,
+  isAlbumArtBackground,
+  albumArt,
+  albumArtEffect,
+  albumArtEffectSettings,
+  onAlbumArtEffectChange,
+  onAlbumArtEffectSettingChange,
 }: EffectsControlsProps) {
   // -------------------------------------------------------------------------
   // Shadow Handlers
@@ -132,6 +154,29 @@ export const EffectsControls = memo(function EffectsControls({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Album Art Effects - shown when album art background is selected */}
+      {isAlbumArtBackground &&
+        albumArtEffect !== undefined &&
+        albumArtEffectSettings !== undefined &&
+        onAlbumArtEffectChange !== undefined &&
+        onAlbumArtEffectSettingChange !== undefined && (
+          <div
+            className="rounded-lg p-3 flex flex-col gap-3"
+            style={{ background: "var(--color-surface2)" }}
+          >
+            <EffectSelector
+              value={albumArtEffect}
+              onChange={onAlbumArtEffectChange}
+              albumArt={albumArt ?? null}
+            />
+            <AlbumArtEffectControls
+              effectType={albumArtEffect}
+              settings={albumArtEffectSettings}
+              onSettingChange={onAlbumArtEffectSettingChange}
+            />
+          </div>
+        )}
+
       {/* Shadow */}
       <EffectSection title="Shadow" enabled={effects.shadow.enabled} onToggle={handleShadowToggle}>
         <Slider
@@ -209,22 +254,24 @@ export const EffectsControls = memo(function EffectsControls({
         />
       </EffectSection>
 
-      {/* Vignette */}
-      <EffectSection
-        title="Vignette"
-        enabled={effects.vignette.enabled}
-        onToggle={handleVignetteToggle}
-      >
-        <Slider
-          label="Intensity"
-          value={effects.vignette.intensity}
-          min={0.1}
-          max={0.8}
-          step={0.05}
-          onChange={intensity => onVignetteChange({ intensity })}
-          formatValue={v => `${Math.round(v * 100)}%`}
-        />
-      </EffectSection>
+      {/* Vignette - hide when album art background is selected (use album art effects instead) */}
+      {!isAlbumArtBackground && (
+        <EffectSection
+          title="Vignette"
+          enabled={effects.vignette.enabled}
+          onToggle={handleVignetteToggle}
+        >
+          <Slider
+            label="Intensity"
+            value={effects.vignette.intensity}
+            min={0.1}
+            max={0.8}
+            step={0.05}
+            onChange={intensity => onVignetteChange({ intensity })}
+            formatValue={v => `${Math.round(v * 100)}%`}
+          />
+        </EffectSection>
+      )}
     </div>
   )
 })

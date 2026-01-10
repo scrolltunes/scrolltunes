@@ -100,6 +100,24 @@ export const CustomizeView = memo(function CustomizeView({
     [store],
   )
 
+  // Album art effect handlers
+  const handleAlbumArtEffectChange = useCallback(
+    (effect: import("../../effects").EffectType) => {
+      store.setAlbumArtEffect(effect)
+    },
+    [store],
+  )
+
+  const handleAlbumArtEffectSettingChange = useCallback(
+    <K extends keyof import("../../effects").EffectSettings>(
+      setting: K,
+      value: import("../../effects").EffectSettings[K],
+    ) => {
+      store.setAlbumArtEffectSetting(setting, value)
+    },
+    [store],
+  )
+
   const imageEditModeConfig = useMemo(() => {
     if (!isAlbumArtBackground) return undefined
     return {
@@ -183,6 +201,12 @@ export const CustomizeView = memo(function CustomizeView({
                       onShadowChange={config => store.setShadow(config)}
                       onBorderChange={config => store.setBorder(config)}
                       onVignetteChange={config => store.setVignette(config)}
+                      isAlbumArtBackground={isAlbumArtBackground}
+                      albumArt={albumArt}
+                      albumArtEffect={state.albumArtEffect.effect}
+                      albumArtEffectSettings={state.albumArtEffect.settings}
+                      onAlbumArtEffectChange={handleAlbumArtEffectChange}
+                      onAlbumArtEffectSettingChange={handleAlbumArtEffectSettingChange}
                     />
                   </ControlSectionContent>
                 ),
@@ -310,6 +334,12 @@ export const CustomizeView = memo(function CustomizeView({
                       onShadowChange={config => store.setShadow(config)}
                       onBorderChange={config => store.setBorder(config)}
                       onVignetteChange={config => store.setVignette(config)}
+                      isAlbumArtBackground={isAlbumArtBackground}
+                      albumArt={albumArt}
+                      albumArtEffect={state.albumArtEffect.effect}
+                      albumArtEffectSettings={state.albumArtEffect.settings}
+                      onAlbumArtEffectChange={handleAlbumArtEffectChange}
+                      onAlbumArtEffectSettingChange={handleAlbumArtEffectSettingChange}
                     />
                   </ControlSectionContent>
                 ),
