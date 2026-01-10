@@ -63,7 +63,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Initialize ShareExperienceStore
   - Render CompactView or ExpandedView based on mode
   - Handle modal open/close with state reset
-- [ ] Not started
+- [x] Completed
 
 ### Task 6: Create CompactView layout
 - **File**: `src/components/share/compact/CompactView.tsx` (new)
@@ -312,6 +312,19 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Convenience methods: `setImageOffset()`, `setImageScale()`, `resetImagePosition()`
 - `isImageEditing()` returns `this.editor.mode === "image"`
 - React hook: `useShareExperienceImageEdit(store)`
+
+### Task 5: Create ShareExperience main component shell
+- Created `src/components/share/ShareExperience.tsx`
+- Unified modal component that switches between compact and expanded modes
+- Props match LyricsShareModal: `isOpen`, `onClose`, `title`, `artist`, `albumArt`, `albumArtLarge`, `spotifyId`, `lines`, `initialSelectedIds`
+- Creates `ShareExperienceStore` when transitioning to customize step
+- Preserves selection when navigating back from customize to select step
+- Inline `LineSelection` component (will be extracted to shared/ in Task 6)
+- Placeholder `CompactView` and `ExpandedView` components for Tasks 6 and 15
+- Modal structure follows existing patterns (AnimatePresence, motion, springs.default)
+- RTL support via text direction detection
+- Escape key and backdrop click handlers for closing
+- State reset on modal close (always reopens in compact/select mode per UX spec)
 
 ---
 
