@@ -239,13 +239,13 @@ Tasks sorted by priority (P0 → P1 → P2).
 - [x] Completed
 
 ### Task 22: Remove /share route and ShareDesignerPage
-- **File**: `src/app/share/page.tsx` (delete)
+- **File**: `src/app/song/[artistSlug]/[trackSlugWithId]/share/page.tsx` (delete)
 - **Description**: Remove the standalone share page
 - **Details**:
   - Delete share page route
   - Update any links to /share
   - Remove ShareDesignerPage component
-- [ ] Not started
+- [x] Completed
 
 ### Task 23: Remove deprecated components
 - **File**: Various (delete)
@@ -253,7 +253,7 @@ Tasks sorted by priority (P0 → P1 → P2).
 - **Details**:
   - Delete LyricsShareModal.tsx
   - Delete ShareDesigner.tsx (modal version)
-  - Delete ShareDesignerPage.tsx
+  - ~~Delete ShareDesignerPage.tsx~~ (done in Task 22)
   - Update exports in index files
 - [ ] Not started
 
@@ -498,6 +498,13 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Removed unused `navigateToStudio` callback and `useRouter` import
 - Updated `src/components/share/index.ts` to export `ShareExperience` and `ShareExperienceProps`
 - LyricsShareModal export kept for now (will be removed in Task 23)
+
+### Task 22: Remove /share route and ShareDesignerPage
+- Deleted `src/app/song/[artistSlug]/[trackSlugWithId]/share/page.tsx` and directory
+- Deleted `src/components/share/designer/ShareDesignerPage.tsx`
+- Removed `ShareDesignerPage` and `ShareDesignerPageProps` export from `designer/index.ts`
+- No links to `/share` route existed in runtime code (only docs)
+- Page subcomponents in `designer/page/` were only used by ShareDesignerPage, will be cleaned up in Task 23
 
 ---
 

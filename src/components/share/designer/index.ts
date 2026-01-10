@@ -152,7 +152,6 @@ export { TemplateCard, type TemplateCardProps } from "./TemplateCard"
 export { TemplateGallery, type TemplateGalleryProps } from "./TemplateGallery"
 export { ShareDesignerPreview, type ShareDesignerPreviewProps } from "./ShareDesignerPreview"
 export { ShareDesigner, type ShareDesignerProps } from "./ShareDesigner"
-export { ShareDesignerPage, type ShareDesignerPageProps } from "./ShareDesignerPage"
 
 // Page Components
 export {
