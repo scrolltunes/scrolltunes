@@ -1,5 +1,7 @@
 # UX Design: Album Art Background Customization
 
+> **Status: ✅ Fully Implemented** (January 2026)
+
 ## Executive Summary
 
 Design a seamless editing experience for album art background positioning and effects in the lyrics share card, with mobile-first interactions and clear visual affordances.
@@ -344,3 +346,55 @@ interface AlbumArtEditState {
 | Dragging | Cursor: grabbing, slight scale pulse |
 | At zoom limit | Slider handle hits end, subtle bounce |
 | Effect applied | Thumbnail shows effect in selector |
+
+---
+
+## 9. Implementation Notes
+
+### Key Files
+
+| Component | File |
+|-----------|------|
+| Image edit state | `src/components/share/designer/ShareDesignerStore.ts` |
+| Image edit toggle | `src/components/share/ImageEditMode.tsx` |
+| Preview with gestures | `src/components/share/designer/ShareDesignerPreview.tsx` |
+| Zoom slider | `src/components/share/designer/controls/ZoomSlider.tsx` |
+| Effect types & defaults | `src/components/share/effects/index.ts` |
+| Effect CSS generation | `src/components/share/effects/applyEffect.ts` |
+| Effect selector | `src/components/share/effects/EffectSelector.tsx` |
+| Effect thumbnails | `src/components/share/effects/EffectThumbnail.tsx` |
+| Effect controls | `src/components/share/effects/AlbumArtEffectControls.tsx` |
+| Color picker | `src/components/share/designer/controls/ColorPicker.tsx` |
+
+### State Management
+
+- Extended `EditMode` type to include `"image"` mode
+- Added `ImageEditState` with `offsetX`, `offsetY`, `scale` properties
+- Added `AlbumArtEffectConfig` with `effect: EffectType` and `settings: EffectSettings`
+- Store methods: `setImageOffset()`, `setImageScale()`, `resetImagePosition()`, `isImageEditing()`
+- Store methods: `setAlbumArtEffect()`, `setAlbumArtEffectSetting()`
+- Hooks: `useShareDesignerImageEdit()`, `useShareDesignerAlbumArtEffect()`
+
+### Effect System
+
+Effects use CSS filters and overlays via `applyEffect()` utility:
+
+| Effect | Implementation |
+|--------|----------------|
+| Vignette | Radial gradient overlay with opacity |
+| Blur | CSS `filter: blur(Npx)` on img element |
+| Darken | CSS `filter: brightness(N)` on img element |
+| Desaturate | CSS `filter: grayscale(N%)` on img element |
+| Tint | Color overlay with `mix-blend-mode: color` |
+| Gradient | Linear/radial gradient overlay with color + opacity |
+| Duotone | Grayscale + contrast filter with multiply/screen blend overlays |
+
+### Export Compatibility
+
+Album art uses an `<img>` element (not CSS `background-image`) so that CSS `filter` properties work with html-to-image export. Overlay-based effects use `mixBlendMode` which renders correctly in canvas.
+
+### Accessibility
+
+- `useScreenReaderAnnounce` hook provides ARIA live region announcements
+- Announces mode changes, zoom level, effect changes, and reset actions
+- Haptic feedback via `useHaptic` hook on mode toggle, reset, and zoom limits
