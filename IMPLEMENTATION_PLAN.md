@@ -181,7 +181,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Tabs: Templates, Layout, Style, Elements, Effects
   - Templates selected by default
   - Horizontal scrollable on narrow screens
-- [ ] Not started
+- [x] Completed
 
 ### Task 17: Create TemplatesPanel
 - **File**: `src/components/share/expanded/panels/TemplatesPanel.tsx` (new)
@@ -421,6 +421,16 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Added `applyTemplate()` method and `ApplyTemplate` event to ShareExperienceStore
 - Added `buildBackgroundFromTemplate()` helper function
 - Updated ShareExperience.tsx to use real ExpandedView and handle mode transitions
+
+### Task 16: Create ControlTabs component
+- Extracted `MobileTabBar` from `ExpandedView.tsx` into `src/components/share/expanded/ControlTabs.tsx`
+- Exported as `ControlTabs` component with `ControlTabId` type and `ControlTabsProps` interface
+- Five tabs: Templates, Layout, Style, Elements, Effects with Phosphor icons
+- Horizontal scrollable via `overflow-x-auto` for narrow screens
+- Animated selection indicator using framer-motion `layoutId`
+- Proper ARIA attributes (`role="tablist"`, `role="tab"`, `aria-selected`)
+- Updated `ExpandedView.tsx` to import and use the extracted component
+- Updated `expanded/index.ts` to export `ControlTabs`, `CONTROL_TABS`, `ControlTabId`, and `ControlTabsProps`
 
 ---
 

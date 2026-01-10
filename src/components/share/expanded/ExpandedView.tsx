@@ -5,12 +5,8 @@ import {
   ArrowCounterClockwise,
   CaretDown,
   Check,
-  Gear,
-  Layout,
-  MagicWand,
   PencilSimple,
   ShareNetwork,
-  Sliders,
   Sparkle,
 } from "@phosphor-icons/react"
 import { motion } from "motion/react"
@@ -54,6 +50,7 @@ import {
 } from "../designer/controls"
 import { useShareExport } from "../designer/useShareExport"
 import type { EffectSettings, EffectType } from "../effects"
+import { type ControlTabId, ControlTabs } from "./ControlTabs"
 
 // ============================================================================
 // Types
@@ -72,74 +69,6 @@ export interface ExpandedViewProps {
   readonly spotifyId: string | null
   readonly onCollapseToCompact: () => void
 }
-
-// ============================================================================
-// Tab Types
-// ============================================================================
-
-type TabId = "templates" | "layout" | "style" | "elements" | "effects"
-
-interface Tab {
-  readonly id: TabId
-  readonly label: string
-  readonly icon: React.ReactNode
-}
-
-const TABS: readonly Tab[] = [
-  { id: "templates", label: "Templates", icon: <Layout size={20} weight="bold" /> },
-  { id: "layout", label: "Layout", icon: <Sliders size={20} weight="bold" /> },
-  { id: "style", label: "Style", icon: <MagicWand size={20} weight="bold" /> },
-  { id: "elements", label: "Elements", icon: <Gear size={20} weight="bold" /> },
-  { id: "effects", label: "Effects", icon: <Sparkle size={20} weight="bold" /> },
-]
-
-// ============================================================================
-// Mobile Tab Bar Component
-// ============================================================================
-
-interface MobileTabBarProps {
-  readonly activeTab: TabId
-  readonly onChange: (tab: TabId) => void
-}
-
-const MobileTabBar = memo(function MobileTabBar({ activeTab, onChange }: MobileTabBarProps) {
-  return (
-    <div
-      className="flex h-12 shrink-0 overflow-x-auto"
-      style={{ borderBottom: "1px solid var(--color-border)" }}
-      role="tablist"
-      aria-label="Studio options"
-    >
-      {TABS.map(tab => {
-        const isActive = activeTab === tab.id
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onChange(tab.id)}
-            className="relative flex flex-shrink-0 flex-col items-center justify-center gap-0.5 px-4 transition-colors"
-            style={{
-              color: isActive ? "var(--color-accent)" : "var(--color-text3)",
-            }}
-          >
-            {tab.icon}
-            <span className="text-xs font-medium">{tab.label}</span>
-            {isActive && (
-              <motion.div
-                layoutId="expanded-tab-indicator"
-                className="absolute bottom-0 left-0 right-0 h-0.5"
-                style={{ background: "var(--color-accent)" }}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
-            )}
-          </button>
-        )
-      })}
-    </div>
-  )
-})
 
 // ============================================================================
 // Share Dropdown Component
@@ -276,7 +205,7 @@ export const ExpandedView = memo(
     const [scaledHeight, setScaledHeight] = useState<number | null>(null)
     const [isTextEditing, setIsTextEditing] = useState(false)
     const [expandedWidth] = useState(true)
-    const [activeTab, setActiveTab] = useState<TabId>("templates")
+    const [activeTab, setActiveTab] = useState<ControlTabId>("templates")
 
     // Store state subscriptions
     const state = useShareExperienceState(store)
@@ -641,7 +570,7 @@ export const ExpandedView = memo(
           </div>
 
           {/* Tab Navigation */}
-          <MobileTabBar activeTab={activeTab} onChange={setActiveTab} />
+          <ControlTabs activeTab={activeTab} onChange={setActiveTab} />
 
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto">{renderMobileTabContent()}</div>
