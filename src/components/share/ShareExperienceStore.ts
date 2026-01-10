@@ -24,6 +24,7 @@ import {
   type LyricLineSelection,
   type LyricsSelectionConfig,
   type PatternBackground,
+  type ShadowConfig,
   type ShareDesignerSongContext,
   type ShareDesignerState,
   type TypographyConfig,
@@ -37,10 +38,17 @@ import type { EffectSettings, EffectType } from "./effects"
 export type ShareExperienceMode = "compact" | "expanded"
 export type ShareExperienceStep = "select" | "customize"
 
+/**
+ * Quick preset types for one-click styling.
+ * Presets are album-aware and adapt to the song's album art colors.
+ */
+export type QuickPreset = "clean" | "vibrant" | "dark" | "vintage"
+
 export interface ShareExperienceEditorState extends ShareDesignerState {
   readonly editor: EditorState
   readonly experienceMode: ShareExperienceMode
   readonly experienceStep: ShareExperienceStep
+  readonly activePreset: QuickPreset | null
 }
 
 // ============================================================================
@@ -62,6 +70,16 @@ export class SetExperienceMode extends Data.TaggedClass("SetExperienceMode")<{
 
 export class SetExperienceStep extends Data.TaggedClass("SetExperienceStep")<{
   readonly step: ShareExperienceStep
+}> {}
+
+// --- Quick Preset Events ---
+
+export class SetActivePreset extends Data.TaggedClass("SetActivePreset")<{
+  readonly preset: QuickPreset | null
+}> {}
+
+export class ApplyQuickPreset extends Data.TaggedClass("ApplyQuickPreset")<{
+  readonly preset: QuickPreset
 }> {}
 
 // --- State Events (with undo history) ---
@@ -170,6 +188,8 @@ export class ResetStore extends Data.TaggedClass("ResetStore")<object> {}
 export type ShareExperienceEvent =
   | SetExperienceMode
   | SetExperienceStep
+  | SetActivePreset
+  | ApplyQuickPreset
   | SetAspectRatio
   | SetPadding
   | SetBackground
@@ -245,6 +265,7 @@ export class ShareExperienceStore {
   private editor: EditorState = DEFAULT_EDITOR_STATE
   private experienceMode: ShareExperienceMode = "compact"
   private experienceStep: ShareExperienceStep = "select"
+  private activePreset: QuickPreset | null = null
   private history: HistoryState = { past: [], future: [] }
   private lastChangeTimestamp = 0
   private context: ShareDesignerSongContext
@@ -275,6 +296,7 @@ export class ShareExperienceStore {
         editor: this.editor,
         experienceMode: this.experienceMode,
         experienceStep: this.experienceStep,
+        activePreset: this.activePreset,
       }
     }
     return this.cachedSnapshot
@@ -314,6 +336,16 @@ export class ShareExperienceStore {
           store.notify()
         })
 
+      // --- Quick Preset Events ---
+      case "SetActivePreset":
+        return Effect.sync(() => {
+          store.activePreset = event.preset
+          store.notify()
+        })
+
+      case "ApplyQuickPreset":
+        return store.handleApplyQuickPreset(event.preset)
+
       // --- State Events ---
       case "SetAspectRatio":
         return Effect.sync(() => {
@@ -332,6 +364,7 @@ export class ShareExperienceStore {
         return Effect.sync(() => {
           store.updateState({ background: event.config }, "Change background")
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       case "SetTypography":
@@ -341,6 +374,7 @@ export class ShareExperienceStore {
             "Change typography",
           )
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       case "SetElementConfig":
@@ -358,6 +392,7 @@ export class ShareExperienceStore {
             `Update ${event.element}`,
           )
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       case "SetEffects":
@@ -367,6 +402,7 @@ export class ShareExperienceStore {
             "Change effects",
           )
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       case "SetSelectedLines":
@@ -416,6 +452,7 @@ export class ShareExperienceStore {
             "Change effect",
           )
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       case "SetAlbumArtEffectSetting":
@@ -433,6 +470,7 @@ export class ShareExperienceStore {
             "Change effect setting",
           )
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       // --- Editor Events (no history) ---
@@ -524,6 +562,7 @@ export class ShareExperienceStore {
           store.experienceMode = "compact"
           store.experienceStep = "select"
           store.currentTemplateId = null
+          store.activePreset = null
           store.history = { past: [], future: [] }
           store.lastChangeTimestamp = 0
           yield* store.handleInitializeBackground()
@@ -590,6 +629,138 @@ export class ShareExperienceStore {
 
       this.updateState({ lyrics: { ...this.state.lyrics, selectedLines } }, "Reset all text")
     })
+  }
+
+  /**
+   * Apply a quick style preset.
+   * Presets configure background, effects, and shadow based on album colors.
+   */
+  private handleApplyQuickPreset(preset: QuickPreset): Effect.Effect<void> {
+    return Effect.sync(() => {
+      const presetConfig = this.getPresetConfig(preset)
+
+      // Apply all preset settings in one state update
+      this.updateState(
+        {
+          background: presetConfig.background,
+          albumArtEffect: presetConfig.albumArtEffect,
+          effects: {
+            ...this.state.effects,
+            shadow: presetConfig.shadow,
+          },
+        },
+        `Apply ${preset} preset`,
+      )
+
+      // Set the active preset (don't clear it since this IS a preset application)
+      this.activePreset = preset
+      this.currentTemplateId = null
+    })
+  }
+
+  /**
+   * Generate preset configuration based on album colors.
+   * Returns background, effect, and shadow settings for the preset.
+   */
+  private getPresetConfig(preset: QuickPreset): {
+    background: BackgroundConfig
+    albumArtEffect: AlbumArtEffectConfig
+    shadow: ShadowConfig
+  } {
+    // Get album-derived colors from gradient palette
+    const palette = this.gradientPalette
+    const first = palette[0]
+    const vibrant = palette[1] // Usually more saturated
+    const muted = palette[4] // Usually more muted
+
+    // Shadow configurations for each preset type
+    const softShadow: ShadowConfig = {
+      enabled: true,
+      blur: 30,
+      spread: 0,
+      offsetY: 15,
+      color: "rgba(0, 0, 0, 0.25)",
+    }
+
+    const mediumShadow: ShadowConfig = {
+      enabled: true,
+      blur: 50,
+      spread: 0,
+      offsetY: 25,
+      color: "rgba(0, 0, 0, 0.5)",
+    }
+
+    const strongShadow: ShadowConfig = {
+      enabled: true,
+      blur: 70,
+      spread: 5,
+      offsetY: 35,
+      color: "rgba(0, 0, 0, 0.7)",
+    }
+
+    switch (preset) {
+      case "clean":
+        // Clean: Light tint from album, no effect, soft shadow
+        return {
+          background: first
+            ? { type: "gradient", gradientId: first.id, gradient: first.gradient }
+            : { type: "solid", color: "#f8fafc" },
+          albumArtEffect: {
+            effect: "none",
+            settings: this.state.albumArtEffect.settings,
+          },
+          shadow: softShadow,
+        }
+
+      case "vibrant":
+        // Vibrant: Saturated gradient from album, no effect, medium shadow
+        return {
+          background: vibrant
+            ? { type: "gradient", gradientId: vibrant.id, gradient: vibrant.gradient }
+            : first
+              ? { type: "gradient", gradientId: first.id, gradient: first.gradient }
+              : { type: "solid", color: "#4f46e5" },
+          albumArtEffect: {
+            effect: "none",
+            settings: this.state.albumArtEffect.settings,
+          },
+          shadow: mediumShadow,
+        }
+
+      case "dark":
+        // Dark: Album art background, darken 60%, strong shadow
+        return {
+          background: this.context.albumArt
+            ? { type: "albumArt", blur: 0, overlayOpacity: 0, overlayColor: "#000000" }
+            : { type: "solid", color: "#1e1e2e" },
+          albumArtEffect: {
+            effect: "darken",
+            settings: {
+              ...this.state.albumArtEffect.settings,
+              darkenAmount: 60,
+            },
+          },
+          shadow: strongShadow,
+        }
+
+      case "vintage":
+        // Vintage: Muted/warm tint from album, desaturate 40%, soft shadow
+        return {
+          background: muted
+            ? { type: "gradient", gradientId: muted.id, gradient: muted.gradient }
+            : first
+              ? { type: "gradient", gradientId: first.id, gradient: first.gradient }
+              : { type: "solid", color: "#78716c" },
+          albumArtEffect: {
+            effect: "desaturate",
+            settings: {
+              ...this.state.albumArtEffect.settings,
+              desaturateAmount: 40,
+            },
+          },
+          shadow: softShadow,
+        }
+    }
   }
 
   private handleInitializeBackground(): Effect.Effect<void> {
@@ -763,6 +934,10 @@ export class ShareExperienceStore {
     return this.experienceStep
   }
 
+  getActivePreset(): QuickPreset | null {
+    return this.activePreset
+  }
+
   // -------------------------------------------------------------------------
   // Convenience Methods (wrap dispatch)
   // -------------------------------------------------------------------------
@@ -773,6 +948,14 @@ export class ShareExperienceStore {
 
   setStep(step: ShareExperienceStep): void {
     Effect.runSync(this.dispatch(new SetExperienceStep({ step })))
+  }
+
+  setActivePreset(preset: QuickPreset | null): void {
+    Effect.runSync(this.dispatch(new SetActivePreset({ preset })))
+  }
+
+  applyQuickPreset(preset: QuickPreset): void {
+    Effect.runSync(this.dispatch(new ApplyQuickPreset({ preset })))
   }
 
   setAspectRatio(config: AspectRatioConfig): void {
@@ -968,6 +1151,11 @@ export function useShareExperienceMode(store: ShareExperienceStore): ShareExperi
 export function useShareExperienceStep(store: ShareExperienceStore): ShareExperienceStep {
   const state = useShareExperienceState(store)
   return state.experienceStep
+}
+
+export function useShareExperienceActivePreset(store: ShareExperienceStore): QuickPreset | null {
+  const state = useShareExperienceState(store)
+  return state.activePreset
 }
 
 export function useShareExperienceBackground(store: ShareExperienceStore): BackgroundConfig {

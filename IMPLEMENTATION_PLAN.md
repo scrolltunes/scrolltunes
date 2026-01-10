@@ -31,7 +31,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Add `activePreset: QuickPreset | null` to state
   - Create `applyPreset(preset: QuickPreset)` method
   - Clear activePreset when any setting is manually changed
-- [ ] Not started
+- [x] Completed
 
 ### Task 3: Add pattern background state to store
 - **File**: `src/components/share/ShareExperienceStore.ts` (modify)
@@ -283,6 +283,16 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Implemented `setMode()` and `setStep()` convenience methods
 - State persists across mode changes (mode/step are separate from history)
 - Includes all React hooks following useSyncExternalStore pattern
+
+### Task 2: Add quick preset state to store
+- Added `QuickPreset` type: `"clean" | "vibrant" | "dark" | "vintage"`
+- Added `activePreset: QuickPreset | null` field to store state
+- Added `SetActivePreset` and `ApplyQuickPreset` tagged events
+- Implemented `handleApplyQuickPreset()` with album-aware preset configs
+- Implemented `getPresetConfig()` to generate background, effect, and shadow settings
+- All manual edits (background, typography, elements, effects, albumArtEffect) clear activePreset
+- Added convenience methods: `setActivePreset()`, `applyQuickPreset()`
+- Added React hook: `useShareExperienceActivePreset()`
 
 ---
 
