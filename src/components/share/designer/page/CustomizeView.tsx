@@ -237,6 +237,8 @@ export const CustomizeView = memo(function CustomizeView({
               imageEdit={imageEdit}
               onImageOffsetChange={handleImageOffsetChange}
               onImageScaleChange={handleImageScaleChange}
+              onExitImageEdit={handleImageEditToggle}
+              onResetImagePosition={handleImageEditReset}
             />
           </PreviewCanvas>
         </div>
@@ -358,6 +360,8 @@ export const CustomizeView = memo(function CustomizeView({
               imageEdit={imageEdit}
               onImageOffsetChange={handleImageOffsetChange}
               onImageScaleChange={handleImageScaleChange}
+              onExitImageEdit={handleImageEditToggle}
+              onResetImagePosition={handleImageEditReset}
             />
           </PreviewCanvas>
         </div>

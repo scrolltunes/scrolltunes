@@ -79,7 +79,7 @@ Generated from specs. Tasks sorted by priority.
   - +/- keys adjust scale by 0.1 increments
   - R key resets to default position/zoom
   - Escape key exits edit mode
-- [ ] Not started
+- [x] Completed
 
 ### Task 8: Add visual affordances for edit mode
 - **File**: `src/components/share/ShareDesignerPreview.tsx` (modify)
@@ -341,6 +341,16 @@ Generated from specs. Tasks sorted by priority.
 - Inverts deltaY so scroll up = zoom in, scroll down = zoom out
 - Prevents default to stop page scroll when zooming
 - Clamps scale to 1.0-3.0 range
+
+### Task 7: Add keyboard navigation
+- Added `useEffect` with keyboard event listener when in image edit mode
+- Arrow keys (Up/Down/Left/Right) adjust offset by 5% increments
+- +/= keys zoom in by 0.1, - key zooms out by 0.1
+- R key resets position and zoom to defaults
+- Escape key exits image edit mode
+- Added `onExitImageEdit` and `onResetImagePosition` props to `ShareDesignerPreview`
+- Ignores keypresses when user is typing in input/textarea/contentEditable
+- Event listener properly cleaned up on unmount
 
 ---
 

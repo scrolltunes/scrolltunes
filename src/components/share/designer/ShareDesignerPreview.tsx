@@ -140,6 +140,8 @@ export interface ShareDesignerPreviewProps {
   readonly imageEdit?: ImageEditState
   readonly onImageOffsetChange?: (offsetX: number, offsetY: number) => void
   readonly onImageScaleChange?: (scale: number) => void
+  readonly onExitImageEdit?: () => void
+  readonly onResetImagePosition?: () => void
 }
 
 // ============================================================================
@@ -182,6 +184,8 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
   imageEdit,
   onImageOffsetChange,
   onImageScaleChange,
+  onExitImageEdit,
+  onResetImagePosition,
 }: ShareDesignerPreviewProps) {
   const isRTL = lyrics.direction === "rtl"
 
@@ -323,6 +327,94 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     },
     [isImageEditing, onImageScaleChange, imageEdit],
   )
+
+  // Keyboard navigation for image edit mode
+  useEffect(() => {
+    if (!isImageEditing) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input/textarea
+      const target = e.target as HTMLElement
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        return
+      }
+
+      const PAN_STEP = 5 // 5% per key press
+      const ZOOM_STEP = 0.1
+
+      switch (e.key) {
+        case "ArrowUp":
+          e.preventDefault()
+          if (onImageOffsetChange && imageEdit) {
+            const newOffsetY = Math.max(-100, imageEdit.offsetY - PAN_STEP)
+            onImageOffsetChange(imageEdit.offsetX, newOffsetY)
+          }
+          break
+
+        case "ArrowDown":
+          e.preventDefault()
+          if (onImageOffsetChange && imageEdit) {
+            const newOffsetY = Math.min(100, imageEdit.offsetY + PAN_STEP)
+            onImageOffsetChange(imageEdit.offsetX, newOffsetY)
+          }
+          break
+
+        case "ArrowLeft":
+          e.preventDefault()
+          if (onImageOffsetChange && imageEdit) {
+            const newOffsetX = Math.max(-100, imageEdit.offsetX - PAN_STEP)
+            onImageOffsetChange(newOffsetX, imageEdit.offsetY)
+          }
+          break
+
+        case "ArrowRight":
+          e.preventDefault()
+          if (onImageOffsetChange && imageEdit) {
+            const newOffsetX = Math.min(100, imageEdit.offsetX + PAN_STEP)
+            onImageOffsetChange(newOffsetX, imageEdit.offsetY)
+          }
+          break
+
+        case "+":
+        case "=": // Handle both + and = (for keyboards where + requires shift)
+          e.preventDefault()
+          if (onImageScaleChange && imageEdit) {
+            const newScale = Math.min(3, imageEdit.scale + ZOOM_STEP)
+            onImageScaleChange(newScale)
+          }
+          break
+
+        case "-":
+          e.preventDefault()
+          if (onImageScaleChange && imageEdit) {
+            const newScale = Math.max(1, imageEdit.scale - ZOOM_STEP)
+            onImageScaleChange(newScale)
+          }
+          break
+
+        case "r":
+        case "R":
+          e.preventDefault()
+          onResetImagePosition?.()
+          break
+
+        case "Escape":
+          e.preventDefault()
+          onExitImageEdit?.()
+          break
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [
+    isImageEditing,
+    imageEdit,
+    onImageOffsetChange,
+    onImageScaleChange,
+    onExitImageEdit,
+    onResetImagePosition,
+  ])
 
   // Store caret position when switching out of edit mode
   const savedCaretRef = useRef<{ lineId: string; offset: number } | null>(null)
