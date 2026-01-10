@@ -1,7 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
-import { ArrowLeft, ArrowRight, Check, X } from "@phosphor-icons/react"
+import { ArrowLeft, ArrowRight, Check, ShareNetwork, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -10,6 +10,7 @@ import {
   useShareExperienceMode,
   useShareExperienceStep,
 } from "./ShareExperienceStore"
+import { CompactView, type CompactViewRef } from "./compact"
 import type { LyricLine, ShareDesignerSongContext } from "./designer/types"
 
 // ============================================================================
@@ -88,40 +89,6 @@ const LineSelection = memo(function LineSelection({
 })
 
 // ============================================================================
-// Compact View Placeholder (Task 6)
-// ============================================================================
-
-interface CompactViewProps {
-  readonly store: ShareExperienceStore
-  readonly title: string
-  readonly artist: string
-  readonly albumArt: string | null
-  readonly albumArtLarge?: string | null
-  readonly spotifyId: string | null
-}
-
-const CompactView = memo(function CompactView({
-  store: _store,
-  title: _title,
-  artist: _artist,
-  albumArt: _albumArt,
-  albumArtLarge: _albumArtLarge,
-  spotifyId: _spotifyId,
-}: CompactViewProps) {
-  // Placeholder - will be implemented in Task 6
-  return (
-    <div className="flex flex-col items-center justify-center p-8">
-      <p className="text-sm" style={{ color: "var(--color-text3)" }}>
-        Compact customize view
-      </p>
-      <p className="mt-2 text-xs" style={{ color: "var(--color-text3)" }}>
-        (Coming in Task 6)
-      </p>
-    </div>
-  )
-})
-
-// ============================================================================
 // Expanded View Placeholder (Task 15)
 // ============================================================================
 
@@ -171,6 +138,7 @@ export const ShareExperience = memo(function ShareExperience({
   initialSelectedIds,
 }: ShareExperienceProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const compactViewRef = useRef<CompactViewRef>(null)
 
   // Local selection state for the select step (before store is created)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -270,6 +238,18 @@ export const ShareExperience = memo(function ShareExperience({
       store.setStep("select")
     }
   }, [store])
+
+  // Expand to studio mode
+  const handleExpandToStudio = useCallback(() => {
+    if (store) {
+      store.setMode("expanded")
+    }
+  }, [store])
+
+  // Trigger share from footer button
+  const handleShareFromFooter = useCallback(() => {
+    compactViewRef.current?.triggerShare()
+  }, [])
 
   // Close modal on backdrop click
   const handleBackdropClick = useCallback(
@@ -391,14 +371,17 @@ export const ShareExperience = memo(function ShareExperience({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.2 }}
+                    className="p-4"
                   >
                     <CompactView
+                      ref={compactViewRef}
                       store={store}
                       title={title}
                       artist={artist}
                       albumArt={albumArt}
                       albumArtLarge={albumArtLarge ?? null}
                       spotifyId={spotifyId}
+                      onExpandToStudio={handleExpandToStudio}
                     />
                   </motion.div>
                 ) : store && mode === "expanded" ? (
@@ -436,11 +419,22 @@ export const ShareExperience = memo(function ShareExperience({
                   Next
                   <ArrowRight size={20} weight="bold" />
                 </button>
+              ) : mode === "compact" ? (
+                <button
+                  type="button"
+                  onClick={handleShareFromFooter}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                  style={{ background: "var(--color-accent)", color: "white" }}
+                  aria-label="Share image"
+                >
+                  <ShareNetwork size={20} weight="bold" />
+                  Share Image
+                </button>
               ) : (
-                // Placeholder for customize mode footer (will be implemented in CompactView/ExpandedView)
+                // Expanded mode footer (Task 15)
                 <div className="flex-1">
                   <p className="text-center text-sm" style={{ color: "var(--color-text3)" }}>
-                    Footer actions (Task 6/15)
+                    Studio footer (Task 15)
                   </p>
                 </div>
               )}

@@ -73,7 +73,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Preview area (reuse ShareDesignerPreview)
   - Controls section below preview
   - Footer with "More options" and "Share Image" buttons
-- [ ] Not started
+- [x] Completed
 
 ### Task 7: Create QuickControls component
 - **File**: `src/components/share/compact/QuickControls.tsx` (new)
@@ -325,6 +325,18 @@ Tasks sorted by priority (P0 → P1 → P2).
 - RTL support via text direction detection
 - Escape key and backdrop click handlers for closing
 - State reset on modal close (always reopens in compact/select mode per UX spec)
+
+### Task 6: Create CompactView layout
+- Created `src/components/share/compact/CompactView.tsx` and `index.ts`
+- Full compact customize view with ShareDesignerPreview integration
+- Exposes `triggerShare` method via forwardRef for footer button integration
+- Text edit mode with toggle button and reset capability
+- Image edit mode button (shown when album art background is selected)
+- Share menu dropdown with copy/download/share actions (reuses useShareExport hook)
+- Preview scaling to fit container width (same pattern as LyricsShareModal)
+- Placeholders for Quick Styles (Task 11), Pattern & Effects controls (Task 7), and Gradient Palette (Task 8)
+- "More options" button to expand to studio mode
+- Footer "Share Image" button integrated in ShareExperience.tsx
 
 ---
 
