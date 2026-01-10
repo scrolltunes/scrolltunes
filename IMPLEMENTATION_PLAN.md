@@ -49,7 +49,7 @@ Generated from specs. Tasks sorted by priority.
   - Calculate scale factor from pinch delta
   - Clamp scale to 1.0-3.0 range
   - Apply CSS transform scale
-- [ ] Not started
+- [x] Completed
 
 ### Task 5: Create ZoomSlider control
 - **File**: `src/components/share/controls/ZoomSlider.tsx` (new)
@@ -315,6 +315,16 @@ Generated from specs. Tasks sorted by priority.
 - Applied zoom via `backgroundSize` CSS property based on scale value
 - Added cursor, touchAction, and userSelect styles for proper drag UX
 - Updated `CustomizeView` to pass image edit props to both desktop and mobile preview instances
+
+### Task 4: Implement pinch-to-zoom
+- Added `onImageScaleChange` prop to `ShareDesignerPreview`
+- Added pinch state refs: `isPinchingRef`, `initialPinchDistanceRef`, `initialScaleRef`
+- Implemented `getTouchDistance` helper to calculate distance between two touch points
+- Implemented touch event handlers: `handleTouchStart`, `handleTouchMove`, `handleTouchEnd`
+- On two-finger touch, captures initial distance and scale; on move, calculates scale factor
+- Clamped scale to 1.0-3.0 range as per spec
+- Added touch event bindings to card element when in image edit mode
+- Updated `CustomizeView` to pass `handleImageScaleChange` callback to both preview instances
 
 ---
 

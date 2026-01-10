@@ -93,6 +93,13 @@ export const CustomizeView = memo(function CustomizeView({
     [store],
   )
 
+  const handleImageScaleChange = useCallback(
+    (scale: number) => {
+      store.setImageScale(scale)
+    },
+    [store],
+  )
+
   const imageEditModeConfig = useMemo(() => {
     if (!isAlbumArtBackground) return undefined
     return {
@@ -229,6 +236,7 @@ export const CustomizeView = memo(function CustomizeView({
               isImageEditing={store.isImageEditing()}
               imageEdit={imageEdit}
               onImageOffsetChange={handleImageOffsetChange}
+              onImageScaleChange={handleImageScaleChange}
             />
           </PreviewCanvas>
         </div>
@@ -349,6 +357,7 @@ export const CustomizeView = memo(function CustomizeView({
               isImageEditing={store.isImageEditing()}
               imageEdit={imageEdit}
               onImageOffsetChange={handleImageOffsetChange}
+              onImageScaleChange={handleImageScaleChange}
             />
           </PreviewCanvas>
         </div>

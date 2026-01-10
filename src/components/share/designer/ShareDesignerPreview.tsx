@@ -139,6 +139,7 @@ export interface ShareDesignerPreviewProps {
   readonly isImageEditing?: boolean
   readonly imageEdit?: ImageEditState
   readonly onImageOffsetChange?: (offsetX: number, offsetY: number) => void
+  readonly onImageScaleChange?: (scale: number) => void
 }
 
 // ============================================================================
@@ -180,6 +181,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
   isImageEditing = false,
   imageEdit,
   onImageOffsetChange,
+  onImageScaleChange,
 }: ShareDesignerPreviewProps) {
   const isRTL = lyrics.direction === "rtl"
 
@@ -188,6 +190,11 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
   const dragStartRef = useRef({ x: 0, y: 0 })
   const offsetStartRef = useRef({ x: 0, y: 0 })
   const cardElementRef = useRef<HTMLDivElement | null>(null)
+
+  // Pinch-to-zoom state
+  const isPinchingRef = useRef(false)
+  const initialPinchDistanceRef = useRef(0)
+  const initialScaleRef = useRef(1)
 
   // Handle pointer down for drag start
   const handlePointerDown = useCallback(
@@ -234,6 +241,67 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     if (isDraggingRef.current) {
       isDraggingRef.current = false
       e.currentTarget.releasePointerCapture(e.pointerId)
+    }
+  }, [])
+
+  // Calculate distance between two touch points
+  const getTouchDistance = useCallback((touch1: React.Touch, touch2: React.Touch): number => {
+    const dx = touch1.clientX - touch2.clientX
+    const dy = touch1.clientY - touch2.clientY
+    return Math.sqrt(dx * dx + dy * dy)
+  }, [])
+
+  // Handle touch start for pinch-to-zoom
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (!isImageEditing || !onImageScaleChange || !imageEdit) return
+
+      // Detect two-finger touch for pinch
+      if (e.touches.length === 2) {
+        e.preventDefault()
+        isPinchingRef.current = true
+        // Stop any ongoing drag when pinch starts
+        isDraggingRef.current = false
+
+        const touch1 = e.touches[0]
+        const touch2 = e.touches[1]
+        if (touch1 && touch2) {
+          initialPinchDistanceRef.current = getTouchDistance(touch1, touch2)
+          initialScaleRef.current = imageEdit.scale
+        }
+      }
+    },
+    [isImageEditing, onImageScaleChange, imageEdit, getTouchDistance],
+  )
+
+  // Handle touch move for pinch-to-zoom
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (!isPinchingRef.current || !onImageScaleChange || !imageEdit) return
+
+      if (e.touches.length === 2) {
+        e.preventDefault()
+
+        const touch1 = e.touches[0]
+        const touch2 = e.touches[1]
+        if (touch1 && touch2) {
+          const currentDistance = getTouchDistance(touch1, touch2)
+          const scaleFactor = currentDistance / initialPinchDistanceRef.current
+
+          // Calculate new scale, clamped to 1.0-3.0 range
+          const newScale = Math.max(1, Math.min(3, initialScaleRef.current * scaleFactor))
+          onImageScaleChange(newScale)
+        }
+      }
+    },
+    [onImageScaleChange, imageEdit, getTouchDistance],
+  )
+
+  // Handle touch end for pinch-to-zoom
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    // End pinch when less than 2 fingers remain
+    if (e.touches.length < 2) {
+      isPinchingRef.current = false
     }
   }, [])
 
@@ -473,6 +541,10 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
         onPointerMove={isImageEditing ? handlePointerMove : undefined}
         onPointerUp={isImageEditing ? handlePointerUp : undefined}
         onPointerCancel={isImageEditing ? handlePointerUp : undefined}
+        onTouchStart={isImageEditing ? handleTouchStart : undefined}
+        onTouchMove={isImageEditing ? handleTouchMove : undefined}
+        onTouchEnd={isImageEditing ? handleTouchEnd : undefined}
+        onTouchCancel={isImageEditing ? handleTouchEnd : undefined}
         style={{
           ...cardBaseStyles,
           ...backgroundStyle,
