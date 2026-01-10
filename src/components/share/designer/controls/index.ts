@@ -1,5 +1,6 @@
 // Primitives
 export { Slider, type SliderProps } from "./Slider"
+export { ZoomSlider, type ZoomSliderProps } from "./ZoomSlider"
 export {
   SegmentedControl,
   type SegmentedControlProps,

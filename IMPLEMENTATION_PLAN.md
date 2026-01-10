@@ -52,14 +52,14 @@ Generated from specs. Tasks sorted by priority.
 - [x] Completed
 
 ### Task 5: Create ZoomSlider control
-- **File**: `src/components/share/controls/ZoomSlider.tsx` (new)
+- **File**: `src/components/share/designer/controls/ZoomSlider.tsx` (new)
 - **Description**: Slider component for zoom level adjustment
 - **Details**:
   - Range input from 100% to 300%
   - Display current zoom percentage
   - Plus/minus buttons at ends
   - Update store scale on change
-- [ ] Not started
+- [x] Completed
 
 ### Task 6: Add scroll-wheel zoom for desktop
 - **File**: `src/components/share/ShareDesignerPreview.tsx` (modify)
@@ -325,6 +325,14 @@ Generated from specs. Tasks sorted by priority.
 - Clamped scale to 1.0-3.0 range as per spec
 - Added touch event bindings to card element when in image edit mode
 - Updated `CustomizeView` to pass `handleImageScaleChange` callback to both preview instances
+
+### Task 5: Create ZoomSlider control
+- Created `src/components/share/designer/controls/ZoomSlider.tsx` with slider + plus/minus buttons
+- Range input from 1.0 (100%) to 3.0 (300%) with 0.1 step
+- Displays current zoom as percentage (e.g., "120%")
+- Plus/minus buttons at ends for fine-grained control
+- Follows existing Slider component patterns with styled-jsx
+- Exported from `controls/index.ts`
 
 ---
 
