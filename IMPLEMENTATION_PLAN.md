@@ -269,7 +269,7 @@ Generated from specs. Tasks sorted by priority.
   - Test each effect type in export
   - Handle SVG filters if needed
   - Ensure transforms export correctly
-- [ ] Not started
+- [x] Completed
 
 ### Task 27: Add color picker component
 - **File**: `src/components/share/controls/ColorPicker.tsx` (new)
@@ -497,6 +497,20 @@ Generated from specs. Tasks sorted by priority.
   - Announces "Effect changed to {effectName}" when effect selection changes
   - Renders ARIA live region via `liveRegionProps`
 - Exported `useScreenReaderAnnounce` from `src/hooks/index.ts`
+
+### Task 26: Ensure effects work in export
+- Modified `src/components/share/designer/ShareDesignerPreview.tsx`:
+  - Refactored album art background from CSS `background-image` to a dedicated `<img>` element
+  - This enables CSS `filter` to be applied directly to the image, which works in html-to-image export
+  - Previously used `backdropFilter` which is NOT supported by html-to-image (canvas limitation)
+  - Created `albumArtBackgroundLayer` memoized component that:
+    - Renders album art as `<img>` element with `crossOrigin="anonymous"` for export
+    - Applies position/scale transforms for image edit mode
+    - Applies CSS `filter` string directly (blur, grayscale, brightness, contrast from effects)
+  - Updated `albumArtOverlay` to remove `backdropFilter` blur (now applied to img element)
+  - Updated `albumArtEffectOverlay` to only render overlay-based effects (vignette, tint, gradient, duotone colors)
+  - Filter-based effects (blur, darken, desaturate, duotone grayscale+contrast) now work in export
+  - Overlay-based effects (vignette, tint, gradient, duotone color blends) use `mixBlendMode` which works in canvas
 
 ---
 

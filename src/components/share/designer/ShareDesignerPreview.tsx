@@ -528,26 +528,10 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
       case "gradient":
         return { background: background.gradient }
 
-      case "albumArt": {
-        // Apply offset and scale transforms when image edit state is available
-        const scale = imageEdit?.scale ?? 1
-        const offsetX = imageEdit?.offsetX ?? 0
-        const offsetY = imageEdit?.offsetY ?? 0
-
-        // Calculate background position based on offset
-        // offset of 0 = center (50%), offset of -100 = 0%, offset of 100 = 100%
-        const posX = 50 + offsetX * 0.5
-        const posY = 50 + offsetY * 0.5
-
-        // Scale the background size (100% * scale)
-        const sizePercent = 100 * scale
-
-        return {
-          background: albumArt ? `url(${albumArt})` : "#1a1a2e",
-          backgroundSize: `${sizePercent}%`,
-          backgroundPosition: `${posX}% ${posY}%`,
-        }
-      }
+      case "albumArt":
+        // Album art is now rendered as a separate img element for export compatibility
+        // Just use a fallback color here
+        return { background: "#1a1a2e" }
 
       case "pattern":
         return { background: background.baseColor }
@@ -555,7 +539,58 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
       default:
         return { background: "#1a1a2e" }
     }
-  }, [background, albumArt, imageEdit])
+  }, [background])
+
+  // Album art background layer - rendered as img element for CSS filter support in export
+  const albumArtBackgroundLayer = useMemo(() => {
+    if (background.type !== "albumArt" || !albumArt) return null
+
+    // Apply offset and scale transforms
+    const scale = imageEdit?.scale ?? 1
+    const offsetX = imageEdit?.offsetX ?? 0
+    const offsetY = imageEdit?.offsetY ?? 0
+
+    // Calculate transform for position and scale
+    // offset of 0 = center, offset of -100/+100 = move by 50% of container
+    const translateX = offsetX * 0.5
+    const translateY = offsetY * 0.5
+
+    // Build CSS filter string from effect settings
+    // This applies directly to the img element so it works in canvas export
+    let filterString = ""
+
+    // Add background blur if configured
+    if (background.blur > 0) {
+      filterString += `blur(${background.blur}px) `
+    }
+
+    // Add album art effect filters
+    if (albumArtEffect && albumArtEffect.effect !== "none") {
+      const effectStyles = applyEffect(albumArtEffect.effect, albumArtEffect.settings)
+      if (effectStyles.filter) {
+        filterString += effectStyles.filter
+      }
+    }
+
+    return (
+      <img
+        src={albumArt}
+        alt=""
+        crossOrigin="anonymous"
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          width: `${100 * scale}%`,
+          height: `${100 * scale}%`,
+          objectFit: "cover",
+          transform: `translate(calc(-50% + ${translateX}%), calc(-50% + ${translateY}%))`,
+          filter: filterString || undefined,
+          pointerEvents: "none",
+        }}
+      />
+    )
+  }, [background, albumArt, imageEdit, albumArtEffect])
 
   // Pattern overlay for pattern backgrounds
   const patternOverlay = useMemo(() => {
@@ -593,60 +628,42 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     )
   }, [background])
 
-  // Album art blur overlay
+  // Album art color overlay (blur is now applied directly to the img element)
   const albumArtOverlay = useMemo(() => {
     if (background.type !== "albumArt") return null
 
     return (
-      <>
-        {/* Blur filter */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backdropFilter: `blur(${background.blur}px)`,
-            WebkitBackdropFilter: `blur(${background.blur}px)`,
-            pointerEvents: "none",
-          }}
-        />
-        {/* Color overlay */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: background.overlayColor,
-            opacity: background.overlayOpacity,
-            pointerEvents: "none",
-          }}
-        />
-      </>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: background.overlayColor,
+          opacity: background.overlayOpacity,
+          pointerEvents: "none",
+        }}
+      />
     )
   }, [background])
 
   // Album art effect overlay (from effects system)
+  // Note: CSS filters (blur, grayscale, brightness, contrast) are applied directly
+  // to the album art img element for export compatibility. Only overlay-based effects
+  // (vignette, tint, gradient, duotone color layers) are rendered here.
   const albumArtEffectOverlay = useMemo(() => {
     if (background.type !== "albumArt" || !albumArtEffect) return null
     if (albumArtEffect.effect === "none") return null
 
     const effectStyles = applyEffect(albumArtEffect.effect, albumArtEffect.settings)
 
+    // Only render overlays - filters are applied to the img element directly
+    const hasOverlays = effectStyles.overlay || effectStyles.secondaryOverlay
+    if (!hasOverlays) return null
+
     return (
       <>
-        {/* Filter layer - applies CSS filters to the background */}
-        {effectStyles.filter && (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              backdropFilter: effectStyles.filter,
-              WebkitBackdropFilter: effectStyles.filter,
-              pointerEvents: "none",
-            }}
-          />
-        )}
-        {/* Primary overlay */}
+        {/* Primary overlay (vignette, tint, gradient, duotone shadow) */}
         {effectStyles.overlay && <div style={effectStyles.overlay} />}
-        {/* Secondary overlay (for effects like duotone) */}
+        {/* Secondary overlay (duotone highlight) */}
         {effectStyles.secondaryOverlay && <div style={effectStyles.secondaryOverlay} />}
       </>
     )
@@ -735,6 +752,8 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
           userSelect: isImageEditing ? "none" : undefined,
         }}
       >
+        {/* Album art background layer - rendered as img for export compatibility */}
+        {albumArtBackgroundLayer}
         {/* Background overlays */}
         {patternOverlay}
         {albumArtOverlay}
