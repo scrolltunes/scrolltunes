@@ -172,7 +172,7 @@ Tasks sorted by priority (P0 → P1 → P2).
   - Side-by-side on desktop (preview left, controls right)
   - Header with back, title, share dropdown
   - Undo/redo buttons in preview area
-- [ ] Not started
+- [x] Completed
 
 ### Task 16: Create ControlTabs component
 - **File**: `src/components/share/expanded/ControlTabs.tsx` (new)
@@ -407,6 +407,20 @@ Tasks sorted by priority (P0 → P1 → P2).
 - Added ZoomSlider component showing when `isImageEditing` is true
 - ZoomSlider appears at bottom of preview area, absolutely positioned
 - Connected to `imageEdit.scale` state and `handleImageScaleChange` callback
+
+### Task 15: Create ExpandedView layout
+- Created `src/components/share/expanded/ExpandedView.tsx` and `index.ts`
+- Full expanded studio mode layout with both mobile and desktop views
+- Mobile: Full screen (100dvh - header) with tabbed controls (Templates, Layout, Style, Elements, Effects)
+- Desktop: Side-by-side layout (60% preview, 40% controls with collapsible accordion sections)
+- Undo/redo buttons in preview area with history state integration
+- Image edit mode with ZoomSlider when album art background selected
+- Share dropdown with copy/download/share actions
+- "Less options" button to collapse back to compact mode
+- Reuses existing components: ShareDesignerPreview, TemplateGallery, all control components
+- Added `applyTemplate()` method and `ApplyTemplate` event to ShareExperienceStore
+- Added `buildBackgroundFromTemplate()` helper function
+- Updated ShareExperience.tsx to use real ExpandedView and handle mode transitions
 
 ---
 

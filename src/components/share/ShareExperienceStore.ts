@@ -4,6 +4,7 @@ import { detectLyricsDirection } from "@/lib"
 import { type GradientOption, buildGradientPalette, extractDominantColor } from "@/lib/colors"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
+import { type Template, getTemplateById } from "./designer/templates"
 import {
   type AlbumArtEffectConfig,
   type AspectRatioConfig,
@@ -103,6 +104,10 @@ export class RegenerateCompactPatternSeed extends Data.TaggedClass(
 )<object> {}
 
 // --- State Events (with undo history) ---
+
+export class ApplyTemplate extends Data.TaggedClass("ApplyTemplate")<{
+  readonly templateId: string
+}> {}
 
 export class SetAspectRatio extends Data.TaggedClass("SetAspectRatio")<{
   readonly config: AspectRatioConfig
@@ -212,6 +217,7 @@ export type ShareExperienceEvent =
   | ApplyQuickPreset
   | SetCompactPattern
   | RegenerateCompactPatternSeed
+  | ApplyTemplate
   | SetAspectRatio
   | SetPadding
   | SetBackground
@@ -275,6 +281,38 @@ function createDefaultState(context: ShareDesignerSongContext): ShareDesignerSta
 
 function statesAreEqual(a: ShareDesignerState, b: ShareDesignerState): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
+}
+
+function buildBackgroundFromTemplate(template: Template): BackgroundConfig {
+  const bg = template.background
+
+  switch (bg.type) {
+    case "solid":
+      return { type: "solid", color: bg.color }
+
+    case "gradient":
+      return {
+        type: "gradient",
+        gradient: bg.gradient,
+        gradientId: bg.gradientId,
+      }
+
+    case "albumArt":
+      return {
+        type: "albumArt",
+        blur: bg.blur,
+        overlayOpacity: bg.overlayOpacity,
+        overlayColor: bg.overlayColor,
+      }
+
+    case "pattern":
+      return {
+        type: "pattern",
+        baseColor: bg.baseColor,
+        pattern: bg.pattern,
+        patternSeed: Date.now(),
+      }
+  }
 }
 
 // ============================================================================
@@ -385,6 +423,10 @@ export class ShareExperienceStore {
           store.compactPatternSeed = Date.now()
           store.notify()
         })
+
+      // --- Template Events ---
+      case "ApplyTemplate":
+        return store.handleApplyTemplate(event.templateId)
 
       // --- State Events ---
       case "SetAspectRatio":
@@ -670,6 +712,51 @@ export class ShareExperienceStore {
       }))
 
       this.updateState({ lyrics: { ...this.state.lyrics, selectedLines } }, "Reset all text")
+    })
+  }
+
+  /**
+   * Apply a template to the current state.
+   */
+  private handleApplyTemplate(templateId: string): Effect.Effect<void> {
+    return Effect.sync(() => {
+      const template = getTemplateById(templateId)
+      if (!template) return
+
+      const newState: ShareDesignerState = {
+        aspectRatio: template.aspectRatio ?? this.state.aspectRatio,
+        padding: template.padding ?? this.state.padding,
+        background: buildBackgroundFromTemplate(template),
+        typography: {
+          ...this.state.typography,
+          fontSize: template.typography.fontSize ?? this.state.typography.fontSize,
+          fontWeight: template.typography.fontWeight ?? this.state.typography.fontWeight,
+          lineHeight: template.typography.lineHeight ?? this.state.typography.lineHeight,
+          letterSpacing: template.typography.letterSpacing ?? this.state.typography.letterSpacing,
+          color: template.typography.color ?? this.state.typography.color,
+          alignment: template.typography.alignment ?? this.state.typography.alignment,
+          textShadow: template.typography.textShadow ?? this.state.typography.textShadow,
+        },
+        elements: {
+          albumArt: { ...this.state.elements.albumArt, ...template.elements.albumArt },
+          metadata: { ...this.state.elements.metadata, ...template.elements.metadata },
+          lyrics: { ...this.state.elements.lyrics, ...template.elements.lyrics },
+          spotifyCode: { ...this.state.elements.spotifyCode, ...template.elements.spotifyCode },
+          branding: { ...this.state.elements.branding, ...template.elements.branding },
+        },
+        effects: {
+          shadow: { ...this.state.effects.shadow, ...template.effects.shadow },
+          border: { ...this.state.effects.border, ...template.effects.border },
+          vignette: { ...this.state.effects.vignette, ...template.effects.vignette },
+        },
+        albumArtEffect: this.state.albumArtEffect,
+        lyrics: this.state.lyrics,
+        exportSettings: this.state.exportSettings,
+      }
+
+      this.updateState(newState, `Apply ${template.name} template`)
+      this.currentTemplateId = templateId
+      this.activePreset = null
     })
   }
 
@@ -1014,6 +1101,10 @@ export class ShareExperienceStore {
 
   regenerateCompactPatternSeed(): void {
     Effect.runSync(this.dispatch(new RegenerateCompactPatternSeed({})))
+  }
+
+  applyTemplate(templateId: string): void {
+    Effect.runSync(this.dispatch(new ApplyTemplate({ templateId })))
   }
 
   setAspectRatio(config: AspectRatioConfig): void {

@@ -12,6 +12,7 @@ import {
 } from "./ShareExperienceStore"
 import { CompactView, type CompactViewRef } from "./compact"
 import type { LyricLine, ShareDesignerSongContext } from "./designer/types"
+import { ExpandedView, type ExpandedViewRef } from "./expanded"
 
 // ============================================================================
 // Types
@@ -89,40 +90,6 @@ const LineSelection = memo(function LineSelection({
 })
 
 // ============================================================================
-// Expanded View Placeholder (Task 15)
-// ============================================================================
-
-interface ExpandedViewProps {
-  readonly store: ShareExperienceStore
-  readonly title: string
-  readonly artist: string
-  readonly albumArt: string | null
-  readonly albumArtLarge?: string | null
-  readonly spotifyId: string | null
-}
-
-const ExpandedView = memo(function ExpandedView({
-  store: _store,
-  title: _title,
-  artist: _artist,
-  albumArt: _albumArt,
-  albumArtLarge: _albumArtLarge,
-  spotifyId: _spotifyId,
-}: ExpandedViewProps) {
-  // Placeholder - will be implemented in Task 15
-  return (
-    <div className="flex flex-col items-center justify-center p-8">
-      <p className="text-sm" style={{ color: "var(--color-text3)" }}>
-        Expanded studio view
-      </p>
-      <p className="mt-2 text-xs" style={{ color: "var(--color-text3)" }}>
-        (Coming in Task 15)
-      </p>
-    </div>
-  )
-})
-
-// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -139,6 +106,7 @@ export const ShareExperience = memo(function ShareExperience({
 }: ShareExperienceProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const compactViewRef = useRef<CompactViewRef>(null)
+  const expandedViewRef = useRef<ExpandedViewRef>(null)
 
   // Local selection state for the select step (before store is created)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -246,6 +214,13 @@ export const ShareExperience = memo(function ShareExperience({
     }
   }, [store])
 
+  // Collapse to compact mode
+  const handleCollapseToCompact = useCallback(() => {
+    if (store) {
+      store.setMode("compact")
+    }
+  }, [store])
+
   // Trigger share from footer button
   const handleShareFromFooter = useCallback(() => {
     compactViewRef.current?.triggerShare()
@@ -301,11 +276,15 @@ export const ShareExperience = memo(function ShareExperience({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={springs.default}
-            className="relative mx-0 flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-2xl shadow-xl sm:mx-4 sm:max-w-xl sm:rounded-2xl"
+            className={`relative mx-0 flex w-full flex-col overflow-hidden shadow-xl ${
+              mode === "expanded"
+                ? "h-[100dvh] max-h-[100dvh] sm:mx-4 sm:h-[90dvh] sm:max-h-[90dvh] sm:max-w-5xl sm:rounded-2xl"
+                : "max-h-[90dvh] rounded-t-2xl sm:mx-4 sm:max-w-xl sm:rounded-2xl"
+            }`}
             style={{ background: "var(--color-surface1)" }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Header */}
+            {/* Header - shown in select and compact modes, in expanded mode show simplified header */}
             <div
               className="flex items-center justify-between px-4 py-3"
               style={{ borderBottom: "1px solid var(--color-border)" }}
@@ -314,10 +293,10 @@ export const ShareExperience = memo(function ShareExperience({
                 {!isSelectStep && (
                   <button
                     type="button"
-                    onClick={handleBack}
+                    onClick={mode === "expanded" ? handleCollapseToCompact : handleBack}
                     className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:brightness-110"
                     style={{ background: "var(--color-surface2)" }}
-                    aria-label="Back"
+                    aria-label={mode === "expanded" ? "Less options" : "Back"}
                   >
                     <ArrowLeft size={18} />
                   </button>
@@ -392,53 +371,54 @@ export const ShareExperience = memo(function ShareExperience({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.2 }}
+                    className="h-full"
                   >
                     <ExpandedView
+                      ref={expandedViewRef}
                       store={store}
                       title={title}
                       artist={artist}
                       albumArt={albumArt}
                       albumArtLarge={albumArtLarge ?? null}
                       spotifyId={spotifyId}
+                      onCollapseToCompact={handleCollapseToCompact}
                     />
                   </motion.div>
                 ) : null}
               </AnimatePresence>
             </div>
 
-            {/* Footer */}
-            <div className="flex gap-3 p-4" style={{ borderTop: "1px solid var(--color-border)" }}>
-              {isSelectStep ? (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  disabled={selectedIds.size === 0}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{ background: "var(--color-accent)", color: "white" }}
-                >
-                  Next
-                  <ArrowRight size={20} weight="bold" />
-                </button>
-              ) : mode === "compact" ? (
-                <button
-                  type="button"
-                  onClick={handleShareFromFooter}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
-                  style={{ background: "var(--color-accent)", color: "white" }}
-                  aria-label="Share image"
-                >
-                  <ShareNetwork size={20} weight="bold" />
-                  Share Image
-                </button>
-              ) : (
-                // Expanded mode footer (Task 15)
-                <div className="flex-1">
-                  <p className="text-center text-sm" style={{ color: "var(--color-text3)" }}>
-                    Studio footer (Task 15)
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* Footer - hidden in expanded mode (ExpandedView has its own footer) */}
+            {mode !== "expanded" && (
+              <div
+                className="flex gap-3 p-4"
+                style={{ borderTop: "1px solid var(--color-border)" }}
+              >
+                {isSelectStep ? (
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    disabled={selectedIds.size === 0}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{ background: "var(--color-accent)", color: "white" }}
+                  >
+                    Next
+                    <ArrowRight size={20} weight="bold" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleShareFromFooter}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                    style={{ background: "var(--color-accent)", color: "white" }}
+                    aria-label="Share image"
+                  >
+                    <ShareNetwork size={20} weight="bold" />
+                    Share Image
+                  </button>
+                )}
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}
