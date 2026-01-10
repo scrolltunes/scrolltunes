@@ -260,7 +260,7 @@ Generated from specs. Tasks sorted by priority.
   - Announce "Image edit mode entered"
   - Announce zoom level changes
   - Announce effect changes
-- [ ] Not started
+- [x] Completed
 
 ### Task 26: Ensure effects work in export
 - **File**: `src/components/share/ShareDesignerPreview.tsx` (modify)
@@ -476,6 +476,27 @@ Generated from specs. Tasks sorted by priority.
   - Added haptic feedback in `handleTouchMove` when hitting min/max zoom (1.0 or 3.0)
   - Added haptic feedback in `handleWheel` when crossing zoom limits
   - Reset haptic ref when pinch ends
+
+### Task 25: Add screen reader announcements
+- Created `src/hooks/useScreenReaderAnnounce.ts`:
+  - New hook that provides an `announce` function and `liveRegionProps` for ARIA live regions
+  - Uses `aria-live="polite"` and `role="status"` for non-disruptive announcements
+  - Uses `sr-only` class for visual hiding while remaining accessible
+  - Clear + requestAnimationFrame pattern ensures re-announcement of same message
+- Modified `src/components/share/ImageEditMode.tsx`:
+  - Added `useScreenReaderAnnounce` hook for announcements
+  - Added `prevIsEditingRef` to track mode changes
+  - Added `prevScaleRef` to track zoom level changes
+  - Announces "Image edit mode entered" / "Image edit mode exited" on mode toggle
+  - Announces "Zoom N%" when zoom level changes while in edit mode
+  - Announces "Image position reset" when reset button is clicked
+  - Renders ARIA live region via `liveRegionProps`
+- Modified `src/components/share/effects/EffectSelector.tsx`:
+  - Added `useScreenReaderAnnounce` hook for announcements
+  - Added `prevValueRef` to track effect changes
+  - Announces "Effect changed to {effectName}" when effect selection changes
+  - Renders ARIA live region via `liveRegionProps`
+- Exported `useScreenReaderAnnounce` from `src/hooks/index.ts`
 
 ---
 

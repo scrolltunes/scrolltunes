@@ -1,8 +1,9 @@
 "use client"
 
 import { useHaptic } from "@/hooks/useHaptic"
+import { useScreenReaderAnnounce } from "@/hooks/useScreenReaderAnnounce"
 import { ArrowCounterClockwise, Check, Image } from "@phosphor-icons/react"
-import { memo, useCallback } from "react"
+import { memo, useCallback, useEffect, useRef } from "react"
 import { DEFAULT_IMAGE_EDIT } from "./designer/types"
 
 interface ImageEditModeProps {
@@ -27,11 +28,31 @@ export const ImageEditMode = memo(function ImageEditMode({
   onReset,
 }: ImageEditModeProps) {
   const { haptic } = useHaptic()
+  const { announce, liveRegionProps } = useScreenReaderAnnounce()
+  const prevIsEditingRef = useRef(isEditing)
+  const prevScaleRef = useRef(scale)
 
   const hasChanges =
     offsetX !== DEFAULT_IMAGE_EDIT.offsetX ||
     offsetY !== DEFAULT_IMAGE_EDIT.offsetY ||
     scale !== DEFAULT_IMAGE_EDIT.scale
+
+  // Announce mode changes
+  useEffect(() => {
+    if (prevIsEditingRef.current !== isEditing) {
+      announce(isEditing ? "Image edit mode entered" : "Image edit mode exited")
+      prevIsEditingRef.current = isEditing
+    }
+  }, [isEditing, announce])
+
+  // Announce zoom level changes
+  useEffect(() => {
+    if (prevScaleRef.current !== scale && isEditing) {
+      const zoomPercent = Math.round(scale * 100)
+      announce(`Zoom ${zoomPercent}%`)
+      prevScaleRef.current = scale
+    }
+  }, [scale, isEditing, announce])
 
   const handleToggle = useCallback(() => {
     haptic("light")
@@ -40,8 +61,9 @@ export const ImageEditMode = memo(function ImageEditMode({
 
   const handleReset = useCallback(() => {
     haptic("medium")
+    announce("Image position reset")
     onReset()
-  }, [haptic, onReset])
+  }, [haptic, announce, onReset])
 
   return (
     <>
@@ -71,6 +93,7 @@ export const ImageEditMode = memo(function ImageEditMode({
           <ArrowCounterClockwise size={18} weight="bold" />
         </button>
       )}
+      <div {...liveRegionProps} />
     </>
   )
 })

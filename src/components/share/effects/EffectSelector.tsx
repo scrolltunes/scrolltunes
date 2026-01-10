@@ -1,8 +1,9 @@
 "use client"
 
-import { memo, useId } from "react"
+import { useScreenReaderAnnounce } from "@/hooks/useScreenReaderAnnounce"
+import { memo, useCallback, useEffect, useId, useRef } from "react"
 import { EffectThumbnail } from "./EffectThumbnail"
-import { EFFECT_DEFINITIONS, type EffectType } from "./index"
+import { EFFECT_DEFINITIONS, type EffectType, getEffectName } from "./index"
 
 export interface EffectSelectorProps {
   readonly value: EffectType
@@ -16,6 +17,24 @@ export const EffectSelector = memo(function EffectSelector({
   albumArt,
 }: EffectSelectorProps) {
   const groupId = useId()
+  const { announce, liveRegionProps } = useScreenReaderAnnounce()
+  const prevValueRef = useRef(value)
+
+  // Announce effect changes
+  useEffect(() => {
+    if (prevValueRef.current !== value) {
+      const effectName = getEffectName(value)
+      announce(`Effect changed to ${effectName}`)
+      prevValueRef.current = value
+    }
+  }, [value, announce])
+
+  const handleEffectChange = useCallback(
+    (effect: EffectType) => {
+      onChange(effect)
+    },
+    [onChange],
+  )
 
   return (
     <div className="flex flex-col gap-2">
@@ -40,7 +59,7 @@ export const EffectSelector = memo(function EffectSelector({
             effect={effect}
             isSelected={effect.id === value}
             albumArt={albumArt}
-            onClick={() => onChange(effect.id)}
+            onClick={() => handleEffectChange(effect.id)}
           />
         ))}
 
@@ -50,6 +69,7 @@ export const EffectSelector = memo(function EffectSelector({
           }
         `}</style>
       </div>
+      <div {...liveRegionProps} />
     </div>
   )
 })
