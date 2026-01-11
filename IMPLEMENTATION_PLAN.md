@@ -31,7 +31,7 @@ Generated from specs. Tasks sorted by priority.
   - Class-based store with useSyncExternalStore pattern
   - Methods: goToPage, nextPage, prevPage, setPagination, findPageForLine, reset
   - Export singleton instance and useScoreBookState hook
-- [ ] Not started
+- [x] Completed
 
 ### Task 3: Add pageFlip animation preset
 - **File**: `src/animations.ts` (modify)
@@ -48,7 +48,7 @@ Generated from specs. Tasks sorted by priority.
   - Export scoreBookStore singleton
   - Export useScoreBookState hook
   - Export ScoreBookState type and events
-- [ ] Not started
+- [x] Completed (done as part of Task 2)
 
 ---
 
@@ -180,6 +180,17 @@ Generated from specs. Tasks sorted by priority.
 - Added 3 new preferences: displayMode, scoreBookShowChords, scoreBookWordHighlight
 - Added getter/setter methods for each preference
 - Default: scorebook mode enabled, chords and word highlight disabled
+
+### Task 2: Create ScoreBookStore with pagination state
+- Created `src/core/ScoreBookStore.ts` with class-based store pattern
+- Defined tagged events: GoToPage, NextPage, PrevPage, SetPagination
+- Implemented ScoreBookState interface with currentPage, totalPages, linesPerPage, pageLineRanges
+- Added methods: goToPage, nextPage, prevPage, setPagination, findPageForLine, reset
+- Added helper methods: getCurrentPageRange, isOnLastLineOfPage, isOnSecondToLastLineOfPage
+- Exported singleton instance and hooks (useScoreBookState, useCurrentPage, useTotalPages, useLinesPerPage, usePageLineRanges)
+
+### Task 4: Export new store from core/index.ts
+- Completed as part of Task 2
 
 ---
 

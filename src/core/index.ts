@@ -173,3 +173,20 @@ export {
   useLinePatch,
   type SongEditsState,
 } from "./SongEditsStore"
+
+export {
+  ScoreBookStore,
+  scoreBookStore,
+  useScoreBookState,
+  useCurrentPage,
+  useTotalPages,
+  useLinesPerPage,
+  usePageLineRanges,
+  type ScoreBookState,
+  type PageLineRange,
+  type ScoreBookEvent,
+  GoToPage,
+  NextPage,
+  PrevPage,
+  SetPagination,
+} from "./ScoreBookStore"
