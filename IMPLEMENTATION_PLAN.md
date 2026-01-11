@@ -290,10 +290,270 @@ Generated from specs. Tasks sorted by priority.
 
 ---
 
+## Gap Analysis (Phase 5)
+
+**Analysis completed**: 2026-01-12
+
+### Components Verified Missing
+| Component | Status | Notes |
+|-----------|--------|-------|
+| StaticLyricLine.tsx | ❌ Missing | No file exists |
+| PageThumbnail.tsx | ❌ Missing | No file exists |
+| PageSidebar.tsx | ❌ Missing | No file exists |
+| PageNavigationArrows.tsx | ❌ Missing | No file exists |
+
+### Preferences Verified Missing
+| Preference | Status | Notes |
+|------------|--------|-------|
+| scoreBookFontSize | ❌ Missing | Only shared `fontSize` exists (default 34px) |
+| SCOREBOOK_MIN_FONT_SIZE | ❌ Missing | Constants not in PreferencesStore.ts or limits.ts |
+| SCOREBOOK_MAX_FONT_SIZE | ❌ Missing | Constants not in PreferencesStore.ts or limits.ts |
+
+### Current State Confirmed
+| Item | Status | Location |
+|------|--------|----------|
+| scoreBookWordHighlight | ✅ Exists | PreferencesStore.ts:79 (will be removed in Task 23) |
+| "Word highlight" toggle | ✅ Exists | settings/page.tsx:950 (will be removed in Task 21) |
+| ScoreBookPage uses LyricLine | ✅ Confirmed | Will switch to StaticLyricLine in Task 15 |
+| Arrow keys seek (not page flip) | ✅ Confirmed | useKeyboardShortcuts.ts has no mode-aware behavior |
+
+### Implementation Notes
+1. **Font size constants location**: Currently in `src/core/PreferencesStore.ts` (lines 8-11). Task 20 can add SCOREBOOK_* constants there rather than limits.ts.
+2. **ScoreBookStore ready**: Already has `nextPage()` and `prevPage()` methods needed for keyboard navigation.
+3. **PageFlipWarning.tsx exists**: Will be deprecated and removed in Task 23.
+
+---
+
+## Phase 5: Score Book Redesign (P0)
+
+**Goal**: Transform Score Book from scrolling-based to true static page display (like a PDF viewer)
+
+Key changes:
+- Static text that doesn't move during playback
+- Line-by-line highlighting (bold + subtle background)
+- Desktop sidebar with mini text previews of pages
+- Navigation arrows + swipe gestures for page transitions
+- Auto-advance when current line crosses page boundary
+- Much smaller default font size (20px vs 34px)
+
+**Task Dependencies**:
+```
+Task 14 (StaticLyricLine)
+    └── Task 15 (Update ScoreBookPage)
+Task 16 (PageThumbnail)
+    └── Task 17 (PageSidebar)
+Task 18 (PageNavigationArrows)
+Task 20 (scoreBookFontSize preference)
+    └── Task 21 (Settings page)
+Tasks 14-18, 20 ──► Task 19 (Restructure ScoreBookDisplay)
+Tasks 14, 16-18 ──► Task 23 (Export & cleanup)
+Task 22 (Keyboard nav) - independent, can be done anytime
+```
+
+### Task 14: Create StaticLyricLine component
+- **File**: `src/components/display/StaticLyricLine.tsx` (new)
+- **Description**: Simple line rendering without word-level animation
+- **Details**:
+  - Props: `text`, `isActive`, `isPast`, `isNext`, `fontSize`, `onClick`, `chords?`, `chordPositions?`
+  - Active line styling: bold text (font-semibold) + subtle background (bg-accent/10) + left border accent
+  - Next line: slight opacity reduction (85%) + ml-2 indent
+  - Past lines: reduced opacity (30-40%)
+  - Upcoming lines: 50% opacity
+  - Support chord display above text (optional, reuse InlineChord/ChordBadge)
+  - No `elapsedInLine`, `wordTimings`, `duration` props needed
+  - Handle empty lines with musical note (♪) placeholder
+  - Support RTL text direction
+  - Include ARIA attributes for accessibility
+- **Depends on**: None (leaf task)
+- [ ] Not started
+
+### Task 15: Update ScoreBookPage to use StaticLyricLine
+- **File**: `src/components/display/ScoreBookPage.tsx` (modify)
+- **Description**: Replace LyricLine with StaticLyricLine, simplify props
+- **Details**:
+  - Replace LyricLine import with StaticLyricLine
+  - Remove word-timing related props: `currentTime`, `isPlaying`, `songDuration`, `allLines`
+  - Remove `showWordHighlight` prop (no longer applicable)
+  - Keep position-based styling logic (getLinePosition function)
+  - Simplify ScoreBookPageProps interface:
+    - Keep: `lines`, `currentLineIndex`, `pageStartIndex`, `fontSize`, `showChords`, `onLineClick`, `lineChordData`, `isRTL`
+    - Remove: `showWordHighlight`, `currentTime`, `isPlaying`, `songDuration`, `allLines`
+  - Pass appropriate props to StaticLyricLine based on line position
+- **Depends on**: Task 14
+- [ ] Not started
+
+### Task 16: Create PageThumbnail component
+- **File**: `src/components/display/PageThumbnail.tsx` (new)
+- **Description**: Mini-rendered preview of a page's text for sidebar
+- **Details**:
+  - Props: `pageIndex`, `lines`, `isCurrentPage`, `currentLineIndex`, `onClick`
+  - Container: ~150px width, 4:3 aspect ratio, rounded corners
+  - Content: Scaled-down text (CSS transform: scale(0.25)) with overflow hidden
+  - Show actual line text, highlight current line within page if visible
+  - Current page styling: accent border (2px), subtle glow/shadow
+  - Non-current pages: surface1 background, muted border
+  - Hover state: slight scale up, brighter border
+  - Click handler navigates to page
+  - Page number badge in corner
+  - ARIA: `role="button"`, `aria-label="Go to page X"`, `aria-current` when current
+- **Depends on**: None (leaf task)
+- [ ] Not started
+
+### Task 17: Create PageSidebar component
+- **File**: `src/components/display/PageSidebar.tsx` (new)
+- **Description**: Desktop-only sidebar showing page thumbnails
+- **Details**:
+  - Props: `pages` (array of line arrays), `currentPage`, `currentLineIndex`, `onPageSelect`
+  - Container: 180px fixed width, full height, `hidden lg:flex flex-col`
+  - Scrollable list with `overflow-y-auto`, smooth scroll behavior
+  - Render PageThumbnail for each page
+  - Auto-scroll to keep current page thumbnail visible (useEffect with scrollIntoView)
+  - Gap between thumbnails: 12px
+  - Subtle header showing "Pages" with total count
+  - Background: surface0 or transparent
+  - ARIA: `role="navigation"`, `aria-label="Page navigation"`
+- **Depends on**: Task 16
+- [ ] Not started
+
+### Task 18: Create PageNavigationArrows component
+- **File**: `src/components/display/PageNavigationArrows.tsx` (new)
+- **Description**: Left/right arrow buttons for page navigation
+- **Details**:
+  - Props: `onPrev`, `onNext`, `hasPrev`, `hasNext`, `className?`
+  - Position: absolute left/right edges within parent container
+  - Desktop: always visible, 48px icon size, subtle background on hover
+  - Mobile: semi-transparent (opacity 50%), smaller (32px), overlay on edges
+  - Icons: CaretLeft/CaretRight from `@phosphor-icons/react`
+  - Disabled state: opacity 30%, pointer-events-none when !hasPrev/!hasNext
+  - Hover: scale up slightly, background highlight
+  - Active/tap: scale down, haptic feedback (useHaptic)
+  - Respect reduced motion (disable scale animations)
+  - ARIA: `aria-label="Previous page"` / `"Next page"`, `aria-disabled` when appropriate
+- **Depends on**: None (leaf task)
+- [ ] Not started
+
+### Task 19: Restructure ScoreBookDisplay layout
+- **File**: `src/components/display/ScoreBookDisplay.tsx` (modify)
+- **Description**: New layout with sidebar and navigation arrows
+- **Details**:
+  - New layout structure:
+    - Desktop: `flex` container with `[PageSidebar 180px] | [Main Content flex-1] | [Nav Arrows overlaid]`
+    - Mobile: `[Main Content 100%]` with `[Nav Arrows overlay on edges]`
+  - Remove word-level timing subscriptions:
+    - Remove currentTime tracking for word highlighting
+    - Remove isPlaying-dependent word animation logic
+  - Keep page auto-advance logic (when currentLineIndex crosses page boundary)
+  - Keep swipe gesture support for mobile
+  - Integrate PageSidebar (desktop only, left side)
+  - Integrate PageNavigationArrows (both desktop and mobile)
+  - Remove PageFlipWarning component and related state (`showPageFlipWarning`, `isOnSecondToLastLineOfPage`)
+  - Remove `scoreBookWordHighlight` preference usage (no longer applicable)
+  - Use `scoreBookFontSize` preference instead of shared `fontSize`
+  - Update ScoreBookPage props to match simplified interface
+  - Build pages array for PageSidebar from pageLineRanges
+  - Ensure proper keyboard focus management
+- **Depends on**: Tasks 14, 15, 16, 17, 18, 20
+- [ ] Not started
+
+### Task 20: Add Score Book specific font size preference
+- **File**: `src/core/PreferencesStore.ts` (modify)
+- **Description**: Separate font size for Score Book mode
+- **Details**:
+  - Add `scoreBookFontSize` to Preferences interface
+  - Default: 20 (much smaller than karaoke's 34px default)
+  - Add constants in PreferencesStore.ts (next to existing MIN_FONT_SIZE, MAX_FONT_SIZE):
+    - `SCOREBOOK_MIN_FONT_SIZE = 14`
+    - `SCOREBOOK_MAX_FONT_SIZE = 32`
+    - `SCOREBOOK_DEFAULT_FONT_SIZE = 20`
+    - `SCOREBOOK_FONT_SIZE_STEP = 2`
+  - Add `getScoreBookFontSize()` getter method
+  - Add `setScoreBookFontSize(value: number)` setter with clamping
+  - Add to DEFAULT_PREFERENCES
+  - Ensure persistence to localStorage and server sync
+- **Depends on**: None (leaf task)
+- [ ] Not started
+
+### Task 21: Update Settings page for Score Book font
+- **File**: `src/app/settings/page.tsx` (modify)
+- **Description**: Add font size slider for Score Book mode
+- **Details**:
+  - Add font size slider in Score Book options section (conditional, in motion.div)
+  - Props: `value={preferences.scoreBookFontSize}`, `onChange={handleScoreBookFontSizeChange}`
+  - Import constants from PreferencesStore: `SCOREBOOK_MIN_FONT_SIZE`, `SCOREBOOK_MAX_FONT_SIZE`, `SCOREBOOK_FONT_SIZE_STEP`
+  - Reuse existing SliderSetting component pattern
+  - Format value: `${value}px` or `${value}px (default)` when 20
+  - **Remove "Word highlight" toggle** at line 950 (no longer applicable with StaticLyricLine)
+  - Keep "Show chords" toggle
+  - Update imports to include new constants from `@/core`
+- **Depends on**: Task 20
+- [ ] Not started
+
+### Task 22: Add keyboard navigation for Score Book
+- **File**: `src/hooks/useKeyboardShortcuts.ts` (modify)
+- **Description**: Arrow key navigation for page flipping
+- **Details**:
+  - **Mode-specific behavior** for ArrowLeft/ArrowRight:
+    - In **Score Book mode**: ArrowLeft → `scoreBookStore.prevPage()`, ArrowRight → `scoreBookStore.nextPage()`
+    - In **Karaoke mode**: ArrowLeft/Right continue to seek (current behavior)
+  - Add `displayMode` parameter to UseKeyboardShortcutsOptions
+  - Import `scoreBookStore` and `preferencesStore` (or accept displayMode as option)
+  - Modify existing ArrowLeft/ArrowRight handlers to check displayMode first
+  - Alternative approach: add new PageUp/PageDown handlers that always work for Score Book
+  - Keep other shortcuts unchanged (spacebar, r, up/down arrows for speed, 1-4 presets)
+  - Consider adding `[` and `]` as alternative page navigation keys (non-conflicting)
+- **Depends on**: None (independent, can be done anytime)
+- [ ] Not started
+
+### Task 23: Export new components and cleanup
+- **File**: `src/components/display/index.ts` (modify)
+- **Description**: Export new components, deprecate unused
+- **Details**:
+  - Add exports for new components:
+    - `export { StaticLyricLine } from "./StaticLyricLine"`
+    - `export { PageThumbnail } from "./PageThumbnail"`
+    - `export { PageSidebar } from "./PageSidebar"`
+    - `export { PageNavigationArrows } from "./PageNavigationArrows"`
+  - Remove PageFlipWarning export (deprecated, no longer used)
+  - **Optional cleanup**: Delete `src/components/display/PageFlipWarning.tsx` file
+  - Update PreferencesStore to remove `scoreBookWordHighlight` preference (or mark deprecated)
+  - Remove `scoreBookWordHighlight` getter/setter methods
+  - Update DEFAULT_PREFERENCES to remove `scoreBookWordHighlight`
+  - Clean up any unused imports in affected files
+- **Depends on**: Tasks 14, 16, 17, 18, 19
+- [ ] Not started
+
+---
+
+## Recommended Execution Order
+
+Phase 5 tasks can be parallelized using subagents. Recommended batches:
+
+**Batch 1** (4 independent leaf tasks - run in parallel):
+- Task 14: StaticLyricLine component
+- Task 16: PageThumbnail component
+- Task 18: PageNavigationArrows component
+- Task 20: scoreBookFontSize preference
+
+**Batch 2** (depends on Batch 1):
+- Task 15: Update ScoreBookPage (depends on Task 14)
+- Task 17: PageSidebar (depends on Task 16)
+- Task 21: Settings page font slider (depends on Task 20)
+- Task 22: Keyboard navigation (independent, can run anytime)
+
+**Batch 3** (integration - depends on all above):
+- Task 19: Restructure ScoreBookDisplay layout
+
+**Batch 4** (cleanup - run last):
+- Task 23: Export new components and cleanup
+
+---
+
 ## Notes
 
-- One task per loop iteration
+- One task per loop iteration (or use subagents for parallel execution)
 - Search before implementing - don't duplicate existing code
 - Validation command: `bun run check`
 - Follow Effect.ts patterns for tagged events
 - Use useSyncExternalStore for React integration
+- All new components should include ARIA attributes for accessibility
+- Respect `prefers-reduced-motion` for animations

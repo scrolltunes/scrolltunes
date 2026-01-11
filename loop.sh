@@ -246,6 +246,14 @@ while true; do
   # Success - reset failure counter
   CONSECUTIVE_FAILURES=0
 
+  # Check for completion signal from Claude
+  if [[ "$OUTPUT" =~ "RALPH_COMPLETE" ]]; then
+    echo ""
+    echo -e "${GREEN}=== All Tasks Complete ===${NC}"
+    echo -e "${GREEN}Claude has signaled that all tasks are finished.${NC}"
+    break
+  fi
+
   if [[ $MAX_ITERATIONS -gt 0 && $ITERATION -ge $MAX_ITERATIONS ]]; then
     echo ""
     echo -e "${GREEN}Reached max iterations ($MAX_ITERATIONS).${NC}"

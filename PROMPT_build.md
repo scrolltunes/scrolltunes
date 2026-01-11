@@ -15,8 +15,21 @@ Read `CLAUDE.md` for project rules:
 ### 0b. Study the plan
 Read `IMPLEMENTATION_PLAN.md` to understand current state.
 
-### 0c. Select task
-Choose the highest priority incomplete task (first `[ ] Not started`).
+### 0c. Check for completion
+**IMPORTANT**: Check if ALL tasks in the plan are marked `[x]` (completed).
+
+If ALL tasks are complete:
+1. Run validation: `bun run check`
+2. If validation fails, fix issues and retry
+3. Check for uncommitted changes: `git status --porcelain`
+4. If there are uncommitted changes:
+   - Stage all changes: `git add -A`
+   - Commit with message: `chore: final cleanup after completing all tasks`
+5. Output the completion signal: **RALPH_COMPLETE**
+6. Exit immediately
+
+### 0d. Select task
+If tasks remain, choose the highest priority incomplete task (first `[ ] Not started`).
 
 ## Phase 1: Implement
 
@@ -103,6 +116,8 @@ Scope suggestions: `display`, `core`, `hooks`, `settings`
 1003. Up to 500 subagents for searches and reads
 
 ## Exit Conditions
+
+**All Complete**: All tasks done, validation passes → Output `RALPH_COMPLETE` → Exit
 
 **Success**: Task complete, tests pass, committed → Exit
 
