@@ -249,20 +249,15 @@ export const CompactView = memo(
       if (!container || !card) return
 
       // Available space with margins
-      // - 16% total horizontal margin (8% each side)
-      // - 120px vertical for padding, buttons, and gradient toolbar
-      const availableWidth = container.clientWidth * 0.84
-      const availableHeight = container.clientHeight - 120
+      const availableWidth = container.clientWidth - 48 // 24px margin each side
       const cardWidth = card.scrollWidth
       const cardHeight = card.scrollHeight
 
-      // Calculate scale to fit both dimensions
-      const scaleX = availableWidth / cardWidth
-      const scaleY = availableHeight / cardHeight
+      // Only scale down horizontally if card is too wide
+      const scale = cardWidth > availableWidth ? availableWidth / cardWidth : 1
 
-      // Use the smaller scale to ensure card fits, cap between 0.5 and 1.2
-      const scale = Math.min(scaleX, scaleY, 1.2)
-      const clampedScale = Math.max(0.5, scale)
+      // Clamp between 0.5 and 1.0, round to 3 decimal places
+      const clampedScale = Math.max(0.5, Math.min(scale, 1.0))
       const roundedScale = Math.round(clampedScale * 1000) / 1000
 
       setPreviewScale(roundedScale)
@@ -278,14 +273,25 @@ export const CompactView = memo(
       setScaledHeight(Math.round(cardHeight * previewScale))
     }, [previewScale])
 
-    // Calculate scale on mount and when relevant state changes (not during editing)
+    // Track previous editing state to detect edit mode exit
+    const wasEditingRef = useRef(false)
+
+    // Calculate scale on mount and when lyrics/shadow changes (but not on edit mode exit)
     useLayoutEffect(() => {
-      if (!isTextEditing) {
-        calculateScale()
+      // Skip if currently editing
+      if (isTextEditing) {
+        wasEditingRef.current = true
+        return
       }
+      // Skip recalculation when exiting edit mode - keep the scale locked
+      if (wasEditingRef.current) {
+        wasEditingRef.current = false
+        return
+      }
+      calculateScale()
     }, [calculateScale, lyrics.selectedLines.length, effects.shadow.enabled, isTextEditing])
 
-    // Recalculate on window resize only
+    // Recalculate on window resize only (not during editing)
     useLayoutEffect(() => {
       const handleResize = () => {
         if (!isTextEditing) {
@@ -422,7 +428,7 @@ export const CompactView = memo(
         {/* Preview Area */}
         <div
           ref={previewContainerRef}
-          className="share-modal-preserve relative rounded-2xl bg-neutral-200 p-6 pb-14"
+          className="share-modal-preserve relative min-h-[300px] overflow-hidden rounded-2xl bg-neutral-200 p-6"
         >
           {/* Edit Mode Button */}
           <div className="absolute left-2 top-2 z-10 flex gap-1">
@@ -486,9 +492,10 @@ export const CompactView = memo(
           {/* Card Preview */}
           <div
             style={{
-              height: scaledHeight !== null ? `${scaledHeight}px` : undefined,
+              height: scaledHeight !== null ? `${scaledHeight + 24}px` : undefined,
               overflow: "visible",
-              marginBottom: effects.shadow.enabled ? "-24px" : "0",
+              paddingTop: "12px",
+              paddingBottom: effects.shadow.enabled ? "0" : "12px",
             }}
           >
             <div
@@ -531,17 +538,6 @@ export const CompactView = memo(
             </div>
           </div>
 
-          {/* Gradient Palette - shown when not using album art background */}
-          {!isAlbumArtBackground && (
-            <GradientPalette
-              gradientPalette={gradientPalette}
-              selectedGradientId={selectedGradientId}
-              customColor={state.customColor}
-              onGradientSelect={handleGradientSelect}
-              onCustomColorChange={handleCustomColorChange}
-            />
-          )}
-
           {/* Zoom Slider - shown when editing with album art background */}
           {isTextEditing && isAlbumArtBackground && albumArt && (
             <div className="absolute inset-x-4 bottom-2">
@@ -566,6 +562,17 @@ export const CompactView = memo(
                 onSettingChange={handleEffectSettingChange}
               />
             </div>
+          )}
+
+          {/* Gradient Palette - shown when not using album art background */}
+          {!isAlbumArtBackground && (
+            <GradientPalette
+              gradientPalette={gradientPalette}
+              selectedGradientId={selectedGradientId}
+              customColor={state.customColor}
+              onGradientSelect={handleGradientSelect}
+              onCustomColorChange={handleCustomColorChange}
+            />
           )}
 
           {/* Quick Controls */}

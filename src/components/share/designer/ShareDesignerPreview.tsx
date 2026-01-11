@@ -942,8 +942,14 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
                   suppressContentEditableWarning
                   onBlur={e => {
                     if (isEditing && onTextChange) {
-                      // Use innerText to preserve line breaks from Enter key
-                      const newText = e.currentTarget.innerText ?? ""
+                      // Use innerText to preserve line breaks, then trim empty lines
+                      const rawText = e.currentTarget.innerText ?? ""
+                      const newText = rawText
+                        .split("\n")
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0)
+                        .join("\n")
+                        .trim()
                       onTextChange(line.id, newText)
                     }
                   }}
@@ -954,7 +960,11 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
                     letterSpacing: `${typography.letterSpacing}px`,
                     color: typography.color,
                     margin: "4px 0",
-                    whiteSpace: lyricsElement.wrapText ? "pre-line" : "nowrap",
+                    // Use pre-line when editing, when wrapText is enabled, or when text contains newlines
+                    whiteSpace:
+                      isEditing || lyricsElement.wrapText || getDisplayText(line.id).includes("\n")
+                        ? "pre-line"
+                        : "nowrap",
                     textShadow: typography.textShadow ? "0 2px 4px rgba(0,0,0,0.3)" : "none",
                     outline: "none",
                     cursor: isEditing ? "text" : "default",

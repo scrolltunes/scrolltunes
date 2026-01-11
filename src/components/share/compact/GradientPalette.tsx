@@ -55,11 +55,11 @@ export const GradientPalette = memo(function GradientPalette({
   const isCustomSelected = selectedGradientId === CUSTOM_COLOR_ID
 
   return (
-    <div className="absolute bottom-2 left-2 right-2 flex justify-center">
-      <div
-        className="flex items-center gap-1.5 rounded-full px-2 py-1.5"
-        style={{ background: "rgba(0,0,0,0.5)" }}
-      >
+    <div>
+      <p className="mb-2 text-sm" style={{ color: "var(--color-text3)" }}>
+        Color
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
         {gradientPalette.map(option => {
           const isSelected = selectedGradientId === option.id
 
@@ -68,10 +68,12 @@ export const GradientPalette = memo(function GradientPalette({
               key={option.id}
               type="button"
               onClick={() => onGradientSelect(option.id, option.gradient)}
-              className="h-6 w-6 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1 focus-visible:ring-offset-transparent"
+              className="h-8 w-8 rounded-full transition-all hover:scale-110 focus:outline-none"
               style={{
                 background: option.gradient,
-                boxShadow: isSelected ? "0 0 0 2px white" : "inset 0 0 0 1px rgba(255,255,255,0.2)",
+                boxShadow: isSelected
+                  ? "0 0 0 2px var(--color-accent)"
+                  : "inset 0 0 0 1px var(--color-border)",
               }}
               aria-label={`Select ${option.id} gradient`}
               aria-pressed={isSelected}
@@ -83,16 +85,16 @@ export const GradientPalette = memo(function GradientPalette({
         <button
           type="button"
           onClick={handleCustomColorClick}
-          className="flex h-6 w-6 items-center justify-center rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1 focus-visible:ring-offset-transparent"
+          className="flex h-8 w-8 items-center justify-center rounded-full transition-all hover:scale-110 focus:outline-none"
           style={{
-            background: isCustomSelected ? customColor : "rgba(255,255,255,0.1)",
+            background: isCustomSelected ? customColor : "var(--color-surface2)",
             boxShadow: isCustomSelected
-              ? "0 0 0 2px white"
-              : "inset 0 0 0 1px rgba(255,255,255,0.2)",
+              ? "0 0 0 2px var(--color-accent)"
+              : "inset 0 0 0 1px var(--color-border)",
           }}
           aria-label="Choose custom color"
         >
-          {!isCustomSelected && <Palette size={14} style={{ color: "rgba(255,255,255,0.7)" }} />}
+          {!isCustomSelected && <Palette size={16} style={{ color: "var(--color-text3)" }} />}
         </button>
 
         {/* Hidden color input */}
