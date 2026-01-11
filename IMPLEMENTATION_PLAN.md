@@ -39,7 +39,7 @@ Generated from specs. Tasks sorted by priority.
 - **Details**:
   - Add `pageFlip` to springs object (stiffness 280, damping 26, mass 0.9)
   - Add `pageFlipVariants` to variants object with enter/center/exit states
-- [ ] Not started
+- [x] Completed
 
 ### Task 4: Export new store from core/index.ts
 - **File**: `src/core/index.ts` (modify)
@@ -191,6 +191,10 @@ Generated from specs. Tasks sorted by priority.
 
 ### Task 4: Export new store from core/index.ts
 - Completed as part of Task 2
+
+### Task 3: Add pageFlip animation preset
+- Added `pageFlip` spring preset to springs object (stiffness 280, damping 26, mass 0.9)
+- Added `pageFlip` variants to variants object with enter/center/exit states for horizontal slide animation
 
 ---
 
