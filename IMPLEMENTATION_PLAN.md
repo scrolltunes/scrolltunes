@@ -20,7 +20,7 @@ Generated from specs. Tasks sorted by priority.
   - Add three new preference fields with defaults (scorebook, false, false)
   - Add getter/setter methods following existing pattern
   - Update DEFAULT_PREFERENCES
-- [ ] Not started
+- [x] Completed
 
 ### Task 2: Create ScoreBookStore with pagination state
 - **File**: `src/core/ScoreBookStore.ts` (new)
@@ -175,7 +175,11 @@ Generated from specs. Tasks sorted by priority.
 
 ## Completed Tasks
 
-(Move completed tasks here with brief notes)
+### Task 1: Add display mode preferences to PreferencesStore
+- Added `DisplayMode` type with "scorebook" | "karaoke" options
+- Added 3 new preferences: displayMode, scoreBookShowChords, scoreBookWordHighlight
+- Added getter/setter methods for each preference
+- Default: scorebook mode enabled, chords and word highlight disabled
 
 ---
 

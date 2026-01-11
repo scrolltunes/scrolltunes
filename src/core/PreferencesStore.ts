@@ -28,6 +28,13 @@ export type ActivationMode = "vad_energy" | "singing"
 export type VadEnvironment = "quiet" | "normal" | "noisy"
 
 /**
+ * Display mode for lyrics rendering
+ * - scorebook: Page-based display with manual/auto page flipping
+ * - karaoke: Scrolling teleprompter display (default)
+ */
+export type DisplayMode = "scorebook" | "karaoke"
+
+/**
  * Configuration for the singing detector (MediaPipe YAMNet)
  */
 export interface SingingDetectorConfig {
@@ -67,6 +74,9 @@ export interface Preferences {
   readonly activationMode: ActivationMode
   readonly vadEnvironment: VadEnvironment
   readonly singingDetectorConfig: SingingDetectorConfig
+  readonly displayMode: DisplayMode
+  readonly scoreBookShowChords: boolean
+  readonly scoreBookWordHighlight: boolean
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -80,6 +90,9 @@ const DEFAULT_PREFERENCES: Preferences = {
   activationMode: "vad_energy",
   vadEnvironment: "normal",
   singingDetectorConfig: DEFAULT_SINGING_DETECTOR_CONFIG,
+  displayMode: "scorebook",
+  scoreBookShowChords: false,
+  scoreBookWordHighlight: false,
 }
 
 export class PreferencesStore {
@@ -246,6 +259,30 @@ export class PreferencesStore {
     this.setState({
       singingDetectorConfig: { ...this.state.singingDetectorConfig, ...config },
     })
+  }
+
+  getDisplayMode(): DisplayMode {
+    return this.state.displayMode
+  }
+
+  setDisplayMode(value: DisplayMode): void {
+    this.setState({ displayMode: value })
+  }
+
+  getScoreBookShowChords(): boolean {
+    return this.state.scoreBookShowChords
+  }
+
+  setScoreBookShowChords(value: boolean): void {
+    this.setState({ scoreBookShowChords: value })
+  }
+
+  getScoreBookWordHighlight(): boolean {
+    return this.state.scoreBookWordHighlight
+  }
+
+  setScoreBookWordHighlight(value: boolean): void {
+    this.setState({ scoreBookWordHighlight: value })
   }
 
   reset(): void {
