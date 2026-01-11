@@ -39,7 +39,7 @@ export const EffectThumbnail = memo(function EffectThumbnail({
       aria-checked={isSelected}
       aria-label={`${effect.name}: ${effect.description}`}
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 rounded-lg p-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent"
+      className="relative flex flex-col items-center gap-1.5 rounded-lg p-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent"
       style={{
         width: 60,
         minWidth: 60,
