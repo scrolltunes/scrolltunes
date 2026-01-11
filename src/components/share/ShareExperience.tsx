@@ -1,7 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
-import { ArrowLeft, ArrowRight, Check, SlidersHorizontal, X } from "@phosphor-icons/react"
+import { ArrowLeft, ArrowRight, Check, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -259,13 +259,6 @@ export const ShareExperience = memo(function ShareExperience({
     }
   }, [store])
 
-  // Expand to studio mode
-  const handleExpandToStudio = useCallback(() => {
-    if (store) {
-      store.setMode("expanded")
-    }
-  }, [store])
-
   // Collapse to compact mode
   const handleCollapseToCompact = useCallback(() => {
     if (store) {
@@ -453,35 +446,22 @@ export const ShareExperience = memo(function ShareExperience({
               </AnimatePresence>
             </div>
 
-            {/* Footer - hidden in expanded mode (ExpandedView has its own footer) */}
-            {mode !== "expanded" && (
+            {/* Footer - only shown in select step */}
+            {isSelectStep && (
               <div
                 className="flex gap-3 p-4"
                 style={{ borderTop: "1px solid var(--color-border)" }}
               >
-                {isSelectStep ? (
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    disabled={selectedIds.size === 0}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    style={{ background: "var(--color-accent)", color: "white" }}
-                  >
-                    Next
-                    <ArrowRight size={20} weight="bold" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleExpandToStudio}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
-                    style={{ background: "var(--color-accent)", color: "white" }}
-                    aria-label="Customize"
-                  >
-                    <SlidersHorizontal size={20} weight="bold" />
-                    Customize
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={selectedIds.size === 0}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: "var(--color-accent)", color: "white" }}
+                >
+                  Next
+                  <ArrowRight size={20} weight="bold" />
+                </button>
               </div>
             )}
           </motion.div>
