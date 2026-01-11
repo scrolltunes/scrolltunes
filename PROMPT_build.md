@@ -28,6 +28,7 @@ Key searches before implementing:
 - Related functionality in adjacent files
 - Store patterns in `src/core/`
 - UI patterns in `src/components/ui/`
+- Animation patterns in `src/animations.ts`
 
 ### 1b. Implement
 Write the code for this ONE task. Follow project patterns:
@@ -50,20 +51,25 @@ class SomeStore {
   }
 }
 
-// Effect.ts pattern
-const myEffect = Effect.gen(function* () {
-  const result = yield* someAsyncOp
-  return result
-}).pipe(
-  Effect.timeout("5 seconds"),
-  Effect.retry({ times: 3 })
-)
+// Tagged events (Effect.ts)
+export class SomeEvent extends Data.TaggedClass("SomeEvent")<{
+  readonly value: string
+}> {}
+
+// Hook pattern
+export function useSomeState(): State {
+  return useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    () => DEFAULT_STATE,
+  )
+}
 ```
 
 ### 1c. Validate
 Run validation command: `bun run check`
 
-This runs: `biome check . && bun run typecheck && bun run test`
+This runs: `biome lint . && bun run typecheck && bun run test`
 
 Must pass before proceeding. If it fails, fix and retry.
 
@@ -79,14 +85,14 @@ Mark the task complete in `IMPLEMENTATION_PLAN.md`:
 
 Create atomic commit:
 ```
-feat(share): short description
+feat(display): short description
 
 Details if needed.
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-Scope suggestions: `share`, `effects`, `store`
+Scope suggestions: `display`, `core`, `hooks`, `settings`
 
 ## Guardrails
 
