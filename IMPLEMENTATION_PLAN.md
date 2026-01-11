@@ -101,7 +101,7 @@ Generated from specs. Tasks sorted by priority.
   - Text: "Next page ready"
   - Position at bottom of lyrics area
   - Semi-transparent background
-- [ ] Not started
+- [x] Completed
 
 ### Task 9: Create ScoreBookPage component
 - **File**: `src/components/display/ScoreBookPage.tsx` (new)
@@ -218,6 +218,17 @@ Generated from specs. Tasks sorted by priority.
 - Renders "Page X of Y" with text-muted color
 - Positioned absolute top-right with subtle styling
 - Includes ARIA label and aria-live="polite" for accessibility
+- Exported from `src/components/display/index.ts`
+
+### Task 8: Create PageFlipWarning component
+- Created `src/components/display/PageFlipWarning.tsx` with memo pattern
+- Props: visible, onTap
+- AnimatePresence for enter/exit animations
+- Pulse animation using timing.pulse for gentle opacity cycling
+- Text: "Next page ready" with accent color styling
+- Positioned absolute bottom center with semi-transparent background
+- Backdrop blur and accent border for visibility
+- ARIA label for accessibility
 - Exported from `src/components/display/index.ts`
 
 ---
