@@ -114,7 +114,7 @@ Generated from specs. Tasks sorted by priority.
   - Past lines: opacity-30 to opacity-40
   - Upcoming lines: opacity-50
   - Reuse LyricLine component with appropriate props
-- [ ] Not started
+- [x] Completed
 
 ### Task 10: Create ScoreBookDisplay main component
 - **File**: `src/components/display/ScoreBookDisplay.tsx` (new)
@@ -138,7 +138,7 @@ Generated from specs. Tasks sorted by priority.
   - Export ScoreBookPage
   - Export PageIndicator
   - Export PageFlipWarning
-- [ ] Not started
+- [~] In progress (ScoreBookPage exported, ScoreBookDisplay pending)
 
 ---
 
@@ -229,6 +229,17 @@ Generated from specs. Tasks sorted by priority.
 - Positioned absolute bottom center with semi-transparent background
 - Backdrop blur and accent border for visibility
 - ARIA label for accessibility
+- Exported from `src/components/display/index.ts`
+
+### Task 9: Create ScoreBookPage component
+- Created `src/components/display/ScoreBookPage.tsx` with memo pattern
+- Props: lines, currentLineIndex, pageStartIndex, fontSize, showChords, showWordHighlight, currentTime, isPlaying, onLineClick, lineChordData, isRTL, songDuration, allLines
+- Position-based styling using LinePosition type (past-far, past-near, current, next, upcoming)
+- Current line: border-l-[3px] with accent color
+- Next line: ml-2 indent
+- Reuses LyricLine component with appropriate props for opacity and styling
+- Supports word-level highlighting when showWordHighlight enabled
+- Supports chord display when showChords enabled
 - Exported from `src/components/display/index.ts`
 
 ---
