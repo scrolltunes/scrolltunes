@@ -8,3 +8,4 @@ export { ScoreBookDisplay, type ScoreBookDisplayProps } from "./ScoreBookDisplay
 export { ScoreBookPage, type ScoreBookPageProps } from "./ScoreBookPage"
 export { SongActionBar, type SongActionBarProps } from "./SongActionBar"
 export { SongInfoModal, type SongInfoModalProps } from "./SongInfoModal"
+export { StaticLyricLine, type StaticLyricLineProps } from "./StaticLyricLine"

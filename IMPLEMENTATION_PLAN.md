@@ -288,6 +288,19 @@ Generated from specs. Tasks sorted by priority.
     - Toggle for "Word highlight" (HighlighterCircle icon)
 - Added `DisplayMode` type export to `src/core/index.ts`
 
+### Task 14: Create StaticLyricLine component
+- Created `src/components/display/StaticLyricLine.tsx` with memo pattern
+- Props: `text`, `isActive`, `isPast`, `isNext`, `fontSize`, `onClick`, `index`, `chords`, `chordPositions`, `isRTL`, `innerRef`
+- Active line styling: font-semibold + subtle accent background with AnimatePresence animation
+- Next line: 85% opacity
+- Past lines: 40% opacity
+- Upcoming lines: 100% opacity with muted text color
+- Reuses InlineChord for fallback chord display, ChordBadge for positioned chords
+- Handles empty lines with musical note (♪) placeholder
+- Full RTL text direction support
+- ARIA attributes: `aria-current` for active, `aria-label` for line content
+- Exported from `src/components/display/index.ts`
+
 ---
 
 ## Gap Analysis (Phase 5)
@@ -297,7 +310,7 @@ Generated from specs. Tasks sorted by priority.
 ### Components Verified Missing
 | Component | Status | Notes |
 |-----------|--------|-------|
-| StaticLyricLine.tsx | ❌ Missing | No file exists |
+| StaticLyricLine.tsx | ✅ Done | Completed in Task 14 |
 | PageThumbnail.tsx | ❌ Missing | No file exists |
 | PageSidebar.tsx | ❌ Missing | No file exists |
 | PageNavigationArrows.tsx | ❌ Missing | No file exists |
@@ -365,7 +378,7 @@ Task 22 (Keyboard nav) - independent, can be done anytime
   - Support RTL text direction
   - Include ARIA attributes for accessibility
 - **Depends on**: None (leaf task)
-- [ ] Not started
+- [x] Completed
 
 ### Task 15: Update ScoreBookPage to use StaticLyricLine
 - **File**: `src/components/display/ScoreBookPage.tsx` (modify)
