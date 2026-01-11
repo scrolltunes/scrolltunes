@@ -217,85 +217,6 @@ export interface GradientOption {
   readonly previewColors: readonly [string, string]
 }
 
-function shiftHueRgb(color: RGB, degrees: number): RGB {
-  const max = Math.max(color.r, color.g, color.b)
-  const min = Math.min(color.r, color.g, color.b)
-  const l = (max + min) / 2 / 255
-
-  if (max === min) return color
-
-  const d = (max - min) / 255
-  const s = l > 0.5 ? d / (2 - (max + min) / 255) : d / ((max + min) / 255)
-
-  let h = 0
-  if (max === color.r) {
-    h = ((color.g - color.b) / (max - min) + (color.g < color.b ? 6 : 0)) / 6
-  } else if (max === color.g) {
-    h = ((color.b - color.r) / (max - min) + 2) / 6
-  } else {
-    h = ((color.r - color.g) / (max - min) + 4) / 6
-  }
-
-  h = (h + degrees / 360) % 1
-  if (h < 0) h += 1
-
-  const hue2rgb = (p: number, q: number, t: number) => {
-    let tNorm = t
-    if (tNorm < 0) tNorm += 1
-    if (tNorm > 1) tNorm -= 1
-    if (tNorm < 1 / 6) return p + (q - p) * 6 * tNorm
-    if (tNorm < 1 / 2) return q
-    if (tNorm < 2 / 3) return p + (q - p) * (2 / 3 - tNorm) * 6
-    return p
-  }
-
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
-  const p = 2 * l - q
-
-  return {
-    r: Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
-    g: Math.round(hue2rgb(p, q, h) * 255),
-    b: Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
-  }
-}
-
-function darkenRgb(color: RGB, factor: number): RGB {
-  return {
-    r: Math.max(0, Math.round(color.r * (1 - factor))),
-    g: Math.max(0, Math.round(color.g * (1 - factor))),
-    b: Math.max(0, Math.round(color.b * (1 - factor))),
-  }
-}
-
-function lightenRgb(color: RGB, factor: number): RGB {
-  return {
-    r: Math.min(255, Math.round(color.r + (255 - color.r) * factor)),
-    g: Math.min(255, Math.round(color.g + (255 - color.g) * factor)),
-    b: Math.min(255, Math.round(color.b + (255 - color.b) * factor)),
-  }
-}
-
-function saturateRgb(color: RGB, factor: number): RGB {
-  const gray = (color.r + color.g + color.b) / 3
-  return {
-    r: Math.min(255, Math.max(0, Math.round(color.r + (color.r - gray) * factor))),
-    g: Math.min(255, Math.max(0, Math.round(color.g + (color.g - gray) * factor))),
-    b: Math.min(255, Math.max(0, Math.round(color.b + (color.b - gray) * factor))),
-  }
-}
-
-function getBrightness(color: RGB): number {
-  // Perceived brightness formula (ITU-R BT.709)
-  return (color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722) / 255
-}
-
-function getSaturation(color: RGB): number {
-  const max = Math.max(color.r, color.g, color.b)
-  const min = Math.min(color.r, color.g, color.b)
-  if (max === 0) return 0
-  return (max - min) / max
-}
-
 // Vibrant preset gradients for dark album art
 const VIBRANT_GRADIENTS: GradientOption[] = [
   {
@@ -345,85 +266,114 @@ const DARK_GRADIENTS: GradientOption[] = [
 ]
 
 /**
+ * Convert RGB to HSL for better color manipulation
+ */
+function rgbToHsl(color: RGB): { h: number; s: number; l: number } {
+  const r = color.r / 255
+  const g = color.g / 255
+  const b = color.b / 255
+
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+
+  if (max === min) {
+    return { h: 0, s: 0, l }
+  }
+
+  const d = max - min
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+
+  let h = 0
+  if (max === r) {
+    h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+  } else if (max === g) {
+    h = ((b - r) / d + 2) / 6
+  } else {
+    h = ((r - g) / d + 4) / 6
+  }
+
+  return { h: h * 360, s, l }
+}
+
+/**
+ * Convert HSL to RGB
+ */
+function hslToRgb(h: number, s: number, l: number): RGB {
+  const hNorm = h / 360
+
+  if (s === 0) {
+    const gray = Math.round(l * 255)
+    return { r: gray, g: gray, b: gray }
+  }
+
+  const hue2rgb = (p: number, q: number, t: number) => {
+    let tNorm = t
+    if (tNorm < 0) tNorm += 1
+    if (tNorm > 1) tNorm -= 1
+    if (tNorm < 1 / 6) return p + (q - p) * 6 * tNorm
+    if (tNorm < 1 / 2) return q
+    if (tNorm < 2 / 3) return p + (q - p) * (2 / 3 - tNorm) * 6
+    return p
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+  const p = 2 * l - q
+
+  return {
+    r: Math.round(hue2rgb(p, q, hNorm + 1 / 3) * 255),
+    g: Math.round(hue2rgb(p, q, hNorm) * 255),
+    b: Math.round(hue2rgb(p, q, hNorm - 1 / 3) * 255),
+  }
+}
+
+/**
  * Build a gradient palette from a base color (hex) for shareable cards.
- * First 2 swatches use complementary colors that contrast with the album art.
+ * Dark presets first, then vibrant presets, then album-derived colors last.
  */
 export function buildGradientPalette(baseColor: string | null): GradientOption[] {
   const rgb = baseColor ? hexToRgb(baseColor) : null
 
   if (!rgb) {
-    // No album art color - return default vibrant + dark gradients
-    return [...VIBRANT_GRADIENTS, ...DARK_GRADIENTS]
+    // No album art color - return default dark + vibrant gradients
+    return [...DARK_GRADIENTS, ...VIBRANT_GRADIENTS]
   }
 
-  const brightness = getBrightness(rgb)
-  const saturation = getSaturation(rgb)
-  const isGrayish = saturation < 0.2
+  const hsl = rgbToHsl(rgb)
 
-  // For grayish album art, prioritize vibrant presets since album-derived colors
-  // will all look similar (gray on gray)
-  if (isGrayish) {
-    return [...VIBRANT_GRADIENTS, ...DARK_GRADIENTS]
-  }
+  // For very desaturated colors, still create derived colors but boost saturation
+  const baseSaturation = Math.max(hsl.s, 0.6) // Ensure minimum 60% saturation
 
-  // Create complementary colors that contrast with the album art
-  // These won't get "swallowed" by the album background
+  // Complementary color (180° opposite)
+  const comp1Hue = (hsl.h + 180) % 360
+  const comp1Light = hslToRgb(comp1Hue, baseSaturation, 0.55)
+  const comp1Dark = hslToRgb(comp1Hue, baseSaturation * 0.9, 0.3)
 
-  // Complementary: 180 degrees opposite on color wheel
-  const complementary = shiftHueRgb(rgb, 180)
-  // Split-complementary: 150 degrees (next to complementary)
-  const splitComplementary = shiftHueRgb(rgb, 150)
+  // Triadic color (120° shift) for contrast
+  const comp2Hue = (hsl.h + 120) % 360
+  const comp2Light = hslToRgb(comp2Hue, baseSaturation, 0.5)
+  const comp2Dark = hslToRgb(comp2Hue, baseSaturation * 0.9, 0.28)
 
-  // Adjust brightness/saturation for good contrast
-  // If album is dark, make gradients vibrant; if light, make them rich
-  const adjustColor = (color: RGB): RGB => {
-    let adjusted = color
-
-    // Ensure good saturation
-    adjusted = saturateRgb(adjusted, 0.5)
-
-    // Adjust brightness for contrast
-    if (brightness < 0.4) {
-      // Dark album: lighten the complementary colors
-      adjusted = lightenRgb(adjusted, 0.3)
-    } else if (brightness > 0.6) {
-      // Light album: darken the complementary colors
-      adjusted = darkenRgb(adjusted, 0.3)
-    }
-
-    // Ensure minimum brightness for visibility
-    if (getBrightness(adjusted) < 0.25) {
-      adjusted = lightenRgb(adjusted, 0.2)
-    }
-
-    return adjusted
-  }
-
-  const comp1 = adjustColor(complementary)
-  const comp1Dark = darkenRgb(comp1, 0.3)
-  const comp2 = adjustColor(splitComplementary)
-  const comp2Dark = darkenRgb(comp2, 0.3)
-
-  const comp1Hex = rgbToHex(comp1)
+  const comp1LightHex = rgbToHex(comp1Light)
   const comp1DarkHex = rgbToHex(comp1Dark)
-  const comp2Hex = rgbToHex(comp2)
+  const comp2LightHex = rgbToHex(comp2Light)
   const comp2DarkHex = rgbToHex(comp2Dark)
 
   return [
-    // First 2: Complementary gradients that contrast with album art
-    {
-      id: "album-complementary",
-      gradient: `linear-gradient(135deg, ${comp1Hex} 0%, ${comp1DarkHex} 100%)`,
-      previewColors: [comp1Hex, comp1DarkHex],
-    },
-    {
-      id: "album-split-complementary",
-      gradient: `linear-gradient(135deg, ${comp2Hex} 0%, ${comp2DarkHex} 100%)`,
-      previewColors: [comp2Hex, comp2DarkHex],
-    },
+    // Dark presets first
+    ...DARK_GRADIENTS,
     // Vibrant presets
     ...VIBRANT_GRADIENTS.slice(0, 4),
-    // Dark presets
-    ...DARK_GRADIENTS,
+    // Album-derived contrasting gradients last
+    {
+      id: "album-complementary",
+      gradient: `linear-gradient(135deg, ${comp1LightHex} 0%, ${comp1DarkHex} 100%)`,
+      previewColors: [comp1LightHex, comp1DarkHex],
+    },
+    {
+      id: "album-triadic",
+      gradient: `linear-gradient(135deg, ${comp2LightHex} 0%, ${comp2DarkHex} 100%)`,
+      previewColors: [comp2LightHex, comp2DarkHex],
+    },
   ]
 }
