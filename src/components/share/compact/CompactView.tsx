@@ -276,7 +276,7 @@ export const CompactView = memo(
     // Track previous editing state to detect edit mode exit
     const wasEditingRef = useRef(false)
 
-    // Calculate scale on mount and when lyrics/shadow changes (but not on edit mode exit)
+    // Calculate scale on mount and when lyrics change (but not on edit mode exit or shadow toggle)
     useLayoutEffect(() => {
       // Skip if currently editing
       if (isTextEditing) {
@@ -289,7 +289,7 @@ export const CompactView = memo(
         return
       }
       calculateScale()
-    }, [calculateScale, lyrics.selectedLines.length, effects.shadow.enabled, isTextEditing])
+    }, [calculateScale, lyrics.selectedLines.length, isTextEditing])
 
     // Recalculate on window resize only (not during editing)
     useLayoutEffect(() => {
@@ -495,7 +495,7 @@ export const CompactView = memo(
               height: scaledHeight !== null ? `${scaledHeight + 24}px` : undefined,
               overflow: "visible",
               paddingTop: "12px",
-              paddingBottom: effects.shadow.enabled ? "0" : "12px",
+              paddingBottom: "12px",
             }}
           >
             <div

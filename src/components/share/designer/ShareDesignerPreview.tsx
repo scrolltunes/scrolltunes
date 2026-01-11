@@ -771,9 +771,12 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     <div
       ref={previewRef}
       style={{
-        padding: effects.shadow.enabled
-          ? `16px 16px ${effects.shadow.offsetY + effects.shadow.blur}px 16px`
-          : "0",
+        paddingTop: "16px",
+        paddingLeft: "16px",
+        paddingRight: "16px",
+        paddingBottom: effects.shadow.enabled
+          ? `${16 + effects.shadow.offsetY + effects.shadow.blur}px`
+          : "16px",
         background: "transparent",
       }}
     >
