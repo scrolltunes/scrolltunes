@@ -3,7 +3,7 @@
 import { springs } from "@/animations"
 import { FloatingMetronome, SingingDebugIndicator, VoiceIndicator } from "@/components/audio"
 import { ChordInfoPanel } from "@/components/chords"
-import { LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
+import { LyricsDisplay, ScoreBookDisplay, SongActionBar, SongInfoModal } from "@/components/display"
 import { EditModeProvider, EditToolbar, EditableLyricsDisplay } from "@/components/edit-mode"
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
@@ -737,6 +737,11 @@ export default function SongPageClient({
               </div>
             </div>
           </EditModeProvider>
+        ) : preferences.displayMode === "scorebook" ? (
+          <ScoreBookDisplay
+            className="flex-1 pb-12"
+            chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
+          />
         ) : (
           <LyricsDisplay
             className="flex-1 pb-12"

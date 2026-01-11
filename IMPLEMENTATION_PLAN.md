@@ -153,7 +153,7 @@ Generated from specs. Tasks sorted by priority.
   - Render LyricsDisplay when displayMode === "karaoke"
   - Pass appropriate props (chordEnhancement, etc.)
   - Maintain edit mode behavior unchanged
-- [ ] Not started
+- [x] Completed
 
 ### Task 13: Add display mode toggle to Settings page
 - **File**: `src/app/settings/page.tsx` (modify)
@@ -259,6 +259,15 @@ Generated from specs. Tasks sorted by priority.
 ### Task 11: Export components from display/index.ts
 - Added ScoreBookDisplay export to `src/components/display/index.ts`
 - All Score Book components now exported: ScoreBookDisplay, ScoreBookPage, PageIndicator, PageFlipWarning
+
+### Task 12: Integrate ScoreBookDisplay into SongPageClient
+- Modified `src/app/song/[artistSlug]/[trackSlugWithId]/SongPageClient.tsx`
+- Added ScoreBookDisplay import from `@/components/display`
+- Added conditional rendering based on `preferences.displayMode`:
+  - When `displayMode === "scorebook"`: renders `ScoreBookDisplay`
+  - When `displayMode === "karaoke"`: renders `LyricsDisplay`
+- Edit mode behavior unchanged (still uses `EditModeProvider` with `EditableLyricsDisplay`)
+- Both displays receive same props pattern (`className`, `chordEnhancement`)
 
 ---
 
