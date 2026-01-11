@@ -5,6 +5,7 @@ import {
   type ActivationMode,
   DEFAULT_FONT_SIZE,
   DEFAULT_SINGING_DETECTOR_CONFIG,
+  type DisplayMode,
   FONT_SIZE_STEP,
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
@@ -21,9 +22,12 @@ import {
   DeviceMobile,
   DownloadSimple,
   Hand,
+  HighlighterCircle,
   Microphone,
   Moon,
   MusicNotes,
+  Notebook,
+  Scroll,
   SignOut,
   SlidersHorizontal,
   TextAa,
@@ -785,6 +789,18 @@ export default function SettingsPage() {
     preferencesStore.setThemeMode(mode)
   }, [])
 
+  const handleDisplayModeChange = useCallback((mode: DisplayMode) => {
+    preferencesStore.setDisplayMode(mode)
+  }, [])
+
+  const handleToggleScoreBookChords = useCallback(() => {
+    preferencesStore.setScoreBookShowChords(!preferences.scoreBookShowChords)
+  }, [preferences.scoreBookShowChords])
+
+  const handleToggleScoreBookWordHighlight = useCallback(() => {
+    preferencesStore.setScoreBookWordHighlight(!preferences.scoreBookWordHighlight)
+  }, [preferences.scoreBookWordHighlight])
+
   const handleReset = useCallback(() => {
     preferencesStore.reset()
   }, [])
@@ -885,6 +901,58 @@ export default function SettingsPage() {
                 step={1000}
                 formatValue={formatAutoHide}
               />
+            </div>
+          </section>
+
+          {/* Display Mode Section */}
+          <section>
+            <h2
+              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              Display Mode
+            </h2>
+            <div className="space-y-3">
+              <RadioOption
+                selected={preferences.displayMode === "scorebook"}
+                onSelect={() => handleDisplayModeChange("scorebook")}
+                label="Score Book"
+                description="Page-based display with manual or auto page flipping"
+                icon={<Notebook size={20} weight="duotone" />}
+              />
+              <RadioOption
+                selected={preferences.displayMode === "karaoke"}
+                onSelect={() => handleDisplayModeChange("karaoke")}
+                label="Karaoke"
+                description="Scrolling teleprompter display"
+                icon={<Scroll size={20} weight="duotone" />}
+              />
+
+              {/* Score Book Options (only when Score Book mode is selected) */}
+              {preferences.displayMode === "scorebook" && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-3"
+                >
+                  <Toggle
+                    enabled={preferences.scoreBookShowChords}
+                    onToggle={handleToggleScoreBookChords}
+                    label="Show chords"
+                    description="Display chord symbols above lyrics"
+                    icon={<MusicNotes size={20} weight="duotone" />}
+                  />
+                  <Toggle
+                    enabled={preferences.scoreBookWordHighlight}
+                    onToggle={handleToggleScoreBookWordHighlight}
+                    label="Word highlight"
+                    description="Highlight individual words as you sing"
+                    icon={<HighlighterCircle size={20} weight="duotone" />}
+                  />
+                </motion.div>
+              )}
             </div>
           </section>
 

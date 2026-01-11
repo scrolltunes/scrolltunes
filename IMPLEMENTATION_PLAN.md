@@ -163,7 +163,7 @@ Generated from specs. Tasks sorted by priority.
   - Add Score Book section with chord and word highlight toggles
   - Follow existing settings UI patterns
   - Update preferences via preferencesStore methods
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -268,6 +268,18 @@ Generated from specs. Tasks sorted by priority.
   - When `displayMode === "karaoke"`: renders `LyricsDisplay`
 - Edit mode behavior unchanged (still uses `EditModeProvider` with `EditableLyricsDisplay`)
 - Both displays receive same props pattern (`className`, `chordEnhancement`)
+
+### Task 13: Add display mode toggle to Settings page
+- Modified `src/app/settings/page.tsx` to add Display Mode section
+- Added imports: `DisplayMode` type, `Notebook`, `Scroll`, `HighlighterCircle` icons
+- Added new handlers: `handleDisplayModeChange`, `handleToggleScoreBookChords`, `handleToggleScoreBookWordHighlight`
+- Created Display Mode section with:
+  - RadioOption for Score Book mode (Notebook icon)
+  - RadioOption for Karaoke mode (Scroll icon)
+  - Conditional Score Book options (animated with motion.div):
+    - Toggle for "Show chords" (MusicNotes icon)
+    - Toggle for "Word highlight" (HighlighterCircle icon)
+- Added `DisplayMode` type export to `src/core/index.ts`
 
 ---
 
