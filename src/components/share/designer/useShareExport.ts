@@ -61,6 +61,24 @@ export function useShareExport({
           letterSpacing: "0px",
         },
         fontEmbedCSS: "",
+        // Filter out edit mode UI elements
+        filter: (node: HTMLElement) => {
+          // Exclude image edit border indicator
+          if (node.classList?.contains("image-edit-border")) {
+            return false
+          }
+          return true
+        },
+        // Clean up edit styling in the cloned DOM before capture
+        onclone: (_doc: Document, element: HTMLElement) => {
+          // Remove text edit styling (dashed underlines) from contentEditable elements
+          const editableElements = element.querySelectorAll<HTMLElement>("[contenteditable]")
+          for (const el of editableElements) {
+            el.style.textDecoration = "none"
+            el.style.cursor = "default"
+            el.removeAttribute("contenteditable")
+          }
+        },
       }
 
       let dataUrl: string

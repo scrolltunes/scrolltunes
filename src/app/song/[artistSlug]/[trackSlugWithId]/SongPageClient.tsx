@@ -8,7 +8,7 @@ import { EditModeProvider, EditToolbar, EditableLyricsDisplay } from "@/componen
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
 import { AddToSetlistModal } from "@/components/setlists"
-import { LyricsShareModal } from "@/components/share"
+import { ShareExperience } from "@/components/share"
 import { AmbientBackground, StatusLabel } from "@/components/ui"
 
 import {
@@ -39,12 +39,12 @@ import {
 } from "@/hooks"
 import { applyEnhancement } from "@/lib"
 import { computeLrcHashSync } from "@/lib/lrc-hash"
-import { applyEditPatches } from "@/lib/song-edits"
 import { saveCachedLyrics } from "@/lib/lyrics-cache"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
+import { applyEditPatches } from "@/lib/song-edits"
 import { userApi } from "@/lib/user-api"
-import { soundSystem } from "@/sounds"
 import type { SongDataSuccess } from "@/services/song-loader"
+import { soundSystem } from "@/sounds"
 import {
   ArrowCounterClockwise,
   ArrowLeft,
@@ -56,7 +56,7 @@ import {
 } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 type ErrorType = "invalid-url" | "not-found" | "network" | "invalid-lyrics"
@@ -155,7 +155,6 @@ export default function SongPageClient({
   initialData,
   initialError,
 }: SongPageClientProps) {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const spotifyId = searchParams.get("spotifyId")
   const shouldEnterEditMode = searchParams.get("edit") === "1"
@@ -179,22 +178,6 @@ export default function SongPageClient({
 
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareInitialIds, setShareInitialIds] = useState<readonly string[]>([])
-
-  const navigateToStudio = useCallback(
-    (selectedIds?: readonly string[]) => {
-      setShowShareModal(false)
-      const baseUrl = `/song/${artistSlug}/${trackSlugWithId}/share`
-      const queryParams = new URLSearchParams()
-      if (selectedIds && selectedIds.length > 0) {
-        queryParams.set("lines", selectedIds.join(","))
-        queryParams.set("step", "customize")
-      } else {
-        queryParams.set("step", "select")
-      }
-      router.push(`${baseUrl}?${queryParams.toString()}`)
-    },
-    [router, artistSlug, trackSlugWithId],
-  )
 
   const playerState = usePlayerState()
   const { play, pause, reset, load } = usePlayerControls()
@@ -734,7 +717,7 @@ export default function SongPageClient({
       )}
 
       {loadState._tag === "Loaded" && (
-        <LyricsShareModal
+        <ShareExperience
           isOpen={showShareModal}
           onClose={() => {
             setShowShareModal(false)
@@ -747,7 +730,6 @@ export default function SongPageClient({
           spotifyId={loadState.spotifyId}
           lines={loadState.lyrics.lines}
           initialSelectedIds={shareInitialIds}
-          onOpenStudio={navigateToStudio}
         />
       )}
     </div>

@@ -4,8 +4,7 @@ import { detectLyricsDirection } from "@/lib"
 import { type GradientOption, buildGradientPalette, extractDominantColor } from "@/lib/colors"
 import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
-import type { EffectSettings, EffectType } from "../effects"
-import { type Template, getTemplateById } from "./templates"
+import { type Template, getTemplateById } from "./designer/templates"
 import {
   type AlbumArtEffectConfig,
   type AspectRatioConfig,
@@ -26,11 +25,47 @@ import {
   type LyricLineSelection,
   type LyricsSelectionConfig,
   type PatternBackground,
-  type ShareDesignerEditorState,
+  type ShadowConfig,
   type ShareDesignerSongContext,
   type ShareDesignerState,
   type TypographyConfig,
-} from "./types"
+} from "./designer/types"
+import type { EffectSettings, EffectType } from "./effects"
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export type ShareExperienceMode = "compact" | "expanded"
+export type ShareExperienceStep = "select" | "customize"
+
+/**
+ * Quick preset types for one-click styling.
+ * Presets are album-aware and adapt to the song's album art colors.
+ */
+export type QuickPreset = "clean" | "vibrant" | "dark" | "vintage"
+
+/**
+ * Pattern variants for compact mode.
+ * Extends the base PatternVariant with "albumArt" option for full-bleed album art backgrounds.
+ * In compact mode, patterns (dots/grid/waves) are overlays on gradient backgrounds,
+ * while "albumArt" switches to album art as the background.
+ */
+export type CompactPatternVariant = "none" | "dots" | "grid" | "waves" | "albumArt"
+
+export interface ShareExperienceEditorState extends ShareDesignerState {
+  readonly editor: EditorState
+  readonly experienceMode: ShareExperienceMode
+  readonly experienceStep: ShareExperienceStep
+  readonly activePreset: QuickPreset | null
+  readonly compactPattern: CompactPatternVariant
+  readonly compactPatternSeed: number
+  readonly gradientPalette: readonly GradientOption[]
+  // Selected color state (persists across pattern changes)
+  readonly selectedGradientId: string | null
+  readonly isCustomColor: boolean
+  readonly customColor: string
+}
 
 // ============================================================================
 // Constants
@@ -43,7 +78,41 @@ const COALESCE_THRESHOLD_MS = 500
 // Tagged Events (Effect.ts pattern)
 // ============================================================================
 
+// --- Experience Mode Events (no history) ---
+
+export class SetExperienceMode extends Data.TaggedClass("SetExperienceMode")<{
+  readonly mode: ShareExperienceMode
+}> {}
+
+export class SetExperienceStep extends Data.TaggedClass("SetExperienceStep")<{
+  readonly step: ShareExperienceStep
+}> {}
+
+// --- Quick Preset Events ---
+
+export class SetActivePreset extends Data.TaggedClass("SetActivePreset")<{
+  readonly preset: QuickPreset | null
+}> {}
+
+export class ApplyQuickPreset extends Data.TaggedClass("ApplyQuickPreset")<{
+  readonly preset: QuickPreset
+}> {}
+
+// --- Compact Pattern Events ---
+
+export class SetCompactPattern extends Data.TaggedClass("SetCompactPattern")<{
+  readonly pattern: CompactPatternVariant
+}> {}
+
+export class RegenerateCompactPatternSeed extends Data.TaggedClass(
+  "RegenerateCompactPatternSeed",
+)<object> {}
+
 // --- State Events (with undo history) ---
+
+export class ApplyTemplate extends Data.TaggedClass("ApplyTemplate")<{
+  readonly templateId: string
+}> {}
 
 export class SetAspectRatio extends Data.TaggedClass("SetAspectRatio")<{
   readonly config: AspectRatioConfig
@@ -87,10 +156,6 @@ export class ResetAllLineText extends Data.TaggedClass("ResetAllLineText")<objec
 
 export class SetExportSettings extends Data.TaggedClass("SetExportSettings")<{
   readonly config: Partial<ExportSettings>
-}> {}
-
-export class ApplyTemplate extends Data.TaggedClass("ApplyTemplate")<{
-  readonly templateId: string
 }> {}
 
 export class RegeneratePatternSeed extends Data.TaggedClass("RegeneratePatternSeed")<object> {}
@@ -150,7 +215,14 @@ export class ResetStore extends Data.TaggedClass("ResetStore")<object> {}
 
 // --- Event Union Type ---
 
-export type ShareDesignerEvent =
+export type ShareExperienceEvent =
+  | SetExperienceMode
+  | SetExperienceStep
+  | SetActivePreset
+  | ApplyQuickPreset
+  | SetCompactPattern
+  | RegenerateCompactPatternSeed
+  | ApplyTemplate
   | SetAspectRatio
   | SetPadding
   | SetBackground
@@ -162,7 +234,6 @@ export type ShareDesignerEvent =
   | ResetLineText
   | ResetAllLineText
   | SetExportSettings
-  | ApplyTemplate
   | RegeneratePatternSeed
   | SetAlbumArtEffect
   | SetAlbumArtEffectSetting
@@ -250,19 +321,30 @@ function buildBackgroundFromTemplate(template: Template): BackgroundConfig {
 }
 
 // ============================================================================
-// ShareDesignerStore Class
+// ShareExperienceStore Class
 // ============================================================================
 
-export class ShareDesignerStore {
+export class ShareExperienceStore {
   private listeners = new Set<() => void>()
   private state: ShareDesignerState
   private editor: EditorState = DEFAULT_EDITOR_STATE
+  private experienceMode: ShareExperienceMode = "compact"
+  private experienceStep: ShareExperienceStep = "select"
+  private activePreset: QuickPreset | null = null
+  private compactPattern: CompactPatternVariant = "none"
+  private compactPatternSeed: number = Date.now()
   private history: HistoryState = { past: [], future: [] }
   private lastChangeTimestamp = 0
   private context: ShareDesignerSongContext
   private gradientPalette: readonly GradientOption[] = []
   private currentTemplateId: string | null = null
-  private cachedSnapshot: ShareDesignerEditorState | null = null
+  private cachedSnapshot: ShareExperienceEditorState | null = null
+  // The user's selected gradient - persists across all pattern changes
+  private selectedGradient: GradientBackground | null = null
+  // Custom color for the color picker
+  private customColor = "#4f46e5"
+  // Whether using custom color (true) or gradient (false)
+  private isCustomColor = false
 
   constructor(context: ShareDesignerSongContext) {
     this.context = context
@@ -280,11 +362,20 @@ export class ShareDesignerStore {
     return () => this.listeners.delete(listener)
   }
 
-  getSnapshot = (): ShareDesignerEditorState => {
+  getSnapshot = (): ShareExperienceEditorState => {
     if (!this.cachedSnapshot) {
       this.cachedSnapshot = {
         ...this.state,
         editor: this.editor,
+        experienceMode: this.experienceMode,
+        experienceStep: this.experienceStep,
+        activePreset: this.activePreset,
+        compactPattern: this.compactPattern,
+        compactPatternSeed: this.compactPatternSeed,
+        gradientPalette: this.gradientPalette,
+        selectedGradientId: this.isCustomColor ? null : (this.selectedGradient?.gradientId ?? null),
+        isCustomColor: this.isCustomColor,
+        customColor: this.customColor,
       }
     }
     return this.cachedSnapshot
@@ -306,11 +397,51 @@ export class ShareDesignerStore {
    * Dispatch an event to the store.
    * Returns an Effect that can be composed or run.
    */
-  readonly dispatch = (event: ShareDesignerEvent): Effect.Effect<void> => {
+  readonly dispatch = (event: ShareExperienceEvent): Effect.Effect<void> => {
     // Capture this for use in generators
     const store = this
 
     switch (event._tag) {
+      // --- Experience Mode Events ---
+      case "SetExperienceMode":
+        return Effect.sync(() => {
+          store.experienceMode = event.mode
+          store.notify()
+        })
+
+      case "SetExperienceStep":
+        return Effect.sync(() => {
+          store.experienceStep = event.step
+          store.notify()
+        })
+
+      // --- Quick Preset Events ---
+      case "SetActivePreset":
+        return Effect.sync(() => {
+          store.activePreset = event.preset
+          store.notify()
+        })
+
+      case "ApplyQuickPreset":
+        return store.handleApplyQuickPreset(event.preset)
+
+      // --- Compact Pattern Events ---
+      case "SetCompactPattern":
+        return Effect.sync(() => {
+          // Delegate to convenience method which has the full logic
+          store.setCompactPattern(event.pattern)
+        })
+
+      case "RegenerateCompactPatternSeed":
+        return Effect.sync(() => {
+          store.compactPatternSeed = Date.now()
+          store.notify()
+        })
+
+      // --- Template Events ---
+      case "ApplyTemplate":
+        return store.handleApplyTemplate(event.templateId)
+
       // --- State Events ---
       case "SetAspectRatio":
         return Effect.sync(() => {
@@ -329,6 +460,7 @@ export class ShareDesignerStore {
         return Effect.sync(() => {
           store.updateState({ background: event.config }, "Change background")
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       case "SetTypography":
@@ -338,6 +470,7 @@ export class ShareDesignerStore {
             "Change typography",
           )
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       case "SetElementConfig":
@@ -355,6 +488,7 @@ export class ShareDesignerStore {
             `Update ${event.element}`,
           )
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       case "SetEffects":
@@ -364,6 +498,7 @@ export class ShareDesignerStore {
             "Change effects",
           )
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       case "SetSelectedLines":
@@ -385,9 +520,6 @@ export class ShareDesignerStore {
             "Change export settings",
           )
         })
-
-      case "ApplyTemplate":
-        return store.handleApplyTemplate(event.templateId)
 
       case "RegeneratePatternSeed":
         return Effect.sync(() => {
@@ -416,6 +548,7 @@ export class ShareDesignerStore {
             "Change effect",
           )
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       case "SetAlbumArtEffectSetting":
@@ -433,6 +566,7 @@ export class ShareDesignerStore {
             "Change effect setting",
           )
           store.currentTemplateId = null
+          store.activePreset = null
         })
 
       // --- Editor Events (no history) ---
@@ -521,7 +655,12 @@ export class ShareDesignerStore {
         return Effect.gen(function* () {
           store.state = createDefaultState(store.context)
           store.editor = DEFAULT_EDITOR_STATE
+          store.experienceMode = "compact"
+          store.experienceStep = "select"
           store.currentTemplateId = null
+          store.activePreset = null
+          store.compactPattern = "none"
+          store.compactPatternSeed = Date.now()
           store.history = { past: [], future: [] }
           store.lastChangeTimestamp = 0
           yield* store.handleInitializeBackground()
@@ -590,6 +729,9 @@ export class ShareDesignerStore {
     })
   }
 
+  /**
+   * Apply a template to the current state.
+   */
   private handleApplyTemplate(templateId: string): Effect.Effect<void> {
     return Effect.sync(() => {
       const template = getTemplateById(templateId)
@@ -628,7 +770,140 @@ export class ShareDesignerStore {
 
       this.updateState(newState, `Apply ${template.name} template`)
       this.currentTemplateId = templateId
+      this.activePreset = null
     })
+  }
+
+  /**
+   * Apply a quick style preset.
+   * Presets configure background, effects, and shadow based on album colors.
+   */
+  private handleApplyQuickPreset(preset: QuickPreset): Effect.Effect<void> {
+    return Effect.sync(() => {
+      const presetConfig = this.getPresetConfig(preset)
+
+      // Apply all preset settings in one state update
+      this.updateState(
+        {
+          background: presetConfig.background,
+          albumArtEffect: presetConfig.albumArtEffect,
+          effects: {
+            ...this.state.effects,
+            shadow: presetConfig.shadow,
+          },
+        },
+        `Apply ${preset} preset`,
+      )
+
+      // Set the active preset (don't clear it since this IS a preset application)
+      this.activePreset = preset
+      this.currentTemplateId = null
+    })
+  }
+
+  /**
+   * Generate preset configuration based on album colors.
+   * Returns background, effect, and shadow settings for the preset.
+   */
+  private getPresetConfig(preset: QuickPreset): {
+    background: BackgroundConfig
+    albumArtEffect: AlbumArtEffectConfig
+    shadow: ShadowConfig
+  } {
+    // Get album-derived colors from gradient palette
+    const palette = this.gradientPalette
+    const first = palette[0]
+    const vibrant = palette[1] // Usually more saturated
+    const muted = palette[4] // Usually more muted
+
+    // Shadow configurations for each preset type
+    const softShadow: ShadowConfig = {
+      enabled: true,
+      blur: 30,
+      spread: 0,
+      offsetY: 15,
+      color: "rgba(0, 0, 0, 0.25)",
+    }
+
+    const mediumShadow: ShadowConfig = {
+      enabled: true,
+      blur: 50,
+      spread: 0,
+      offsetY: 25,
+      color: "rgba(0, 0, 0, 0.5)",
+    }
+
+    const strongShadow: ShadowConfig = {
+      enabled: true,
+      blur: 70,
+      spread: 5,
+      offsetY: 35,
+      color: "rgba(0, 0, 0, 0.7)",
+    }
+
+    switch (preset) {
+      case "clean":
+        // Clean: Light tint from album, no effect, soft shadow
+        return {
+          background: first
+            ? { type: "gradient", gradientId: first.id, gradient: first.gradient }
+            : { type: "solid", color: "#f8fafc" },
+          albumArtEffect: {
+            effect: "none",
+            settings: this.state.albumArtEffect.settings,
+          },
+          shadow: softShadow,
+        }
+
+      case "vibrant":
+        // Vibrant: Saturated gradient from album, no effect, medium shadow
+        return {
+          background: vibrant
+            ? { type: "gradient", gradientId: vibrant.id, gradient: vibrant.gradient }
+            : first
+              ? { type: "gradient", gradientId: first.id, gradient: first.gradient }
+              : { type: "solid", color: "#4f46e5" },
+          albumArtEffect: {
+            effect: "none",
+            settings: this.state.albumArtEffect.settings,
+          },
+          shadow: mediumShadow,
+        }
+
+      case "dark":
+        // Dark: Album art background, darken 60%, strong shadow
+        return {
+          background: this.context.albumArt
+            ? { type: "albumArt", blur: 0, overlayOpacity: 0, overlayColor: "#000000" }
+            : { type: "solid", color: "#1e1e2e" },
+          albumArtEffect: {
+            effect: "darken",
+            settings: {
+              ...this.state.albumArtEffect.settings,
+              darkenAmount: 60,
+            },
+          },
+          shadow: strongShadow,
+        }
+
+      case "vintage":
+        // Vintage: Muted/warm tint from album, desaturate 40%, soft shadow
+        return {
+          background: muted
+            ? { type: "gradient", gradientId: muted.id, gradient: muted.gradient }
+            : first
+              ? { type: "gradient", gradientId: first.id, gradient: first.gradient }
+              : { type: "solid", color: "#78716c" },
+          albumArtEffect: {
+            effect: "desaturate",
+            settings: {
+              ...this.state.albumArtEffect.settings,
+              desaturateAmount: 40,
+            },
+          },
+          shadow: softShadow,
+        }
+    }
   }
 
   private handleInitializeBackground(): Effect.Effect<void> {
@@ -649,18 +924,21 @@ export class ShareDesignerStore {
 
       const first = store.gradientPalette[0]
       if (first) {
-        store.updateState(
-          {
-            background: {
-              type: "gradient",
-              gradient: first.gradient,
-              gradientId: first.id,
-            },
-          },
-          "Initialize background",
-          { skipHistory: true },
-        )
+        const gradientBg: GradientBackground = {
+          type: "gradient",
+          gradient: first.gradient,
+          gradientId: first.id,
+        }
+        // Initialize selected gradient
+        store.selectedGradient = gradientBg
+        store.isCustomColor = false
+        store.updateState({ background: gradientBg }, "Initialize background", {
+          skipHistory: true,
+        })
       }
+
+      // Always notify to update gradient palette in UI
+      store.notify()
     })
   }
 
@@ -794,9 +1072,105 @@ export class ShareDesignerStore {
     return this.currentTemplateId
   }
 
+  getExperienceMode(): ShareExperienceMode {
+    return this.experienceMode
+  }
+
+  getExperienceStep(): ShareExperienceStep {
+    return this.experienceStep
+  }
+
+  getActivePreset(): QuickPreset | null {
+    return this.activePreset
+  }
+
+  getCompactPattern(): CompactPatternVariant {
+    return this.compactPattern
+  }
+
+  getCompactPatternSeed(): number {
+    return this.compactPatternSeed
+  }
+
+  getSelectedGradientId(): string | null {
+    if (this.isCustomColor) return null
+    return this.selectedGradient?.gradientId ?? null
+  }
+
+  getIsCustomColor(): boolean {
+    return this.isCustomColor
+  }
+
+  getCustomColor(): string {
+    return this.customColor
+  }
+
   // -------------------------------------------------------------------------
   // Convenience Methods (wrap dispatch)
   // -------------------------------------------------------------------------
+
+  setMode(mode: ShareExperienceMode): void {
+    Effect.runSync(this.dispatch(new SetExperienceMode({ mode })))
+  }
+
+  setStep(step: ShareExperienceStep): void {
+    Effect.runSync(this.dispatch(new SetExperienceStep({ step })))
+  }
+
+  setActivePreset(preset: QuickPreset | null): void {
+    Effect.runSync(this.dispatch(new SetActivePreset({ preset })))
+  }
+
+  applyQuickPreset(preset: QuickPreset): void {
+    Effect.runSync(this.dispatch(new ApplyQuickPreset({ preset })))
+  }
+
+  setCompactPattern(pattern: CompactPatternVariant): void {
+    // If clicking the same pattern (waves), regenerate the seed
+    if (pattern === this.compactPattern && pattern === "waves") {
+      this.compactPatternSeed = Date.now()
+      this.notify()
+      return
+    }
+
+    // Skip if same pattern (except waves handled above)
+    if (pattern === this.compactPattern) {
+      return
+    }
+
+    this.compactPattern = pattern
+    this.activePreset = null
+
+    // Only change background for albumArt mode
+    // For none/dots/grid/waves, background stays as gradient (overlay handled by patternOverlay prop)
+    if (pattern === "albumArt") {
+      this.updateState(
+        {
+          background: {
+            type: "albumArt",
+            blur: 0,
+            overlayOpacity: 0,
+            overlayColor: "#000000",
+          },
+        },
+        "Change pattern",
+        { skipHistory: true },
+      )
+      // updateState may not notify if background was already albumArt, so ensure we notify
+      this.notify()
+    } else {
+      // Just notify - CompactView will compute the effective background
+      this.notify()
+    }
+  }
+
+  regenerateCompactPatternSeed(): void {
+    Effect.runSync(this.dispatch(new RegenerateCompactPatternSeed({})))
+  }
+
+  applyTemplate(templateId: string): void {
+    Effect.runSync(this.dispatch(new ApplyTemplate({ templateId })))
+  }
 
   setAspectRatio(config: AspectRatioConfig): void {
     Effect.runSync(this.dispatch(new SetAspectRatio({ config })))
@@ -811,12 +1185,20 @@ export class ShareDesignerStore {
   }
 
   setSolidColor(color: string): void {
-    Effect.runSync(this.dispatch(new SetBackground({ config: { type: "solid", color } })))
+    // Save the custom color - this persists across pattern changes
+    this.customColor = color
+    this.isCustomColor = true
+    // CompactView will use this to compute effective background
+    this.notify()
   }
 
   setGradient(gradientId: string, gradient: string): void {
     const bg: GradientBackground = { type: "gradient", gradientId, gradient }
-    Effect.runSync(this.dispatch(new SetBackground({ config: bg })))
+    // Save the selected gradient - this persists across pattern changes
+    this.selectedGradient = bg
+    this.isCustomColor = false
+    // CompactView will use this to compute effective background
+    this.notify()
   }
 
   setAlbumArtBackground(config: Omit<BackgroundConfig & { type: "albumArt" }, "type">): void {
@@ -960,14 +1342,6 @@ export class ShareDesignerStore {
     Effect.runSync(this.dispatch(new ResetHistory({})))
   }
 
-  applyTemplate(templateId: string): void {
-    Effect.runSync(this.dispatch(new ApplyTemplate({ templateId })))
-  }
-
-  clearTemplateId(): void {
-    this.currentTemplateId = null
-  }
-
   reset(): void {
     Effect.runPromise(this.dispatch(new ResetStore({})))
   }
@@ -977,65 +1351,105 @@ export class ShareDesignerStore {
 // Factory Function
 // ============================================================================
 
-export function createShareDesignerStore(context: ShareDesignerSongContext): ShareDesignerStore {
-  return new ShareDesignerStore(context)
+export function createShareExperienceStore(
+  context: ShareDesignerSongContext,
+): ShareExperienceStore {
+  return new ShareExperienceStore(context)
 }
 
 // ============================================================================
 // React Hooks
 // ============================================================================
 
-export function useShareDesignerState(store: ShareDesignerStore): ShareDesignerEditorState {
+// Stable no-op subscribe for null store case
+const noopSubscribe = (): (() => void) => () => {}
+
+export function useShareExperienceState(store: ShareExperienceStore): ShareExperienceEditorState {
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 }
 
-export function useShareDesignerBackground(store: ShareDesignerStore): BackgroundConfig {
-  const state = useShareDesignerState(store)
+export function useShareExperienceMode(store: ShareExperienceStore | null): ShareExperienceMode {
+  return useSyncExternalStore(
+    store?.subscribe ?? noopSubscribe,
+    () => store?.getSnapshot().experienceMode ?? "compact",
+    () => store?.getSnapshot().experienceMode ?? "compact",
+  )
+}
+
+export function useShareExperienceStep(store: ShareExperienceStore | null): ShareExperienceStep {
+  return useSyncExternalStore(
+    store?.subscribe ?? noopSubscribe,
+    () => store?.getSnapshot().experienceStep ?? "select",
+    () => store?.getSnapshot().experienceStep ?? "select",
+  )
+}
+
+export function useShareExperienceActivePreset(store: ShareExperienceStore): QuickPreset | null {
+  const state = useShareExperienceState(store)
+  return state.activePreset
+}
+
+export function useShareExperienceCompactPattern(
+  store: ShareExperienceStore,
+): CompactPatternVariant {
+  const state = useShareExperienceState(store)
+  return state.compactPattern
+}
+
+export function useShareExperienceCompactPatternSeed(store: ShareExperienceStore): number {
+  const state = useShareExperienceState(store)
+  return state.compactPatternSeed
+}
+
+export function useShareExperienceBackground(store: ShareExperienceStore): BackgroundConfig {
+  const state = useShareExperienceState(store)
   return state.background
 }
 
-export function useShareDesignerTypography(store: ShareDesignerStore): TypographyConfig {
-  const state = useShareDesignerState(store)
+export function useShareExperienceTypography(store: ShareExperienceStore): TypographyConfig {
+  const state = useShareExperienceState(store)
   return state.typography
 }
 
-export function useShareDesignerElements(store: ShareDesignerStore): ElementsConfig {
-  const state = useShareDesignerState(store)
+export function useShareExperienceElements(store: ShareExperienceStore): ElementsConfig {
+  const state = useShareExperienceState(store)
   return state.elements
 }
 
-export function useShareDesignerEffects(store: ShareDesignerStore): EffectsConfig {
-  const state = useShareDesignerState(store)
+export function useShareExperienceEffects(store: ShareExperienceStore): EffectsConfig {
+  const state = useShareExperienceState(store)
   return state.effects
 }
 
-export function useShareDesignerAlbumArtEffect(store: ShareDesignerStore): AlbumArtEffectConfig {
-  const state = useShareDesignerState(store)
+export function useShareExperienceAlbumArtEffect(
+  store: ShareExperienceStore,
+): AlbumArtEffectConfig {
+  const state = useShareExperienceState(store)
   return state.albumArtEffect
 }
 
-export function useShareDesignerLyrics(store: ShareDesignerStore): LyricsSelectionConfig {
-  const state = useShareDesignerState(store)
+export function useShareExperienceLyrics(store: ShareExperienceStore): LyricsSelectionConfig {
+  const state = useShareExperienceState(store)
   return state.lyrics
 }
 
-export function useShareDesignerEditor(store: ShareDesignerStore): EditorState {
-  const state = useShareDesignerState(store)
+export function useShareExperienceEditor(store: ShareExperienceStore): EditorState {
+  const state = useShareExperienceState(store)
   return state.editor
 }
 
-export function useShareDesignerImageEdit(store: ShareDesignerStore): ImageEditState {
-  const state = useShareDesignerState(store)
+export function useShareExperienceImageEdit(store: ShareExperienceStore): ImageEditState {
+  const state = useShareExperienceState(store)
   return state.editor.imageEdit
 }
 
-export function useShareDesignerHistory(store: ShareDesignerStore): {
+export function useShareExperienceHistory(store: ShareExperienceStore): {
   canUndo: boolean
   canRedo: boolean
   pastCount: number
   futureCount: number
 } {
-  useShareDesignerState(store)
+  useShareExperienceState(store)
   const info = store.getHistoryInfo()
   return {
     canUndo: store.canUndo(),
@@ -1045,17 +1459,12 @@ export function useShareDesignerHistory(store: ShareDesignerStore): {
   }
 }
 
-export function useShareDesignerAspectRatio(store: ShareDesignerStore): AspectRatioConfig {
-  const state = useShareDesignerState(store)
+export function useShareExperienceAspectRatio(store: ShareExperienceStore): AspectRatioConfig {
+  const state = useShareExperienceState(store)
   return state.aspectRatio
 }
 
-export function useShareDesignerExportSettings(store: ShareDesignerStore): ExportSettings {
-  const state = useShareDesignerState(store)
+export function useShareExperienceExportSettings(store: ShareExperienceStore): ExportSettings {
+  const state = useShareExperienceState(store)
   return state.exportSettings
-}
-
-export function useShareDesignerTemplateId(store: ShareDesignerStore): string | null {
-  useShareDesignerState(store)
-  return store.getCurrentTemplateId()
 }

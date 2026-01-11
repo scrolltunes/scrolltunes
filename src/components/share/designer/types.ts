@@ -5,6 +5,8 @@
  * Follows project patterns with readonly modifiers throughout.
  */
 
+import { DEFAULT_EFFECT_SETTINGS, type EffectSettings, type EffectType } from "../effects"
+
 // ============================================================================
 // Aspect Ratio Types
 // ============================================================================
@@ -172,6 +174,18 @@ export interface EffectsConfig {
 }
 
 // ============================================================================
+// Album Art Effect Types (New Effects System)
+// ============================================================================
+
+// Re-export from effects module for convenience
+export type { EffectSettings, EffectType, GradientDirection } from "../effects"
+
+export interface AlbumArtEffectConfig {
+  readonly effect: EffectType
+  readonly settings: EffectSettings
+}
+
+// ============================================================================
 // Lyrics Selection Types
 // ============================================================================
 
@@ -204,7 +218,13 @@ export interface ExportSettings {
 // Editor State (Transient - Not part of undo/redo)
 // ============================================================================
 
-export type EditMode = "select" | "customize" | "text"
+export type EditMode = "select" | "customize" | "text" | "image"
+
+export interface ImageEditState {
+  readonly offsetX: number // -100 to 100 (percentage)
+  readonly offsetY: number // -100 to 100 (percentage)
+  readonly scale: number // 1.0 to 3.0
+}
 
 export interface EditorState {
   readonly mode: EditMode
@@ -212,6 +232,7 @@ export interface EditorState {
   readonly zoom: number
   readonly isPanning: boolean
   readonly isExporting: boolean
+  readonly imageEdit: ImageEditState
 }
 
 // ============================================================================
@@ -226,6 +247,7 @@ export interface ShareDesignerState {
   readonly typography: TypographyConfig
   readonly elements: ElementsConfig
   readonly effects: EffectsConfig
+  readonly albumArtEffect: AlbumArtEffectConfig
   readonly exportSettings: ExportSettings
 }
 
@@ -353,10 +375,21 @@ export const DEFAULT_EFFECTS: EffectsConfig = {
   vignette: DEFAULT_VIGNETTE,
 }
 
+export const DEFAULT_ALBUM_ART_EFFECT: AlbumArtEffectConfig = {
+  effect: "none",
+  settings: DEFAULT_EFFECT_SETTINGS,
+}
+
 export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   format: "png",
   quality: "high",
   pixelRatio: 3,
+}
+
+export const DEFAULT_IMAGE_EDIT: ImageEditState = {
+  offsetX: 0,
+  offsetY: 0,
+  scale: 1,
 }
 
 export const DEFAULT_EDITOR_STATE: EditorState = {
@@ -365,6 +398,7 @@ export const DEFAULT_EDITOR_STATE: EditorState = {
   zoom: 1,
   isPanning: false,
   isExporting: false,
+  imageEdit: DEFAULT_IMAGE_EDIT,
 }
 
 export const DEFAULT_ASPECT_RATIO: AspectRatioConfig = {
@@ -390,5 +424,6 @@ export const DEFAULT_SHARE_DESIGNER_STATE: ShareDesignerState = {
   typography: DEFAULT_TYPOGRAPHY,
   elements: DEFAULT_ELEMENTS,
   effects: DEFAULT_EFFECTS,
+  albumArtEffect: DEFAULT_ALBUM_ART_EFFECT,
   exportSettings: DEFAULT_EXPORT_SETTINGS,
 }

@@ -1,5 +1,5 @@
-import { type Client, createClient } from "@libsql/client/web"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
+import { type Client, createClient } from "@libsql/client/web"
 import { Context, Data, Effect, Layer } from "effect"
 import { ServerConfig } from "./server-config"
 

@@ -1,0 +1,594 @@
+"use client"
+
+import {
+  ArrowCounterClockwise,
+  Check,
+  PencilSimple,
+  ShareNetwork,
+} from "@phosphor-icons/react"
+import { AnimatePresence, motion } from "motion/react"
+import {
+  forwardRef,
+  memo,
+  useCallback,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import type { ShareExperienceStore } from "../ShareExperienceStore"
+import {
+  useShareExperienceAlbumArtEffect,
+  useShareExperienceBackground,
+  useShareExperienceCompactPattern,
+  useShareExperienceEffects,
+  useShareExperienceElements,
+  useShareExperienceImageEdit,
+  useShareExperienceLyrics,
+  useShareExperienceState,
+  useShareExperienceTypography,
+} from "../ShareExperienceStore"
+import { ShareDesignerPreview } from "../designer/ShareDesignerPreview"
+import { ZoomSlider } from "../designer/controls"
+import { useShareExport } from "../designer/useShareExport"
+import {
+  AlbumArtEffectControls,
+  EffectSelector,
+  type EffectSettings,
+} from "../effects"
+import { CUSTOM_COLOR_ID, GradientPalette } from "./GradientPalette"
+import { QuickControls } from "./QuickControls"
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface CompactViewRef {
+  triggerShare: () => void
+}
+
+export interface CompactViewProps {
+  readonly store: ShareExperienceStore
+  readonly title: string
+  readonly artist: string
+  readonly albumArt: string | null
+  readonly albumArtLarge?: string | null
+  readonly spotifyId: string | null
+}
+
+// ============================================================================
+// Share Menu Component
+// ============================================================================
+
+interface ShareMenuProps {
+  readonly isOpen: boolean
+  readonly onClose: () => void
+  readonly isCopied: boolean
+  readonly isGenerating: boolean
+  readonly isSharing: boolean
+  readonly onCopy: () => void
+  readonly onDownload: () => void
+  readonly onShare: () => void
+}
+
+const ShareMenu = memo(function ShareMenu({
+  isOpen,
+  onClose,
+  isCopied,
+  isGenerating,
+  isSharing,
+  onCopy,
+  onDownload,
+  onShare,
+}: ShareMenuProps) {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop to close menu */}
+          <div className="fixed inset-0 z-10" onClick={onClose} />
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full z-20 mt-2 w-48 overflow-hidden rounded-xl shadow-lg"
+            style={{
+              background: "var(--color-surface2)",
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                onCopy()
+                onClose()
+              }}
+              disabled={isGenerating}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:brightness-110 disabled:opacity-50"
+              style={{ color: "var(--color-text)" }}
+            >
+              {isCopied ? (
+                <Check size={18} style={{ color: "var(--color-success)" }} />
+              ) : (
+                <span className="flex h-[18px] w-[18px] items-center justify-center">
+                  <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor">
+                    <path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z" />
+                  </svg>
+                </span>
+              )}
+              <span>{isCopied ? "Copied!" : "Copy to clipboard"}</span>
+            </button>
+            <div style={{ height: 1, background: "var(--color-border)" }} />
+            <button
+              type="button"
+              onClick={() => {
+                onDownload()
+                onClose()
+              }}
+              disabled={isGenerating}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:brightness-110 disabled:opacity-50"
+              style={{ color: "var(--color-text)" }}
+            >
+              <span className="flex h-[18px] w-[18px] items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor">
+                  <path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,124.69V32a8,8,0,0,0-16,0v92.69L93.66,98.34a8,8,0,0,0-11.32,11.32Z" />
+                </svg>
+              </span>
+              <span>Save to device</span>
+            </button>
+            <div style={{ height: 1, background: "var(--color-border)" }} />
+            <button
+              type="button"
+              onClick={() => {
+                onShare()
+                onClose()
+              }}
+              disabled={isGenerating || isSharing}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:brightness-110 disabled:opacity-50"
+              style={{ color: "var(--color-text)" }}
+            >
+              <ShareNetwork size={18} />
+              <span>Share...</span>
+            </button>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+})
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+export const CompactView = memo(
+  forwardRef<CompactViewRef, CompactViewProps>(function CompactView(
+    { store, title, artist, albumArt, albumArtLarge, spotifyId },
+    ref,
+  ) {
+    const previewContainerRef = useRef<HTMLDivElement>(null)
+    const cardRef = useRef<HTMLDivElement>(null)
+    const exportRef = useRef<HTMLDivElement>(null) // Outer wrapper with shadow padding for export
+
+    // State
+    const [showShareMenu, setShowShareMenu] = useState(false)
+    const [previewScale, setPreviewScale] = useState(1)
+    const [scaledHeight, setScaledHeight] = useState<number | null>(null)
+    const [isTextEditing, setIsTextEditing] = useState(false)
+
+    // Store state subscriptions
+    const state = useShareExperienceState(store)
+    const lyrics = useShareExperienceLyrics(store)
+    const background = useShareExperienceBackground(store)
+    const typography = useShareExperienceTypography(store)
+    const elements = useShareExperienceElements(store)
+    const effects = useShareExperienceEffects(store)
+    const albumArtEffect = useShareExperienceAlbumArtEffect(store)
+    const imageEdit = useShareExperienceImageEdit(store)
+    const compactPattern = useShareExperienceCompactPattern(store)
+
+    // Gradient palette and selection from store state (reactive, persists across pattern changes)
+    const gradientPalette = state.gradientPalette
+    const selectedGradientId = state.isCustomColor ? CUSTOM_COLOR_ID : state.selectedGradientId
+
+    // Determine if album art background is active
+    const isAlbumArtBackground = compactPattern === "albumArt"
+
+    // Compute effective background: always show gradient (unless albumArt mode)
+    // Pattern is rendered as overlay via patternOverlay prop
+    const effectiveBackground = useMemo(() => {
+      if (compactPattern === "albumArt") {
+        return background // albumArt background from store
+      }
+      // For none/dots/grid/waves, use the selected gradient or solid color
+      if (state.isCustomColor) {
+        return { type: "solid" as const, color: state.customColor }
+      }
+      if (state.selectedGradientId) {
+        const gradient = gradientPalette.find(g => g.id === state.selectedGradientId)
+        if (gradient) {
+          return { type: "gradient" as const, gradientId: gradient.id, gradient: gradient.gradient }
+        }
+      }
+      // Fallback to first gradient
+      const first = gradientPalette[0]
+      if (first) {
+        return { type: "gradient" as const, gradientId: first.id, gradient: first.gradient }
+      }
+      return { type: "solid" as const, color: "#4f46e5" }
+    }, [compactPattern, background, state.isCustomColor, state.customColor, state.selectedGradientId, gradientPalette])
+
+    // Pattern overlay for dots/grid/waves (not for none or albumArt)
+    const patternOverlayConfig = useMemo(() => {
+      if (compactPattern === "none" || compactPattern === "albumArt") {
+        return undefined
+      }
+      return { pattern: compactPattern, seed: state.compactPatternSeed }
+    }, [compactPattern, state.compactPatternSeed])
+
+    // Export hook - use exportRef to include shadow padding in export
+    const { isGenerating, isSharing, isCopied, handleDownload, handleCopy, handleShare } =
+      useShareExport({
+        cardRef: exportRef,
+        title,
+        artist,
+        settings: state.exportSettings,
+      })
+
+    // Expose triggerShare to parent via ref
+    useImperativeHandle(ref, () => ({
+      triggerShare: handleShare,
+    }))
+
+    // Calculate preview scale to fit within container
+    const calculateScale = useCallback(() => {
+      const container = previewContainerRef.current
+      const card = cardRef.current
+      if (!container || !card) return
+
+      // Available space with margins (48px container padding + 32px for card wrapper padding)
+      const availableWidth = container.clientWidth - 80
+      const cardWidth = card.scrollWidth
+      const cardHeight = card.scrollHeight
+
+      // Only scale down horizontally if card is too wide
+      const scale = cardWidth > availableWidth ? availableWidth / cardWidth : 1
+
+      // Clamp between 0.5 and 1.0, round to 3 decimal places
+      const clampedScale = Math.max(0.5, Math.min(scale, 1.0))
+      const roundedScale = Math.round(clampedScale * 1000) / 1000
+
+      setPreviewScale(roundedScale)
+      setScaledHeight(Math.round(cardHeight * roundedScale))
+    }, [])
+
+    // Update only the height during editing (keep scale locked)
+    const updateHeightOnly = useCallback(() => {
+      const card = cardRef.current
+      if (!card) return
+
+      const cardHeight = card.scrollHeight
+      setScaledHeight(Math.round(cardHeight * previewScale))
+    }, [previewScale])
+
+    // Track previous editing state to detect edit mode exit
+    const wasEditingRef = useRef(false)
+
+    // Calculate scale on mount and when lyrics change (but not on edit mode exit or shadow toggle)
+    useLayoutEffect(() => {
+      // Skip if currently editing
+      if (isTextEditing) {
+        wasEditingRef.current = true
+        return
+      }
+      // Skip recalculation when exiting edit mode - keep the scale locked
+      if (wasEditingRef.current) {
+        wasEditingRef.current = false
+        return
+      }
+      calculateScale()
+    }, [calculateScale, lyrics.selectedLines.length, isTextEditing])
+
+    // Recalculate on window resize only (not during editing)
+    useLayoutEffect(() => {
+      const handleResize = () => {
+        if (!isTextEditing) {
+          calculateScale()
+        }
+      }
+      window.addEventListener("resize", handleResize)
+
+      return () => {
+        window.removeEventListener("resize", handleResize)
+      }
+    }, [calculateScale, isTextEditing])
+
+    // Update height during editing when content changes
+    useLayoutEffect(() => {
+      if (isTextEditing) {
+        const card = cardRef.current
+        if (!card) return
+
+        const observer = new ResizeObserver(() => updateHeightOnly())
+        observer.observe(card)
+
+        return () => observer.disconnect()
+      }
+    }, [isTextEditing, updateHeightOnly])
+
+    // Combined edit mode handlers (text + image editing)
+    const handleToggleEditMode = useCallback(() => {
+      const newIsEditing = !isTextEditing
+      setIsTextEditing(newIsEditing)
+      // Also enable/disable image editing if album art background
+      if (isAlbumArtBackground) {
+        store.setEditMode(newIsEditing ? "image" : "customize")
+      }
+    }, [isTextEditing, isAlbumArtBackground, store])
+
+    const handleTextChange = useCallback(
+      (lineId: string, text: string) => {
+        store.updateLineText(lineId, text)
+      },
+      [store],
+    )
+
+    const handleResetAll = useCallback(() => {
+      store.resetAllLineText()
+      store.resetImagePosition()
+    }, [store])
+
+    const handleImageOffsetChange = useCallback(
+      (offsetX: number, offsetY: number) => {
+        store.setImageOffset(offsetX, offsetY)
+      },
+      [store],
+    )
+
+    const handleImageScaleChange = useCallback(
+      (scale: number) => {
+        store.setImageScale(scale)
+      },
+      [store],
+    )
+
+    // Get display text for preview
+    const getDisplayText = useCallback((lineId: string) => store.getDisplayText(lineId), [store])
+
+    // Check if there are any edits (text or image position)
+    const hasTextEdits = useMemo(() => store.hasTextEdits(), [store, lyrics])
+    const hasImageEdits = imageEdit.offsetX !== 0 || imageEdit.offsetY !== 0 || imageEdit.scale !== 1
+    const hasAnyEdits = hasTextEdits || hasImageEdits
+
+    // Background art URL
+    const backgroundArtUrl = albumArtLarge ?? albumArt
+
+    // QuickControls handlers
+    const handlePatternChange = useCallback(
+      (pattern: typeof compactPattern) => {
+        store.setCompactPattern(pattern)
+      },
+      [store],
+    )
+
+    const handleEffectTypeChange = useCallback(
+      (effect: typeof albumArtEffect.effect) => {
+        store.setAlbumArtEffect(effect)
+      },
+      [store],
+    )
+
+    const handleEffectSettingChange = useCallback(
+      <K extends keyof EffectSettings>(setting: K, value: EffectSettings[K]) => {
+        store.setAlbumArtEffectSetting(setting, value)
+      },
+      [store],
+    )
+
+    const handleShadowToggle = useCallback(
+      (enabled: boolean) => {
+        store.setShadow({ enabled })
+      },
+      [store],
+    )
+
+    const handleSpotifyCodeToggle = useCallback(
+      (visible: boolean) => {
+        store.setElementConfig("spotifyCode", { visible })
+      },
+      [store],
+    )
+
+    const handleBrandingToggle = useCallback(
+      (visible: boolean) => {
+        store.setElementConfig("branding", { visible })
+      },
+      [store],
+    )
+
+    // Gradient palette handlers
+    const handleGradientSelect = useCallback(
+      (gradientId: string, gradient: string) => {
+        store.setGradient(gradientId, gradient)
+      },
+      [store],
+    )
+
+    const handleCustomColorChange = useCallback(
+      (color: string) => {
+        store.setSolidColor(color)
+      },
+      [store],
+    )
+
+    return (
+      <div className="flex flex-col">
+        {/* Preview Area */}
+        <div
+          ref={previewContainerRef}
+          className="share-modal-preserve relative min-h-[300px] overflow-hidden rounded-2xl bg-neutral-200 p-6"
+        >
+          {/* Edit Mode Button */}
+          <div className="absolute left-2 top-2 z-10 flex gap-1">
+            <button
+              type="button"
+              onClick={handleToggleEditMode}
+              className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+              style={{
+                background: isTextEditing ? "var(--color-accent)" : "rgba(0,0,0,0.4)",
+                color: isTextEditing ? "white" : "rgba(255,255,255,0.8)",
+              }}
+              aria-label={isTextEditing ? "Done editing" : "Edit"}
+            >
+              {isTextEditing ? (
+                <Check size={18} weight="bold" />
+              ) : (
+                <PencilSimple size={18} weight="bold" />
+              )}
+            </button>
+            {/* Reset Button - shown when editing and there are changes */}
+            {isTextEditing && hasAnyEdits && (
+              <button
+                type="button"
+                onClick={handleResetAll}
+                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+                style={{
+                  background: "rgba(0,0,0,0.4)",
+                  color: "rgba(255,255,255,0.8)",
+                }}
+                aria-label="Reset changes"
+              >
+                <ArrowCounterClockwise size={18} weight="bold" />
+              </button>
+            )}
+          </div>
+
+          {/* Share Menu Button */}
+          <div className="absolute right-2 top-2 z-10">
+            <button
+              type="button"
+              onClick={() => setShowShareMenu(prev => !prev)}
+              disabled={isGenerating}
+              className="flex h-8 w-8 items-center justify-center rounded-full transition-colors disabled:opacity-50"
+              style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.8)" }}
+              aria-label="Share options"
+            >
+              <ShareNetwork size={18} weight="bold" />
+            </button>
+            <ShareMenu
+              isOpen={showShareMenu}
+              onClose={() => setShowShareMenu(false)}
+              isCopied={isCopied}
+              isGenerating={isGenerating}
+              isSharing={isSharing}
+              onCopy={handleCopy}
+              onDownload={handleDownload}
+              onShare={handleShare}
+            />
+          </div>
+
+          {/* Card Preview */}
+          <div
+            style={{
+              height: scaledHeight !== null ? `${scaledHeight + 24}px` : undefined,
+              overflow: "visible",
+              paddingTop: "12px",
+              paddingBottom: "12px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                transform: previewScale < 1 ? `scale(${previewScale})` : undefined,
+                transformOrigin: "top center",
+              }}
+            >
+              <ShareDesignerPreview
+                title={title}
+                artist={artist}
+                albumArt={backgroundArtUrl}
+                spotifyId={spotifyId}
+                lyrics={lyrics}
+                background={effectiveBackground}
+                typography={typography}
+                padding={state.padding}
+                albumArtElement={elements.albumArt}
+                metadataElement={elements.metadata}
+                lyricsElement={elements.lyrics}
+                spotifyCodeElement={elements.spotifyCode}
+                brandingElement={elements.branding}
+                effects={effects}
+                albumArtEffect={albumArtEffect}
+                getDisplayText={getDisplayText}
+                previewRef={exportRef}
+                cardRef={cardRef}
+                isEditing={isTextEditing}
+                onTextChange={handleTextChange}
+                isImageEditing={isTextEditing && isAlbumArtBackground}
+                imageEdit={imageEdit}
+                onImageOffsetChange={handleImageOffsetChange}
+                onImageScaleChange={handleImageScaleChange}
+                onExitImageEdit={handleToggleEditMode}
+                onResetImagePosition={handleResetAll}
+                patternOverlay={patternOverlayConfig}
+              />
+            </div>
+          </div>
+
+          {/* Zoom Slider - shown when editing with album art background */}
+          {isTextEditing && isAlbumArtBackground && albumArt && (
+            <div className="absolute inset-x-4 bottom-2">
+              <ZoomSlider value={imageEdit.scale} onChange={handleImageScaleChange} />
+            </div>
+          )}
+        </div>
+
+        {/* Controls Section */}
+        <div className="mt-4 space-y-4">
+          {/* Effect Controls - shown when using album art background */}
+          {isAlbumArtBackground && albumArt && (
+            <div className="space-y-3">
+              <EffectSelector
+                value={albumArtEffect.effect}
+                onChange={handleEffectTypeChange}
+                albumArt={albumArt}
+              />
+              <AlbumArtEffectControls
+                effectType={albumArtEffect.effect}
+                settings={albumArtEffect.settings}
+                onSettingChange={handleEffectSettingChange}
+              />
+            </div>
+          )}
+
+          {/* Gradient Palette - shown when not using album art background */}
+          {!isAlbumArtBackground && (
+            <GradientPalette
+              gradientPalette={gradientPalette}
+              selectedGradientId={selectedGradientId}
+              customColor={state.customColor}
+              onGradientSelect={handleGradientSelect}
+              onCustomColorChange={handleCustomColorChange}
+            />
+          )}
+
+          {/* Quick Controls */}
+          <QuickControls
+            compactPattern={compactPattern}
+            onPatternChange={handlePatternChange}
+            hasAlbumArt={Boolean(albumArt)}
+            effects={effects}
+            elements={elements}
+            onShadowToggle={handleShadowToggle}
+            onSpotifyCodeToggle={handleSpotifyCodeToggle}
+            onBrandingToggle={handleBrandingToggle}
+            spotifyId={spotifyId}
+          />
+        </div>
+      </div>
+    )
+  }),
+)

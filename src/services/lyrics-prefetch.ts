@@ -161,9 +161,7 @@ const prefetchLyricsImpl = (
     }
 
     // Apply enhancement to lyrics if available
-    const enhancedLyrics = enhancement
-      ? applyEnhancement(data.lyrics, enhancement)
-      : data.lyrics
+    const enhancedLyrics = enhancement ? applyEnhancement(data.lyrics, enhancement) : data.lyrics
 
     return {
       id,
