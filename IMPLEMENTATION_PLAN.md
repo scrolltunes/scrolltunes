@@ -89,7 +89,7 @@ Generated from specs. Tasks sorted by priority.
   - Render "Page X of Y" text
   - Position absolute top-right with subtle styling
   - Use text-muted color from theme
-- [ ] Not started
+- [x] Completed
 
 ### Task 8: Create PageFlipWarning component
 - **File**: `src/components/display/PageFlipWarning.tsx` (new)
@@ -211,6 +211,14 @@ Generated from specs. Tasks sorted by priority.
 - Triggers onSwipeLeft/onSwipeRight callbacks if threshold exceeded
 - Returns handlers object (onTouchStart, onTouchEnd) for element attachment
 - Exported from `src/hooks/index.ts` with types
+
+### Task 7: Create PageIndicator component
+- Created `src/components/display/PageIndicator.tsx` with memo pattern
+- Props: currentPage, totalPages, className
+- Renders "Page X of Y" with text-muted color
+- Positioned absolute top-right with subtle styling
+- Includes ARIA label and aria-live="polite" for accessibility
+- Exported from `src/components/display/index.ts`
 
 ---
 
