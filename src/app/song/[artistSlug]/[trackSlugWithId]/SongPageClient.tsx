@@ -39,7 +39,7 @@ import {
 } from "@/hooks"
 import { applyEnhancement } from "@/lib"
 import { computeLrcHashSync } from "@/lib/lrc-hash"
-import { saveCachedLyrics } from "@/lib/lyrics-cache"
+import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { applyEditPatches } from "@/lib/song-edits"
 import { userApi } from "@/lib/user-api"
@@ -118,6 +118,7 @@ export interface SongPageClientProps {
 }
 
 function computeInitialLoadState(
+  lrclibId: number,
   initialData: SongDataSuccess | null,
   initialError: ErrorType | null,
 ): LoadState {
@@ -125,6 +126,31 @@ function computeInitialLoadState(
     return { _tag: "Error", errorType: initialError }
   }
 
+  // Always prefer localStorage cache first (avoids network calls for cached songs)
+  if (typeof window !== "undefined") {
+    const cached = loadCachedLyrics(lrclibId)
+    if (cached) {
+      const lrcContent = cached.lyrics.lines.map(l => l.text).join("\n")
+      const lrcHash = computeLrcHashSync(lrcContent)
+
+      return {
+        _tag: "Loaded",
+        lyrics: cached.lyrics,
+        lrcHash,
+        hasEnhancement: cached.hasEnhancement ?? false,
+        hasChordEnhancement: cached.hasChordEnhancement ?? false,
+        bpm: cached.bpm,
+        key: cached.key,
+        albumArt: cached.albumArt ?? null,
+        albumArtLarge: cached.albumArtLarge ?? null,
+        spotifyId: cached.spotifyId ?? null,
+        bpmSource: cached.bpmSource ?? null,
+        lyricsSource: cached.lyricsSource ?? null,
+      }
+    }
+  }
+
+  // Fall back to server data
   if (initialData) {
     const lrcContent = initialData.lyrics.lines.map(l => l.text).join("\n")
     const lrcHash = computeLrcHashSync(lrcContent)
@@ -159,17 +185,39 @@ export default function SongPageClient({
   const spotifyId = searchParams.get("spotifyId")
   const shouldEnterEditMode = searchParams.get("edit") === "1"
 
-  const initialLoadState = useMemo(
-    () => computeInitialLoadState(initialData, initialError),
-    [initialData, initialError],
-  )
+  const { initialLoadState, initialEnhancements, loadedFromCache } = useMemo(() => {
+    // Check localStorage first (before computing load state)
+    if (typeof window !== "undefined") {
+      const cached = loadCachedLyrics(lrclibId)
+      if (cached) {
+        const loadState = computeInitialLoadState(lrclibId, initialData, initialError)
+        return {
+          initialLoadState: loadState,
+          initialEnhancements: {
+            loading: false,
+            enhancement: cached.enhancement ?? null,
+            chordEnhancement: cached.chordEnhancement ?? null,
+          },
+          loadedFromCache: true,
+        }
+      }
+    }
+
+    const loadState = computeInitialLoadState(lrclibId, initialData, initialError)
+    return {
+      initialLoadState: loadState,
+      initialEnhancements: {
+        loading: false,
+        enhancement: null,
+        chordEnhancement: null,
+      },
+      loadedFromCache: false,
+    }
+  }, [lrclibId, initialData, initialError])
 
   const [loadState] = useState<LoadState>(initialLoadState)
-  const [enhancements, setEnhancements] = useState<EnhancementsState>({
-    loading: false,
-    enhancement: null,
-    chordEnhancement: null,
-  })
+  const [enhancements, setEnhancements] = useState<EnhancementsState>(initialEnhancements)
+  const wasLoadedFromCache = useRef(loadedFromCache)
   const [showInfo, setShowInfo] = useState(false)
   const [showAddToSetlist, setShowAddToSetlist] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
@@ -287,6 +335,9 @@ export default function SongPageClient({
     if (loadState._tag !== "Loaded" || hasCachedInitialData.current) return
     hasCachedInitialData.current = true
 
+    // Skip caching and API calls if loaded from localStorage cache
+    if (wasLoadedFromCache.current) return
+
     // Cache lyrics for future visits
     saveCachedLyrics(lrclibId, {
       lyrics: loadState.lyrics,
@@ -334,6 +385,32 @@ export default function SongPageClient({
     })
   }, [loadState, lrclibId, spotifyId])
 
+  // Update cache when enhancements are loaded (so next visit has them immediately)
+  const hasUpdatedCacheWithEnhancements = useRef(false)
+  useEffect(() => {
+    if (loadState._tag !== "Loaded" || hasUpdatedCacheWithEnhancements.current) return
+    if (!enhancements.enhancement && !enhancements.chordEnhancement) return
+    // Skip if loaded from cache (enhancements already cached)
+    if (wasLoadedFromCache.current) return
+
+    hasUpdatedCacheWithEnhancements.current = true
+
+    saveCachedLyrics(lrclibId, {
+      lyrics: loadState.lyrics,
+      bpm: loadState.bpm,
+      key: loadState.key,
+      albumArt: loadState.albumArt ?? undefined,
+      albumArtLarge: loadState.albumArtLarge ?? undefined,
+      spotifyId: loadState.spotifyId ?? undefined,
+      bpmSource: loadState.bpmSource ?? undefined,
+      lyricsSource: loadState.lyricsSource ?? undefined,
+      hasEnhancement: enhancements.enhancement !== null,
+      enhancement: enhancements.enhancement,
+      hasChordEnhancement: enhancements.chordEnhancement !== null,
+      chordEnhancement: enhancements.chordEnhancement,
+    })
+  }, [loadState, lrclibId, enhancements])
+
   // Load lyrics into player when loadState or enhancements change
   useEffect(() => {
     if (loadState._tag !== "Loaded") return
@@ -373,6 +450,12 @@ export default function SongPageClient({
   useEffect(() => {
     if (loadState._tag !== "Loaded" || hasFetchedEnhancements.current) return
     if (!loadState.hasEnhancement && !loadState.hasChordEnhancement) return
+
+    // Skip fetching if enhancements already loaded from cache
+    if (enhancements.enhancement !== null || enhancements.chordEnhancement !== null) {
+      hasFetchedEnhancements.current = true
+      return
+    }
 
     hasFetchedEnhancements.current = true
     setEnhancements(prev => ({ ...prev, loading: true }))
