@@ -3,12 +3,6 @@
 import { memo, useCallback } from "react"
 import type { CompactPatternVariant } from "../ShareExperienceStore"
 import type { EffectsConfig, ElementsConfig } from "../designer/types"
-import {
-  AlbumArtEffectControls,
-  EffectSelector,
-  type EffectSettings,
-  type EffectType,
-} from "../effects"
 
 // ============================================================================
 // Types
@@ -124,15 +118,6 @@ export interface QuickControlsProps {
   readonly compactPattern: CompactPatternVariant
   readonly onPatternChange: (pattern: CompactPatternVariant) => void
   readonly hasAlbumArt: boolean
-  // Album art effect state (for album pattern)
-  readonly albumArt?: string | null
-  readonly effectType: EffectType
-  readonly effectSettings: EffectSettings
-  readonly onEffectTypeChange: (effect: EffectType) => void
-  readonly onEffectSettingChange: <K extends keyof EffectSettings>(
-    setting: K,
-    value: EffectSettings[K],
-  ) => void
   // Toggles state
   readonly effects: EffectsConfig
   readonly elements: ElementsConfig
@@ -147,11 +132,6 @@ export const QuickControls = memo(function QuickControls({
   compactPattern,
   onPatternChange,
   hasAlbumArt,
-  albumArt,
-  effectType,
-  effectSettings,
-  onEffectTypeChange,
-  onEffectSettingChange,
   effects,
   elements,
   onShadowToggle,
@@ -159,8 +139,6 @@ export const QuickControls = memo(function QuickControls({
   onBrandingToggle,
   spotifyId,
 }: QuickControlsProps) {
-  const isAlbumPattern = compactPattern === "albumArt"
-  const showEffectControls = isAlbumPattern && hasAlbumArt
 
   const handleShadowChange = useCallback(
     (checked: boolean) => {
@@ -191,25 +169,6 @@ export const QuickControls = memo(function QuickControls({
         onChange={onPatternChange}
         hasAlbumArt={hasAlbumArt}
       />
-
-      {/* Album Art Effect Controls (shown only when Album pattern is selected) */}
-      {showEffectControls && (
-        <div className="space-y-3">
-          <p className="text-sm" style={{ color: "var(--color-text3)" }}>
-            Effect
-          </p>
-          <EffectSelector
-            value={effectType}
-            onChange={onEffectTypeChange}
-            albumArt={albumArt ?? null}
-          />
-          <AlbumArtEffectControls
-            effectType={effectType}
-            settings={effectSettings}
-            onSettingChange={onEffectSettingChange}
-          />
-        </div>
-      )}
 
       {/* Toggle Controls */}
       <div className="space-y-3">

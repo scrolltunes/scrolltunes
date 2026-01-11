@@ -224,6 +224,10 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!isImageEditing || !onImageOffsetChange || !imageEdit) return
 
+      // Skip drag if clicking on editable text
+      const target = e.target as HTMLElement
+      if (target.isContentEditable) return
+
       e.preventDefault()
       isDraggingRef.current = true
       setIsDragging(true)
@@ -248,9 +252,10 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
       const deltaY = e.clientY - dragStartRef.current.y
 
       // Convert pixel movement to percentage offset (scaled by zoom level)
+      // Multiply by 2 to compensate for the 0.5 multiplier in transform application
       const scale = imageEdit.scale
-      const offsetDeltaX = ((deltaX / rect.width) * 100) / scale
-      const offsetDeltaY = ((deltaY / rect.height) * 100) / scale
+      const offsetDeltaX = ((deltaX / rect.width) * 200) / scale
+      const offsetDeltaY = ((deltaY / rect.height) * 200) / scale
 
       const newOffsetX = Math.max(-100, Math.min(100, offsetStartRef.current.x + offsetDeltaX))
       const newOffsetY = Math.max(-100, Math.min(100, offsetStartRef.current.y + offsetDeltaY))
@@ -280,6 +285,10 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
   const handleTouchStart = useCallback(
     (e: React.TouchEvent<HTMLDivElement>) => {
       if (!isImageEditing || !onImageScaleChange || !imageEdit) return
+
+      // Skip if touching editable text (for single touch)
+      const target = e.target as HTMLElement
+      if (e.touches.length === 1 && target.isContentEditable) return
 
       // Detect two-finger touch for pinch
       if (e.touches.length === 2) {
@@ -824,7 +833,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
         )}
 
         {/* Content */}
-        <div style={{ position: "relative", opacity: isImageEditing ? 0.5 : 1 }}>
+        <div style={{ position: "relative" }}>
           {/* Header: Album Art + Metadata */}
           {(albumArtElement.visible || metadataElement.visible) && (
             <div
@@ -933,7 +942,8 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
                   suppressContentEditableWarning
                   onBlur={e => {
                     if (isEditing && onTextChange) {
-                      const newText = e.currentTarget.textContent ?? ""
+                      // Use innerText to preserve line breaks from Enter key
+                      const newText = e.currentTarget.innerText ?? ""
                       onTextChange(line.id, newText)
                     }
                   }}
@@ -944,7 +954,7 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
                     letterSpacing: `${typography.letterSpacing}px`,
                     color: typography.color,
                     margin: "4px 0",
-                    whiteSpace: lyricsElement.wrapText ? "normal" : "nowrap",
+                    whiteSpace: lyricsElement.wrapText ? "pre-line" : "nowrap",
                     textShadow: typography.textShadow ? "0 2px 4px rgba(0,0,0,0.3)" : "none",
                     outline: "none",
                     cursor: isEditing ? "text" : "default",
@@ -954,6 +964,8 @@ export const ShareDesignerPreview = memo(function ShareDesignerPreview({
                     textDecorationColor: isEditing ? "rgba(255,255,255,0.5)" : undefined,
                     textUnderlineOffset: isEditing ? "4px" : undefined,
                     caretColor: isEditing ? "white" : undefined,
+                    // Allow text selection even when image editing is active
+                    userSelect: isEditing ? "text" : undefined,
                   }}
                 >
                   {getDisplayText(line.id)}

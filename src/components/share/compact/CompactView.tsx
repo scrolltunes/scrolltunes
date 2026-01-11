@@ -17,7 +17,6 @@ import {
   useRef,
   useState,
 } from "react"
-import { ImageEditMode } from "../ImageEditMode"
 import type { ShareExperienceStore } from "../ShareExperienceStore"
 import {
   useShareExperienceAlbumArtEffect,
@@ -33,7 +32,11 @@ import {
 import { ShareDesignerPreview } from "../designer/ShareDesignerPreview"
 import { ZoomSlider } from "../designer/controls"
 import { useShareExport } from "../designer/useShareExport"
-import type { EffectSettings } from "../effects"
+import {
+  AlbumArtEffectControls,
+  EffectSelector,
+  type EffectSettings,
+} from "../effects"
 import { CUSTOM_COLOR_ID, GradientPalette } from "./GradientPalette"
 import { QuickControls } from "./QuickControls"
 
@@ -167,6 +170,7 @@ export const CompactView = memo(
   ) {
     const previewContainerRef = useRef<HTMLDivElement>(null)
     const cardRef = useRef<HTMLDivElement>(null)
+    const exportRef = useRef<HTMLDivElement>(null) // Outer wrapper with shadow padding for export
 
     // State
     const [showShareMenu, setShowShareMenu] = useState(false)
@@ -189,9 +193,8 @@ export const CompactView = memo(
     const gradientPalette = state.gradientPalette
     const selectedGradientId = state.isCustomColor ? CUSTOM_COLOR_ID : state.selectedGradientId
 
-    // Determine if image editing is available
+    // Determine if album art background is active
     const isAlbumArtBackground = compactPattern === "albumArt"
-    const isImageEditing = state.editor.mode === "image"
 
     // Compute effective background: always show gradient (unless albumArt mode)
     // Pattern is rendered as overlay via patternOverlay prop
@@ -225,10 +228,10 @@ export const CompactView = memo(
       return { pattern: compactPattern, seed: state.compactPatternSeed }
     }, [compactPattern, state.compactPatternSeed])
 
-    // Export hook
+    // Export hook - use exportRef to include shadow padding in export
     const { isGenerating, isSharing, isCopied, handleDownload, handleCopy, handleShare } =
       useShareExport({
-        cardRef,
+        cardRef: exportRef,
         title,
         artist,
         settings: state.exportSettings,
@@ -245,45 +248,79 @@ export const CompactView = memo(
       const card = cardRef.current
       if (!container || !card) return
 
-      const availableWidth = container.clientWidth * 0.92
+      // Available space with margins
+      // - 16% total horizontal margin (8% each side)
+      // - 120px vertical for padding, buttons, and gradient toolbar
+      const availableWidth = container.clientWidth * 0.84
+      const availableHeight = container.clientHeight - 120
       const cardWidth = card.scrollWidth
       const cardHeight = card.scrollHeight
 
-      if (cardWidth > availableWidth) {
-        const scale = Math.max(0.5, availableWidth / cardWidth)
-        const roundedScale = Math.round(scale * 1000) / 1000
-        setPreviewScale(roundedScale)
-        setScaledHeight(Math.round(cardHeight * roundedScale))
-      } else {
-        setPreviewScale(1)
-        setScaledHeight(null)
-      }
+      // Calculate scale to fit both dimensions
+      const scaleX = availableWidth / cardWidth
+      const scaleY = availableHeight / cardHeight
+
+      // Use the smaller scale to ensure card fits, cap between 0.5 and 1.2
+      const scale = Math.min(scaleX, scaleY, 1.2)
+      const clampedScale = Math.max(0.5, scale)
+      const roundedScale = Math.round(clampedScale * 1000) / 1000
+
+      setPreviewScale(roundedScale)
+      setScaledHeight(Math.round(cardHeight * roundedScale))
     }, [])
 
-    // Calculate scale on mount and when relevant state changes
-    useLayoutEffect(() => {
-      calculateScale()
-    }, [calculateScale, lyrics.selectedLines.length, effects.shadow.enabled])
-
-    // Recalculate on resize
-    useLayoutEffect(() => {
+    // Update only the height during editing (keep scale locked)
+    const updateHeightOnly = useCallback(() => {
       const card = cardRef.current
       if (!card) return
 
-      const observer = new ResizeObserver(() => calculateScale())
-      observer.observe(card)
-      window.addEventListener("resize", calculateScale)
+      const cardHeight = card.scrollHeight
+      setScaledHeight(Math.round(cardHeight * previewScale))
+    }, [previewScale])
+
+    // Calculate scale on mount and when relevant state changes (not during editing)
+    useLayoutEffect(() => {
+      if (!isTextEditing) {
+        calculateScale()
+      }
+    }, [calculateScale, lyrics.selectedLines.length, effects.shadow.enabled, isTextEditing])
+
+    // Recalculate on window resize only
+    useLayoutEffect(() => {
+      const handleResize = () => {
+        if (!isTextEditing) {
+          calculateScale()
+        }
+      }
+      window.addEventListener("resize", handleResize)
 
       return () => {
-        observer.disconnect()
-        window.removeEventListener("resize", calculateScale)
+        window.removeEventListener("resize", handleResize)
       }
-    }, [calculateScale])
+    }, [calculateScale, isTextEditing])
 
-    // Text editing handlers
-    const handleToggleTextEdit = useCallback(() => {
-      setIsTextEditing(prev => !prev)
-    }, [])
+    // Update height during editing when content changes
+    useLayoutEffect(() => {
+      if (isTextEditing) {
+        const card = cardRef.current
+        if (!card) return
+
+        const observer = new ResizeObserver(() => updateHeightOnly())
+        observer.observe(card)
+
+        return () => observer.disconnect()
+      }
+    }, [isTextEditing, updateHeightOnly])
+
+    // Combined edit mode handlers (text + image editing)
+    const handleToggleEditMode = useCallback(() => {
+      const newIsEditing = !isTextEditing
+      setIsTextEditing(newIsEditing)
+      // Also enable/disable image editing if album art background
+      if (isAlbumArtBackground) {
+        store.setEditMode(newIsEditing ? "image" : "customize")
+      }
+    }, [isTextEditing, isAlbumArtBackground, store])
 
     const handleTextChange = useCallback(
       (lineId: string, text: string) => {
@@ -292,18 +329,10 @@ export const CompactView = memo(
       [store],
     )
 
-    const handleResetText = useCallback(() => {
+    const handleResetAll = useCallback(() => {
       store.resetAllLineText()
+      store.resetImagePosition()
     }, [store])
-
-    // Image editing handlers
-    const handleToggleImageEdit = useCallback(() => {
-      if (isImageEditing) {
-        store.setEditMode("customize")
-      } else {
-        store.setEditMode("image")
-      }
-    }, [store, isImageEditing])
 
     const handleImageOffsetChange = useCallback(
       (offsetX: number, offsetY: number) => {
@@ -319,15 +348,13 @@ export const CompactView = memo(
       [store],
     )
 
-    const handleResetImagePosition = useCallback(() => {
-      store.resetImagePosition()
-    }, [store])
-
     // Get display text for preview
     const getDisplayText = useCallback((lineId: string) => store.getDisplayText(lineId), [store])
 
-    // Check if text has been edited
+    // Check if there are any edits (text or image position)
     const hasTextEdits = useMemo(() => store.hasTextEdits(), [store, lyrics])
+    const hasImageEdits = imageEdit.offsetX !== 0 || imageEdit.offsetY !== 0 || imageEdit.scale !== 1
+    const hasAnyEdits = hasTextEdits || hasImageEdits
 
     // Background art URL
     const backgroundArtUrl = albumArtLarge ?? albumArt
@@ -397,18 +424,17 @@ export const CompactView = memo(
           ref={previewContainerRef}
           className="share-modal-preserve relative rounded-2xl bg-neutral-200 p-6 pb-14"
         >
-          {/* Edit Mode Buttons */}
+          {/* Edit Mode Button */}
           <div className="absolute left-2 top-2 z-10 flex gap-1">
-            {/* Text Edit Button */}
             <button
               type="button"
-              onClick={handleToggleTextEdit}
+              onClick={handleToggleEditMode}
               className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
               style={{
                 background: isTextEditing ? "var(--color-accent)" : "rgba(0,0,0,0.4)",
                 color: isTextEditing ? "white" : "rgba(255,255,255,0.8)",
               }}
-              aria-label={isTextEditing ? "Done editing" : "Edit text"}
+              aria-label={isTextEditing ? "Done editing" : "Edit"}
             >
               {isTextEditing ? (
                 <Check size={18} weight="bold" />
@@ -416,36 +442,22 @@ export const CompactView = memo(
                 <PencilSimple size={18} weight="bold" />
               )}
             </button>
-            {/* Reset Text Button */}
-            {isTextEditing && hasTextEdits && (
+            {/* Reset Button - shown when editing and there are changes */}
+            {isTextEditing && hasAnyEdits && (
               <button
                 type="button"
-                onClick={handleResetText}
+                onClick={handleResetAll}
                 className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
                 style={{
                   background: "rgba(0,0,0,0.4)",
                   color: "rgba(255,255,255,0.8)",
                 }}
-                aria-label="Reset text"
+                aria-label="Reset changes"
               >
                 <ArrowCounterClockwise size={18} weight="bold" />
               </button>
             )}
           </div>
-
-          {/* Image Edit Button (when Album pattern selected) */}
-          {isAlbumArtBackground && albumArt && (
-            <div className="absolute right-12 top-2 z-10 flex gap-1">
-              <ImageEditMode
-                isEditing={isImageEditing}
-                offsetX={imageEdit.offsetX}
-                offsetY={imageEdit.offsetY}
-                scale={imageEdit.scale}
-                onToggle={handleToggleImageEdit}
-                onReset={handleResetImagePosition}
-              />
-            </div>
-          )}
 
           {/* Share Menu Button */}
           <div className="absolute right-2 top-2 z-10">
@@ -504,15 +516,16 @@ export const CompactView = memo(
                 effects={effects}
                 albumArtEffect={albumArtEffect}
                 getDisplayText={getDisplayText}
+                previewRef={exportRef}
                 cardRef={cardRef}
                 isEditing={isTextEditing}
                 onTextChange={handleTextChange}
-                isImageEditing={isImageEditing}
+                isImageEditing={isTextEditing && isAlbumArtBackground}
                 imageEdit={imageEdit}
                 onImageOffsetChange={handleImageOffsetChange}
                 onImageScaleChange={handleImageScaleChange}
-                onExitImageEdit={() => store.setEditMode("customize")}
-                onResetImagePosition={handleResetImagePosition}
+                onExitImageEdit={handleToggleEditMode}
+                onResetImagePosition={handleResetAll}
                 patternOverlay={patternOverlayConfig}
               />
             </div>
@@ -529,8 +542,8 @@ export const CompactView = memo(
             />
           )}
 
-          {/* Zoom Slider - shown when image edit mode is active */}
-          {isImageEditing && (
+          {/* Zoom Slider - shown when editing with album art background */}
+          {isTextEditing && isAlbumArtBackground && albumArt && (
             <div className="absolute inset-x-4 bottom-2">
               <ZoomSlider value={imageEdit.scale} onChange={handleImageScaleChange} />
             </div>
@@ -539,16 +552,27 @@ export const CompactView = memo(
 
         {/* Controls Section */}
         <div className="mt-4 space-y-4">
+          {/* Effect Controls - shown when using album art background */}
+          {isAlbumArtBackground && albumArt && (
+            <div className="space-y-3">
+              <EffectSelector
+                value={albumArtEffect.effect}
+                onChange={handleEffectTypeChange}
+                albumArt={albumArt}
+              />
+              <AlbumArtEffectControls
+                effectType={albumArtEffect.effect}
+                settings={albumArtEffect.settings}
+                onSettingChange={handleEffectSettingChange}
+              />
+            </div>
+          )}
+
           {/* Quick Controls */}
           <QuickControls
             compactPattern={compactPattern}
             onPatternChange={handlePatternChange}
             hasAlbumArt={Boolean(albumArt)}
-            albumArt={albumArt}
-            effectType={albumArtEffect.effect}
-            effectSettings={albumArtEffect.settings}
-            onEffectTypeChange={handleEffectTypeChange}
-            onEffectSettingChange={handleEffectSettingChange}
             effects={effects}
             elements={elements}
             onShadowToggle={handleShadowToggle}

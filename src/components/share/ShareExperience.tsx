@@ -299,10 +299,14 @@ export const ShareExperience = memo(function ShareExperience({
 
   // Determine header title based on step and mode
   const headerTitle = useMemo(() => {
-    if (isSelectStep) return "Select Lyrics"
+    if (isSelectStep) {
+      const count = selectedIds.size
+      if (count === 0) return "Select Lyrics"
+      return `Select Lyrics (${count})`
+    }
     if (mode === "expanded") return "Studio"
     return "Customize"
-  }, [isSelectStep, mode])
+  }, [isSelectStep, mode, selectedIds.size])
 
   return (
     <AnimatePresence>

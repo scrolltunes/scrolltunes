@@ -1133,6 +1133,11 @@ export class ShareExperienceStore {
       return
     }
 
+    // Skip if same pattern (except waves handled above)
+    if (pattern === this.compactPattern) {
+      return
+    }
+
     this.compactPattern = pattern
     this.activePreset = null
 
@@ -1151,6 +1156,8 @@ export class ShareExperienceStore {
         "Change pattern",
         { skipHistory: true },
       )
+      // updateState may not notify if background was already albumArt, so ensure we notify
+      this.notify()
     } else {
       // Just notify - CompactView will compute the effective background
       this.notify()
