@@ -38,3 +38,9 @@ export {
   type UseDynamicPaginationOptions,
   type UseDynamicPaginationResult,
 } from "./useDynamicPagination"
+export {
+  useSwipeGesture,
+  type UseSwipeGestureOptions,
+  type UseSwipeGestureHandlers,
+  type UseSwipeGestureResult,
+} from "./useSwipeGesture"

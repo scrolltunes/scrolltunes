@@ -75,7 +75,7 @@ Generated from specs. Tasks sorted by priority.
   - Calculate horizontal distance on touch end
   - Trigger callback if threshold exceeded
   - Return handlers object for attachment to element
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -202,6 +202,14 @@ Generated from specs. Tasks sorted by priority.
 - Calculates linesPerPage based on available height (minus 100px padding) and lineHeight (fontSize * 1.8)
 - Clamps result between 4-10 lines
 - Updates automatically on container resize
+- Exported from `src/hooks/index.ts` with types
+
+### Task 6: Create useSwipeGesture hook
+- Created `src/hooks/useSwipeGesture.ts` with touch event handling
+- Options: onSwipeLeft, onSwipeRight, threshold (default 50px), enabled
+- Tracks touchStartX on touchstart, calculates deltaX on touchend
+- Triggers onSwipeLeft/onSwipeRight callbacks if threshold exceeded
+- Returns handlers object (onTouchStart, onTouchEnd) for element attachment
 - Exported from `src/hooks/index.ts` with types
 
 ---
