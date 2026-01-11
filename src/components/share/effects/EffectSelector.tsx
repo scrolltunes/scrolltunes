@@ -42,7 +42,7 @@ export const EffectSelector = memo(function EffectSelector({
         Effect
       </span>
       <div
-        className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1"
+        className="flex gap-2 overflow-x-auto py-1 px-1"
         role="radiogroup"
         aria-label="Select album art effect"
         style={{

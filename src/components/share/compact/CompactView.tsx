@@ -248,8 +248,8 @@ export const CompactView = memo(
       const card = cardRef.current
       if (!container || !card) return
 
-      // Available space with margins
-      const availableWidth = container.clientWidth - 48 // 24px margin each side
+      // Available space with margins (48px container padding + 32px for card wrapper padding)
+      const availableWidth = container.clientWidth - 80
       const cardWidth = card.scrollWidth
       const cardHeight = card.scrollHeight
 
