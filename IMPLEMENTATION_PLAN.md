@@ -64,7 +64,7 @@ Generated from specs. Tasks sorted by priority.
   - Clamp result between 4-10 lines
   - Return linesPerPage value
   - Update on resize using ResizeObserver
-- [ ] Not started
+- [x] Completed
 
 ### Task 6: Create useSwipeGesture hook
 - **File**: `src/hooks/useSwipeGesture.ts` (new)
@@ -195,6 +195,14 @@ Generated from specs. Tasks sorted by priority.
 ### Task 3: Add pageFlip animation preset
 - Added `pageFlip` spring preset to springs object (stiffness 280, damping 26, mass 0.9)
 - Added `pageFlip` variants to variants object with enter/center/exit states for horizontal slide animation
+
+### Task 5: Create useDynamicPagination hook
+- Created `src/hooks/useDynamicPagination.ts` with ResizeObserver pattern
+- Options: containerRef, fontSize, totalLines
+- Calculates linesPerPage based on available height (minus 100px padding) and lineHeight (fontSize * 1.8)
+- Clamps result between 4-10 lines
+- Updates automatically on container resize
+- Exported from `src/hooks/index.ts` with types
 
 ---
 

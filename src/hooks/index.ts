@@ -33,3 +33,8 @@ export {
   useScreenReaderAnnounce,
   type UseScreenReaderAnnounceResult,
 } from "./useScreenReaderAnnounce"
+export {
+  useDynamicPagination,
+  type UseDynamicPaginationOptions,
+  type UseDynamicPaginationResult,
+} from "./useDynamicPagination"
