@@ -128,7 +128,7 @@ Generated from specs. Tasks sorted by priority.
   - AnimatePresence with pageFlipVariants for page transitions
   - Include PageIndicator, ScoreBookPage, PageFlipWarning
   - Handle reduced motion preference
-- [ ] Not started
+- [x] Completed
 
 ### Task 11: Export components from display/index.ts
 - **File**: `src/components/display/index.ts` (modify)
@@ -138,7 +138,7 @@ Generated from specs. Tasks sorted by priority.
   - Export ScoreBookPage
   - Export PageIndicator
   - Export PageFlipWarning
-- [~] In progress (ScoreBookPage exported, ScoreBookDisplay pending)
+- [x] Completed
 
 ---
 
@@ -241,6 +241,24 @@ Generated from specs. Tasks sorted by priority.
 - Supports word-level highlighting when showWordHighlight enabled
 - Supports chord display when showChords enabled
 - Exported from `src/components/display/index.ts`
+
+### Task 10: Create ScoreBookDisplay main component
+- Created `src/components/display/ScoreBookDisplay.tsx` as main orchestrating component
+- Subscribes to LyricsPlayer for currentLineIndex via useCurrentLineIndex hook
+- Subscribes to ScoreBookStore for pagination state via useScoreBookState hook
+- Uses useDynamicPagination hook to calculate lines per page based on container size
+- Uses useSwipeGesture hook for manual page navigation (swipe left/right)
+- Auto-advances page when current line crosses page boundary via useEffect
+- Uses AnimatePresence with pageFlip variants for animated page transitions
+- Includes PageIndicator (top-right), ScoreBookPage (main content), PageFlipWarning (bottom)
+- Handles reduced motion preference with crossfade fallback animation
+- Supports chord display and word-level highlighting via preferences
+- Builds chord data map with transposition support (same pattern as LyricsDisplay)
+- Exported from `src/components/display/index.ts`
+
+### Task 11: Export components from display/index.ts
+- Added ScoreBookDisplay export to `src/components/display/index.ts`
+- All Score Book components now exported: ScoreBookDisplay, ScoreBookPage, PageIndicator, PageFlipWarning
 
 ---
 
