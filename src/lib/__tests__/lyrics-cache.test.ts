@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import type { Lyrics } from "@/core"
-import type { CachedLyrics } from "../recent-songs-types"
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import {
   LYRICS_CACHE_VERSION,
   LYRICS_KEY_PREFIX,
@@ -11,6 +10,7 @@ import {
   removeCachedLyrics,
   saveCachedLyrics,
 } from "../lyrics-cache"
+import type { CachedLyrics } from "../recent-songs-types"
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -58,7 +58,7 @@ const mockCachedData: Omit<CachedLyrics, "cachedAt"> = {
   bpmSource: { name: "Test", url: "https://example.com" },
   lyricsSource: { name: "LRCLIB", url: "https://lrclib.net" },
   hasEnhancement: true,
-  enhancement: { words: [] },
+  enhancement: { version: 1, algoVersion: 1, lines: [] },
   hasChordEnhancement: false,
   chordEnhancement: null,
 }
@@ -109,7 +109,7 @@ describe("lyrics-cache", () => {
       expect(loaded).not.toBeNull()
       expect(loaded?.lyrics.title).toBe("Test Song")
       expect(loaded?.bpm).toBe(120)
-      expect(loaded?.enhancement).toEqual({ words: [] })
+      expect(loaded?.enhancement).toEqual({ version: 1, algoVersion: 1, lines: [] })
     })
 
     test("returns null for non-existent cache", () => {
@@ -239,18 +239,30 @@ describe("lyrics-cache", () => {
       const dataWithEnhancement = {
         ...mockCachedData,
         hasEnhancement: true,
-        enhancement: { words: [{ lineId: "line-1", words: [] }] },
+        enhancement: { version: 1, algoVersion: 1, lines: [{ idx: 0, words: [] }] },
         hasChordEnhancement: true,
-        chordEnhancement: { version: 1, chords: [] },
+        chordEnhancement: {
+          patchFormatVersion: "chords-json-v1" as const,
+          algoVersion: "1.0",
+          lines: [],
+        },
       }
 
       saveCachedLyrics(12345, dataWithEnhancement)
       const loaded = loadCachedLyrics(12345)
 
       expect(loaded?.hasEnhancement).toBe(true)
-      expect(loaded?.enhancement).toEqual({ words: [{ lineId: "line-1", words: [] }] })
+      expect(loaded?.enhancement).toEqual({
+        version: 1,
+        algoVersion: 1,
+        lines: [{ idx: 0, words: [] }],
+      })
       expect(loaded?.hasChordEnhancement).toBe(true)
-      expect(loaded?.chordEnhancement).toEqual({ version: 1, chords: [] })
+      expect(loaded?.chordEnhancement).toEqual({
+        patchFormatVersion: "chords-json-v1",
+        algoVersion: "1.0",
+        lines: [],
+      })
     })
 
     test("loads lyrics without enhancements", () => {

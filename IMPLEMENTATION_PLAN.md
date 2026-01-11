@@ -169,7 +169,14 @@ Generated from specs. Tasks sorted by priority.
 
 ## Discovered Tasks
 
-(Tasks discovered during implementation go here)
+### Task D1: Fix lyrics-cache.test.ts TypeScript errors
+- **File**: `src/lib/__tests__/lyrics-cache.test.ts` (modify)
+- **Description**: Fix type errors for EnhancementPayload and ChordEnhancementPayloadV1 types
+- **Details**:
+  - Updated mock enhancement data from `{ words: [] }` to `{ version: 1, algoVersion: 1, lines: [] }` (EnhancementPayload type)
+  - Updated mock chordEnhancement data from `{ version: 1, chords: [] }` to `{ patchFormatVersion: "chords-json-v1", algoVersion: "1.0", lines: [] }` (ChordEnhancementPayloadV1 type)
+  - Updated test assertions to match new type shapes
+- [x] Completed
 
 ---
 

@@ -1,11 +1,6 @@
 "use client"
 
-import {
-  ArrowCounterClockwise,
-  Check,
-  PencilSimple,
-  ShareNetwork,
-} from "@phosphor-icons/react"
+import { ArrowCounterClockwise, Check, PencilSimple, ShareNetwork } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import {
   forwardRef,
@@ -32,11 +27,7 @@ import {
 import { ShareDesignerPreview } from "../designer/ShareDesignerPreview"
 import { ZoomSlider } from "../designer/controls"
 import { useShareExport } from "../designer/useShareExport"
-import {
-  AlbumArtEffectControls,
-  EffectSelector,
-  type EffectSettings,
-} from "../effects"
+import { AlbumArtEffectControls, EffectSelector, type EffectSettings } from "../effects"
 import { CUSTOM_COLOR_ID, GradientPalette } from "./GradientPalette"
 import { QuickControls } from "./QuickControls"
 
@@ -218,7 +209,14 @@ export const CompactView = memo(
         return { type: "gradient" as const, gradientId: first.id, gradient: first.gradient }
       }
       return { type: "solid" as const, color: "#4f46e5" }
-    }, [compactPattern, background, state.isCustomColor, state.customColor, state.selectedGradientId, gradientPalette])
+    }, [
+      compactPattern,
+      background,
+      state.isCustomColor,
+      state.customColor,
+      state.selectedGradientId,
+      gradientPalette,
+    ])
 
     // Pattern overlay for dots/grid/waves (not for none or albumArt)
     const patternOverlayConfig = useMemo(() => {
@@ -359,7 +357,8 @@ export const CompactView = memo(
 
     // Check if there are any edits (text or image position)
     const hasTextEdits = useMemo(() => store.hasTextEdits(), [store, lyrics])
-    const hasImageEdits = imageEdit.offsetX !== 0 || imageEdit.offsetY !== 0 || imageEdit.scale !== 1
+    const hasImageEdits =
+      imageEdit.offsetX !== 0 || imageEdit.offsetY !== 0 || imageEdit.scale !== 1
     const hasAnyEdits = hasTextEdits || hasImageEdits
 
     // Background art URL
