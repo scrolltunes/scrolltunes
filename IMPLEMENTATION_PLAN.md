@@ -286,7 +286,7 @@ These files already follow Effect.ts patterns correctly:
 - **Details**:
   - Use Effect.gen
   - Use typed errors
-- [ ] Not started
+- [x] Completed
 
 ### Task 20: Migrate /user/favorites/sync route
 - **File**: `src/app/api/user/favorites/sync/route.ts` (modify)
@@ -548,6 +548,13 @@ These files already follow Effect.ts patterns correctly:
 - Uses DbService/DbLayer for proper Effect dependency injection
 - Effect.runPromiseExit with pattern matching for 401/404/400/409/500 responses
 
+### Task 19: Migrate /user/setlists/[id]/songs/[songId] route
+- Converted DELETE handler to deleteSong Effect using Effect.gen with Effect.tryPromise
+- Uses AuthError, UnauthorizedError, DatabaseError, NotFoundError, ValidationError from centralized errors.ts
+- Uses DbService/DbLayer for proper Effect dependency injection
+- Effect.runPromiseExit with pattern matching for 401/400/404/500 responses
+- Validates composite songId format (provider:id) with proper ValidationError
+
 ---
 
 ## Notes
@@ -595,6 +602,6 @@ These files already follow Effect.ts patterns correctly:
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
-| P1: API Routes (await) | 12 | 3 completed |
+| P1: API Routes (await) | 12 | 4 completed |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **18 completed** |
+| **Total** | **31** | **19 completed** |
