@@ -11,7 +11,20 @@ import {
   updateEditPayload,
 } from "@/lib/song-edits"
 import { userApi } from "@/lib/user-api"
+import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
+
+// ============================================================================
+// SongEdits Errors
+// ============================================================================
+
+/**
+ * Error during song edits API operations
+ */
+export class SongEditsError extends Data.TaggedClass("SongEditsError")<{
+  readonly operation: string
+  readonly cause?: unknown
+}> {}
 
 const CACHE_KEY_PREFIX = "scrolltunes:song-edits:"
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -121,107 +134,147 @@ class SongEditsStore {
 
   // --- Loading ---
 
-  async loadEdits(songId: number, lrcHash: string): Promise<void> {
-    // Skip if already loaded for this song with same hash
-    if (
-      this.state.songId === songId &&
-      this.state.lrcHash === lrcHash &&
-      this.state.status === "ready"
-    ) {
-      return
-    }
+  private loadEditsEffect(songId: number, lrcHash: string): Effect.Effect<void, SongEditsError> {
+    return Effect.gen(this, function* () {
+      // Skip if already loaded for this song with same hash
+      if (
+        this.state.songId === songId &&
+        this.state.lrcHash === lrcHash &&
+        this.state.status === "ready"
+      ) {
+        return
+      }
 
-    // Check localStorage first
-    const cached = loadFromCache(songId)
-    if (cached && cached.lrcHash === lrcHash) {
+      // Check localStorage first
+      const cached = loadFromCache(songId)
+      if (cached && cached.lrcHash === lrcHash) {
+        this.updateState({
+          status: "ready",
+          songId,
+          lrcHash,
+          payload: cached,
+          originalPayload: cached,
+          isDirty: false,
+          error: null,
+        })
+        return
+      }
+
       this.updateState({
-        status: "ready",
+        status: "loading",
         songId,
         lrcHash,
-        payload: cached,
-        originalPayload: cached,
-        isDirty: false,
-        error: null,
-      })
-      return
-    }
-
-    this.updateState({
-      status: "loading",
-      songId,
-      lrcHash,
-      payload: null,
-      originalPayload: null,
-      isDirty: false,
-      error: null,
-    })
-
-    // Fetch from server
-    const data = await userApi.get<{ edits: SongEditPatchPayload | null }>(
-      `/api/user/song-edits/${songId}`,
-    )
-
-    if (data?.edits) {
-      // Check if patches still align with current lyrics
-      if (data.edits.lrcHash !== lrcHash) {
-        // Hash mismatch - patches may not align correctly
-        // Still load them but could add a warning indicator
-        console.warn("Song edit patches may be outdated - LRC hash mismatch")
-      }
-      saveToCache(songId, data.edits)
-      this.updateState({
-        status: "ready",
-        payload: data.edits,
-        originalPayload: data.edits,
-        isDirty: false,
-        error: null,
-      })
-    } else {
-      // No edits found - use empty state
-      this.updateState({
-        status: "ready",
         payload: null,
         originalPayload: null,
         isDirty: false,
         error: null,
       })
-    }
+
+      // Fetch from server
+      const data = yield* Effect.tryPromise({
+        try: () =>
+          userApi.get<{ edits: SongEditPatchPayload | null }>(`/api/user/song-edits/${songId}`),
+        catch: cause => new SongEditsError({ operation: "loadEdits", cause }),
+      })
+
+      if (data?.edits) {
+        // Check if patches still align with current lyrics
+        if (data.edits.lrcHash !== lrcHash) {
+          // Hash mismatch - patches may not align correctly
+          // Still load them but could add a warning indicator
+          console.warn("Song edit patches may be outdated - LRC hash mismatch")
+        }
+        saveToCache(songId, data.edits)
+        this.updateState({
+          status: "ready",
+          payload: data.edits,
+          originalPayload: data.edits,
+          isDirty: false,
+          error: null,
+        })
+      } else {
+        // No edits found - use empty state
+        this.updateState({
+          status: "ready",
+          payload: null,
+          originalPayload: null,
+          isDirty: false,
+          error: null,
+        })
+      }
+    })
+  }
+
+  loadEdits(songId: number, lrcHash: string): void {
+    Effect.runFork(
+      this.loadEditsEffect(songId, lrcHash).pipe(
+        Effect.catchAll(error =>
+          Effect.sync(() => {
+            this.updateState({
+              status: "error",
+              error: error.cause instanceof Error ? error.cause.message : "Failed to load edits",
+            })
+          }),
+        ),
+      ),
+    )
   }
 
   // --- Saving ---
 
-  async saveEdits(): Promise<boolean> {
-    const { songId, payload } = this.state
-    if (songId === null || payload === null) {
-      return false
-    }
+  private saveEditsEffect(): Effect.Effect<boolean, SongEditsError> {
+    return Effect.gen(this, function* () {
+      const { songId, payload } = this.state
+      if (songId === null || payload === null) {
+        return false
+      }
 
-    this.updateState({ status: "saving" })
+      this.updateState({ status: "saving" })
 
-    // Optimistic local save
-    saveToCache(songId, payload)
+      // Optimistic local save
+      saveToCache(songId, payload)
 
-    // Sync to server
-    const result = await userApi.postWithResponse<{ success: boolean }>(
-      `/api/user/song-edits/${songId}`,
-      { edits: payload },
-    )
-
-    if (result?.success) {
-      this.updateState({
-        status: "ready",
-        originalPayload: payload,
-        isDirty: false,
-        error: null,
+      // Sync to server
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          userApi.postWithResponse<{ success: boolean }>(`/api/user/song-edits/${songId}`, {
+            edits: payload,
+          }),
+        catch: cause => new SongEditsError({ operation: "saveEdits", cause }),
       })
-      return true
-    }
 
-    this.updateState({
-      status: "error",
-      error: "Failed to save edits",
+      if (result?.success) {
+        this.updateState({
+          status: "ready",
+          originalPayload: payload,
+          isDirty: false,
+          error: null,
+        })
+        return true
+      }
+
+      this.updateState({
+        status: "error",
+        error: "Failed to save edits",
+      })
+      return false
     })
-    return false
+  }
+
+  async saveEdits(): Promise<boolean> {
+    return Effect.runPromise(
+      this.saveEditsEffect().pipe(
+        Effect.catchAll(error =>
+          Effect.sync(() => {
+            this.updateState({
+              status: "error",
+              error: error.cause instanceof Error ? error.cause.message : "Failed to save edits",
+            })
+            return false
+          }),
+        ),
+      ),
+    )
   }
 
   // --- Edit Mode ---
@@ -435,11 +488,12 @@ class SongEditsStore {
     }
   }
 
-  async deleteEdits(): Promise<boolean> {
+  deleteEdits(): boolean {
     const { songId } = this.state
     if (songId === null) return false
 
     removeFromCache(songId)
+    // userApi.delete already uses Effect.runFork internally (fire-and-forget)
     userApi.delete(`/api/user/song-edits/${songId}`)
 
     this.updateState({

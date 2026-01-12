@@ -177,7 +177,7 @@ These files already follow Effect.ts patterns correctly:
   - deleteEdits() (lines 438-452) → Effect.Effect
   - Line 443: userApi.delete() fire-and-forget → Effect.runFork
   - Define SongEditsError tagged class
-- [ ] Not started
+- [x] Completed
 
 ### Task 10: Migrate FavoritesStore to Effect
 - **File**: `src/core/FavoritesStore.ts` (modify)
@@ -467,6 +467,15 @@ These files already follow Effect.ts patterns correctly:
 - Changed fetchChords() return type from Promise<void> to void (fire-and-forget)
 - userApi.put() in saveTranspose() was already Effect-compliant via user-api.ts
 
+### Task 9: Migrate SongEditsStore to Effect
+- Defined SongEditsError tagged class with operation and cause fields
+- Converted loadEdits() from async/await to loadEditsEffect() using Effect.gen with Effect.tryPromise
+- Converted saveEdits() from async/await to saveEditsEffect() using Effect.gen with Effect.tryPromise
+- loadEdits() now uses Effect.runFork for fire-and-forget background load
+- saveEdits() uses Effect.runPromise to maintain Promise<boolean> return type
+- Error recovery via Effect.catchAll updates state with error message
+- deleteEdits() changed from async to sync since userApi.delete() is already fire-and-forget
+
 ---
 
 ## Notes
@@ -512,8 +521,8 @@ These files already follow Effect.ts patterns correctly:
 | Phase | Count | Status |
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
-| P0: Core Stores | 8 | 5 completed |
+| P0: Core Stores | 8 | 6 completed |
 | P1: API Routes (try/catch) | 4 | Not started |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **8 completed** |
+| **Total** | **31** | **9 completed** |
