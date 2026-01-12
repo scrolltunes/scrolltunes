@@ -41,9 +41,9 @@ export interface ScoreBookDisplayProps {
 /**
  * Main Score Book display - page-based lyrics with auto/manual page navigation
  *
- * Orchestrates ScoreBookPage, PageIndicator, PageFlipWarning, and pagination logic.
+ * Orchestrates ScoreBookPage, PageIndicator, PageSidebar, and pagination logic.
  * Pages flip automatically when the current line crosses a page boundary,
- * or manually via swipe gestures.
+ * or manually via swipe gestures or navigation arrows.
  */
 export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   className = "",

@@ -392,6 +392,16 @@ Generated from specs. Tasks sorted by priority.
 - Updated `SongPageClient.tsx` to pass `displayMode: preferences.displayMode` to hook
 - Added `displayMode` to useEffect dependency array
 
+### Task 23: Export new components and cleanup
+- Modified `src/components/display/index.ts` to remove PageFlipWarning export
+- Deleted `src/components/display/PageFlipWarning.tsx` file (deprecated, no longer used)
+- Modified `src/core/PreferencesStore.ts`:
+  - Removed `scoreBookWordHighlight` from Preferences interface
+  - Removed `scoreBookWordHighlight` from DEFAULT_PREFERENCES
+  - Removed `getScoreBookWordHighlight()` and `setScoreBookWordHighlight()` methods
+- Updated JSDoc comment in ScoreBookDisplay.tsx to reference PageSidebar instead of PageFlipWarning
+- All new components already exported: StaticLyricLine, PageThumbnail, PageSidebar, PageNavigationArrows
+
 ---
 
 ## Gap Analysis (Phase 5)
@@ -624,7 +634,7 @@ Task 22 (Keyboard nav) - independent, can be done anytime
   - Update DEFAULT_PREFERENCES to remove `scoreBookWordHighlight`
   - Clean up any unused imports in affected files
 - **Depends on**: Tasks 14, 16, 17, 18, 19
-- [ ] Not started
+- [x] Completed
 
 ---
 

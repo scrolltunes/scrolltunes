@@ -81,7 +81,6 @@ export interface Preferences {
   readonly singingDetectorConfig: SingingDetectorConfig
   readonly displayMode: DisplayMode
   readonly scoreBookShowChords: boolean
-  readonly scoreBookWordHighlight: boolean
   readonly scoreBookFontSize: number
 }
 
@@ -98,7 +97,6 @@ const DEFAULT_PREFERENCES: Preferences = {
   singingDetectorConfig: DEFAULT_SINGING_DETECTOR_CONFIG,
   displayMode: "scorebook",
   scoreBookShowChords: false,
-  scoreBookWordHighlight: false,
   scoreBookFontSize: SCOREBOOK_DEFAULT_FONT_SIZE,
 }
 
@@ -282,14 +280,6 @@ export class PreferencesStore {
 
   setScoreBookShowChords(value: boolean): void {
     this.setState({ scoreBookShowChords: value })
-  }
-
-  getScoreBookWordHighlight(): boolean {
-    return this.state.scoreBookWordHighlight
-  }
-
-  setScoreBookWordHighlight(value: boolean): void {
-    this.setState({ scoreBookWordHighlight: value })
   }
 
   getScoreBookFontSize(): number {
