@@ -277,7 +277,7 @@ These files already follow Effect.ts patterns correctly:
 - **Details**:
   - GET and POST handlers
   - Use typed errors
-- [ ] Not started
+- [x] Completed
 
 ### Task 19: Migrate /user/setlists/[id]/songs/[songId] route
 - **File**: `src/app/api/user/setlists/[id]/songs/[songId]/route.ts` (modify)
@@ -540,6 +540,14 @@ These files already follow Effect.ts patterns correctly:
 - Uses DbService/DbLayer for proper Effect dependency injection
 - Effect.runPromiseExit with pattern matching for 401/404/400/500 responses
 
+### Task 18: Migrate /user/setlists/[id]/songs route
+- Converted GET handler to getSongs Effect using Effect.gen with Effect.tryPromise
+- Converted POST handler to addSong Effect using Effect.gen with Effect.tryPromise
+- Added ConflictError to src/lib/errors.ts for handling 409 "Song already in setlist" case
+- Uses AuthError, UnauthorizedError, DatabaseError, NotFoundError, ValidationError, ConflictError from centralized errors.ts
+- Uses DbService/DbLayer for proper Effect dependency injection
+- Effect.runPromiseExit with pattern matching for 401/404/400/409/500 responses
+
 ---
 
 ## Notes
@@ -587,6 +595,6 @@ These files already follow Effect.ts patterns correctly:
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
-| P1: API Routes (await) | 12 | 2 completed |
+| P1: API Routes (await) | 12 | 3 completed |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **17 completed** |
+| **Total** | **31** | **18 completed** |

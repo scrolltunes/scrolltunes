@@ -51,7 +51,14 @@ export class NotFoundError extends Data.TaggedClass("NotFoundError")<{
   readonly id?: string
 }> {}
 
-export type RequestErrors = ValidationError | NotFoundError
+/**
+ * Resource already exists (duplicate entry, etc.)
+ */
+export class ConflictError extends Data.TaggedClass("ConflictError")<{
+  readonly message: string
+}> {}
+
+export type RequestErrors = ValidationError | NotFoundError | ConflictError
 
 // ============================================================================
 // Database Errors

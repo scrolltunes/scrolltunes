@@ -1,101 +1,209 @@
 import { auth } from "@/auth"
-import { db } from "@/lib/db"
 import { normalizeSongInput } from "@/lib/db/normalize"
 import { userSetlistSongs, userSetlists } from "@/lib/db/schema"
+import {
+  AuthError,
+  ConflictError,
+  DatabaseError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from "@/lib/errors"
+import { DbLayer, DbService } from "@/services/db"
 import { and, asc, eq, sql } from "drizzle-orm"
+import { Effect } from "effect"
 import { NextResponse } from "next/server"
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+const getSongs = (setlistId: string) =>
+  Effect.gen(function* () {
+    const session = yield* Effect.tryPromise({
+      try: () => auth(),
+      catch: cause => new AuthError({ cause }),
+    })
 
+    if (!session?.user?.id) {
+      return yield* Effect.fail(new UnauthorizedError({}))
+    }
+
+    const { db } = yield* DbService
+
+    const setlist = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ id: userSetlists.id })
+          .from(userSetlists)
+          .where(and(eq(userSetlists.id, setlistId), eq(userSetlists.userId, session.user.id)))
+          .then(rows => rows[0]),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    if (!setlist) {
+      return yield* Effect.fail(new NotFoundError({ resource: "Setlist", id: setlistId }))
+    }
+
+    const songs = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select()
+          .from(userSetlistSongs)
+          .where(eq(userSetlistSongs.setlistId, setlistId))
+          .orderBy(asc(userSetlistSongs.sortOrder)),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    return { songs }
+  })
+
+interface AddSongInput {
+  songId?: unknown
+  songProvider?: unknown
+  title?: unknown
+  artist?: unknown
+  album?: unknown
+}
+
+const addSong = (setlistId: string, input: AddSongInput) =>
+  Effect.gen(function* () {
+    const session = yield* Effect.tryPromise({
+      try: () => auth(),
+      catch: cause => new AuthError({ cause }),
+    })
+
+    if (!session?.user?.id) {
+      return yield* Effect.fail(new UnauthorizedError({}))
+    }
+
+    const { songId, songProvider, title, artist, album } = input
+
+    if (
+      typeof songId !== "string" ||
+      typeof songProvider !== "string" ||
+      typeof title !== "string" ||
+      typeof artist !== "string"
+    ) {
+      return yield* Effect.fail(
+        new ValidationError({
+          message: "Missing required fields: songId, songProvider, title, artist",
+        }),
+      )
+    }
+
+    const { db } = yield* DbService
+
+    const setlist = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ id: userSetlists.id })
+          .from(userSetlists)
+          .where(and(eq(userSetlists.id, setlistId), eq(userSetlists.userId, session.user.id)))
+          .then(rows => rows[0]),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    if (!setlist) {
+      return yield* Effect.fail(new NotFoundError({ resource: "Setlist", id: setlistId }))
+    }
+
+    // Check if song already exists in this setlist
+    const existing = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ id: userSetlistSongs.id })
+          .from(userSetlistSongs)
+          .where(
+            and(
+              eq(userSetlistSongs.setlistId, setlistId),
+              eq(userSetlistSongs.songId, songId),
+              eq(userSetlistSongs.songProvider, songProvider),
+            ),
+          )
+          .then(rows => rows[0]),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    if (existing) {
+      return yield* Effect.fail(new ConflictError({ message: "Song already in setlist" }))
+    }
+
+    const maxSortOrderResult = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ max: sql<number>`COALESCE(MAX(${userSetlistSongs.sortOrder}), -1)` })
+          .from(userSetlistSongs)
+          .where(eq(userSetlistSongs.setlistId, setlistId))
+          .then(rows => rows[0]?.max ?? -1),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    const [song] = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .insert(userSetlistSongs)
+          .values(
+            normalizeSongInput({
+              setlistId,
+              songId,
+              songProvider,
+              songTitle: title,
+              songArtist: artist,
+              songAlbum: typeof album === "string" ? album : "",
+              sortOrder: maxSortOrderResult + 1,
+            }),
+          )
+          .returning(),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    return { song }
+  })
+
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  const setlist = await db
-    .select({ id: userSetlists.id })
-    .from(userSetlists)
-    .where(and(eq(userSetlists.id, id), eq(userSetlists.userId, session.user.id)))
-    .then(rows => rows[0])
+  const exit = await Effect.runPromiseExit(getSongs(id).pipe(Effect.provide(DbLayer)))
 
-  if (!setlist) {
-    return NextResponse.json({ error: "Setlist not found" }, { status: 404 })
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      if (cause.error instanceof UnauthorizedError) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      if (cause.error instanceof NotFoundError) {
+        return NextResponse.json({ error: "Setlist not found" }, { status: 404 })
+      }
+    }
+    console.error("Failed to fetch setlist songs", exit.cause)
+    return NextResponse.json({ error: "Failed to fetch setlist songs" }, { status: 500 })
   }
 
-  const songs = await db
-    .select()
-    .from(userSetlistSongs)
-    .where(eq(userSetlistSongs.setlistId, id))
-    .orderBy(asc(userSetlistSongs.sortOrder))
-
-  return NextResponse.json({ songs })
+  return NextResponse.json(exit.value)
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
   const { id } = await params
-  const body = await request.json()
-  const { songId, songProvider, title, artist, album } = body
+  const body = await request.json().catch(() => ({}))
 
-  if (!songId || !songProvider || !title || !artist) {
-    return NextResponse.json(
-      { error: "Missing required fields: songId, songProvider, title, artist" },
-      { status: 400 },
-    )
+  const exit = await Effect.runPromiseExit(addSong(id, body).pipe(Effect.provide(DbLayer)))
+
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      if (cause.error instanceof UnauthorizedError) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      if (cause.error instanceof NotFoundError) {
+        return NextResponse.json({ error: "Setlist not found" }, { status: 404 })
+      }
+      if (cause.error instanceof ValidationError) {
+        return NextResponse.json({ error: cause.error.message }, { status: 400 })
+      }
+      if (cause.error instanceof ConflictError) {
+        return NextResponse.json({ error: cause.error.message }, { status: 409 })
+      }
+    }
+    console.error("Failed to add song to setlist", exit.cause)
+    return NextResponse.json({ error: "Failed to add song to setlist" }, { status: 500 })
   }
 
-  const setlist = await db
-    .select({ id: userSetlists.id })
-    .from(userSetlists)
-    .where(and(eq(userSetlists.id, id), eq(userSetlists.userId, session.user.id)))
-    .then(rows => rows[0])
-
-  if (!setlist) {
-    return NextResponse.json({ error: "Setlist not found" }, { status: 404 })
-  }
-
-  // Check if song already exists in this setlist
-  const existing = await db
-    .select({ id: userSetlistSongs.id })
-    .from(userSetlistSongs)
-    .where(
-      and(
-        eq(userSetlistSongs.setlistId, id),
-        eq(userSetlistSongs.songId, songId),
-        eq(userSetlistSongs.songProvider, songProvider),
-      ),
-    )
-    .then(rows => rows[0])
-
-  if (existing) {
-    return NextResponse.json({ error: "Song already in setlist" }, { status: 409 })
-  }
-
-  const maxSortOrder = await db
-    .select({ max: sql<number>`COALESCE(MAX(${userSetlistSongs.sortOrder}), -1)` })
-    .from(userSetlistSongs)
-    .where(eq(userSetlistSongs.setlistId, id))
-    .then(rows => rows[0]?.max ?? -1)
-
-  const [song] = await db
-    .insert(userSetlistSongs)
-    .values(
-      normalizeSongInput({
-        setlistId: id,
-        songId,
-        songProvider,
-        songTitle: title,
-        songArtist: artist,
-        songAlbum: album ?? "",
-        sortOrder: maxSortOrder + 1,
-      }),
-    )
-    .returning()
-
-  return NextResponse.json({ song }, { status: 201 })
+  return NextResponse.json(exit.value, { status: 201 })
 }
