@@ -3,40 +3,48 @@
 import { type RefObject, useLayoutEffect, useState } from "react"
 
 export interface UseDynamicPaginationOptions {
-  readonly containerRef: RefObject<HTMLElement | null>
+  readonly contentRef: RefObject<HTMLElement | null>
   readonly fontSize: number
   readonly totalLines: number
 }
 
 export interface UseDynamicPaginationResult {
   readonly linesPerPage: number
+  readonly debugHeight: number
 }
 
 const MIN_LINES = 3
 const MAX_LINES = 10
-const LINE_HEIGHT_MULTIPLIER = 1.8
-// Accounts for: internal padding of animated container (pt-16 pb-20 = 144px)
-const VERTICAL_PADDING = 150
+// Text line height multiplier (typical readable text)
+const TEXT_LINE_HEIGHT = 1.5
+// Fixed spacing per line: gap-2 (8px) + padding + highlight box margins
+const FIXED_LINE_SPACING = 38
+// Content area padding: pt-16 (64px) + pb-20 (80px)
+const CONTENT_PADDING = 144
 
 export function useDynamicPagination(
   options: UseDynamicPaginationOptions,
 ): UseDynamicPaginationResult {
-  const { containerRef, fontSize, totalLines } = options
+  const { contentRef, fontSize, totalLines } = options
   const [linesPerPage, setLinesPerPage] = useState(6)
+  const [debugHeight, setDebugHeight] = useState(0)
 
   useLayoutEffect(() => {
-    const container = containerRef.current
-    if (!container || totalLines === 0) return
+    const content = contentRef.current
+    if (!content || totalLines === 0) return
 
     function calculateLinesPerPage() {
-      const containerElement = containerRef.current
-      if (!containerElement) return
+      const contentElement = contentRef.current
+      if (!contentElement) return
 
-      const availableHeight = containerElement.clientHeight - VERTICAL_PADDING
-      const lineHeight = fontSize * LINE_HEIGHT_MULTIPLIER
+      // Measure container height and subtract content area padding
+      const availableHeight = contentElement.clientHeight - CONTENT_PADDING
+      // Line height = proportional text height + fixed spacing
+      const lineHeight = fontSize * TEXT_LINE_HEIGHT + FIXED_LINE_SPACING
       const calculatedLines = Math.floor(availableHeight / lineHeight)
       const clampedLines = Math.max(MIN_LINES, Math.min(calculatedLines, MAX_LINES))
 
+      setDebugHeight(contentElement.clientHeight)
       setLinesPerPage(clampedLines)
     }
 
@@ -46,13 +54,13 @@ export function useDynamicPagination(
     })
 
     const observer = new ResizeObserver(() => calculateLinesPerPage())
-    observer.observe(container)
+    observer.observe(content)
 
     return () => {
       cancelAnimationFrame(frameId)
       observer.disconnect()
     }
-  }, [containerRef, fontSize, totalLines])
+  }, [contentRef, fontSize, totalLines])
 
-  return { linesPerPage }
+  return { linesPerPage, debugHeight }
 }

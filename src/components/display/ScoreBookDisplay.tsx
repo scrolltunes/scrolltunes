@@ -26,14 +26,6 @@ import { PageNavigationArrows } from "./PageNavigationArrows"
 import { ScoreBookPage } from "./ScoreBookPage"
 
 /**
- * Check if running on localhost (dev mode)
- */
-function useIsLocalhost(): boolean {
-  if (typeof window === "undefined") return false
-  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-}
-
-/**
  * Chord data for a single line
  */
 interface LineChordData {
@@ -76,21 +68,22 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const transposeSemitones = useTranspose()
   const prefersReducedMotion = useReducedMotion()
   const currentTime = useContinuousTime()
-  const isLocalhost = useIsLocalhost()
 
   // ScoreBook pagination state
   const { currentPage, totalPages, linesPerPage, pageLineRanges } = useScoreBookState()
 
-  // Container ref for dynamic pagination
+  // Container ref for swipe gestures
   const containerRef = useRef<HTMLDivElement | null>(null)
+  // Content area ref for accurate height measurement (inside the padded area)
+  const contentRef = useRef<HTMLDivElement | null>(null)
 
   // Get lyrics from state
   const lyrics = state._tag !== "Idle" ? state.lyrics : null
   const totalLines = lyrics?.lines.length ?? 0
 
-  // Dynamic pagination calculation
-  const { linesPerPage: calculatedLinesPerPage } = useDynamicPagination({
-    containerRef,
+  // Dynamic pagination calculation - measures actual content area
+  const { linesPerPage: calculatedLinesPerPage, debugHeight } = useDynamicPagination({
+    contentRef,
     fontSize: scoreBookFontSize,
     totalLines,
   })
@@ -299,9 +292,9 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const hasNext = currentPage < totalPages - 1
 
   return (
-    <div className={`flex ${className}`} aria-label="Score Book lyrics display">
+    <div className={`flex h-full ${className}`} aria-label="Score Book lyrics display">
       {/* Main content area */}
-      <div ref={containerRef} className="relative flex-1 min-h-0 overflow-hidden" {...swipeHandlers}>
+      <div ref={containerRef} className="relative flex-1 min-h-0 h-full overflow-hidden" {...swipeHandlers}>
         {/* Page progress bar */}
         <div className="absolute top-0 left-0 right-0 h-1 z-40" style={{ background: "var(--color-progress-track)" }}>
           <div
@@ -316,12 +309,17 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
         {/* Page indicator */}
         <PageIndicator currentPage={currentPage + 1} totalPages={totalPages} />
 
-        {/* Debug overlay - localhost only */}
-        {isLocalhost && (
-          <div className="absolute top-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono">
-            Lines: {currentPageLines.length} / {linesPerPage}
-          </div>
-        )}
+        {/* Debug overlay */}
+        <div className="absolute top-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono">
+          Lines: {currentPageLines.length} / {linesPerPage} | H: {debugHeight}px
+        </div>
+
+        {/* Hidden measurement div - measures container height */}
+        <div
+          ref={contentRef}
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden="true"
+        />
 
         {/* Animated page container */}
         <AnimatePresence mode="wait" initial={false}>

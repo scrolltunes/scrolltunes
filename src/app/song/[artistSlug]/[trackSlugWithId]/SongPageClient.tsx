@@ -667,7 +667,7 @@ export default function SongPageClient({
   return (
     <div
       ref={doubleTapRef}
-      className="h-screen"
+      className="h-dvh overflow-hidden"
       style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
     >
       <AmbientBackground variant="subtle" />
@@ -745,52 +745,7 @@ export default function SongPageClient({
         </div>
       </header>
 
-      <main
-        className={`pt-16 flex flex-col min-h-0 ${
-          preferences.displayMode === "scorebook"
-            ? "h-[calc(100vh-1.75rem)]" // End at footer (100vh - 28px)
-            : "h-[calc(100vh-4rem)]" // Original height
-        }`}
-      >
-        {/* Action bar at top for non-scorebook modes */}
-        <AnimatePresence initial={false}>
-          {(!isLoaded || isHeaderVisible) && preferences.displayMode !== "scorebook" && (
-            <motion.div
-              className="sticky top-16 z-30 backdrop-blur"
-              style={{ background: "var(--color-header-bg)" }}
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={springs.default}
-              layout
-            >
-              <SongActionBar
-                songId={lrclibId}
-                title={loadState.lyrics.title}
-                artist={loadState.lyrics.artist}
-                {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
-                onAddToSetlist={() => setShowAddToSetlist(true)}
-                onShareClick={() => setShowShareModal(true)}
-                onInfoClick={() => setShowInfo(true)}
-                onEditClick={handleEnterEditMode}
-                hasIssue={loadState.bpm === null || chordsState.status === "error"}
-                onWarningClick={() => setShowReportModal(true)}
-              />
-              <ChordInfoPanel
-                isOpen={showChordPanel}
-                {...(chordsState.data?.tuning !== undefined && {
-                  tuning: chordsState.data.tuning,
-                })}
-                {...(loadState._tag === "Loaded" &&
-                  loadState.key !== null && { musicalKey: loadState.key })}
-                {...(chordsState.data?.capo !== undefined && { capo: chordsState.data.capo })}
-                transpose={transpose}
-                onTransposeChange={v => chordsStore.setTranspose(v)}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+      <main className="pt-16 flex flex-col min-h-0 h-[calc(100dvh-1.75rem)] overflow-hidden">
         {isEditMode && loadState._tag === "Loaded" ? (
           <EditModeProvider>
             <div className="flex-1 flex flex-col overflow-hidden">
@@ -804,7 +759,7 @@ export default function SongPageClient({
             </div>
           </EditModeProvider>
         ) : preferences.displayMode === "scorebook" ? (
-          <div className="flex-1 flex flex-col min-h-0">
+          <>
             <ScoreBookDisplay
               className="flex-1 min-h-0"
               chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
@@ -829,13 +784,55 @@ export default function SongPageClient({
                 onInfoClick={() => setShowInfo(true)}
               />
             </div>
-          </div>
+          </>
         ) : (
-          <LyricsDisplay
-            className="flex-1 pb-12"
-            chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
-            onCreateCard={handleCreateCard}
-          />
+          <div className="flex-1 flex flex-col min-h-0">
+            <LyricsDisplay
+              className="flex-1 min-h-0"
+              chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
+              onCreateCard={handleCreateCard}
+            />
+            {/* Action bar at bottom, directly above footer */}
+            <AnimatePresence initial={false}>
+              {(!isLoaded || isHeaderVisible) && (
+                <motion.div
+                  className="shrink-0 border-t"
+                  style={{
+                    background: "var(--color-header-bg)",
+                    borderColor: "var(--color-border)",
+                  }}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={springs.default}
+                >
+                  <SongActionBar
+                    songId={lrclibId}
+                    title={loadState.lyrics.title}
+                    artist={loadState.lyrics.artist}
+                    {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
+                    onAddToSetlist={() => setShowAddToSetlist(true)}
+                    onShareClick={() => setShowShareModal(true)}
+                    onInfoClick={() => setShowInfo(true)}
+                    onEditClick={handleEnterEditMode}
+                    hasIssue={loadState.bpm === null || chordsState.status === "error"}
+                    onWarningClick={() => setShowReportModal(true)}
+                  />
+                  <ChordInfoPanel
+                    isOpen={showChordPanel}
+                    {...(chordsState.data?.tuning !== undefined && {
+                      tuning: chordsState.data.tuning,
+                    })}
+                    {...(loadState._tag === "Loaded" &&
+                      loadState.key !== null && { musicalKey: loadState.key })}
+                    {...(chordsState.data?.capo !== undefined && { capo: chordsState.data.capo })}
+                    transpose={transpose}
+                    onTransposeChange={v => chordsStore.setTranspose(v)}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         )}
 
         {!isEditMode && <FloatingMetronome bpm={currentBpm} position="bottom-right" />}
