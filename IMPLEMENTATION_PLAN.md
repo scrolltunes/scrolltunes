@@ -343,6 +343,19 @@ Generated from specs. Tasks sorted by priority.
 - Added `setScoreBookFontSize(value: number)` setter with clamping
 - Exported new constants from `src/core/index.ts`
 
+### Task 17: Create PageSidebar component
+- Created `src/components/display/PageSidebar.tsx` with memo pattern
+- Props: `pages` (array of line arrays), `currentPage`, `currentLineIndex`, `onPageSelect`, `linesPerPage`
+- Container: 180px fixed width, full height, `hidden lg:flex flex-col`
+- Scrollable list with `overflow-y-auto`, smooth scroll behavior
+- Renders PageThumbnail for each page with proper page start index calculation
+- Auto-scrolls to keep current page thumbnail visible via useEffect + scrollIntoView
+- Gap between thumbnails: 12px (gap-3 in Tailwind)
+- Subtle header showing "Pages (X)" with total count
+- Background: surface0 with muted border separator
+- ARIA: `aria-label="Page navigation"` (role="navigation" removed as redundant on nav element)
+- Exported from `src/components/display/index.ts`
+
 ---
 
 ## Gap Analysis (Phase 5)
@@ -468,7 +481,7 @@ Task 22 (Keyboard nav) - independent, can be done anytime
   - Background: surface0 or transparent
   - ARIA: `role="navigation"`, `aria-label="Page navigation"`
 - **Depends on**: Task 16
-- [ ] Not started
+- [x] Completed
 
 ### Task 18: Create PageNavigationArrows component
 - **File**: `src/components/display/PageNavigationArrows.tsx` (new)

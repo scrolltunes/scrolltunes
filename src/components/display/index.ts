@@ -8,6 +8,7 @@ export {
   PageNavigationArrows,
   type PageNavigationArrowsProps,
 } from "./PageNavigationArrows"
+export { PageSidebar, type PageSidebarProps } from "./PageSidebar"
 export { PageThumbnail, type PageThumbnailProps } from "./PageThumbnail"
 export { ScoreBookDisplay, type ScoreBookDisplayProps } from "./ScoreBookDisplay"
 export { ScoreBookPage, type ScoreBookPageProps } from "./ScoreBookPage"
