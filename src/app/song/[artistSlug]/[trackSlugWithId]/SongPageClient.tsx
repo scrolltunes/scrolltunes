@@ -16,6 +16,7 @@ import {
   chordsStore,
   metronomeStore,
   recentSongsStore,
+  scoreBookStore,
   songEditsStore,
   useChordsState,
   useDetailedActivityStatus,
@@ -286,9 +287,14 @@ export default function SongPageClient({
 
   useWakeLock({ enabled: isLoaded && preferences.wakeLockEnabled })
 
+  // Disable auto-hide in Score Book mode to prevent layout shifts (page is static anyway)
   const { isVisible: isHeaderVisible } = useAutoHide({
     timeoutMs: preferences.autoHideControlsMs,
-    enabled: isLoaded && preferences.autoHideControlsMs > 0 && playerState._tag === "Playing",
+    enabled:
+      isLoaded &&
+      preferences.autoHideControlsMs > 0 &&
+      playerState._tag === "Playing" &&
+      preferences.displayMode !== "scorebook",
   })
 
   const handleTogglePlayPause = useCallback(async () => {
@@ -302,6 +308,7 @@ export default function SongPageClient({
 
   const handleReset = useCallback(async () => {
     reset()
+    scoreBookStore.goToPage(0)
     if (userEnabledMic.current) {
       await startListening()
     }

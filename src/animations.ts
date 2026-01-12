@@ -64,12 +64,11 @@ export const springs = {
     stiffness: 500,
     damping: 30,
   },
-  // Page flip animation for Score Book mode
+  // Page flip animation for Score Book mode (instant, slideshow-style)
   pageFlip: {
-    type: "spring" as const,
-    stiffness: 280,
-    damping: 26,
-    mass: 0.9,
+    type: "tween" as const,
+    duration: 0.08,
+    ease: "easeOut" as const,
   },
 }
 

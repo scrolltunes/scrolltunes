@@ -104,13 +104,8 @@ export const ScoreBookPage = memo(function ScoreBookPage({
         // Get chord data for this line
         const chordData = showChords ? lineChordData?.get(globalIndex) : undefined
 
-        // Style wrapper based on position
-        const wrapperClassName = getWrapperClassName(position)
-        const wrapperStyle =
-          position === "current" ? { borderColor: "var(--color-accent)" } : undefined
-
         return (
-          <div key={line.id} className={wrapperClassName} style={wrapperStyle}>
+          <div key={line.id}>
             <StaticLyricLine
               text={line.text}
               isActive={isActive}
@@ -130,20 +125,3 @@ export const ScoreBookPage = memo(function ScoreBookPage({
   )
 })
 
-/**
- * Get wrapper class name based on line position
- * Implements the spec styling:
- * - Current: border-l-3 border-accent
- * - Next: ml-2 indent
- * - Opacity handled in LyricLine component
- */
-function getWrapperClassName(position: LinePosition): string {
-  switch (position) {
-    case "current":
-      return "relative border-l-[3px] rounded-l-sm"
-    case "next":
-      return "ml-2"
-    default:
-      return ""
-  }
-}
