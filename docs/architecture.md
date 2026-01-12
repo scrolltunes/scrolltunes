@@ -497,6 +497,208 @@ class LyricsPlayer {
 }
 ```
 
+#### Centralized Error Definitions
+
+All shared API errors are defined in `src/lib/errors.ts`. Domain-specific errors remain co-located with their modules.
+
+```typescript
+// src/lib/errors.ts
+import { Data } from "effect"
+
+// Authentication errors
+export class AuthError extends Data.TaggedClass("AuthError")<{
+  readonly cause: unknown
+}> {}
+
+export class UnauthorizedError extends Data.TaggedClass("UnauthorizedError")<object> {}
+
+export class ForbiddenError extends Data.TaggedClass("ForbiddenError")<object> {}
+
+// Request validation errors
+export class ValidationError extends Data.TaggedClass("ValidationError")<{
+  readonly message: string
+}> {}
+
+export class NotFoundError extends Data.TaggedClass("NotFoundError")<{
+  readonly resource: string
+  readonly id?: string
+}> {}
+
+export class ConflictError extends Data.TaggedClass("ConflictError")<{
+  readonly message: string
+}> {}
+
+// Database errors
+export class DatabaseError extends Data.TaggedClass("DatabaseError")<{
+  readonly cause: unknown
+}> {}
+
+// Union types for error handling
+export type AuthErrors = AuthError | UnauthorizedError | ForbiddenError
+export type RequestErrors = ValidationError | NotFoundError | ConflictError
+export type ApiError = AuthErrors | RequestErrors | DatabaseError
+```
+
+Domain-specific errors remain in their modules:
+- BPM errors: `src/lib/bpm/bpm-errors.ts`
+- Speech errors: `src/lib/speech-errors.ts`
+- Store errors: co-located with each store (e.g., `SetlistError` in `SetlistsStore.ts`)
+
+#### API Route Pattern
+
+All API routes use `Effect.runPromiseExit()` with proper error handling:
+
+```typescript
+// src/app/api/user/[resource]/route.ts
+import { auth } from "@/auth"
+import { AuthError, DatabaseError, UnauthorizedError } from "@/lib/errors"
+import { DbLayer, DbService } from "@/services/db"
+import { Effect } from "effect"
+import { NextResponse } from "next/server"
+
+const getResource = Effect.gen(function* () {
+  // 1. Authenticate
+  const session = yield* Effect.tryPromise({
+    try: () => auth(),
+    catch: cause => new AuthError({ cause }),
+  })
+
+  if (!session?.user?.id) {
+    return yield* Effect.fail(new UnauthorizedError({}))
+  }
+
+  // 2. Get database service from context
+  const { db } = yield* DbService
+
+  // 3. Execute database query
+  const result = yield* Effect.tryPromise({
+    try: () => db.select().from(table).where(eq(table.userId, session.user.id)),
+    catch: cause => new DatabaseError({ cause }),
+  })
+
+  return result
+})
+
+export async function GET() {
+  // Run effect with dependencies
+  const exit = await Effect.runPromiseExit(getResource.pipe(Effect.provide(DbLayer)))
+
+  // Pattern match on exit for proper HTTP responses
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      const error = cause.error
+      if (error._tag === "UnauthorizedError") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      if (error._tag === "ForbiddenError") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      if (error._tag === "NotFoundError") {
+        return NextResponse.json({ error: "Not found" }, { status: 404 })
+      }
+      if (error._tag === "ValidationError") {
+        return NextResponse.json({ error: error.message }, { status: 400 })
+      }
+    }
+    console.error("Request failed", exit.cause)
+    return NextResponse.json({ error: "Server error" }, { status: 500 })
+  }
+
+  return NextResponse.json(exit.value)
+}
+```
+
+#### Core Store Effect Pattern
+
+Core stores define their own error types and use Effect for async operations:
+
+```typescript
+// src/core/ExampleStore.ts
+import { Data, Effect } from "effect"
+
+// Store-specific error
+export class StoreError extends Data.TaggedClass("StoreError")<{
+  readonly operation: string
+  readonly cause?: unknown
+}> {}
+
+export class ExampleStore {
+  private listeners = new Set<() => void>()
+  private state: State = DEFAULT_STATE
+
+  // Effect-based async operation
+  private readonly fetchEffect: Effect.Effect<void, StoreError> = Effect.gen(
+    this,
+    function* () {
+      const response = yield* Effect.tryPromise({
+        try: () => fetch("/api/resource"),
+        catch: cause => new StoreError({ operation: "fetch", cause }),
+      })
+
+      const data = yield* Effect.tryPromise({
+        try: () => response.json(),
+        catch: cause => new StoreError({ operation: "fetch", cause }),
+      })
+
+      this.setState({ data, isLoading: false })
+    },
+  )
+
+  // Public method fires effect and handles errors
+  fetch(): void {
+    this.setState({ isLoading: true })
+    Effect.runFork(
+      this.fetchEffect.pipe(
+        Effect.catchAll(() =>
+          Effect.sync(() => {
+            this.setState({ isLoading: false, error: "Failed to fetch" })
+          }),
+        ),
+      ),
+    )
+  }
+}
+```
+
+#### Fire-and-Forget Pattern
+
+For background operations where errors can be ignored:
+
+```typescript
+// ✅ Correct: Effect.runFork with Effect.ignore
+Effect.runFork(
+  someEffect.pipe(Effect.ignore)
+)
+
+// ✅ Correct: Effect.runFork with explicit error recovery
+Effect.runFork(
+  someEffect.pipe(
+    Effect.catchAll(() => Effect.sync(() => {
+      // Recovery logic
+    }))
+  )
+)
+
+// ❌ Wrong: Promise .catch(() => {})
+fetch(url).catch(() => {})
+
+// ❌ Wrong: void fetch().catch()
+void fetch(url).catch(() => {})
+```
+
+#### Anti-Patterns to Avoid
+
+| Pattern | Problem | Solution |
+|---------|---------|----------|
+| `.catch(() => {})` | Silently swallows errors | `Effect.runFork` + `Effect.ignore` |
+| `void fetch().catch()` | Fire-and-forget without Effect | `Effect.runFork` + `Effect.tryPromise` |
+| Empty catch blocks | Silent failure, no recovery | Effect error channel + `catchAll` |
+| `try/catch` in domain code | Not composable, untyped | `Effect.tryPromise` + tagged errors |
+| `Promise` constructor | Callbacks, not Effect | `Effect.async` for callbacks |
+| Direct `await` in routes | No typed errors | `Effect.runPromiseExit` + pattern match |
+| Inline error classes | Duplication across routes | Import from `src/lib/errors.ts` |
+
 ### 3. State Management
 
 **No external state management library** — each component/hook manages its own state:

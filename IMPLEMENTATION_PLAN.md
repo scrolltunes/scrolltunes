@@ -406,7 +406,7 @@ These files already follow Effect.ts patterns correctly:
   - Add Centralized Errors section
   - Add Anti-Patterns section
   - Reference good examples in codebase
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -637,6 +637,14 @@ These files already follow Effect.ts patterns correctly:
 - Line 1089: `audioContext.close().catch(() => {})` → Effect pattern for proper fire-and-forget cleanup
 - Captures audioContext reference before setting to null to avoid closure issues
 
+### Task 31: Update architecture.md documentation
+- Added "Centralized Error Definitions" section documenting `src/lib/errors.ts` structure
+- Added "API Route Pattern" section with full example using `Effect.runPromiseExit()` and error pattern matching
+- Added "Core Store Effect Pattern" section showing how stores use Effect for async operations
+- Added "Fire-and-Forget Pattern" section with correct Effect patterns vs anti-patterns
+- Added "Anti-Patterns to Avoid" table listing common mistakes and their Effect-based solutions
+- Note: Effect.fn and Branded Types sections not added as these patterns are not currently used in the codebase
+
 ---
 
 ## Notes
@@ -685,5 +693,5 @@ These files already follow Effect.ts patterns correctly:
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
 | P1: API Routes (await) | 12 | 12 completed |
-| P2: Cleanup | 4 | 3 completed |
-| **Total** | **31** | **30 completed** |
+| P2: Cleanup | 4 | 4 completed |
+| **Total** | **31** | **31 completed** |
