@@ -361,7 +361,7 @@ These files already follow Effect.ts patterns correctly:
 - **Details**:
   - Use Effect.gen
   - Use typed errors
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -610,6 +610,14 @@ These files already follow Effect.ts patterns correctly:
 - Validates composite songId format with proper ValidationError for 400 status code
 - Returns 204 No Content on success (maintaining existing behavior)
 
+### Task 27: Migrate /user/me route
+- Converted GET handler to getMe Effect using Effect.gen with Effect.tryPromise
+- Uses AuthError, DatabaseError, NotFoundError from centralized errors.ts
+- Uses DbService/DbLayer for proper Effect dependency injection
+- Effect.all with concurrency: 2 for parallel user and profile queries
+- Effect.runPromiseExit with pattern matching for 404/500 responses
+- Returns null user/profile for unauthenticated requests (not an error, maintains existing behavior)
+
 ---
 
 ## Notes
@@ -657,6 +665,6 @@ These files already follow Effect.ts patterns correctly:
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
-| P1: API Routes (await) | 12 | 11 completed |
+| P1: API Routes (await) | 12 | 12 completed |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **26 completed** |
+| **Total** | **31** | **27 completed** |
