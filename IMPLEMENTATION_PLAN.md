@@ -236,7 +236,7 @@ These files already follow Effect.ts patterns correctly:
   - Use Effect.gen with typed errors
   - db.batch() can stay inside Effect context
   - Pattern match for error responses
-- [ ] Not started
+- [x] Completed
 
 ### Task 15: Migrate /admin/stats route
 - **File**: `src/app/api/admin/stats/route.ts` (modify)
@@ -508,6 +508,14 @@ These files already follow Effect.ts patterns correctly:
 - Both handlers properly handle 401 for unauthorized and 500 for other errors
 - Follows same pattern as /user/preferences route
 
+### Task 14: Migrate /user/setlists/[id]/reorder route
+- Converted POST handler to reorderSongs Effect using Effect.gen with Effect.tryPromise
+- Replaced try/catch with Effect.runPromiseExit and pattern matching
+- Uses AuthError, UnauthorizedError, DatabaseError, NotFoundError, ValidationError from centralized errors.ts
+- Properly handles 401 for unauthorized, 404 for setlist not found, 400 for validation errors, 500 for other errors
+- db.batch() wrapped in Effect.tryPromise for proper error handling
+- Follows same pattern as /user/preferences and /user/metronome routes
+
 ---
 
 ## Notes
@@ -554,7 +562,7 @@ These files already follow Effect.ts patterns correctly:
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
-| P1: API Routes (try/catch) | 4 | 2 completed |
+| P1: API Routes (try/catch) | 4 | 3 completed |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **13 completed** |
+| **Total** | **31** | **14 completed** |
