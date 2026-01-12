@@ -1,68 +1,90 @@
+import { Data, Effect } from "effect"
+
 const SAMPLE_SIZE = 32
 
-export async function extractDominantColor(url: string): Promise<string | null> {
-  if (typeof window === "undefined") return null
+export class ColorExtractionError extends Data.TaggedClass("ColorExtractionError")<{
+  readonly reason: "no-context" | "no-pixels" | "load-error" | "ssr"
+}> {}
 
-  return new Promise(resolve => {
+export type ColorExtractionResult = string | null
+
+/**
+ * Extract dominant color from image URL using Effect.async pattern
+ * Returns null for SSR, load errors, or when no valid pixels found
+ */
+export const extractDominantColorEffect = (
+  url: string,
+): Effect.Effect<ColorExtractionResult, ColorExtractionError> =>
+  Effect.async<ColorExtractionResult, ColorExtractionError>(resume => {
+    if (typeof window === "undefined") {
+      resume(Effect.succeed(null))
+      return
+    }
+
     const img = new Image()
     img.crossOrigin = "anonymous"
 
     img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas")
-        const ctx = canvas.getContext("2d")
-        if (!ctx) {
-          resolve(null)
-          return
-        }
-
-        canvas.width = SAMPLE_SIZE
-        canvas.height = SAMPLE_SIZE
-        ctx.drawImage(img, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE)
-
-        const imageData = ctx.getImageData(0, 0, SAMPLE_SIZE, SAMPLE_SIZE)
-        const data = imageData.data
-
-        let totalR = 0
-        let totalG = 0
-        let totalB = 0
-        let count = 0
-
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i] ?? 0
-          const g = data[i + 1] ?? 0
-          const b = data[i + 2] ?? 0
-          const a = data[i + 3] ?? 0
-
-          if (a < 128) continue
-
-          const brightness = (r + g + b) / 3
-          if (brightness < 20 || brightness > 235) continue
-
-          totalR += r
-          totalG += g
-          totalB += b
-          count++
-        }
-
-        if (count === 0) {
-          resolve(null)
-          return
-        }
-
-        const avgR = Math.round(totalR / count)
-        const avgG = Math.round(totalG / count)
-        const avgB = Math.round(totalB / count)
-
-        resolve(`rgb(${avgR},${avgG},${avgB})`)
-      } catch {
-        resolve(null)
+      const canvas = document.createElement("canvas")
+      const ctx = canvas.getContext("2d")
+      if (!ctx) {
+        resume(Effect.succeed(null))
+        return
       }
+
+      canvas.width = SAMPLE_SIZE
+      canvas.height = SAMPLE_SIZE
+      ctx.drawImage(img, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE)
+
+      const imageData = ctx.getImageData(0, 0, SAMPLE_SIZE, SAMPLE_SIZE)
+      const data = imageData.data
+
+      let totalR = 0
+      let totalG = 0
+      let totalB = 0
+      let count = 0
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i] ?? 0
+        const g = data[i + 1] ?? 0
+        const b = data[i + 2] ?? 0
+        const a = data[i + 3] ?? 0
+
+        if (a < 128) continue
+
+        const brightness = (r + g + b) / 3
+        if (brightness < 20 || brightness > 235) continue
+
+        totalR += r
+        totalG += g
+        totalB += b
+        count++
+      }
+
+      if (count === 0) {
+        resume(Effect.succeed(null))
+        return
+      }
+
+      const avgR = Math.round(totalR / count)
+      const avgG = Math.round(totalG / count)
+      const avgB = Math.round(totalB / count)
+
+      resume(Effect.succeed(`rgb(${avgR},${avgG},${avgB})`))
     }
 
-    img.onerror = () => resolve(null)
+    img.onerror = () => {
+      resume(Effect.succeed(null))
+    }
+
     img.src = url
   })
+
+/**
+ * Async wrapper for boundaries - maintains existing API
+ */
+export async function extractDominantColor(url: string): Promise<string | null> {
+  return Effect.runPromise(extractDominantColorEffect(url))
 }
 
 function parseRgb(rgb: string): { r: number; g: number; b: number } | null {

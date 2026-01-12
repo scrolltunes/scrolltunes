@@ -384,7 +384,7 @@ These files already follow Effect.ts patterns correctly:
 - **Details**:
   - Use Effect.async for image loading
   - Same pattern as Task 28
-- [ ] Not started
+- [x] Completed
 
 ### Task 30: Fix SpeechRecognitionStore cleanup
 - **File**: `src/core/SpeechRecognitionStore.ts` (modify)
@@ -624,6 +624,14 @@ These files already follow Effect.ts patterns correctly:
 - All callers import from `@/lib/colors` which resolves to the extract-dominant-color module
 - No code changes needed - just cleanup of dead code
 
+### Task 29: Convert colors/extract-dominant-color.ts to Effect.async
+- Converted `extractDominantColor` from Promise constructor to Effect.async pattern
+- Added `extractDominantColorEffect` function returning `Effect.Effect<ColorExtractionResult, ColorExtractionError>`
+- Defined `ColorExtractionError` tagged class with reason field
+- Exported `ColorExtractionResult` type alias for `string | null`
+- Kept async wrapper `extractDominantColor` for existing callers that wrap in `Effect.tryPromise`
+- Updated `src/lib/colors/index.ts` to export new Effect-based function and types
+
 ---
 
 ## Notes
@@ -672,5 +680,5 @@ These files already follow Effect.ts patterns correctly:
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
 | P1: API Routes (await) | 12 | 12 completed |
-| P2: Cleanup | 4 | 1 completed |
-| **Total** | **31** | **28 completed** |
+| P2: Cleanup | 4 | 2 completed |
+| **Total** | **31** | **29 completed** |
