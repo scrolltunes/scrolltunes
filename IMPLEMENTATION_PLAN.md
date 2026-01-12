@@ -394,7 +394,7 @@ These files already follow Effect.ts patterns correctly:
   - Wrap audioContext.close() in Effect.tryPromise
   - Use Effect.runFork with Effect.ignore for cleanup
   - Low impact but maintains consistency
-- [ ] Not started
+- [x] Completed
 
 ### Task 31: Update architecture.md documentation
 - **File**: `docs/architecture.md` (modify)
@@ -632,6 +632,11 @@ These files already follow Effect.ts patterns correctly:
 - Kept async wrapper `extractDominantColor` for existing callers that wrap in `Effect.tryPromise`
 - Updated `src/lib/colors/index.ts` to export new Effect-based function and types
 
+### Task 30: Fix SpeechRecognitionStore cleanup
+- Replaced `.catch(() => {})` anti-pattern with Effect.runFork + Effect.tryPromise + Effect.ignore
+- Line 1089: `audioContext.close().catch(() => {})` → Effect pattern for proper fire-and-forget cleanup
+- Captures audioContext reference before setting to null to avoid closure issues
+
 ---
 
 ## Notes
@@ -680,5 +685,5 @@ These files already follow Effect.ts patterns correctly:
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
 | P1: API Routes (await) | 12 | 12 completed |
-| P2: Cleanup | 4 | 2 completed |
-| **Total** | **31** | **29 completed** |
+| P2: Cleanup | 4 | 3 completed |
+| **Total** | **31** | **30 completed** |

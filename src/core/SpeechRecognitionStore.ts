@@ -1086,7 +1086,13 @@ export class SpeechRecognitionStore {
     }
 
     if (this.audioContext) {
-      this.audioContext.close().catch(() => {})
+      const ctx = this.audioContext
+      Effect.runFork(
+        Effect.tryPromise({
+          try: () => ctx.close(),
+          catch: () => null,
+        }).pipe(Effect.ignore),
+      )
       this.audioContext = null
     }
 
