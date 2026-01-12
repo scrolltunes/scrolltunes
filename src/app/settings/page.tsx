@@ -9,6 +9,10 @@ import {
   FONT_SIZE_STEP,
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
+  SCOREBOOK_DEFAULT_FONT_SIZE,
+  SCOREBOOK_FONT_SIZE_STEP,
+  SCOREBOOK_MAX_FONT_SIZE,
+  SCOREBOOK_MIN_FONT_SIZE,
   type ThemeMode,
   type VadEnvironment,
   preferencesStore,
@@ -22,7 +26,6 @@ import {
   DeviceMobile,
   DownloadSimple,
   Hand,
-  HighlighterCircle,
   Microphone,
   Moon,
   MusicNotes,
@@ -797,9 +800,9 @@ export default function SettingsPage() {
     preferencesStore.setScoreBookShowChords(!preferences.scoreBookShowChords)
   }, [preferences.scoreBookShowChords])
 
-  const handleToggleScoreBookWordHighlight = useCallback(() => {
-    preferencesStore.setScoreBookWordHighlight(!preferences.scoreBookWordHighlight)
-  }, [preferences.scoreBookWordHighlight])
+  const handleScoreBookFontSizeChange = useCallback((value: number) => {
+    preferencesStore.setScoreBookFontSize(value)
+  }, [])
 
   const handleReset = useCallback(() => {
     preferencesStore.reset()
@@ -812,6 +815,11 @@ export default function SettingsPage() {
 
   const formatFontSize = (px: number): string => {
     if (px === DEFAULT_FONT_SIZE) return `${px}px (default)`
+    return `${px}px`
+  }
+
+  const formatScoreBookFontSize = (px: number): string => {
+    if (px === SCOREBOOK_DEFAULT_FONT_SIZE) return `${px}px (default)`
     return `${px}px`
   }
 
@@ -937,19 +945,23 @@ export default function SettingsPage() {
                   transition={{ duration: 0.2 }}
                   className="space-y-3"
                 >
+                  <SliderSetting
+                    value={preferences.scoreBookFontSize}
+                    onChange={handleScoreBookFontSizeChange}
+                    label="Font size"
+                    description="Adjust the size of lyrics text in Score Book mode"
+                    icon={<TextAa size={20} weight="duotone" />}
+                    min={SCOREBOOK_MIN_FONT_SIZE}
+                    max={SCOREBOOK_MAX_FONT_SIZE}
+                    step={SCOREBOOK_FONT_SIZE_STEP}
+                    formatValue={formatScoreBookFontSize}
+                  />
                   <Toggle
                     enabled={preferences.scoreBookShowChords}
                     onToggle={handleToggleScoreBookChords}
                     label="Show chords"
                     description="Display chord symbols above lyrics"
                     icon={<MusicNotes size={20} weight="duotone" />}
-                  />
-                  <Toggle
-                    enabled={preferences.scoreBookWordHighlight}
-                    onToggle={handleToggleScoreBookWordHighlight}
-                    label="Word highlight"
-                    description="Highlight individual words as you sing"
-                    icon={<HighlighterCircle size={20} weight="duotone" />}
                   />
                 </motion.div>
               )}

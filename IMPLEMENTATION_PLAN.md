@@ -356,6 +356,17 @@ Generated from specs. Tasks sorted by priority.
 - ARIA: `aria-label="Page navigation"` (role="navigation" removed as redundant on nav element)
 - Exported from `src/components/display/index.ts`
 
+### Task 21: Update Settings page for Score Book font
+- Modified `src/app/settings/page.tsx`
+- Added imports for SCOREBOOK_* constants from `@/core`
+- Added `handleScoreBookFontSizeChange` handler
+- Added `formatScoreBookFontSize` format function
+- Added SliderSetting for Score Book font size in the conditional Score Book options section
+- Removed "Word highlight" toggle (no longer applicable with StaticLyricLine)
+- Removed unused `handleToggleScoreBookWordHighlight` handler
+- Removed unused `HighlighterCircle` icon import
+- Kept "Show chords" toggle unchanged
+
 ---
 
 ## Gap Analysis (Phase 5)
@@ -554,7 +565,7 @@ Task 22 (Keyboard nav) - independent, can be done anytime
   - Keep "Show chords" toggle
   - Update imports to include new constants from `@/core`
 - **Depends on**: Task 20
-- [ ] Not started
+- [x] Completed
 
 ### Task 22: Add keyboard navigation for Score Book
 - **File**: `src/hooks/useKeyboardShortcuts.ts` (modify)
