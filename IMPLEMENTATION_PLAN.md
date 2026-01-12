@@ -120,7 +120,7 @@ These files already follow Effect.ts patterns correctly:
   - reorderSongs() (lines 294-324) → Effect.Effect<void, SetlistError>
   - Define SetlistError tagged class
   - Use Effect.runFork for fire-and-forget sync operations
-- [ ] Not started
+- [x] Completed
 
 ### Task 5: Migrate AccountStore to Effect
 - **File**: `src/core/AccountStore.ts` (modify)
@@ -428,6 +428,14 @@ These files already follow Effect.ts patterns correctly:
 - Uses Effect.sync for queue recovery on failure (maintaining existing behavior)
 - Added Effect import
 
+### Task 4: Migrate SetlistsStore to Effect
+- Converted all 8 async methods to Effect patterns
+- Defined SetlistError tagged class with operation and cause fields
+- fetchAll() uses Effect.runFork for fire-and-forget background fetch
+- fetchSongs() uses Effect.runFork with Effect.ignore
+- create(), update(), delete(), addSong(), removeSong(), reorderSongs() use Effect.runPromise with catchAll fallback
+- Maintained existing API (public methods still return Promise where needed)
+
 ---
 
 ## Notes
@@ -473,8 +481,8 @@ These files already follow Effect.ts patterns correctly:
 | Phase | Count | Status |
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
-| P0: Core Stores | 8 | Not started |
+| P0: Core Stores | 8 | 1 completed |
 | P1: API Routes (try/catch) | 4 | Not started |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **3 completed** |
+| **Total** | **31** | **4 completed** |

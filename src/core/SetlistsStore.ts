@@ -1,6 +1,19 @@
 "use client"
 
+import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
+
+// ============================================================================
+// Setlist Errors
+// ============================================================================
+
+/**
+ * Error during setlist API operations
+ */
+export class SetlistError extends Data.TaggedClass("SetlistError")<{
+  readonly operation: string
+  readonly cause?: unknown
+}> {}
 
 export interface SetlistSong {
   readonly id: string
@@ -89,54 +102,78 @@ export class SetlistsStore {
     }
   }
 
-  async fetchAll(): Promise<void> {
-    const hasCachedData = this.state.setlists.length > 0
-    if (!hasCachedData) {
-      this.setState({ isLoading: true })
-    }
-
-    try {
-      const response = await fetch("/api/user/setlists")
+  private readonly fetchAllEffect: Effect.Effect<void, SetlistError> = Effect.gen(
+    this,
+    function* () {
+      const response = yield* Effect.tryPromise({
+        try: () => fetch("/api/user/setlists"),
+        catch: cause => new SetlistError({ operation: "fetchAll", cause }),
+      })
 
       if (!response.ok) {
-        this.setState({ isLoading: false })
         return
       }
 
-      const data = (await response.json()) as { setlists: Setlist[] }
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<{ setlists: Setlist[] }>,
+        catch: cause => new SetlistError({ operation: "fetchAll", cause }),
+      })
 
       this.setState({
         setlists: data.setlists,
         isLoading: false,
       })
       this.saveToStorage()
-    } catch {
-      this.setState({ isLoading: false })
+    },
+  )
+
+  fetchAll(): void {
+    const hasCachedData = this.state.setlists.length > 0
+    if (!hasCachedData) {
+      this.setState({ isLoading: true })
     }
+
+    Effect.runFork(
+      this.fetchAllEffect.pipe(
+        Effect.catchAll(() =>
+          Effect.sync(() => {
+            this.setState({ isLoading: false })
+          }),
+        ),
+      ),
+    )
   }
 
-  async create(
+  private createEffect(
     name: string,
     options?: { description?: string; color?: string; icon?: string },
-  ): Promise<Setlist | null> {
-    try {
-      const response = await fetch("/api/user/setlists", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          description: options?.description,
-          color: options?.color,
-          icon: options?.icon,
-        }),
+  ): Effect.Effect<Setlist | null, SetlistError> {
+    return Effect.gen(this, function* () {
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          fetch("/api/user/setlists", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name,
+              description: options?.description,
+              color: options?.color,
+              icon: options?.icon,
+            }),
+          }),
+        catch: cause => new SetlistError({ operation: "create", cause }),
       })
 
       if (!response.ok) {
         return null
       }
 
-      const data = (await response.json()) as { setlist: Setlist }
-      const newSetlist = { ...data.setlist, songCount: 0, songs: [] }
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<{ setlist: Setlist }>,
+        catch: cause => new SetlistError({ operation: "create", cause }),
+      })
+
+      const newSetlist = { ...data.setlist, songCount: 0, songs: [] as const }
 
       this.setState({
         setlists: [...this.state.setlists, newSetlist],
@@ -144,27 +181,41 @@ export class SetlistsStore {
       this.saveToStorage()
 
       return newSetlist
-    } catch {
-      return null
-    }
+    })
   }
 
-  async update(
+  async create(
+    name: string,
+    options?: { description?: string; color?: string; icon?: string },
+  ): Promise<Setlist | null> {
+    return Effect.runPromise(
+      this.createEffect(name, options).pipe(Effect.catchAll(() => Effect.succeed(null))),
+    )
+  }
+
+  private updateEffect(
     id: string,
     updates: { name?: string; description?: string; color?: string | null; icon?: string },
-  ): Promise<boolean> {
-    try {
-      const response = await fetch(`/api/user/setlists/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
+  ): Effect.Effect<boolean, SetlistError> {
+    return Effect.gen(this, function* () {
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          fetch(`/api/user/setlists/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updates),
+          }),
+        catch: cause => new SetlistError({ operation: "update", cause }),
       })
 
       if (!response.ok) {
         return false
       }
 
-      const data = (await response.json()) as { setlist: Setlist }
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<{ setlist: Setlist }>,
+        catch: cause => new SetlistError({ operation: "update", cause }),
+      })
 
       this.setState({
         setlists: this.state.setlists.map(s => (s.id === id ? { ...s, ...data.setlist } : s)),
@@ -172,15 +223,26 @@ export class SetlistsStore {
       this.saveToStorage()
 
       return true
-    } catch {
-      return false
-    }
+    })
   }
 
-  async delete(id: string): Promise<boolean> {
-    try {
-      const response = await fetch(`/api/user/setlists/${id}`, {
-        method: "DELETE",
+  async update(
+    id: string,
+    updates: { name?: string; description?: string; color?: string | null; icon?: string },
+  ): Promise<boolean> {
+    return Effect.runPromise(
+      this.updateEffect(id, updates).pipe(Effect.catchAll(() => Effect.succeed(false))),
+    )
+  }
+
+  private deleteEffect(id: string): Effect.Effect<boolean, SetlistError> {
+    return Effect.gen(this, function* () {
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          fetch(`/api/user/setlists/${id}`, {
+            method: "DELETE",
+          }),
+        catch: cause => new SetlistError({ operation: "delete", cause }),
       })
 
       if (!response.ok) {
@@ -194,20 +256,30 @@ export class SetlistsStore {
       this.saveToStorage()
 
       return true
-    } catch {
-      return false
-    }
+    })
   }
 
-  async fetchSongs(setlistId: string): Promise<void> {
-    try {
-      const response = await fetch(`/api/user/setlists/${setlistId}`)
+  async delete(id: string): Promise<boolean> {
+    return Effect.runPromise(
+      this.deleteEffect(id).pipe(Effect.catchAll(() => Effect.succeed(false))),
+    )
+  }
+
+  private fetchSongsEffect(setlistId: string): Effect.Effect<void, SetlistError> {
+    return Effect.gen(this, function* () {
+      const response = yield* Effect.tryPromise({
+        try: () => fetch(`/api/user/setlists/${setlistId}`),
+        catch: cause => new SetlistError({ operation: "fetchSongs", cause }),
+      })
 
       if (!response.ok) {
         return
       }
 
-      const data = (await response.json()) as { setlist: Setlist & { songs: SetlistSong[] } }
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<{ setlist: Setlist & { songs: SetlistSong[] } }>,
+        catch: cause => new SetlistError({ operation: "fetchSongs", cause }),
+      })
 
       this.setState({
         setlists: this.state.setlists.map(s =>
@@ -215,27 +287,36 @@ export class SetlistsStore {
         ),
       })
       this.saveToStorage()
-    } catch {
-      // Failed to fetch songs
-    }
+    })
   }
 
-  async addSong(
+  fetchSongs(setlistId: string): void {
+    Effect.runFork(this.fetchSongsEffect(setlistId).pipe(Effect.ignore))
+  }
+
+  private addSongEffect(
     setlistId: string,
     song: { songId: string; songProvider: string; title: string; artist: string; album?: string },
-  ): Promise<SetlistSong | null> {
-    try {
-      const response = await fetch(`/api/user/setlists/${setlistId}/songs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(song),
+  ): Effect.Effect<SetlistSong | null, SetlistError> {
+    return Effect.gen(this, function* () {
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          fetch(`/api/user/setlists/${setlistId}/songs`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(song),
+          }),
+        catch: cause => new SetlistError({ operation: "addSong", cause }),
       })
 
       if (!response.ok) {
         return null
       }
 
-      const data = (await response.json()) as { song: SetlistSong }
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<{ song: SetlistSong }>,
+        catch: cause => new SetlistError({ operation: "addSong", cause }),
+      })
 
       this.setState({
         setlists: this.state.setlists.map(s => {
@@ -251,15 +332,29 @@ export class SetlistsStore {
       this.saveToStorage()
 
       return data.song
-    } catch {
-      return null
-    }
+    })
   }
 
-  async removeSong(setlistId: string, compositeId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`/api/user/setlists/${setlistId}/songs/${compositeId}`, {
-        method: "DELETE",
+  async addSong(
+    setlistId: string,
+    song: { songId: string; songProvider: string; title: string; artist: string; album?: string },
+  ): Promise<SetlistSong | null> {
+    return Effect.runPromise(
+      this.addSongEffect(setlistId, song).pipe(Effect.catchAll(() => Effect.succeed(null))),
+    )
+  }
+
+  private removeSongEffect(
+    setlistId: string,
+    compositeId: string,
+  ): Effect.Effect<boolean, SetlistError> {
+    return Effect.gen(this, function* () {
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          fetch(`/api/user/setlists/${setlistId}/songs/${compositeId}`, {
+            method: "DELETE",
+          }),
+        catch: cause => new SetlistError({ operation: "removeSong", cause }),
       })
 
       if (!response.ok) {
@@ -286,17 +381,30 @@ export class SetlistsStore {
       this.saveToStorage()
 
       return true
-    } catch {
-      return false
-    }
+    })
   }
 
-  async reorderSongs(setlistId: string, songIds: string[]): Promise<boolean> {
-    try {
-      const response = await fetch(`/api/user/setlists/${setlistId}/reorder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ songIds }),
+  async removeSong(setlistId: string, compositeId: string): Promise<boolean> {
+    return Effect.runPromise(
+      this.removeSongEffect(setlistId, compositeId).pipe(
+        Effect.catchAll(() => Effect.succeed(false)),
+      ),
+    )
+  }
+
+  private reorderSongsEffect(
+    setlistId: string,
+    songIds: string[],
+  ): Effect.Effect<boolean, SetlistError> {
+    return Effect.gen(this, function* () {
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          fetch(`/api/user/setlists/${setlistId}/reorder`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ songIds }),
+          }),
+        catch: cause => new SetlistError({ operation: "reorderSongs", cause }),
       })
 
       if (!response.ok) {
@@ -318,9 +426,15 @@ export class SetlistsStore {
       this.saveToStorage()
 
       return true
-    } catch {
-      return false
-    }
+    })
+  }
+
+  async reorderSongs(setlistId: string, songIds: string[]): Promise<boolean> {
+    return Effect.runPromise(
+      this.reorderSongsEffect(setlistId, songIds).pipe(
+        Effect.catchAll(() => Effect.succeed(false)),
+      ),
+    )
   }
 
   setActiveSetlist(id: string | null): void {
