@@ -2,7 +2,7 @@
 
 import { DEFAULT_SCROLL_SPEED, MAX_SCROLL_SPEED, MIN_SCROLL_SPEED } from "@/constants"
 import { Data, Effect } from "effect"
-import { useMemo, useSyncExternalStore } from "react"
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
 
 // --- Types ---
 
@@ -445,6 +445,35 @@ export function useCurrentTime(): number {
     return state.currentTime
   }
   return 0
+}
+
+/**
+ * Hook for continuous time updates (polls on every animation frame)
+ * Use this for smooth progress bars and animations that need 60fps updates
+ */
+export function useContinuousTime(): number {
+  const state = usePlayerState()
+  const isPlaying = state._tag === "Playing"
+  const [time, setTime] = useState(() => lyricsPlayer.getCurrentTime())
+
+  useEffect(() => {
+    if (!isPlaying) {
+      setTime(lyricsPlayer.getCurrentTime())
+      return
+    }
+
+    let frameId: number
+
+    const update = () => {
+      setTime(lyricsPlayer.getCurrentTime())
+      frameId = requestAnimationFrame(update)
+    }
+
+    frameId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(frameId)
+  }, [isPlaying])
+
+  return time
 }
 
 /**

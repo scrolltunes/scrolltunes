@@ -1,5 +1,6 @@
 "use client"
 
+import { usePreferences } from "@/core"
 import { motion } from "motion/react"
 import { memo } from "react"
 
@@ -54,10 +55,13 @@ export const AmbientBackground = memo(function AmbientBackground({
   variant = "default",
   className = "",
 }: AmbientBackgroundProps) {
+  const { themeMode } = usePreferences()
+  const isLightMode = themeMode === "light"
+
   const opacityMap = {
-    subtle: 0.08,
-    default: 0.12,
-    vibrant: 0.18,
+    subtle: isLightMode ? 0.03 : 0.08,
+    default: isLightMode ? 0.04 : 0.12,
+    vibrant: isLightMode ? 0.06 : 0.18,
   }
   const opacity = opacityMap[variant]
 

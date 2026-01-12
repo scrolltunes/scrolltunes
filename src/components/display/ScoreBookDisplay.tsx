@@ -5,6 +5,7 @@ import {
   type LyricLine as LyricLineType,
   scoreBookStore,
   useChordsData,
+  useContinuousTime,
   useCurrentLineIndex,
   usePlayerControls,
   usePlayerState,
@@ -67,6 +68,7 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const showChords = useShowChords()
   const transposeSemitones = useTranspose()
   const prefersReducedMotion = useReducedMotion()
+  const currentTime = useContinuousTime()
 
   // ScoreBook pagination state
   const { currentPage, totalPages, linesPerPage, pageLineRanges } = useScoreBookState()
@@ -251,6 +253,26 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
     return lyrics.lines.slice(currentPageRange.start, currentPageRange.end + 1)
   }, [lyrics, currentPageRange])
 
+  // Calculate page progress (0-1) - no memo for smooth continuous updates
+  let pageProgress = 0
+  if (currentPageLines.length > 0) {
+    const firstLine = currentPageLines[0]
+    const lastLine = currentPageLines[currentPageLines.length - 1]
+    if (firstLine && lastLine) {
+      const pageStartTime = firstLine.startTime
+      const pageEndTime = lastLine.endTime
+      const pageDuration = pageEndTime - pageStartTime
+
+      if (pageDuration > 0) {
+        if (currentTime >= pageEndTime) {
+          pageProgress = 1
+        } else if (currentTime > pageStartTime) {
+          pageProgress = (currentTime - pageStartTime) / pageDuration
+        }
+      }
+    }
+  }
+
   // Animation variants - use crossfade for reduced motion
   const animationVariants = prefersReducedMotion
     ? {
@@ -292,8 +314,24 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
 
       {/* Main content area */}
       <div ref={containerRef} className="relative flex-1 overflow-hidden" {...swipeHandlers}>
+        {/* Page progress bar */}
+        <div className="absolute top-0 left-0 right-0 h-1 z-40" style={{ background: "var(--color-progress-track)" }}>
+          <div
+            className="h-full w-full origin-left"
+            style={{
+              transform: `scaleX(${pageProgress})`,
+              background: "linear-gradient(90deg, var(--color-progress-start) 0%, var(--color-progress-end) 100%)",
+            }}
+          />
+        </div>
+
         {/* Page indicator */}
         <PageIndicator currentPage={currentPage + 1} totalPages={totalPages} />
+
+        {/* Debug overlay */}
+        <div className="absolute top-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono">
+          Lines: {currentPageLines.length} / {linesPerPage}
+        </div>
 
         {/* Animated page container */}
         <AnimatePresence mode="wait" initial={false}>

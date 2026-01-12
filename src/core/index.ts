@@ -4,6 +4,7 @@ export {
   usePlayerState,
   useCurrentLineIndex,
   useCurrentTime,
+  useContinuousTime,
   usePlayerControls,
   useResetCount,
   type Lyrics,

@@ -12,10 +12,10 @@ export interface UseDynamicPaginationResult {
   readonly linesPerPage: number
 }
 
-const MIN_LINES = 4
+const MIN_LINES = 5
 const MAX_LINES = 10
 const LINE_HEIGHT_MULTIPLIER = 1.8
-const VERTICAL_PADDING = 100
+const VERTICAL_PADDING = 220
 
 export function useDynamicPagination(
   options: UseDynamicPaginationOptions,
