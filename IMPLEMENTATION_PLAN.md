@@ -268,7 +268,7 @@ These files already follow Effect.ts patterns correctly:
   - All three handlers use Effect.gen
   - Use typed errors
   - Pattern match for status codes
-- [ ] Not started
+- [x] Completed
 
 ### Task 18: Migrate /user/setlists/[id]/songs route
 - **File**: `src/app/api/user/setlists/[id]/songs/route.ts` (modify)
@@ -532,6 +532,14 @@ These files already follow Effect.ts patterns correctly:
 - Effect.runPromiseExit with pattern matching for 401/400/500 responses
 - Validation errors handled with ValidationError for proper 400 status codes
 
+### Task 17: Migrate /user/setlists/[id] route
+- Converted GET handler to getSetlist Effect using Effect.gen with Effect.tryPromise
+- Converted PATCH handler to updateSetlist Effect using Effect.gen with Effect.tryPromise
+- Converted DELETE handler to deleteSetlist Effect using Effect.gen with Effect.tryPromise
+- Uses AuthError, UnauthorizedError, DatabaseError, NotFoundError, ValidationError from centralized errors.ts
+- Uses DbService/DbLayer for proper Effect dependency injection
+- Effect.runPromiseExit with pattern matching for 401/404/400/500 responses
+
 ---
 
 ## Notes
@@ -579,6 +587,6 @@ These files already follow Effect.ts patterns correctly:
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
-| P1: API Routes (await) | 12 | 1 completed |
+| P1: API Routes (await) | 12 | 2 completed |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **16 completed** |
+| **Total** | **31** | **17 completed** |
