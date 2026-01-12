@@ -131,7 +131,7 @@ These files already follow Effect.ts patterns correctly:
   - Define AccountError tagged class
   - Use Effect.runFork for background initialization
   - Add error recovery for failed fetches
-- [ ] Not started
+- [x] Completed
 
 ### Task 6: Migrate PreferencesStore to Effect
 - **File**: `src/core/PreferencesStore.ts` (modify)
@@ -436,6 +436,13 @@ These files already follow Effect.ts patterns correctly:
 - create(), update(), delete(), addSong(), removeSong(), reorderSongs() use Effect.runPromise with catchAll fallback
 - Maintained existing API (public methods still return Promise where needed)
 
+### Task 5: Migrate AccountStore to Effect
+- Defined AccountError tagged class with operation and cause fields
+- Converted initialize() to Effect.gen with Effect.tryPromise
+- Uses Effect.runFork for fire-and-forget background initialization
+- Error recovery via Effect.catchAll resets state on failure
+- Changed return type from Promise<void> to void (caller was already fire-and-forget)
+
 ---
 
 ## Notes
@@ -481,8 +488,8 @@ These files already follow Effect.ts patterns correctly:
 | Phase | Count | Status |
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
-| P0: Core Stores | 8 | 1 completed |
+| P0: Core Stores | 8 | 2 completed |
 | P1: API Routes (try/catch) | 4 | Not started |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **4 completed** |
+| **Total** | **31** | **5 completed** |

@@ -1,7 +1,20 @@
 "use client"
 
+import { Data, Effect } from "effect"
 import type { Session } from "next-auth"
 import { useSyncExternalStore } from "react"
+
+// ============================================================================
+// Account Errors
+// ============================================================================
+
+/**
+ * Error during account API operations
+ */
+export class AccountError extends Data.TaggedClass("AccountError")<{
+  readonly operation: string
+  readonly cause?: unknown
+}> {}
 
 export interface AccountUser {
   readonly id: string
@@ -56,11 +69,13 @@ export class AccountStore {
     this.notify()
   }
 
-  async initialize(): Promise<void> {
-    this.setState({ isLoading: true })
-
-    try {
-      const response = await fetch("/api/user/me")
+  private readonly initializeEffect: Effect.Effect<void, AccountError> = Effect.gen(
+    this,
+    function* () {
+      const response = yield* Effect.tryPromise({
+        try: () => fetch("/api/user/me"),
+        catch: cause => new AccountError({ operation: "initialize", cause }),
+      })
 
       if (!response.ok) {
         this.setState({
@@ -72,10 +87,14 @@ export class AccountStore {
         return
       }
 
-      const data = (await response.json()) as {
-        user: AccountUser | null
-        profile: AccountProfile | null
-      }
+      const data = yield* Effect.tryPromise({
+        try: () =>
+          response.json() as Promise<{
+            user: AccountUser | null
+            profile: AccountProfile | null
+          }>,
+        catch: cause => new AccountError({ operation: "initialize", cause }),
+      })
 
       this.setState({
         isAuthenticated: data.user !== null,
@@ -83,14 +102,26 @@ export class AccountStore {
         user: data.user,
         profile: data.profile,
       })
-    } catch {
-      this.setState({
-        isAuthenticated: false,
-        isLoading: false,
-        user: null,
-        profile: null,
-      })
-    }
+    },
+  )
+
+  initialize(): void {
+    this.setState({ isLoading: true })
+
+    Effect.runFork(
+      this.initializeEffect.pipe(
+        Effect.catchAll(() =>
+          Effect.sync(() => {
+            this.setState({
+              isAuthenticated: false,
+              isLoading: false,
+              user: null,
+              profile: null,
+            })
+          }),
+        ),
+      ),
+    )
   }
 
   initializeFromSession(session: Session | null): void {
