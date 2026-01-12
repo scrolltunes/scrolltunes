@@ -89,7 +89,7 @@ These files already follow Effect.ts patterns correctly:
   - Line 44: `delete()` - same pattern
   - Import Effect from "effect"
   - Maintain existing auth guard behavior
-- [ ] Not started
+- [x] Completed
 
 ### Task 3: Fix fire-and-forget in vad-log.ts
 - **File**: `src/lib/vad-log.ts` (modify)
@@ -418,6 +418,11 @@ These files already follow Effect.ts patterns correctly:
 - Exported union types: AuthErrors, RequestErrors, DataErrors, NetworkErrors, ApiError
 - Domain-specific errors (BPM, Speech) remain in their modules
 
+### Task 2: Fix fire-and-forget in user-api.ts
+- Replaced `.catch(() => {})` with Effect.tryPromise + Effect.runFork + Effect.ignore
+- Updated post(), put(), delete() methods
+- Maintains existing auth guard behavior
+
 ---
 
 ## Notes
@@ -462,9 +467,9 @@ These files already follow Effect.ts patterns correctly:
 ### Task Count Summary
 | Phase | Count | Status |
 |-------|-------|--------|
-| P0: Foundation | 3 | 1 completed |
+| P0: Foundation | 3 | 2 completed |
 | P0: Core Stores | 8 | Not started |
 | P1: API Routes (try/catch) | 4 | Not started |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **1 completed** |
+| **Total** | **31** | **2 completed** |

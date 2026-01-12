@@ -1,4 +1,5 @@
 import { accountStore } from "@/core"
+import { Effect } from "effect"
 
 /**
  * Client-side API utilities with built-in authentication guards.
@@ -11,11 +12,15 @@ export const userApi = {
    */
   post: (url: string, body: unknown): void => {
     if (!accountStore.isAuthenticated()) return
-    fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }).catch(() => {})
+    Effect.runFork(
+      Effect.tryPromise(() =>
+        fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+      ).pipe(Effect.ignore),
+    )
   },
 
   /**
@@ -23,11 +28,15 @@ export const userApi = {
    */
   put: (url: string, body: unknown): void => {
     if (!accountStore.isAuthenticated()) return
-    fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }).catch(() => {})
+    Effect.runFork(
+      Effect.tryPromise(() =>
+        fetch(url, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+      ).pipe(Effect.ignore),
+    )
   },
 
   /**
@@ -41,7 +50,7 @@ export const userApi = {
       options.headers = { "Content-Type": "application/json" }
       options.body = JSON.stringify(body)
     }
-    fetch(url, options).catch(() => {})
+    Effect.runFork(Effect.tryPromise(() => fetch(url, options)).pipe(Effect.ignore))
   },
 
   /**
