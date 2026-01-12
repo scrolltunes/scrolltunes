@@ -58,12 +58,12 @@ function Toggle({ enabled, onToggle, label, description, icon }: ToggleProps) {
     <button
       type="button"
       onClick={onToggle}
-      className="w-full flex items-start gap-4 p-4 rounded-xl text-left transition-colors hover:brightness-110"
+      className="group w-full flex items-start gap-4 p-4 rounded-xl text-left transition-colors"
       style={{ background: "var(--color-surface1)" }}
     >
       <div
-        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-        style={{ background: "var(--color-surface2)", color: "var(--color-accent)" }}
+        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors group-hover:brightness-95"
+        style={{ background: "var(--color-surface3)", color: "var(--color-accent)" }}
       >
         {icon}
       </div>
@@ -118,7 +118,7 @@ function SliderSetting({
       <div className="flex items-start gap-4">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-          style={{ background: "var(--color-surface2)", color: "var(--color-accent)" }}
+          style={{ background: "var(--color-surface3)", color: "var(--color-accent)" }}
         >
           {icon}
         </div>
@@ -164,16 +164,16 @@ function RadioOption({ selected, onSelect, label, description, icon, badge }: Ra
     <button
       type="button"
       onClick={onSelect}
-      className="w-full flex items-start gap-4 p-4 rounded-xl text-left transition-colors hover:brightness-110"
+      className="group w-full flex items-start gap-4 p-4 rounded-xl text-left transition-colors"
       style={{
         background: "var(--color-surface1)",
         border: selected ? "2px solid var(--color-accent)" : "2px solid transparent",
       }}
     >
       <div
-        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors group-hover:brightness-95"
         style={{
-          background: selected ? "var(--color-accent)" : "var(--color-surface2)",
+          background: selected ? "var(--color-accent)" : "var(--color-surface3)",
           color: selected ? "white" : "var(--color-accent)",
         }}
       >
@@ -326,7 +326,7 @@ function VoiceActivationSection({
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-between p-4 rounded-xl transition-colors hover:brightness-110"
+              className="w-full flex items-center justify-between p-4 rounded-xl transition-colors hover:brightness-95"
               style={{ background: "var(--color-surface1)" }}
             >
               <div className="flex items-center gap-3">
@@ -477,9 +477,9 @@ function VoiceActivationSection({
                 <button
                   type="button"
                   onClick={handleResetToDefaults}
-                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-sm transition-colors hover:brightness-110"
+                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-sm transition-colors hover:brightness-95"
                   style={{
-                    background: "var(--color-surface2)",
+                    background: "var(--color-surface3)",
                     color: "var(--color-text3)",
                   }}
                 >
@@ -572,8 +572,8 @@ function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
           <button
             type="button"
             onClick={handleClose}
-            className="flex-1 px-4 py-3 rounded-xl transition-colors hover:brightness-110"
-            style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
+            className="flex-1 px-4 py-3 rounded-xl transition-colors hover:brightness-95"
+            style={{ background: "var(--color-surface3)", color: "var(--color-text)" }}
           >
             Cancel
           </button>
@@ -718,8 +718,8 @@ function AccountSection() {
               <button
                 type="button"
                 onClick={handleExportData}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:brightness-110"
-                style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:brightness-95"
+                style={{ background: "var(--color-surface3)", color: "var(--color-text)" }}
               >
                 <DownloadSimple size={18} />
                 Export my data
@@ -727,8 +727,8 @@ function AccountSection() {
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:brightness-110"
-                style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:brightness-95"
+                style={{ background: "var(--color-surface3)", color: "var(--color-text)" }}
               >
                 <SignOut size={18} />
                 Sign out
@@ -839,8 +839,8 @@ export default function SettingsPage() {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <Link
             href="/"
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
-            style={{ background: "var(--color-surface2)" }}
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-95"
+            style={{ background: "var(--color-surface3)" }}
             aria-label="Back"
           >
             <ArrowLeft size={20} />
@@ -1013,7 +1013,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleReset}
-              className="w-full flex items-center justify-center gap-2 p-4 rounded-xl transition-colors hover:brightness-110"
+              className="w-full flex items-center justify-center gap-2 p-4 rounded-xl transition-colors hover:brightness-95"
               style={{
                 background: "var(--color-surface1)",
                 border: "1px solid var(--color-border)",
