@@ -7,7 +7,21 @@ import { MAX_RECENT_SONGS, type RecentSong } from "@/lib/recent-songs-types"
 import { recentSongToHistorySyncItem, syncHistory } from "@/lib/sync-service"
 import { userApi } from "@/lib/user-api"
 import { runPrefetchSongs } from "@/services/lyrics-prefetch"
+import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
+
+// ============================================================================
+// RecentSongs Errors
+// ============================================================================
+
+/**
+ * Error during album art fetch operations
+ */
+export class RecentSongsError extends Data.TaggedClass("RecentSongsError")<{
+  readonly operation: string
+  readonly songId: number
+  readonly cause?: unknown
+}> {}
 
 const STORAGE_KEY = "scrolltunes:recents"
 
@@ -323,78 +337,100 @@ class RecentSongsStore {
     }
   }
 
-  private async fetchAlbumArtInBackground(songIds: number[]): Promise<void> {
-    const fetchPromises = songIds.map(async id => {
-      try {
-        const response = await fetch(`/api/lyrics/${id}`)
-        if (!response.ok) {
-          this.setLoadingAlbumArt(id, false)
-          return
-        }
+  private fetchAlbumArtForSong(id: number): Effect.Effect<void, RecentSongsError> {
+    return Effect.gen(this, function* () {
+      const response = yield* Effect.tryPromise({
+        try: () => fetch(`/api/lyrics/${id}`),
+        catch: cause => new RecentSongsError({ operation: "fetchLyrics", songId: id, cause }),
+      })
 
-        const data = (await response.json()) as LyricsApiSuccessResponse
-        if (!data.lyrics) {
-          this.setLoadingAlbumArt(id, false)
-          return
-        }
-
-        const albumArt = data.albumArt ?? undefined
-
-        // Fetch enhancements separately if available
-        let enhancement = null
-        let chordEnhancement = null
-        if (data.hasEnhancement || data.hasChordEnhancement) {
-          try {
-            const enhResponse = await fetch(`/api/lyrics/${id}/enhancements`)
-            if (enhResponse.ok) {
-              const enhData = await enhResponse.json()
-              enhancement = enhData.enhancement ?? null
-              chordEnhancement = enhData.chordEnhancement ?? null
-            }
-          } catch {
-            // Ignore enhancement fetch errors
-          }
-        }
-
-        // Apply enhancement to lyrics if available before caching
-        const enhancedLyrics = enhancement
-          ? applyEnhancement(data.lyrics, enhancement)
-          : data.lyrics
-
-        saveCachedLyrics(id, {
-          lyrics: enhancedLyrics,
-          bpm: data.bpm ?? null,
-          key: data.key ?? null,
-          albumArt,
-          spotifyId: data.spotifyId ?? undefined,
-          bpmSource: data.attribution?.bpm ?? undefined,
-          lyricsSource: data.attribution?.lyrics ?? undefined,
-          hasEnhancement: data.hasEnhancement ?? undefined,
-          enhancement: enhancement ?? undefined,
-          hasChordEnhancement: data.hasChordEnhancement ?? undefined,
-          chordEnhancement: chordEnhancement ?? undefined,
-        })
-
-        if (albumArt) {
-          this.setRecents(prev =>
-            prev.map(song =>
-              song.id === id
-                ? {
-                    ...song,
-                    albumArt,
-                    durationSeconds: data.lyrics.duration ?? song.durationSeconds,
-                  }
-                : song,
-            ),
-          )
-        }
+      if (!response.ok) {
         this.setLoadingAlbumArt(id, false)
-      } catch {
-        this.setLoadingAlbumArt(id, false)
+        return
       }
-    })
 
-    await Promise.allSettled(fetchPromises)
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<LyricsApiSuccessResponse>,
+        catch: cause => new RecentSongsError({ operation: "parseLyrics", songId: id, cause }),
+      })
+
+      if (!data.lyrics) {
+        this.setLoadingAlbumArt(id, false)
+        return
+      }
+
+      const albumArt = data.albumArt ?? undefined
+
+      // Fetch enhancements separately if available
+      let enhancement = null
+      let chordEnhancement = null
+      if (data.hasEnhancement || data.hasChordEnhancement) {
+        const enhResult = yield* Effect.tryPromise({
+          try: () => fetch(`/api/lyrics/${id}/enhancements`),
+          catch: () => null,
+        }).pipe(
+          Effect.flatMap(enhResponse => {
+            if (!enhResponse || !enhResponse.ok) return Effect.succeed(null)
+            return Effect.tryPromise({
+              try: () => enhResponse.json(),
+              catch: () => null,
+            })
+          }),
+          Effect.catchAll(() => Effect.succeed(null)),
+        )
+
+        if (enhResult) {
+          enhancement = enhResult.enhancement ?? null
+          chordEnhancement = enhResult.chordEnhancement ?? null
+        }
+      }
+
+      // Apply enhancement to lyrics if available before caching
+      const enhancedLyrics = enhancement ? applyEnhancement(data.lyrics, enhancement) : data.lyrics
+
+      saveCachedLyrics(id, {
+        lyrics: enhancedLyrics,
+        bpm: data.bpm ?? null,
+        key: data.key ?? null,
+        albumArt,
+        spotifyId: data.spotifyId ?? undefined,
+        bpmSource: data.attribution?.bpm ?? undefined,
+        lyricsSource: data.attribution?.lyrics ?? undefined,
+        hasEnhancement: data.hasEnhancement ?? undefined,
+        enhancement: enhancement ?? undefined,
+        hasChordEnhancement: data.hasChordEnhancement ?? undefined,
+        chordEnhancement: chordEnhancement ?? undefined,
+      })
+
+      if (albumArt) {
+        this.setRecents(prev =>
+          prev.map(song =>
+            song.id === id
+              ? {
+                  ...song,
+                  albumArt,
+                  durationSeconds: data.lyrics.duration ?? song.durationSeconds,
+                }
+              : song,
+          ),
+        )
+      }
+      this.setLoadingAlbumArt(id, false)
+    })
+  }
+
+  private fetchAlbumArtInBackground(songIds: number[]): void {
+    const effects = songIds.map(id =>
+      this.fetchAlbumArtForSong(id).pipe(
+        Effect.catchAll(() =>
+          Effect.sync(() => {
+            this.setLoadingAlbumArt(id, false)
+          }),
+        ),
+      ),
+    )
+
+    Effect.runFork(Effect.all(effects, { concurrency: 5 }))
   }
 }
 

@@ -154,7 +154,7 @@ These files already follow Effect.ts patterns correctly:
   - Add concurrency limit { concurrency: 5 }
   - Use Effect.runFork for background execution
   - Fire-and-forget calls at lines 242, 252 (userApi.delete)
-- [ ] Not started
+- [x] Completed
 
 ### Task 8: Migrate ChordsStore to Effect
 - **File**: `src/core/ChordsStore.ts` (modify)
@@ -451,6 +451,13 @@ These files already follow Effect.ts patterns correctly:
 - Changed return type from Promise<void> to void (caller was already fire-and-forget)
 - Maintained localStorage fallback behavior
 
+### Task 7: Migrate RecentSongsStore to Effect
+- Defined RecentSongsError tagged class with operation, songId, and cause fields
+- Converted fetchAlbumArtInBackground from Promise.allSettled to Effect.all with concurrency: 5
+- New fetchAlbumArtForSong Effect handles individual song fetch with proper error recovery
+- Uses Effect.runFork for fire-and-forget background execution
+- Fire-and-forget calls (userApi.delete) were already Effect-compliant via user-api.ts
+
 ---
 
 ## Notes
@@ -496,8 +503,8 @@ These files already follow Effect.ts patterns correctly:
 | Phase | Count | Status |
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
-| P0: Core Stores | 8 | 3 completed |
+| P0: Core Stores | 8 | 4 completed |
 | P1: API Routes (try/catch) | 4 | Not started |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **6 completed** |
+| **Total** | **31** | **7 completed** |
