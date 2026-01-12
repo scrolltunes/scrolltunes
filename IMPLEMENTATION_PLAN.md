@@ -199,7 +199,7 @@ These files already follow Effect.ts patterns correctly:
   - Lines 103-126: Wrap userApi.get in Effect
   - Line 100: syncToServer() → Effect.runFork
   - Define MetronomeError tagged class
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -484,6 +484,14 @@ These files already follow Effect.ts patterns correctly:
 - All fire-and-forget sync operations properly handled by userApi (migrated in Task 2)
 - No error class needed (fire-and-forget is intentional per task spec)
 
+### Task 11: Migrate MetronomeStore to Effect
+- Defined MetronomeError tagged class with operation and cause fields
+- Converted initialize() from async/await to initializeEffect() using Effect.gen with Effect.tryPromise
+- Uses Effect.runFork with Effect.ignore for fire-and-forget background initialization
+- syncToServer() already uses userApi.put() which is Effect-compliant via user-api.ts (no change needed)
+- Changed return type from Promise<void> to void (fire-and-forget pattern)
+- Maintained localStorage fallback behavior
+
 ---
 
 ## Notes
@@ -529,8 +537,8 @@ These files already follow Effect.ts patterns correctly:
 | Phase | Count | Status |
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
-| P0: Core Stores | 8 | 7 completed |
+| P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | Not started |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **10 completed** |
+| **Total** | **31** | **11 completed** |

@@ -1,7 +1,20 @@
 "use client"
 
 import { userApi } from "@/lib/user-api"
+import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
+
+// ============================================================================
+// Metronome Errors
+// ============================================================================
+
+/**
+ * Error during metronome API operations
+ */
+export class MetronomeError extends Data.TaggedClass("MetronomeError")<{
+  readonly operation: string
+  readonly cause?: unknown
+}> {}
 
 export type MetronomeMode = "click" | "visual" | "both"
 
@@ -100,7 +113,35 @@ export class MetronomeStore {
     userApi.put("/api/user/metronome", { metronome: settings })
   }
 
-  async initialize(): Promise<void> {
+  private readonly initializeEffect: Effect.Effect<void, MetronomeError> = Effect.gen(
+    this,
+    function* () {
+      const response = yield* Effect.tryPromise({
+        try: () => fetch("/api/user/metronome"),
+        catch: cause => new MetronomeError({ operation: "initialize", cause }),
+      })
+
+      if (!response.ok) {
+        return
+      }
+
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<{ metronome: PersistedMetronomeSettings | null }>,
+        catch: cause => new MetronomeError({ operation: "initialize", cause }),
+      })
+
+      if (data?.metronome) {
+        this.setState({
+          mode: data.metronome.mode,
+          isMuted: data.metronome.isMuted,
+          volume: data.metronome.volume,
+        })
+        savePersistedSettings(data.metronome)
+      }
+    },
+  )
+
+  initialize(): void {
     if (this.initialized) return
     this.initialized = true
 
@@ -112,17 +153,7 @@ export class MetronomeStore {
       return
     }
 
-    const data = await userApi.get<{ metronome: PersistedMetronomeSettings | null }>(
-      "/api/user/metronome",
-    )
-    if (data?.metronome) {
-      this.setState({
-        mode: data.metronome.mode,
-        isMuted: data.metronome.isMuted,
-        volume: data.metronome.volume,
-      })
-      savePersistedSettings(data.metronome)
-    }
+    Effect.runFork(this.initializeEffect.pipe(Effect.ignore))
   }
 
   start(): void {
