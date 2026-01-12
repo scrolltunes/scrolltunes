@@ -299,7 +299,7 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={currentPage}
-            className="absolute inset-0 pt-16 pb-20 px-4 lg:px-8 overflow-hidden"
+            className="absolute inset-0 pt-16 pb-20 px-14 lg:px-16 overflow-hidden"
             variants={animationVariants}
             initial="enter"
             animate="center"
