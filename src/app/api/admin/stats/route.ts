@@ -1,53 +1,81 @@
 import { auth } from "@/auth"
-import { db } from "@/lib/db"
 import { appUserProfiles, userSongItems, users } from "@/lib/db/schema"
+import { AuthError, DatabaseError, ForbiddenError, UnauthorizedError } from "@/lib/errors"
+import { DbLayer, DbService } from "@/services/db"
 import { count, desc, eq } from "drizzle-orm"
+import { Effect } from "effect"
 import { NextResponse } from "next/server"
 
-export async function GET() {
-  const session = await auth()
+const getStats = Effect.gen(function* () {
+  const session = yield* Effect.tryPromise({
+    try: () => auth(),
+    catch: cause => new AuthError({ cause }),
+  })
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return yield* Effect.fail(new UnauthorizedError({}))
   }
 
-  const [profile] = await db
-    .select({ isAdmin: appUserProfiles.isAdmin })
-    .from(appUserProfiles)
-    .where(eq(appUserProfiles.userId, session.user.id))
+  const { db } = yield* DbService
+
+  const [profile] = yield* Effect.tryPromise({
+    try: () =>
+      db
+        .select({ isAdmin: appUserProfiles.isAdmin })
+        .from(appUserProfiles)
+        .where(eq(appUserProfiles.userId, session.user.id)),
+    catch: cause => new DatabaseError({ cause }),
+  })
 
   if (!profile?.isAdmin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    return yield* Effect.fail(new ForbiddenError({}))
   }
 
-  // Top 5 most favorited songs
-  const topFavorites = await db
-    .select({
-      songId: userSongItems.songId,
-      title: userSongItems.songTitle,
-      artist: userSongItems.songArtist,
-      favoriteCount: count(),
-    })
-    .from(userSongItems)
-    .where(eq(userSongItems.isFavorite, true))
-    .groupBy(userSongItems.songId, userSongItems.songTitle, userSongItems.songArtist)
-    .orderBy(desc(count()))
-    .limit(5)
+  // Run all queries in parallel using Effect.all
+  const [topFavorites, [userCount], [lastUser]] = yield* Effect.all(
+    [
+      // Top 5 most favorited songs
+      Effect.tryPromise({
+        try: () =>
+          db
+            .select({
+              songId: userSongItems.songId,
+              title: userSongItems.songTitle,
+              artist: userSongItems.songArtist,
+              favoriteCount: count(),
+            })
+            .from(userSongItems)
+            .where(eq(userSongItems.isFavorite, true))
+            .groupBy(userSongItems.songId, userSongItems.songTitle, userSongItems.songArtist)
+            .orderBy(desc(count()))
+            .limit(5),
+        catch: cause => new DatabaseError({ cause }),
+      }),
 
-  // Total users
-  const [userCount] = await db.select({ count: count() }).from(users)
+      // Total users
+      Effect.tryPromise({
+        try: () => db.select({ count: count() }).from(users),
+        catch: cause => new DatabaseError({ cause }),
+      }),
 
-  // Last joined user
-  const [lastUser] = await db
-    .select({
-      email: users.email,
-      createdAt: users.createdAt,
-    })
-    .from(users)
-    .orderBy(desc(users.createdAt))
-    .limit(1)
+      // Last joined user
+      Effect.tryPromise({
+        try: () =>
+          db
+            .select({
+              email: users.email,
+              createdAt: users.createdAt,
+            })
+            .from(users)
+            .orderBy(desc(users.createdAt))
+            .limit(1),
+        catch: cause => new DatabaseError({ cause }),
+      }),
+    ],
+    { concurrency: "unbounded" },
+  )
 
-  return NextResponse.json({
+  return {
     topFavorites: topFavorites.map(song => ({
       title: song.title,
       artist: song.artist,
@@ -60,5 +88,26 @@ export async function GET() {
           joinedAt: lastUser.createdAt.toISOString(),
         }
       : null,
-  })
+  }
+})
+
+export async function GET() {
+  const exit = await Effect.runPromiseExit(getStats.pipe(Effect.provide(DbLayer)))
+
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      const error = cause.error
+      if (error._tag === "UnauthorizedError") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      if (error._tag === "ForbiddenError") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    }
+    console.error("Failed to fetch stats", exit.cause)
+    return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 })
+  }
+
+  return NextResponse.json(exit.value)
 }

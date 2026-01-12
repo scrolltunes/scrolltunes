@@ -247,7 +247,7 @@ These files already follow Effect.ts patterns correctly:
   - Use Effect.all for parallel queries
   - Use typed errors matching other admin routes
   - Reference: `src/app/api/admin/songs/route.ts`
-- [ ] Not started
+- [x] Completed
 
 ### Lower Priority: Routes with direct await (acceptable but could be improved)
 
@@ -516,6 +516,14 @@ These files already follow Effect.ts patterns correctly:
 - db.batch() wrapped in Effect.tryPromise for proper error handling
 - Follows same pattern as /user/preferences and /user/metronome routes
 
+### Task 15: Migrate /admin/stats route
+- Converted GET handler to getStats Effect using Effect.gen with Effect.tryPromise
+- Replaced sequential awaits with Effect.all for parallel queries (topFavorites, userCount, lastUser)
+- Uses AuthError, UnauthorizedError, ForbiddenError, DatabaseError from centralized errors.ts
+- Uses DbService/DbLayer instead of direct db import for proper Effect dependency injection
+- Effect.runPromiseExit with pattern matching for 401/403/500 responses
+- All admin routes now fully Effect-compliant
+
 ---
 
 ## Notes
@@ -562,7 +570,7 @@ These files already follow Effect.ts patterns correctly:
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
-| P1: API Routes (try/catch) | 4 | 3 completed |
+| P1: API Routes (try/catch) | 4 | 4 completed |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **14 completed** |
+| **Total** | **31** | **15 completed** |
