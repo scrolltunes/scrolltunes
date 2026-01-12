@@ -245,7 +245,10 @@ export default function SongPageClient({
 
   const userEnabledMic = useRef(false)
 
-  useKeyboardShortcuts({ enabled: loadState._tag === "Loaded" })
+  useKeyboardShortcuts({
+    enabled: loadState._tag === "Loaded",
+    displayMode: preferences.displayMode,
+  })
 
   useTempoPreference({
     songId: `lrclib-${lrclibId}`,

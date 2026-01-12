@@ -382,6 +382,16 @@ Generated from specs. Tasks sorted by priority.
 - Added `hasPrev` and `hasNext` computed values for navigation arrows
 - Added horizontal padding to animated page container (`px-4 lg:px-8`)
 
+### Task 22: Add keyboard navigation for Score Book
+- Modified `src/hooks/useKeyboardShortcuts.ts`
+- Added `displayMode` parameter to `UseKeyboardShortcutsOptions` interface
+- Imported `scoreBookStore` and `DisplayMode` type from `@/core`
+- Modified ArrowLeft/ArrowRight handlers with mode-specific behavior:
+  - In Score Book mode: calls `scoreBookStore.prevPage()` / `scoreBookStore.nextPage()`
+  - In Karaoke mode: seeks backward/forward (existing behavior)
+- Updated `SongPageClient.tsx` to pass `displayMode: preferences.displayMode` to hook
+- Added `displayMode` to useEffect dependency array
+
 ---
 
 ## Gap Analysis (Phase 5)
@@ -596,7 +606,7 @@ Task 22 (Keyboard nav) - independent, can be done anytime
   - Keep other shortcuts unchanged (spacebar, r, up/down arrows for speed, 1-4 presets)
   - Consider adding `[` and `]` as alternative page navigation keys (non-conflicting)
 - **Depends on**: None (independent, can be done anytime)
-- [ ] Not started
+- [x] Completed
 
 ### Task 23: Export new components and cleanup
 - **File**: `src/components/display/index.ts` (modify)
