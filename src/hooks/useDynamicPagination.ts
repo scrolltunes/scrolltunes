@@ -15,7 +15,8 @@ export interface UseDynamicPaginationResult {
 const MIN_LINES = 3
 const MAX_LINES = 10
 const LINE_HEIGHT_MULTIPLIER = 1.8
-const VERTICAL_PADDING = 120
+// Accounts for: internal padding of animated container (pt-16 pb-20 = 144px)
+const VERTICAL_PADDING = 150
 
 export function useDynamicPagination(
   options: UseDynamicPaginationOptions,

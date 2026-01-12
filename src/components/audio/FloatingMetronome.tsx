@@ -166,7 +166,11 @@ export const FloatingMetronome = memo(function FloatingMetronome({
         <AnimatePresence>
           {isOpen && (
             <motion.div
-              className={`absolute ${popoverPositionClasses[position]} w-48 rounded-lg border border-neutral-700 bg-neutral-900/90 p-3 backdrop-blur-sm`}
+              className={`absolute ${popoverPositionClasses[position]} w-48 rounded-lg border p-3 backdrop-blur-sm`}
+              style={{
+                background: "color-mix(in srgb, var(--color-surface1) 95%, transparent)",
+                borderColor: "var(--color-border-strong)",
+              }}
               initial={{ opacity: 0, scale: 0.9, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 10 }}
@@ -174,7 +178,7 @@ export const FloatingMetronome = memo(function FloatingMetronome({
               aria-label="Metronome settings"
             >
               <div className="mb-3">
-                <div className="mb-1.5 text-xs text-neutral-400">Mode</div>
+                <div className="mb-1.5 text-xs" style={{ color: "var(--color-text3)" }}>Mode</div>
                 <div className="flex gap-1">
                   {(["click", "visual", "both"] as const).map(mode => (
                     <button
@@ -182,10 +186,13 @@ export const FloatingMetronome = memo(function FloatingMetronome({
                       type="button"
                       onClick={() => handleModeChange(mode)}
                       className={`flex-1 rounded px-2 py-1 text-xs transition-colors ${
-                        metronomeState.mode === mode
-                          ? "bg-indigo-500 text-white"
-                          : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+                        metronomeState.mode === mode ? "bg-indigo-500 text-white" : ""
                       }`}
+                      style={
+                        metronomeState.mode === mode
+                          ? {}
+                          : { background: "var(--color-surface3)", color: "var(--color-text2)" }
+                      }
                       aria-pressed={metronomeState.mode === mode}
                     >
                       {modeLabels[mode]}
@@ -199,10 +206,13 @@ export const FloatingMetronome = memo(function FloatingMetronome({
                   type="button"
                   onClick={handleMuteToggle}
                   className={`w-full rounded px-2 py-1.5 text-xs transition-colors ${
-                    metronomeState.isMuted
-                      ? "bg-red-500/20 text-red-400"
-                      : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+                    metronomeState.isMuted ? "bg-red-500/20 text-red-400" : ""
                   }`}
+                  style={
+                    metronomeState.isMuted
+                      ? {}
+                      : { background: "var(--color-surface3)", color: "var(--color-text2)" }
+                  }
                   aria-pressed={metronomeState.isMuted}
                 >
                   {metronomeState.isMuted ? "Unmute" : "Mute"}
@@ -211,7 +221,9 @@ export const FloatingMetronome = memo(function FloatingMetronome({
 
               {showVolumeSlider && (
                 <div>
-                  <div className="mb-1.5 text-xs text-neutral-400">Volume</div>
+                  <div className="mb-1.5 text-xs" style={{ color: "var(--color-text3)" }}>
+                    Volume
+                  </div>
                   <input
                     type="range"
                     min="0"
@@ -219,7 +231,8 @@ export const FloatingMetronome = memo(function FloatingMetronome({
                     step="0.01"
                     value={metronomeState.volume}
                     onChange={handleVolumeChange}
-                    className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-neutral-700 accent-indigo-500"
+                    className="h-1.5 w-full cursor-pointer appearance-none rounded-lg accent-indigo-500"
+                    style={{ background: "var(--color-surface3)" }}
                     aria-label="Metronome volume"
                   />
                 </div>
@@ -233,10 +246,14 @@ export const FloatingMetronome = memo(function FloatingMetronome({
             <button
               type="button"
               onClick={handleDecreaseBpm}
-              className="w-7 h-7 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors border border-neutral-700/50"
+              className="w-7 h-7 rounded-full flex items-center justify-center transition-colors border"
+              style={{
+                background: "var(--color-surface3)",
+                borderColor: "var(--color-border)",
+              }}
               aria-label="Decrease tempo"
             >
-              <Minus size={14} weight="bold" className="text-neutral-300" />
+              <Minus size={14} weight="bold" style={{ color: "var(--color-text2)" }} />
             </button>
           )}
 
@@ -247,7 +264,11 @@ export const FloatingMetronome = memo(function FloatingMetronome({
               e.preventDefault()
               setIsOpen(prev => !prev)
             }}
-            className="rounded-full bg-neutral-900/80 p-2 backdrop-blur-sm border border-neutral-700/50"
+            className="rounded-full p-2 backdrop-blur-sm border"
+            style={{
+              background: "color-mix(in srgb, var(--color-surface1) 90%, transparent)",
+              borderColor: "var(--color-border)",
+            }}
             aria-label={
               isPlaying
                 ? `Metronome settings${effectiveBpm !== null ? `, ${effectiveBpm} BPM` : ""}`
@@ -264,15 +285,19 @@ export const FloatingMetronome = memo(function FloatingMetronome({
             <button
               type="button"
               onClick={handleIncreaseBpm}
-              className="w-7 h-7 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors border border-neutral-700/50"
+              className="w-7 h-7 rounded-full flex items-center justify-center transition-colors border"
+              style={{
+                background: "var(--color-surface3)",
+                borderColor: "var(--color-border)",
+              }}
               aria-label="Increase tempo"
             >
-              <Plus size={14} weight="bold" className="text-neutral-300" />
+              <Plus size={14} weight="bold" style={{ color: "var(--color-text2)" }} />
             </button>
           )}
         </div>
 
-        <div className="mt-1 text-center text-xs text-neutral-400">
+        <div className="mt-1 text-center text-xs" style={{ color: "var(--color-text3)" }}>
           {effectiveBpm !== null ? `${effectiveBpm} BPM` : "Set tempo"}
         </div>
       </div>

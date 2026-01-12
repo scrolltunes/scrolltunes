@@ -57,18 +57,28 @@ export const VoiceIndicator = memo(function VoiceIndicator({
     ${permissionDenied ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
   `
 
-  const getBackgroundColor = () => {
+  const getBackgroundClass = () => {
     if (permissionDenied) return "bg-red-500/20"
     if (isSpeaking) return "bg-green-500/20"
     if (isListening) return "bg-indigo-500/20"
-    return "bg-neutral-800"
+    return "" // Use inline style for theme-aware idle state
+  }
+
+  const getBackgroundStyle = () => {
+    if (permissionDenied || isSpeaking || isListening) return {}
+    return { background: "var(--color-surface3)" }
   }
 
   const getIconColor = () => {
     if (permissionDenied) return "text-red-400"
     if (isSpeaking) return "text-green-400"
     if (isListening) return "text-indigo-400"
-    return "text-neutral-500"
+    return "" // Use inline style for theme-aware idle state
+  }
+
+  const getIconStyle = () => {
+    if (permissionDenied || isSpeaking || isListening) return {}
+    return { color: "var(--color-text3)" }
   }
 
   const getTooltip = () => {
@@ -96,7 +106,8 @@ export const VoiceIndicator = memo(function VoiceIndicator({
       type="button"
       onClick={permissionDenied ? undefined : onToggle}
       disabled={permissionDenied}
-      className={`${baseClasses} ${getBackgroundColor()}`}
+      className={`${baseClasses} ${getBackgroundClass()}`}
+      style={getBackgroundStyle()}
       whileHover={permissionDenied ? {} : { scale: 1.05 }}
       whileTap={permissionDenied ? {} : { scale: 0.95 }}
       title={getTooltip()}
@@ -226,6 +237,7 @@ export const VoiceIndicator = memo(function VoiceIndicator({
         <motion.div
           key={permissionDenied ? "denied" : isSpeaking ? "speaking" : "idle"}
           className={getIconColor()}
+          style={getIconStyle()}
           initial={{ scale: 0.8, opacity: 0, rotate: -10 }}
           animate={{
             scale: isSpeaking ? 1 + level * 0.2 : 1,

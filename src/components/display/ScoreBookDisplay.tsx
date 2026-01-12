@@ -26,6 +26,14 @@ import { PageNavigationArrows } from "./PageNavigationArrows"
 import { ScoreBookPage } from "./ScoreBookPage"
 
 /**
+ * Check if running on localhost (dev mode)
+ */
+function useIsLocalhost(): boolean {
+  if (typeof window === "undefined") return false
+  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+}
+
+/**
  * Chord data for a single line
  */
 interface LineChordData {
@@ -68,6 +76,7 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const transposeSemitones = useTranspose()
   const prefersReducedMotion = useReducedMotion()
   const currentTime = useContinuousTime()
+  const isLocalhost = useIsLocalhost()
 
   // ScoreBook pagination state
   const { currentPage, totalPages, linesPerPage, pageLineRanges } = useScoreBookState()
@@ -307,10 +316,12 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
         {/* Page indicator */}
         <PageIndicator currentPage={currentPage + 1} totalPages={totalPages} />
 
-        {/* Debug overlay */}
-        <div className="absolute top-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono">
-          Lines: {currentPageLines.length} / {linesPerPage}
-        </div>
+        {/* Debug overlay - localhost only */}
+        {isLocalhost && (
+          <div className="absolute top-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono">
+            Lines: {currentPageLines.length} / {linesPerPage}
+          </div>
+        )}
 
         {/* Animated page container */}
         <AnimatePresence mode="wait" initial={false}>

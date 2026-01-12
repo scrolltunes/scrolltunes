@@ -70,8 +70,9 @@ export const MetronomeOrb = memo(function MetronomeOrb({
         className={`
           absolute inset-0 rounded-full
           transition-colors duration-300
-          ${isDormant ? "bg-neutral-800" : "bg-indigo-500/20"}
+          ${isDormant ? "" : "bg-indigo-500/20"}
         `}
+        style={isDormant ? { background: "var(--color-surface3)" } : {}}
       />
 
       <AnimatePresence>
@@ -107,8 +108,9 @@ export const MetronomeOrb = memo(function MetronomeOrb({
         className={`
           rounded-full
           ${domeSizes[size]}
-          ${isDormant ? "bg-neutral-600" : "bg-indigo-500"}
+          ${isDormant ? "" : "bg-indigo-500"}
         `}
+        style={isDormant ? { background: "var(--color-text-muted)" } : {}}
         animate={
           !isDormant
             ? {

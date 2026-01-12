@@ -745,7 +745,13 @@ export default function SongPageClient({
         </div>
       </header>
 
-      <main className="pt-16 h-[calc(100vh-4rem)] flex flex-col min-h-0">
+      <main
+        className={`pt-16 flex flex-col min-h-0 ${
+          preferences.displayMode === "scorebook"
+            ? "h-[calc(100vh-1.75rem)]" // End at footer (100vh - 28px)
+            : "h-[calc(100vh-4rem)]" // Original height
+        }`}
+      >
         {/* Action bar at top for non-scorebook modes */}
         <AnimatePresence initial={false}>
           {(!isLoaded || isHeaderVisible) && preferences.displayMode !== "scorebook" && (
@@ -798,16 +804,16 @@ export default function SongPageClient({
             </div>
           </EditModeProvider>
         ) : preferences.displayMode === "scorebook" ? (
-          <>
+          <div className="flex-1 flex flex-col min-h-0">
             <ScoreBookDisplay
               className="flex-1 min-h-0"
               chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
               isManualMode={isScoreBookManualMode}
               enterManualMode={enterScoreBookManualMode}
             />
-            {/* Action bar fixed at bottom for scorebook mode */}
+            {/* Action bar at bottom, directly above footer */}
             <div
-              className="fixed left-0 right-0 bottom-7 z-30 border-t [&>div]:py-1.5"
+              className="shrink-0 border-t [&>div]:py-1.5"
               style={{
                 background: "var(--color-header-bg)",
                 borderColor: "var(--color-border)",
@@ -823,8 +829,7 @@ export default function SongPageClient({
                 onInfoClick={() => setShowInfo(true)}
               />
             </div>
-          </>
-
+          </div>
         ) : (
           <LyricsDisplay
             className="flex-1 pb-12"
