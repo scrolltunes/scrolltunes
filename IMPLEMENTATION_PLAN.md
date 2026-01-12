@@ -323,7 +323,7 @@ These files already follow Effect.ts patterns correctly:
 - **Details**:
   - GET and DELETE handlers
   - Use typed errors
-- [ ] Not started
+- [x] Completed
 
 ### Task 24: Migrate /user/export route
 - **File**: `src/app/api/user/export/route.ts` (modify)
@@ -579,6 +579,14 @@ These files already follow Effect.ts patterns correctly:
 - Uses DbService/DbLayer for proper Effect dependency injection
 - Effect.runPromiseExit with pattern matching for 401/400/500 responses
 
+### Task 23: Migrate /user/history route
+- Converted GET handler to getHistory Effect using Effect.gen with Effect.tryPromise
+- Converted DELETE handler to deleteHistory Effect using Effect.gen with Effect.tryPromise
+- Uses AuthError, UnauthorizedError, DatabaseError from centralized errors.ts
+- Uses DbService/DbLayer for proper Effect dependency injection
+- Effect.runPromiseExit with pattern matching for 401/500 responses
+- DELETE supports both single song deletion and clearing all history
+
 ---
 
 ## Notes
@@ -626,6 +634,6 @@ These files already follow Effect.ts patterns correctly:
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
-| P1: API Routes (await) | 12 | 7 completed |
+| P1: API Routes (await) | 12 | 8 completed |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **22 completed** |
+| **Total** | **31** | **23 completed** |
