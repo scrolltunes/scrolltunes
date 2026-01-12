@@ -343,7 +343,7 @@ These files already follow Effect.ts patterns correctly:
   - Wrap in Effect.gen
   - Use typed errors from src/lib/errors.ts
   - Pattern match on exit for status codes
-- [ ] Not started
+- [x] Completed
 
 ### Task 26: Migrate /user/favorites/[songId] route
 - **File**: `src/app/api/user/favorites/[songId]/route.ts` (modify)
@@ -595,6 +595,13 @@ These files already follow Effect.ts patterns correctly:
 - Uses DbService/DbLayer for proper Effect dependency injection
 - Effect.runPromiseExit with pattern matching for 401/404/500 responses
 
+### Task 25: Migrate /user/delete route
+- Converted POST handler to deleteUser Effect using Effect.gen with Effect.tryPromise
+- Uses AuthError, UnauthorizedError, DatabaseError, ValidationError from centralized errors.ts
+- Uses DbService/DbLayer for proper Effect dependency injection
+- Effect.runPromiseExit with pattern matching for 401/400/500 responses
+- Validates confirmation body with proper ValidationError for 400 status code
+
 ---
 
 ## Notes
@@ -642,6 +649,6 @@ These files already follow Effect.ts patterns correctly:
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
-| P1: API Routes (await) | 12 | 9 completed |
+| P1: API Routes (await) | 12 | 10 completed |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **24 completed** |
+| **Total** | **31** | **25 completed** |
