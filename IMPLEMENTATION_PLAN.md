@@ -165,7 +165,7 @@ These files already follow Effect.ts patterns correctly:
   - loadTranspose() (lines 247-260) → Effect.Effect
   - Line 264: userApi.put() fire-and-forget → Effect.runFork
   - Define ChordsError tagged class
-- [ ] Not started
+- [x] Completed
 
 ### Task 9: Migrate SongEditsStore to Effect
 - **File**: `src/core/SongEditsStore.ts` (modify)
@@ -458,6 +458,15 @@ These files already follow Effect.ts patterns correctly:
 - Uses Effect.runFork for fire-and-forget background execution
 - Fire-and-forget calls (userApi.delete) were already Effect-compliant via user-api.ts
 
+### Task 8: Migrate ChordsStore to Effect
+- Defined ChordsError tagged class with operation and cause fields
+- Converted fetchChords() from async/await with try/catch to fetchChordsEffect() using Effect.gen
+- Converted loadTranspose() from async Promise to loadTransposeEffect() using Effect.gen
+- Uses Effect.runFork for fire-and-forget background fetch
+- Error recovery via Effect.catchAll updates state with error message
+- Changed fetchChords() return type from Promise<void> to void (fire-and-forget)
+- userApi.put() in saveTranspose() was already Effect-compliant via user-api.ts
+
 ---
 
 ## Notes
@@ -503,8 +512,8 @@ These files already follow Effect.ts patterns correctly:
 | Phase | Count | Status |
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
-| P0: Core Stores | 8 | 4 completed |
+| P0: Core Stores | 8 | 5 completed |
 | P1: API Routes (try/catch) | 4 | Not started |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **7 completed** |
+| **Total** | **31** | **8 completed** |

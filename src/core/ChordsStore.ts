@@ -2,7 +2,20 @@
 
 import { type SongsterrChordData, transposeChord } from "@/lib/chords"
 import { userApi } from "@/lib/user-api"
+import { Data, Effect } from "effect"
 import { useMemo, useSyncExternalStore } from "react"
+
+// ============================================================================
+// Chords Errors
+// ============================================================================
+
+/**
+ * Error during chords API operations
+ */
+export class ChordsError extends Data.TaggedClass("ChordsError")<{
+  readonly operation: string
+  readonly cause?: unknown
+}> {}
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const CACHE_KEY_PREFIX = "scrolltunes:chords:"
@@ -178,40 +191,47 @@ class ChordsStore {
     this.notify()
   }
 
-  async fetchChords(songsterrSongId: number, artist: string, title: string): Promise<void> {
-    if (this.state.songId === songsterrSongId && this.state.status === "ready") {
-      return
-    }
+  private fetchChordsEffect(
+    songsterrSongId: number,
+    artist: string,
+    title: string,
+  ): Effect.Effect<void, ChordsError> {
+    return Effect.gen(this, function* () {
+      if (this.state.songId === songsterrSongId && this.state.status === "ready") {
+        return
+      }
 
-    const savedTranspose = await this.loadTranspose(songsterrSongId)
+      const savedTranspose = yield* this.loadTransposeEffect(songsterrSongId)
 
-    const cached = loadFromCache(songsterrSongId)
-    if (cached) {
+      const cached = loadFromCache(songsterrSongId)
+      if (cached) {
+        this.updateState({
+          status: "ready",
+          songId: songsterrSongId,
+          data: cached,
+          error: null,
+          transposeSemitones: savedTranspose,
+        })
+        return
+      }
+
       this.updateState({
-        status: "ready",
+        status: "loading",
         songId: songsterrSongId,
-        data: cached,
+        data: null,
         error: null,
         transposeSemitones: savedTranspose,
       })
-      return
-    }
 
-    this.updateState({
-      status: "loading",
-      songId: songsterrSongId,
-      data: null,
-      error: null,
-      transposeSemitones: savedTranspose,
-    })
+      const params = new URLSearchParams({ artist, title })
+      const requestUrl = `/api/chords/${songsterrSongId}?${params.toString()}`
+      const fullUrl =
+        typeof window !== "undefined" ? `${window.location.origin}${requestUrl}` : requestUrl
 
-    const params = new URLSearchParams({ artist, title })
-    const requestUrl = `/api/chords/${songsterrSongId}?${params.toString()}`
-    const fullUrl =
-      typeof window !== "undefined" ? `${window.location.origin}${requestUrl}` : requestUrl
-
-    try {
-      const response = await fetch(requestUrl)
+      const response = yield* Effect.tryPromise({
+        try: () => fetch(requestUrl),
+        catch: cause => new ChordsError({ operation: "fetchChords", cause }),
+      })
 
       if (response.status === 404) {
         this.updateState({
@@ -223,10 +243,19 @@ class ChordsStore {
       }
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch chords: ${response.status}`)
+        this.updateState({
+          status: "error",
+          error: `Failed to fetch chords: ${response.status}`,
+          errorUrl: fullUrl,
+        })
+        return
       }
 
-      const data = (await response.json()) as SongsterrChordData
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<SongsterrChordData>,
+        catch: cause => new ChordsError({ operation: "fetchChords", cause }),
+      })
+
       saveToCache(songsterrSongId, data)
 
       this.updateState({
@@ -235,28 +264,48 @@ class ChordsStore {
         error: null,
         errorUrl: null,
       })
-    } catch (err) {
-      this.updateState({
-        status: "error",
-        error: err instanceof Error ? err.message : "Unknown error",
-        errorUrl: fullUrl,
-      })
-    }
+    })
   }
 
-  private async loadTranspose(songId: number): Promise<number> {
-    const localTranspose = loadTransposeForSong(songId)
-    if (localTranspose !== null) {
-      return localTranspose
-    }
+  fetchChords(songsterrSongId: number, artist: string, title: string): void {
+    Effect.runFork(
+      this.fetchChordsEffect(songsterrSongId, artist, title).pipe(
+        Effect.catchAll(error =>
+          Effect.sync(() => {
+            const params = new URLSearchParams({ artist, title })
+            const requestUrl = `/api/chords/${songsterrSongId}?${params.toString()}`
+            const fullUrl =
+              typeof window !== "undefined" ? `${window.location.origin}${requestUrl}` : requestUrl
+            this.updateState({
+              status: "error",
+              error: error.cause instanceof Error ? error.cause.message : "Unknown error",
+              errorUrl: fullUrl,
+            })
+          }),
+        ),
+      ),
+    )
+  }
 
-    const data = await userApi.get<{ transpose: number }>(`/api/user/transpose/${songId}`)
-    if (data) {
-      saveTransposeForSong(songId, data.transpose)
-      return data.transpose
-    }
+  private loadTransposeEffect(songId: number): Effect.Effect<number, never> {
+    return Effect.gen(this, function* () {
+      const localTranspose = loadTransposeForSong(songId)
+      if (localTranspose !== null) {
+        return localTranspose
+      }
 
-    return 0
+      const data = yield* Effect.tryPromise({
+        try: () => userApi.get<{ transpose: number }>(`/api/user/transpose/${songId}`),
+        catch: () => null,
+      }).pipe(Effect.catchAll(() => Effect.succeed(null)))
+
+      if (data) {
+        saveTransposeForSong(songId, data.transpose)
+        return data.transpose
+      }
+
+      return 0
+    })
   }
 
   private saveTranspose(songId: number, semitones: number): void {
