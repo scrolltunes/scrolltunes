@@ -309,6 +309,40 @@ Generated from specs. Tasks sorted by priority.
 - Updated ScoreBookDisplay.tsx to remove unused `useCurrentTime` hook and `scoreBookWordHighlight` preference
 - Props spread conditionally to handle `exactOptionalPropertyTypes`
 
+### Task 16: Create PageThumbnail component
+- Created `src/components/display/PageThumbnail.tsx` with memo pattern
+- Props: `pageIndex`, `lines`, `isCurrentPage`, `currentLineIndex`, `pageStartIndex`, `onClick`
+- Container: 150px width with 4:3 aspect ratio, rounded corners
+- Content: Scaled-down text using CSS `transform: scale(0.25)` with overflow hidden
+- Shows actual line text from the page
+- Highlights current line within page (accent color, bold) when visible
+- Current page: 2px accent border + subtle glow shadow
+- Non-current pages: surface1 background, muted 1px border
+- Hover state: scale 1.05 + brightness increase
+- Page number badge in top-right corner
+- ARIA: `aria-label="Go to page X"`, `aria-current="page"` when current
+- Exported from `src/components/display/index.ts`
+
+### Task 18: Create PageNavigationArrows component
+- Created `src/components/display/PageNavigationArrows.tsx` with memo pattern
+- Props: `onPrev`, `onNext`, `hasPrev`, `hasNext`, `className?`
+- Desktop: 48px icons, transparent background with hover effect (bg-white/10)
+- Mobile: 32px icons, semi-transparent overlay (bg-black/30, text-white/50)
+- Disabled state: 30% opacity, pointer-events-none
+- Uses `useReducedMotion()` to disable scale animations when preferred
+- Provides haptic feedback via `useHaptic()` hook
+- Hover: scale 1.1, Tap: scale 0.9
+- ARIA: `aria-label="Previous page"` / `"Next page"`, `aria-disabled` when appropriate
+- Exported from `src/components/display/index.ts`
+
+### Task 20: Add Score Book specific font size preference
+- Added constants to `src/core/PreferencesStore.ts`: SCOREBOOK_MIN_FONT_SIZE (14), SCOREBOOK_MAX_FONT_SIZE (32), SCOREBOOK_FONT_SIZE_STEP (2), SCOREBOOK_DEFAULT_FONT_SIZE (20)
+- Added `scoreBookFontSize` to Preferences interface
+- Added to DEFAULT_PREFERENCES with default value 20
+- Added `getScoreBookFontSize()` getter method
+- Added `setScoreBookFontSize(value: number)` setter with clamping
+- Exported new constants from `src/core/index.ts`
+
 ---
 
 ## Gap Analysis (Phase 5)
@@ -319,16 +353,16 @@ Generated from specs. Tasks sorted by priority.
 | Component | Status | Notes |
 |-----------|--------|-------|
 | StaticLyricLine.tsx | ✅ Done | Completed in Task 14 |
-| PageThumbnail.tsx | ❌ Missing | No file exists |
+| PageThumbnail.tsx | ✅ Done | Completed in Task 16 |
 | PageSidebar.tsx | ❌ Missing | No file exists |
-| PageNavigationArrows.tsx | ❌ Missing | No file exists |
+| PageNavigationArrows.tsx | ✅ Done | Completed in Task 18 |
 
 ### Preferences Verified Missing
 | Preference | Status | Notes |
 |------------|--------|-------|
-| scoreBookFontSize | ❌ Missing | Only shared `fontSize` exists (default 34px) |
-| SCOREBOOK_MIN_FONT_SIZE | ❌ Missing | Constants not in PreferencesStore.ts or limits.ts |
-| SCOREBOOK_MAX_FONT_SIZE | ❌ Missing | Constants not in PreferencesStore.ts or limits.ts |
+| scoreBookFontSize | ✅ Done | Completed in Task 20 |
+| SCOREBOOK_MIN_FONT_SIZE | ✅ Done | Added in Task 20 |
+| SCOREBOOK_MAX_FONT_SIZE | ✅ Done | Added in Task 20 |
 
 ### Current State Confirmed
 | Item | Status | Location |
@@ -418,7 +452,7 @@ Task 22 (Keyboard nav) - independent, can be done anytime
   - Page number badge in corner
   - ARIA: `role="button"`, `aria-label="Go to page X"`, `aria-current` when current
 - **Depends on**: None (leaf task)
-- [ ] Not started
+- [x] Completed
 
 ### Task 17: Create PageSidebar component
 - **File**: `src/components/display/PageSidebar.tsx` (new)
@@ -451,7 +485,7 @@ Task 22 (Keyboard nav) - independent, can be done anytime
   - Respect reduced motion (disable scale animations)
   - ARIA: `aria-label="Previous page"` / `"Next page"`, `aria-disabled` when appropriate
 - **Depends on**: None (leaf task)
-- [ ] Not started
+- [x] Completed
 
 ### Task 19: Restructure ScoreBookDisplay layout
 - **File**: `src/components/display/ScoreBookDisplay.tsx` (modify)
@@ -492,7 +526,7 @@ Task 22 (Keyboard nav) - independent, can be done anytime
   - Add to DEFAULT_PREFERENCES
   - Ensure persistence to localStorage and server sync
 - **Depends on**: None (leaf task)
-- [ ] Not started
+- [x] Completed
 
 ### Task 21: Update Settings page for Score Book font
 - **File**: `src/app/settings/page.tsx` (modify)

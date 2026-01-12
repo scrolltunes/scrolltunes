@@ -10,6 +10,11 @@ export const MAX_FONT_SIZE = 48
 export const FONT_SIZE_STEP = 2
 export const DEFAULT_FONT_SIZE = 34
 
+export const SCOREBOOK_MIN_FONT_SIZE = 14
+export const SCOREBOOK_MAX_FONT_SIZE = 32
+export const SCOREBOOK_FONT_SIZE_STEP = 2
+export const SCOREBOOK_DEFAULT_FONT_SIZE = 20
+
 export type ThemeMode = "system" | "light" | "dark"
 
 /**
@@ -77,6 +82,7 @@ export interface Preferences {
   readonly displayMode: DisplayMode
   readonly scoreBookShowChords: boolean
   readonly scoreBookWordHighlight: boolean
+  readonly scoreBookFontSize: number
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -93,6 +99,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   displayMode: "scorebook",
   scoreBookShowChords: false,
   scoreBookWordHighlight: false,
+  scoreBookFontSize: SCOREBOOK_DEFAULT_FONT_SIZE,
 }
 
 export class PreferencesStore {
@@ -283,6 +290,15 @@ export class PreferencesStore {
 
   setScoreBookWordHighlight(value: boolean): void {
     this.setState({ scoreBookWordHighlight: value })
+  }
+
+  getScoreBookFontSize(): number {
+    return this.state.scoreBookFontSize
+  }
+
+  setScoreBookFontSize(value: number): void {
+    const clamped = Math.max(SCOREBOOK_MIN_FONT_SIZE, Math.min(SCOREBOOK_MAX_FONT_SIZE, value))
+    this.setState({ scoreBookFontSize: clamped })
   }
 
   reset(): void {
