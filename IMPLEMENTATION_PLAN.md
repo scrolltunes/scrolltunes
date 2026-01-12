@@ -226,7 +226,7 @@ These files already follow Effect.ts patterns correctly:
   - Use Effect.gen
   - Use typed errors for database operations
   - Pattern match for error responses
-- [ ] Not started
+- [x] Completed
 
 ### Task 14: Migrate /user/setlists/[id]/reorder route
 - **File**: `src/app/api/user/setlists/[id]/reorder/route.ts` (modify)
@@ -500,6 +500,14 @@ These files already follow Effect.ts patterns correctly:
 - Both handlers properly handle 401 for unauthorized and 500 for other errors
 - Reference: `src/app/api/user/history/count/route.ts`
 
+### Task 13: Migrate /user/metronome route
+- Converted GET handler to Effect.gen with Effect.tryPromise (getMetronome effect)
+- Converted PUT handler to Effect.gen with Effect.tryPromise (saveMetronome effect)
+- Replaced try/catch with Effect.runPromiseExit and pattern matching
+- Uses AuthError, UnauthorizedError, DatabaseError from centralized errors.ts
+- Both handlers properly handle 401 for unauthorized and 500 for other errors
+- Follows same pattern as /user/preferences route
+
 ---
 
 ## Notes
@@ -546,7 +554,7 @@ These files already follow Effect.ts patterns correctly:
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
-| P1: API Routes (try/catch) | 4 | 1 completed |
+| P1: API Routes (try/catch) | 4 | 2 completed |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **12 completed** |
+| **Total** | **31** | **13 completed** |
