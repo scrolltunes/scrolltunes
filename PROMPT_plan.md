@@ -6,14 +6,15 @@ You are in PLANNING mode. Analyze specifications against existing code and gener
 
 ### 0a. Study specifications
 Read all files in `specs/` directory using parallel subagents:
-- `specs/image-edit-mode.md`
-- `specs/effects-system.md`
+- `specs/score-book-display.md`
 
 ### 0b. Study existing implementation
 Use parallel subagents to analyze relevant source directories:
-- `src/components/share/` - Existing share designer components
-- `src/components/share/controls/` - Existing control components
-- `src/core/` - Store patterns to follow
+- `src/core/` - State management stores (LyricsPlayer, PreferencesStore patterns)
+- `src/components/display/` - Current LyricsDisplay and LyricLine implementations
+- `src/hooks/` - Existing hook patterns (useSwipe*, useDynamic*)
+- `src/animations.ts` - Animation presets
+- `src/app/song/[artistSlug]/[trackSlugWithId]/` - Song page integration point
 
 ### 0c. Study the current plan
 Read `IMPLEMENTATION_PLAN.md` if it exists.
@@ -35,10 +36,11 @@ Compare specs against implementation:
 **CRITICAL**: Don't assume something isn't implemented. Search the codebase first. This is Ralph's Achilles' heel.
 
 Key things to search for:
-- Existing vignette implementation
-- ShareDesignerStore structure
-- Pattern selector component
-- Any existing pan/zoom code
+- Existing ScoreBookStore or similar pagination store
+- Display mode preferences in PreferencesStore
+- Page-based display components
+- Swipe gesture hooks
+- Dynamic pagination logic
 
 ## Phase 2: Generate Plan
 

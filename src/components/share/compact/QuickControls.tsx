@@ -139,7 +139,6 @@ export const QuickControls = memo(function QuickControls({
   onBrandingToggle,
   spotifyId,
 }: QuickControlsProps) {
-
   const handleShadowChange = useCallback(
     (checked: boolean) => {
       onShadowToggle(checked)

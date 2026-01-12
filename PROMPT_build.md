@@ -15,8 +15,21 @@ Read `CLAUDE.md` for project rules:
 ### 0b. Study the plan
 Read `IMPLEMENTATION_PLAN.md` to understand current state.
 
-### 0c. Select task
-Choose the highest priority incomplete task (first `[ ] Not started`).
+### 0c. Check for completion
+**IMPORTANT**: Check if ALL tasks in the plan are marked `[x]` (completed).
+
+If ALL tasks are complete:
+1. Run validation: `bun run check`
+2. If validation fails, fix issues and retry
+3. Check for uncommitted changes: `git status --porcelain`
+4. If there are uncommitted changes:
+   - Stage all changes: `git add -A`
+   - Commit with message: `chore: final cleanup after completing all tasks`
+5. Output the completion signal: **RALPH_COMPLETE**
+6. Exit immediately
+
+### 0d. Select task
+If tasks remain, choose the highest priority incomplete task (first `[ ] Not started`).
 
 ## Phase 1: Implement
 
@@ -28,6 +41,7 @@ Key searches before implementing:
 - Related functionality in adjacent files
 - Store patterns in `src/core/`
 - UI patterns in `src/components/ui/`
+- Animation patterns in `src/animations.ts`
 
 ### 1b. Implement
 Write the code for this ONE task. Follow project patterns:
@@ -50,20 +64,25 @@ class SomeStore {
   }
 }
 
-// Effect.ts pattern
-const myEffect = Effect.gen(function* () {
-  const result = yield* someAsyncOp
-  return result
-}).pipe(
-  Effect.timeout("5 seconds"),
-  Effect.retry({ times: 3 })
-)
+// Tagged events (Effect.ts)
+export class SomeEvent extends Data.TaggedClass("SomeEvent")<{
+  readonly value: string
+}> {}
+
+// Hook pattern
+export function useSomeState(): State {
+  return useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    () => DEFAULT_STATE,
+  )
+}
 ```
 
 ### 1c. Validate
 Run validation command: `bun run check`
 
-This runs: `biome check . && bun run typecheck && bun run test`
+This runs: `biome lint . && bun run typecheck && bun run test`
 
 Must pass before proceeding. If it fails, fix and retry.
 
@@ -79,14 +98,14 @@ Mark the task complete in `IMPLEMENTATION_PLAN.md`:
 
 Create atomic commit:
 ```
-feat(share): short description
+feat(display): short description
 
 Details if needed.
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-Scope suggestions: `share`, `effects`, `store`
+Scope suggestions: `display`, `core`, `hooks`, `settings`
 
 ## Guardrails
 
@@ -97,6 +116,8 @@ Scope suggestions: `share`, `effects`, `store`
 1003. Up to 500 subagents for searches and reads
 
 ## Exit Conditions
+
+**All Complete**: All tasks done, validation passes → Output `RALPH_COMPLETE` → Exit
 
 **Success**: Task complete, tests pass, committed → Exit
 

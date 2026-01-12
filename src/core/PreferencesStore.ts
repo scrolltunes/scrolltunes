@@ -10,6 +10,11 @@ export const MAX_FONT_SIZE = 48
 export const FONT_SIZE_STEP = 2
 export const DEFAULT_FONT_SIZE = 34
 
+export const SCOREBOOK_MIN_FONT_SIZE = 14
+export const SCOREBOOK_MAX_FONT_SIZE = 32
+export const SCOREBOOK_FONT_SIZE_STEP = 2
+export const SCOREBOOK_DEFAULT_FONT_SIZE = 20
+
 export type ThemeMode = "system" | "light" | "dark"
 
 /**
@@ -26,6 +31,13 @@ export type ActivationMode = "vad_energy" | "singing"
  * - noisy: Higher threshold, slower detection - better noise rejection
  */
 export type VadEnvironment = "quiet" | "normal" | "noisy"
+
+/**
+ * Display mode for lyrics rendering
+ * - scorebook: Page-based display with manual/auto page flipping
+ * - karaoke: Scrolling teleprompter display (default)
+ */
+export type DisplayMode = "scorebook" | "karaoke"
 
 /**
  * Configuration for the singing detector (MediaPipe YAMNet)
@@ -67,6 +79,9 @@ export interface Preferences {
   readonly activationMode: ActivationMode
   readonly vadEnvironment: VadEnvironment
   readonly singingDetectorConfig: SingingDetectorConfig
+  readonly displayMode: DisplayMode
+  readonly scoreBookShowChords: boolean
+  readonly scoreBookFontSize: number
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -80,6 +95,9 @@ const DEFAULT_PREFERENCES: Preferences = {
   activationMode: "vad_energy",
   vadEnvironment: "normal",
   singingDetectorConfig: DEFAULT_SINGING_DETECTOR_CONFIG,
+  displayMode: "scorebook",
+  scoreBookShowChords: false,
+  scoreBookFontSize: SCOREBOOK_DEFAULT_FONT_SIZE,
 }
 
 export class PreferencesStore {
@@ -246,6 +264,31 @@ export class PreferencesStore {
     this.setState({
       singingDetectorConfig: { ...this.state.singingDetectorConfig, ...config },
     })
+  }
+
+  getDisplayMode(): DisplayMode {
+    return this.state.displayMode
+  }
+
+  setDisplayMode(value: DisplayMode): void {
+    this.setState({ displayMode: value })
+  }
+
+  getScoreBookShowChords(): boolean {
+    return this.state.scoreBookShowChords
+  }
+
+  setScoreBookShowChords(value: boolean): void {
+    this.setState({ scoreBookShowChords: value })
+  }
+
+  getScoreBookFontSize(): number {
+    return this.state.scoreBookFontSize
+  }
+
+  setScoreBookFontSize(value: number): void {
+    const clamped = Math.max(SCOREBOOK_MIN_FONT_SIZE, Math.min(SCOREBOOK_MAX_FONT_SIZE, value))
+    this.setState({ scoreBookFontSize: clamped })
   }
 
   reset(): void {

@@ -1,6 +1,6 @@
 "use client"
 
-import { usePlayerControls, usePlayerState } from "@/core"
+import { type DisplayMode, scoreBookStore, usePlayerControls, usePlayerState } from "@/core"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
@@ -8,6 +8,12 @@ export interface UseKeyboardShortcutsOptions {
   readonly enabled?: boolean
   readonly seekAmount?: number
   readonly tempoStep?: number
+  /**
+   * Display mode determines ArrowLeft/ArrowRight behavior:
+   * - "scorebook": page navigation (prev/next page)
+   * - "karaoke": seek backward/forward (default behavior)
+   */
+  readonly displayMode?: DisplayMode
 }
 
 const PRESET_TEMPOS: Record<string, number> = {
@@ -18,7 +24,7 @@ const PRESET_TEMPOS: Record<string, number> = {
 }
 
 export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): void {
-  const { enabled = true, seekAmount = 5, tempoStep = 0.1 } = options ?? {}
+  const { enabled = true, seekAmount = 5, tempoStep = 0.1, displayMode = "karaoke" } = options ?? {}
   const state = usePlayerState()
   const { play, pause, reset, seek, setScrollSpeed, getScrollSpeed } = usePlayerControls()
   const router = useRouter()
@@ -57,7 +63,9 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
         }
         case "ArrowLeft": {
           event.preventDefault()
-          if (state._tag === "Playing" || state._tag === "Paused") {
+          if (displayMode === "scorebook") {
+            scoreBookStore.prevPage()
+          } else if (state._tag === "Playing" || state._tag === "Paused") {
             const newTime = Math.max(0, state.currentTime - seekAmount)
             seek(newTime)
           }
@@ -65,7 +73,9 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
         }
         case "ArrowRight": {
           event.preventDefault()
-          if (state._tag === "Playing" || state._tag === "Paused") {
+          if (displayMode === "scorebook") {
+            scoreBookStore.nextPage()
+          } else if (state._tag === "Playing" || state._tag === "Paused") {
             const lyrics = state.lyrics
             const newTime = Math.min(lyrics.duration, state.currentTime + seekAmount)
             seek(newTime)
@@ -110,6 +120,7 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
     state,
     seekAmount,
     tempoStep,
+    displayMode,
     play,
     pause,
     reset,

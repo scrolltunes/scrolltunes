@@ -64,6 +64,13 @@ export const springs = {
     stiffness: 500,
     damping: 30,
   },
+  // Page flip animation for Score Book mode
+  pageFlip: {
+    type: "spring" as const,
+    stiffness: 280,
+    damping: 26,
+    mass: 0.9,
+  },
 }
 
 // Timing-based animations (non-spring)
@@ -143,6 +150,12 @@ export const variants = {
     past: { opacity: 0.4, scale: 1, y: 0 },
     active: { opacity: 1, scale: 1.02, y: 0 },
     upcoming: { opacity: 0.7, scale: 1, y: 0 },
+  },
+  // Page flip animation for Score Book mode
+  pageFlip: {
+    enter: { opacity: 0, x: "100%" },
+    center: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: "-100%" },
   },
 }
 

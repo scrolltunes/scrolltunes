@@ -68,11 +68,16 @@ export {
   MAX_FONT_SIZE,
   FONT_SIZE_STEP,
   DEFAULT_FONT_SIZE,
+  SCOREBOOK_MIN_FONT_SIZE,
+  SCOREBOOK_MAX_FONT_SIZE,
+  SCOREBOOK_FONT_SIZE_STEP,
+  SCOREBOOK_DEFAULT_FONT_SIZE,
   DEFAULT_SINGING_DETECTOR_CONFIG,
   type Preferences,
   type ThemeMode,
   type ActivationMode,
   type VadEnvironment,
+  type DisplayMode,
   type SingingDetectorConfig,
 } from "./PreferencesStore"
 
@@ -173,3 +178,20 @@ export {
   useLinePatch,
   type SongEditsState,
 } from "./SongEditsStore"
+
+export {
+  ScoreBookStore,
+  scoreBookStore,
+  useScoreBookState,
+  useCurrentPage,
+  useTotalPages,
+  useLinesPerPage,
+  usePageLineRanges,
+  type ScoreBookState,
+  type PageLineRange,
+  type ScoreBookEvent,
+  GoToPage,
+  NextPage,
+  PrevPage,
+  SetPagination,
+} from "./ScoreBookStore"
