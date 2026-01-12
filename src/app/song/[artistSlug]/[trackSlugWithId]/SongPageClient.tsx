@@ -746,8 +746,9 @@ export default function SongPageClient({
       </header>
 
       <main className="pt-16 h-[calc(100vh-4rem)] flex flex-col min-h-0">
+        {/* Action bar at top for non-scorebook modes */}
         <AnimatePresence initial={false}>
-          {(!isLoaded || isHeaderVisible) && (
+          {(!isLoaded || isHeaderVisible) && preferences.displayMode !== "scorebook" && (
             <motion.div
               className="sticky top-16 z-30 backdrop-blur"
               style={{ background: "var(--color-header-bg)" }}
@@ -797,12 +798,33 @@ export default function SongPageClient({
             </div>
           </EditModeProvider>
         ) : preferences.displayMode === "scorebook" ? (
-          <ScoreBookDisplay
-            className="flex-1 pb-12"
-            chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
-            isManualMode={isScoreBookManualMode}
-            enterManualMode={enterScoreBookManualMode}
-          />
+          <>
+            <ScoreBookDisplay
+              className="flex-1 min-h-0"
+              chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
+              isManualMode={isScoreBookManualMode}
+              enterManualMode={enterScoreBookManualMode}
+            />
+            {/* Action bar fixed at bottom for scorebook mode */}
+            <div
+              className="fixed left-0 right-0 bottom-7 z-30 border-t [&>div]:py-1.5"
+              style={{
+                background: "var(--color-header-bg)",
+                borderColor: "var(--color-border)",
+              }}
+            >
+              <SongActionBar
+                songId={lrclibId}
+                title={loadState.lyrics.title}
+                artist={loadState.lyrics.artist}
+                {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
+                onAddToSetlist={() => setShowAddToSetlist(true)}
+                onShareClick={() => setShowShareModal(true)}
+                onInfoClick={() => setShowInfo(true)}
+              />
+            </div>
+          </>
+
         ) : (
           <LyricsDisplay
             className="flex-1 pb-12"

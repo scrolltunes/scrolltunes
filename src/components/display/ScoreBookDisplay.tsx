@@ -23,7 +23,6 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { memo, useCallback, useEffect, useMemo, useRef } from "react"
 import { PageIndicator } from "./PageIndicator"
 import { PageNavigationArrows } from "./PageNavigationArrows"
-import { PageSidebar } from "./PageSidebar"
 import { ScoreBookPage } from "./ScoreBookPage"
 
 /**
@@ -160,17 +159,6 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
     [jumpToLine],
   )
 
-  // Handle page selection from sidebar
-  const handlePageSelect = useCallback((pageIndex: number) => {
-    scoreBookStore.goToPage(pageIndex)
-  }, [])
-
-  // Build pages array for sidebar
-  const pages = useMemo(() => {
-    if (!lyrics) return []
-    return pageLineRanges.map(range => lyrics.lines.slice(range.start, range.end + 1))
-  }, [lyrics, pageLineRanges])
-
   // Detect RTL direction once per song
   const isRTL = useMemo(
     () => (lyrics ? detectLyricsDirection(lyrics.lines) === "rtl" : false),
@@ -302,18 +290,9 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const hasNext = currentPage < totalPages - 1
 
   return (
-    <div className={`flex h-full ${className}`} aria-label="Score Book lyrics display">
-      {/* Desktop sidebar with page thumbnails */}
-      <PageSidebar
-        pages={pages}
-        currentPage={currentPage}
-        currentLineIndex={activeIndex}
-        onPageSelect={handlePageSelect}
-        linesPerPage={linesPerPage}
-      />
-
+    <div className={`flex ${className}`} aria-label="Score Book lyrics display">
       {/* Main content area */}
-      <div ref={containerRef} className="relative flex-1 overflow-hidden" {...swipeHandlers}>
+      <div ref={containerRef} className="relative flex-1 min-h-0 overflow-hidden" {...swipeHandlers}>
         {/* Page progress bar */}
         <div className="absolute top-0 left-0 right-0 h-1 z-40" style={{ background: "var(--color-progress-track)" }}>
           <div

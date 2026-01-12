@@ -12,10 +12,10 @@ export interface UseDynamicPaginationResult {
   readonly linesPerPage: number
 }
 
-const MIN_LINES = 5
+const MIN_LINES = 3
 const MAX_LINES = 10
 const LINE_HEIGHT_MULTIPLIER = 1.8
-const VERTICAL_PADDING = 220
+const VERTICAL_PADDING = 120
 
 export function useDynamicPagination(
   options: UseDynamicPaginationOptions,
@@ -39,12 +39,18 @@ export function useDynamicPagination(
       setLinesPerPage(clampedLines)
     }
 
-    calculateLinesPerPage()
+    // Defer initial calculation to next frame to ensure layout is complete
+    const frameId = requestAnimationFrame(() => {
+      calculateLinesPerPage()
+    })
 
     const observer = new ResizeObserver(() => calculateLinesPerPage())
     observer.observe(container)
 
-    return () => observer.disconnect()
+    return () => {
+      cancelAnimationFrame(frameId)
+      observer.disconnect()
+    }
   }, [containerRef, fontSize, totalLines])
 
   return { linesPerPage }

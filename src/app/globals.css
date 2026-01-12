@@ -98,7 +98,7 @@
   --color-border: rgba(26, 26, 26, 0.08);
   --color-border-strong: rgba(26, 26, 26, 0.15);
 
-  --color-header-bg: rgba(229, 226, 221, 0.85);
+  --color-header-bg: rgba(255, 255, 255, 0.9);
 
   --background: #faf7f2;
   --foreground: #1a1a1a;
@@ -127,7 +127,7 @@
 body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
 /* Custom scrollbar styling using CSS variables */
