@@ -37,49 +37,75 @@ If tasks remain, choose the highest priority incomplete task (first `[ ] Not sta
 **CRITICAL**: Search codebase to verify functionality doesn't already exist. Use up to 500 parallel subagents for searches and reads.
 
 Key searches before implementing:
-- Existing component with similar name
-- Related functionality in adjacent files
+- Existing error definitions in `src/lib/errors.ts`
+- Effect patterns in adjacent files
 - Store patterns in `src/core/`
-- UI patterns in `src/components/ui/`
-- Animation patterns in `src/animations.ts`
+- API route patterns in `app/api/admin/`
 
-### 1b. Implement
+### 1b. Study reference implementations
+Read these files for patterns to follow:
+- `src/core/SingingDetectionService.ts` - Full service layer pattern
+- `src/lib/spotify-client.ts` - Retry, error handling, Layer
+- `app/api/admin/chords/enhance/route.ts` - API route with Effect.runPromiseExit
+- `src/core/LyricsPlayer.ts` - Tagged events with Data.TaggedClass
+
+### 1c. Implement
 Write the code for this ONE task. Follow project patterns:
 
 ```typescript
-// Store pattern (useSyncExternalStore)
-class SomeStore {
-  private state: State = initialState
-  private listeners = new Set<() => void>()
-
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
-  }
-
-  getSnapshot = () => this.state
-
-  private notify() {
-    for (const listener of this.listeners) listener()
-  }
-}
-
-// Tagged events (Effect.ts)
-export class SomeEvent extends Data.TaggedClass("SomeEvent")<{
-  readonly value: string
+// Tagged Error pattern
+export class SomeError extends Data.TaggedClass("SomeError")<{
+  readonly cause: unknown
 }> {}
 
-// Hook pattern
-export function useSomeState(): State {
-  return useSyncExternalStore(
-    store.subscribe,
-    store.getSnapshot,
-    () => DEFAULT_STATE,
-  )
+// Effect-based async in stores
+const fetchData = (): Effect.Effect<Data, SomeError> =>
+  Effect.gen(function* () {
+    const response = yield* Effect.tryPromise({
+      try: () => fetch("/api/data"),
+      catch: cause => new SomeError({ cause }),
+    })
+    return yield* Effect.tryPromise({
+      try: () => response.json(),
+      catch: cause => new SomeError({ cause }),
+    })
+  })
+
+// Fire-and-forget with Effect
+Effect.runFork(
+  someEffect.pipe(Effect.ignore)
+)
+
+// API route pattern
+export async function GET(request: NextRequest) {
+  const effect = Effect.gen(function* () {
+    const session = yield* Effect.tryPromise({
+      try: () => auth(),
+      catch: cause => new AuthError({ cause }),
+    })
+    if (!session?.user?.id) {
+      return yield* Effect.fail(new UnauthorizedError({}))
+    }
+    // ... business logic
+  })
+
+  const exit = await Effect.runPromiseExit(effect.pipe(Effect.provide(DbLayer)))
+
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      if (cause.error instanceof UnauthorizedError) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+    }
+    return NextResponse.json({ error: "Server error" }, { status: 500 })
+  }
+
+  return NextResponse.json(exit.value)
 }
 ```
 
-### 1c. Validate
+### 1d. Validate
 Run validation command: `bun run check`
 
 This runs: `biome lint . && bun run typecheck && bun run test`
@@ -98,14 +124,14 @@ Mark the task complete in `IMPLEMENTATION_PLAN.md`:
 
 Create atomic commit:
 ```
-feat(display): short description
+feat(effect): short description
 
 Details if needed.
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-Scope suggestions: `display`, `core`, `hooks`, `settings`
+Scope suggestions: `effect`, `api`, `core`, `lib`, `errors`
 
 ## Guardrails
 
@@ -128,3 +154,4 @@ Scope suggestions: `display`, `core`, `hooks`, `settings`
 - @CLAUDE.md
 - @IMPLEMENTATION_PLAN.md
 - @specs/*
+- @docs/architecture.md
