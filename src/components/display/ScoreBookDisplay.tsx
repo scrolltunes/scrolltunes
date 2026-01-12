@@ -20,8 +20,9 @@ import { mergeChordSources } from "@/lib/chords/merge-chords"
 import type { ChordEnhancementPayloadV1 } from "@/lib/gp/chord-types"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { memo, useCallback, useEffect, useMemo, useRef } from "react"
-import { PageFlipWarning } from "./PageFlipWarning"
 import { PageIndicator } from "./PageIndicator"
+import { PageNavigationArrows } from "./PageNavigationArrows"
+import { PageSidebar } from "./PageSidebar"
 import { ScoreBookPage } from "./ScoreBookPage"
 
 /**
@@ -51,14 +52,14 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const state = usePlayerState()
   const currentLineIndex = useCurrentLineIndex()
   const { jumpToLine } = usePlayerControls()
-  const { fontSize, scoreBookShowChords } = usePreferences()
+  const { scoreBookFontSize, scoreBookShowChords } = usePreferences()
   const chordsData = useChordsData()
   const showChords = useShowChords()
   const transposeSemitones = useTranspose()
   const prefersReducedMotion = useReducedMotion()
 
   // ScoreBook pagination state
-  const { currentPage, totalPages, pageLineRanges } = useScoreBookState()
+  const { currentPage, totalPages, linesPerPage, pageLineRanges } = useScoreBookState()
 
   // Container ref for dynamic pagination
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -68,18 +69,18 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const totalLines = lyrics?.lines.length ?? 0
 
   // Dynamic pagination calculation
-  const { linesPerPage } = useDynamicPagination({
+  const { linesPerPage: calculatedLinesPerPage } = useDynamicPagination({
     containerRef,
-    fontSize,
+    fontSize: scoreBookFontSize,
     totalLines,
   })
 
   // Update ScoreBookStore when pagination parameters change
   useEffect(() => {
     if (totalLines > 0) {
-      scoreBookStore.setPagination(totalLines, linesPerPage)
+      scoreBookStore.setPagination(totalLines, calculatedLinesPerPage)
     }
-  }, [totalLines, linesPerPage])
+  }, [totalLines, calculatedLinesPerPage])
 
   // Reset pagination when song changes
   const songId = lyrics?.songId
@@ -114,14 +115,12 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
     enabled: true,
   })
 
-  // Page flip warning - show on second-to-last line of current page
-  const showPageFlipWarning = useMemo(() => {
-    if (!isPlaying || currentPage >= totalPages - 1) return false
-    return scoreBookStore.isOnSecondToLastLineOfPage(currentLineIndex)
-  }, [isPlaying, currentPage, totalPages, currentLineIndex])
+  // Navigation arrow handlers
+  const handlePrevPage = useCallback(() => {
+    scoreBookStore.prevPage()
+  }, [])
 
-  // Handle page flip warning tap
-  const handlePageFlipTap = useCallback(() => {
+  const handleNextPage = useCallback(() => {
     scoreBookStore.nextPage()
   }, [])
 
@@ -132,6 +131,17 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
     },
     [jumpToLine],
   )
+
+  // Handle page selection from sidebar
+  const handlePageSelect = useCallback((pageIndex: number) => {
+    scoreBookStore.goToPage(pageIndex)
+  }, [])
+
+  // Build pages array for sidebar
+  const pages = useMemo(() => {
+    if (!lyrics) return []
+    return pageLineRanges.map(range => lyrics.lines.slice(range.start, range.end + 1))
+  }, [lyrics, pageLineRanges])
 
   // Detect RTL direction once per song
   const isRTL = useMemo(
@@ -240,42 +250,57 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const isPlayingOrPaused = isPlaying || state._tag === "Paused"
   const activeIndex = isPlayingOrPaused ? Math.max(0, currentLineIndex) : -1
 
+  const hasPrev = currentPage > 0
+  const hasNext = currentPage < totalPages - 1
+
   return (
-    <div
-      ref={containerRef}
-      className={`relative overflow-hidden h-full ${className}`}
-      {...swipeHandlers}
-      aria-label="Score Book lyrics display"
-    >
-      {/* Page indicator */}
-      <PageIndicator currentPage={currentPage + 1} totalPages={totalPages} />
+    <div className={`flex h-full ${className}`} aria-label="Score Book lyrics display">
+      {/* Desktop sidebar with page thumbnails */}
+      <PageSidebar
+        pages={pages}
+        currentPage={currentPage}
+        currentLineIndex={activeIndex}
+        onPageSelect={handlePageSelect}
+        linesPerPage={linesPerPage}
+      />
 
-      {/* Animated page container */}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={currentPage}
-          className="absolute inset-0 pt-16 pb-20"
-          variants={animationVariants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={transitionConfig}
-        >
-          <ScoreBookPage
-            lines={currentPageLines}
-            currentLineIndex={activeIndex}
-            pageStartIndex={currentPageRange?.start ?? 0}
-            fontSize={fontSize}
-            showChords={scoreBookShowChords && showChords}
-            onLineClick={handleLineClick}
-            lineChordData={lineChordData}
-            isRTL={isRTL}
-          />
-        </motion.div>
-      </AnimatePresence>
+      {/* Main content area */}
+      <div ref={containerRef} className="relative flex-1 overflow-hidden" {...swipeHandlers}>
+        {/* Page indicator */}
+        <PageIndicator currentPage={currentPage + 1} totalPages={totalPages} />
 
-      {/* Page flip warning */}
-      <PageFlipWarning visible={showPageFlipWarning} onTap={handlePageFlipTap} />
+        {/* Animated page container */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={currentPage}
+            className="absolute inset-0 pt-16 pb-20 px-4 lg:px-8"
+            variants={animationVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={transitionConfig}
+          >
+            <ScoreBookPage
+              lines={currentPageLines}
+              currentLineIndex={activeIndex}
+              pageStartIndex={currentPageRange?.start ?? 0}
+              fontSize={scoreBookFontSize}
+              showChords={scoreBookShowChords && showChords}
+              onLineClick={handleLineClick}
+              lineChordData={lineChordData}
+              isRTL={isRTL}
+            />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Navigation arrows */}
+        <PageNavigationArrows
+          onPrev={handlePrevPage}
+          onNext={handleNextPage}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+        />
+      </div>
     </div>
   )
 })

@@ -367,6 +367,21 @@ Generated from specs. Tasks sorted by priority.
 - Removed unused `HighlighterCircle` icon import
 - Kept "Show chords" toggle unchanged
 
+### Task 19: Restructure ScoreBookDisplay layout
+- Modified `src/components/display/ScoreBookDisplay.tsx`
+- New layout structure:
+  - Desktop: `flex` container with `[PageSidebar 180px] | [Main Content flex-1] | [Nav Arrows overlaid]`
+  - Mobile: `[Main Content 100%]` with `[Nav Arrows overlay on edges]`
+- Removed PageFlipWarning import and related state (`showPageFlipWarning`, `isOnSecondToLastLineOfPage`)
+- Integrated PageSidebar (desktop only, left side via `hidden lg:flex` in component)
+- Integrated PageNavigationArrows (both desktop and mobile)
+- Changed from `fontSize` to `scoreBookFontSize` preference
+- Added `handlePrevPage`, `handleNextPage`, `handlePageSelect` callbacks
+- Built `pages` array from `pageLineRanges` for PageSidebar
+- Renamed `linesPerPage` from hook to `calculatedLinesPerPage` to avoid conflict with store state
+- Added `hasPrev` and `hasNext` computed values for navigation arrows
+- Added horizontal padding to animated page container (`px-4 lg:px-8`)
+
 ---
 
 ## Gap Analysis (Phase 5)
@@ -378,7 +393,7 @@ Generated from specs. Tasks sorted by priority.
 |-----------|--------|-------|
 | StaticLyricLine.tsx | ✅ Done | Completed in Task 14 |
 | PageThumbnail.tsx | ✅ Done | Completed in Task 16 |
-| PageSidebar.tsx | ❌ Missing | No file exists |
+| PageSidebar.tsx | ✅ Done | Completed in Task 17 |
 | PageNavigationArrows.tsx | ✅ Done | Completed in Task 18 |
 
 ### Preferences Verified Missing
@@ -532,7 +547,7 @@ Task 22 (Keyboard nav) - independent, can be done anytime
   - Build pages array for PageSidebar from pageLineRanges
   - Ensure proper keyboard focus management
 - **Depends on**: Tasks 14, 15, 16, 17, 18, 20
-- [ ] Not started
+- [x] Completed
 
 ### Task 20: Add Score Book specific font size preference
 - **File**: `src/core/PreferencesStore.ts` (modify)
