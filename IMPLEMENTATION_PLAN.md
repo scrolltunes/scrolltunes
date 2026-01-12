@@ -189,7 +189,7 @@ These files already follow Effect.ts patterns correctly:
   - Line 109, 116: sync calls without awaiting
   - Line 167: userApi.post() → Effect.runFork
   - No new error class needed (fire-and-forget is intentional)
-- [ ] Not started
+- [x] Completed
 
 ### Task 11: Migrate MetronomeStore to Effect
 - **File**: `src/core/MetronomeStore.ts` (modify)
@@ -476,6 +476,14 @@ These files already follow Effect.ts patterns correctly:
 - Error recovery via Effect.catchAll updates state with error message
 - deleteEdits() changed from async to sync since userApi.delete() is already fire-and-forget
 
+### Task 10: Migrate FavoritesStore to Effect
+- No code changes required - already Effect-compliant through userApi
+- syncAddToServer() uses userApi.post() which internally uses Effect.runFork with Effect.ignore
+- syncRemoveFromServer() uses userApi.delete() which internally uses Effect.runFork with Effect.ignore
+- syncAllToServer() uses userApi.post() which is already Effect-compliant
+- All fire-and-forget sync operations properly handled by userApi (migrated in Task 2)
+- No error class needed (fire-and-forget is intentional per task spec)
+
 ---
 
 ## Notes
@@ -521,8 +529,8 @@ These files already follow Effect.ts patterns correctly:
 | Phase | Count | Status |
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
-| P0: Core Stores | 8 | 6 completed |
+| P0: Core Stores | 8 | 7 completed |
 | P1: API Routes (try/catch) | 4 | Not started |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **9 completed** |
+| **Total** | **31** | **10 completed** |
