@@ -1,6 +1,7 @@
 "use client"
 
 import { loadPublicConfig } from "@/services/public-config"
+import { Effect } from "effect"
 
 const publicConfig = loadPublicConfig()
 
@@ -55,14 +56,22 @@ function flushServerVADLogs(): void {
     if (ok) return
   }
 
-  void fetch("/api/dev/vad-log", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body,
-    keepalive: true,
-  }).catch(() => {
-    serverLogQueue = entries.slice(-100).concat(serverLogQueue).slice(-200)
-  })
+  Effect.runFork(
+    Effect.tryPromise(() =>
+      fetch("/api/dev/vad-log", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+        keepalive: true,
+      }),
+    ).pipe(
+      Effect.catchAll(() =>
+        Effect.sync(() => {
+          serverLogQueue = entries.slice(-100).concat(serverLogQueue).slice(-200)
+        }),
+      ),
+    ),
+  )
 }
 
 export function vadLog(category: string, message: string, data?: Record<string, unknown>): void {

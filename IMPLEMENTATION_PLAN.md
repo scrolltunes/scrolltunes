@@ -99,7 +99,7 @@ These files already follow Effect.ts patterns correctly:
   - Wrap fetch in Effect.tryPromise
   - Use Effect.runFork with Effect.ignore for background flush
   - Maintain existing queue recovery behavior on failure (line 64)
-- [ ] Not started
+- [x] Completed
 
 ---
 
@@ -423,6 +423,11 @@ These files already follow Effect.ts patterns correctly:
 - Updated post(), put(), delete() methods
 - Maintains existing auth guard behavior
 
+### Task 3: Fix fire-and-forget in vad-log.ts
+- Replaced `void fetch().catch()` with Effect.runFork + Effect.catchAll pattern
+- Uses Effect.sync for queue recovery on failure (maintaining existing behavior)
+- Added Effect import
+
 ---
 
 ## Notes
@@ -467,9 +472,9 @@ These files already follow Effect.ts patterns correctly:
 ### Task Count Summary
 | Phase | Count | Status |
 |-------|-------|--------|
-| P0: Foundation | 3 | 2 completed |
+| P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | Not started |
 | P1: API Routes (try/catch) | 4 | Not started |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **2 completed** |
+| **Total** | **31** | **3 completed** |
