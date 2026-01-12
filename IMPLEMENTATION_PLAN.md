@@ -296,7 +296,7 @@ These files already follow Effect.ts patterns correctly:
   - POST handler: use Effect.all for parallel inserts
   - GET handler: wrap in Effect.gen
   - Use typed errors
-- [ ] Not started
+- [x] Completed
 
 ### Task 21: Migrate /user/song-edits/[songId] route
 - **File**: `src/app/api/user/song-edits/[songId]/route.ts` (modify)
@@ -555,6 +555,14 @@ These files already follow Effect.ts patterns correctly:
 - Effect.runPromiseExit with pattern matching for 401/400/404/500 responses
 - Validates composite songId format (provider:id) with proper ValidationError
 
+### Task 20: Migrate /user/favorites/sync route
+- Converted GET handler to getFavorites Effect using Effect.gen with Effect.tryPromise
+- Converted POST handler to syncFavorites Effect using Effect.gen with Effect.tryPromise
+- Uses Effect.all with concurrency: 5 for parallel inserts (replacing sequential for loop)
+- Uses AuthError, UnauthorizedError, DatabaseError, ValidationError from centralized errors.ts
+- Uses DbService/DbLayer for proper Effect dependency injection
+- Effect.runPromiseExit with pattern matching for 401/400/500 responses
+
 ---
 
 ## Notes
@@ -602,6 +610,6 @@ These files already follow Effect.ts patterns correctly:
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
-| P1: API Routes (await) | 12 | 4 completed |
+| P1: API Routes (await) | 12 | 5 completed |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **19 completed** |
+| **Total** | **31** | **20 completed** |
