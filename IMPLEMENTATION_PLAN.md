@@ -375,7 +375,7 @@ These files already follow Effect.ts patterns correctly:
   - Use Effect.async pattern for image loading
   - Proper cleanup handling
   - Reference: `src/lib/web-speech.ts` Effect.async pattern
-- [ ] Not started
+- [x] Completed
 
 ### Task 29: Convert colors/extract-dominant-color.ts to Effect.async
 - **File**: `src/lib/colors/extract-dominant-color.ts` (modify)
@@ -618,6 +618,12 @@ These files already follow Effect.ts patterns correctly:
 - Effect.runPromiseExit with pattern matching for 404/500 responses
 - Returns null user/profile for unauthenticated requests (not an error, maintains existing behavior)
 
+### Task 28: Convert colors.ts to Effect.async
+- Removed dead code file `src/lib/colors.ts` - was not imported anywhere
+- Active implementation is in `src/lib/colors/extract-dominant-color.ts` (exported via `src/lib/colors/index.ts`)
+- All callers import from `@/lib/colors` which resolves to the extract-dominant-color module
+- No code changes needed - just cleanup of dead code
+
 ---
 
 ## Notes
@@ -666,5 +672,5 @@ These files already follow Effect.ts patterns correctly:
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
 | P1: API Routes (await) | 12 | 12 completed |
-| P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **27 completed** |
+| P2: Cleanup | 4 | 1 completed |
+| **Total** | **31** | **28 completed** |
