@@ -4,7 +4,7 @@ import type { LyricLine as LyricLineType } from "@/core"
 import type { LyricChordPosition } from "@/lib/chords"
 
 import { memo } from "react"
-import { LyricLine } from "./LyricLine"
+import { StaticLyricLine } from "./StaticLyricLine"
 
 /**
  * Position of a line relative to the current line
@@ -58,18 +58,6 @@ export interface ScoreBookPageProps {
    */
   readonly showChords: boolean
   /**
-   * Whether to enable word-level highlighting
-   */
-  readonly showWordHighlight: boolean
-  /**
-   * Current playback time for word highlighting
-   */
-  readonly currentTime?: number
-  /**
-   * Whether lyrics are playing
-   */
-  readonly isPlaying?: boolean
-  /**
    * Callback when a line is clicked
    */
   readonly onLineClick?: (index: number) => void
@@ -81,14 +69,6 @@ export interface ScoreBookPageProps {
    * Whether text is right-to-left
    */
   readonly isRTL?: boolean
-  /**
-   * Total song duration for calculating line durations
-   */
-  readonly songDuration?: number
-  /**
-   * All lines array for calculating durations
-   */
-  readonly allLines?: readonly LyricLineType[]
 }
 
 /**
@@ -107,14 +87,9 @@ export const ScoreBookPage = memo(function ScoreBookPage({
   pageStartIndex,
   fontSize,
   showChords,
-  showWordHighlight,
-  currentTime = 0,
-  isPlaying = false,
   onLineClick,
   lineChordData,
   isRTL = false,
-  songDuration,
-  allLines,
 }: ScoreBookPageProps) {
   return (
     <div className="flex flex-col gap-2 px-4 py-2">
@@ -126,16 +101,6 @@ export const ScoreBookPage = memo(function ScoreBookPage({
         const isPast = position === "past-far" || position === "past-near"
         const isNext = position === "next"
 
-        // Calculate duration for word timing
-        const duration =
-          isActive && allLines && showWordHighlight
-            ? (allLines[globalIndex + 1]?.startTime ?? songDuration ?? 0) - line.startTime
-            : undefined
-
-        // Get elapsed time within current line for word-level sync
-        const elapsedInLine =
-          isActive && showWordHighlight ? Math.max(0, currentTime - line.startTime) : undefined
-
         // Get chord data for this line
         const chordData = showChords ? lineChordData?.get(globalIndex) : undefined
 
@@ -146,7 +111,7 @@ export const ScoreBookPage = memo(function ScoreBookPage({
 
         return (
           <div key={line.id} className={wrapperClassName} style={wrapperStyle}>
-            <LyricLine
+            <StaticLyricLine
               text={line.text}
               isActive={isActive}
               isPast={isPast}
@@ -154,14 +119,9 @@ export const ScoreBookPage = memo(function ScoreBookPage({
               index={globalIndex}
               fontSize={fontSize}
               isRTL={isRTL}
-              isPlaying={isPlaying && showWordHighlight}
-              chords={chordData?.chords}
-              chordPositions={chordData?.chordPositions}
-              lineStartTime={line.startTime}
-              wordTimings={showWordHighlight ? line.words : undefined}
-              elapsedInLine={elapsedInLine}
+              {...(chordData?.chords && { chords: chordData.chords })}
+              {...(chordData?.chordPositions && { chordPositions: chordData.chordPositions })}
               {...(onLineClick && { onClick: () => onLineClick(globalIndex) })}
-              {...(duration !== undefined && { duration })}
             />
           </div>
         )

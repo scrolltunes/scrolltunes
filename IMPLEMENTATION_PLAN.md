@@ -301,6 +301,14 @@ Generated from specs. Tasks sorted by priority.
 - ARIA attributes: `aria-current` for active, `aria-label` for line content
 - Exported from `src/components/display/index.ts`
 
+### Task 15: Update ScoreBookPage to use StaticLyricLine
+- Modified `src/components/display/ScoreBookPage.tsx`
+- Replaced LyricLine import with StaticLyricLine
+- Removed word-timing related props from interface: `showWordHighlight`, `currentTime`, `isPlaying`, `songDuration`, `allLines`
+- Simplified props interface to: `lines`, `currentLineIndex`, `pageStartIndex`, `fontSize`, `showChords`, `onLineClick`, `lineChordData`, `isRTL`
+- Updated ScoreBookDisplay.tsx to remove unused `useCurrentTime` hook and `scoreBookWordHighlight` preference
+- Props spread conditionally to handle `exactOptionalPropertyTypes`
+
 ---
 
 ## Gap Analysis (Phase 5)
@@ -393,7 +401,7 @@ Task 22 (Keyboard nav) - independent, can be done anytime
     - Remove: `showWordHighlight`, `currentTime`, `isPlaying`, `songDuration`, `allLines`
   - Pass appropriate props to StaticLyricLine based on line position
 - **Depends on**: Task 14
-- [ ] Not started
+- [x] Completed
 
 ### Task 16: Create PageThumbnail component
 - **File**: `src/components/display/PageThumbnail.tsx` (new)

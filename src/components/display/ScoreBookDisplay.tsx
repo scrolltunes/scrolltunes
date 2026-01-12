@@ -6,7 +6,6 @@ import {
   scoreBookStore,
   useChordsData,
   useCurrentLineIndex,
-  useCurrentTime,
   usePlayerControls,
   usePlayerState,
   usePreferences,
@@ -51,9 +50,8 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
 }: ScoreBookDisplayProps) {
   const state = usePlayerState()
   const currentLineIndex = useCurrentLineIndex()
-  const currentTime = useCurrentTime()
   const { jumpToLine } = usePlayerControls()
-  const { fontSize, scoreBookShowChords, scoreBookWordHighlight } = usePreferences()
+  const { fontSize, scoreBookShowChords } = usePreferences()
   const chordsData = useChordsData()
   const showChords = useShowChords()
   const transposeSemitones = useTranspose()
@@ -269,14 +267,9 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
             pageStartIndex={currentPageRange?.start ?? 0}
             fontSize={fontSize}
             showChords={scoreBookShowChords && showChords}
-            showWordHighlight={scoreBookWordHighlight}
-            currentTime={currentTime}
-            isPlaying={isPlaying}
             onLineClick={handleLineClick}
             lineChordData={lineChordData}
             isRTL={isRTL}
-            songDuration={lyrics.duration}
-            allLines={lyrics.lines}
           />
         </motion.div>
       </AnimatePresence>
