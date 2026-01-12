@@ -142,7 +142,7 @@ These files already follow Effect.ts patterns correctly:
   - Line 153: syncToServer() fire-and-forget → Effect.runFork
   - Define PreferencesError tagged class
   - Maintain localStorage fallback behavior
-- [ ] Not started
+- [x] Completed
 
 ### Task 7: Migrate RecentSongsStore to Effect
 - **File**: `src/core/RecentSongsStore.ts` (modify)
@@ -443,6 +443,14 @@ These files already follow Effect.ts patterns correctly:
 - Error recovery via Effect.catchAll resets state on failure
 - Changed return type from Promise<void> to void (caller was already fire-and-forget)
 
+### Task 6: Migrate PreferencesStore to Effect
+- Defined PreferencesError tagged class with operation and cause fields
+- Converted initialize() to Effect.gen with Effect.tryPromise
+- Uses Effect.runFork with Effect.ignore for fire-and-forget background initialization
+- syncToServer() already uses userApi.put() which uses Effect.runFork internally (no change needed)
+- Changed return type from Promise<void> to void (caller was already fire-and-forget)
+- Maintained localStorage fallback behavior
+
 ---
 
 ## Notes
@@ -488,8 +496,8 @@ These files already follow Effect.ts patterns correctly:
 | Phase | Count | Status |
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
-| P0: Core Stores | 8 | 2 completed |
+| P0: Core Stores | 8 | 3 completed |
 | P1: API Routes (try/catch) | 4 | Not started |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **5 completed** |
+| **Total** | **31** | **6 completed** |

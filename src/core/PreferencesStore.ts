@@ -1,7 +1,20 @@
 "use client"
 
 import { userApi } from "@/lib/user-api"
+import { Data, Effect } from "effect"
 import { useSyncExternalStore } from "react"
+
+// ============================================================================
+// Preferences Errors
+// ============================================================================
+
+/**
+ * Error during preferences API operations
+ */
+export class PreferencesError extends Data.TaggedClass("PreferencesError")<{
+  readonly operation: string
+  readonly cause?: unknown
+}> {}
 
 const STORAGE_KEY = "scrolltunes-preferences"
 
@@ -160,20 +173,38 @@ export class PreferencesStore {
     this.notify()
   }
 
-  async initialize(): Promise<void> {
+  private readonly initializeEffect: Effect.Effect<void, PreferencesError> = Effect.gen(
+    this,
+    function* () {
+      const response = yield* Effect.tryPromise({
+        try: () => fetch("/api/user/preferences"),
+        catch: cause => new PreferencesError({ operation: "initialize", cause }),
+      })
+
+      if (!response.ok) {
+        return
+      }
+
+      const data = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<{ preferences: Partial<Preferences> | null }>,
+        catch: cause => new PreferencesError({ operation: "initialize", cause }),
+      })
+
+      if (data?.preferences) {
+        this.state = { ...DEFAULT_PREFERENCES, ...data.preferences }
+        this.saveToStorage()
+        this.notify()
+      }
+    },
+  )
+
+  initialize(): void {
     if (this.initialized) return
     this.initialized = true
 
     if (this.hasLocalData) return
 
-    const data = await userApi.get<{ preferences: Partial<Preferences> | null }>(
-      "/api/user/preferences",
-    )
-    if (data?.preferences) {
-      this.state = { ...DEFAULT_PREFERENCES, ...data.preferences }
-      this.saveToStorage()
-      this.notify()
-    }
+    Effect.runFork(this.initializeEffect.pipe(Effect.ignore))
   }
 
   get<K extends keyof Preferences>(key: K): Preferences[K] {
