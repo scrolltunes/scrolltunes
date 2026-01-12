@@ -216,7 +216,7 @@ These files already follow Effect.ts patterns correctly:
   - Use typed errors from src/lib/errors.ts
   - Pattern match on exit for error responses
   - Reference: `src/app/api/user/history/count/route.ts`
-- [ ] Not started
+- [x] Completed
 
 ### Task 13: Migrate /user/metronome route
 - **File**: `src/app/api/user/metronome/route.ts` (modify)
@@ -492,6 +492,14 @@ These files already follow Effect.ts patterns correctly:
 - Changed return type from Promise<void> to void (fire-and-forget pattern)
 - Maintained localStorage fallback behavior
 
+### Task 12: Migrate /user/preferences route
+- Converted GET handler to Effect.gen with Effect.tryPromise
+- Converted PUT handler to Effect.gen with Effect.tryPromise
+- Replaced try/catch with Effect.runPromiseExit and pattern matching
+- Uses AuthError, UnauthorizedError, DatabaseError from centralized errors.ts
+- Both handlers properly handle 401 for unauthorized and 500 for other errors
+- Reference: `src/app/api/user/history/count/route.ts`
+
 ---
 
 ## Notes
@@ -519,7 +527,7 @@ These files already follow Effect.ts patterns correctly:
 | `.catch(() => {})` | user-api.ts:18,30,44 | Effect.runFork + Effect.ignore |
 | `void fetch().catch()` | vad-log.ts:58 | Effect.runFork + Effect.ignore |
 | Empty catch blocks | SetlistsStore.ts | Effect error channel |
-| try/catch in routes | preferences, metronome, reorder | Effect.runPromiseExit |
+| try/catch in routes | metronome, reorder | Effect.runPromiseExit |
 | Promise constructor | colors.ts:34, colors/extract-dominant-color.ts:6 | Effect.async |
 | `.catch(() => {})` | SpeechRecognitionStore.ts:1089 | Effect.runFork + Effect.ignore |
 
@@ -529,7 +537,7 @@ These files already follow Effect.ts patterns correctly:
 3. **Services layer is fully Effect-compliant** - auth.ts, db.ts, fetch.ts, storage.ts use Context.Tag
 4. **Admin routes mostly compliant** - Only /admin/stats needs migration
 5. **2 user routes already compliant** - history/count and history/sync use Effect.runPromiseExit
-6. **3 user routes have explicit try/catch** - preferences, metronome, setlists/[id]/reorder
+6. **2 user routes have explicit try/catch** - metronome, setlists/[id]/reorder (preferences migrated)
 7. **13 user routes use raw async/await** - Functional but inconsistent
 8. **8 core stores need migration** - SetlistsStore is highest priority (8 methods)
 
@@ -538,7 +546,7 @@ These files already follow Effect.ts patterns correctly:
 |-------|-------|--------|
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
-| P1: API Routes (try/catch) | 4 | Not started |
+| P1: API Routes (try/catch) | 4 | 1 completed |
 | P1: API Routes (await) | 12 | Not started |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **11 completed** |
+| **Total** | **31** | **12 completed** |
