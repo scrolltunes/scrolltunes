@@ -36,6 +36,14 @@ interface LineChordData {
 export interface ScoreBookDisplayProps {
   readonly className?: string
   readonly chordEnhancement?: ChordEnhancementPayloadV1 | null | undefined
+  /**
+   * Whether manual navigation mode is active (disables auto-advance)
+   */
+  readonly isManualMode?: boolean
+  /**
+   * Callback to enter manual navigation mode during playback
+   */
+  readonly enterManualMode?: () => void
 }
 
 /**
@@ -48,6 +56,8 @@ export interface ScoreBookDisplayProps {
 export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   className = "",
   chordEnhancement,
+  isManualMode = false,
+  enterManualMode,
 }: ScoreBookDisplayProps) {
   const state = usePlayerState()
   const currentLineIndex = useCurrentLineIndex()
@@ -82,31 +92,45 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
     }
   }, [totalLines, calculatedLinesPerPage])
 
+  // Navigate to page containing current line after repagination (e.g., window resize)
+  // This ensures content is never hidden when linesPerPage changes
+  // Note: Only depends on calculatedLinesPerPage to avoid overriding manual navigation
+  useEffect(() => {
+    if (currentLineIndex < 0) return
+
+    const targetPage = scoreBookStore.findPageForLine(currentLineIndex)
+    scoreBookStore.goToPage(targetPage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calculatedLinesPerPage])
+
   // Reset pagination when song changes
   const songId = lyrics?.songId
   useEffect(() => {
     scoreBookStore.reset()
   }, [songId])
 
-  // Auto-advance page when current line crosses page boundary
+  // Auto-advance page when current line crosses page boundary during playback
+  // Respects manual mode - when user navigates manually, auto-advance is paused
   const isPlaying = state._tag === "Playing"
   useEffect(() => {
-    if (!isPlaying || currentLineIndex < 0) return
+    if (!isPlaying || currentLineIndex < 0 || isManualMode) return
 
     const targetPage = scoreBookStore.findPageForLine(currentLineIndex)
     if (targetPage !== currentPage) {
       scoreBookStore.goToPage(targetPage)
     }
-  }, [currentLineIndex, currentPage, isPlaying])
+  }, [currentLineIndex, currentPage, isPlaying, isManualMode])
 
   // Manual navigation via swipe
   const handleSwipeLeft = useCallback(() => {
+    enterManualMode?.()
     scoreBookStore.nextPage()
-  }, [])
+  }, [enterManualMode])
 
   const handleSwipeRight = useCallback(() => {
+    enterManualMode?.()
     scoreBookStore.prevPage()
-  }, [])
+  }, [enterManualMode])
 
   const { handlers: swipeHandlers } = useSwipeGesture({
     onSwipeLeft: handleSwipeLeft,
@@ -117,12 +141,14 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
 
   // Navigation arrow handlers
   const handlePrevPage = useCallback(() => {
+    enterManualMode?.()
     scoreBookStore.prevPage()
-  }, [])
+  }, [enterManualMode])
 
   const handleNextPage = useCallback(() => {
+    enterManualMode?.()
     scoreBookStore.nextPage()
-  }, [])
+  }, [enterManualMode])
 
   // Handle line click - jump to that line
   const handleLineClick = useCallback(

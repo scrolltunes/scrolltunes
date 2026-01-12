@@ -14,6 +14,11 @@ export interface UseKeyboardShortcutsOptions {
    * - "karaoke": seek backward/forward (default behavior)
    */
   readonly displayMode?: DisplayMode
+  /**
+   * Callback when Score Book page navigation occurs via keyboard
+   * Used to enter manual mode during playback
+   */
+  readonly onScoreBookNav?: () => void
 }
 
 const PRESET_TEMPOS: Record<string, number> = {
@@ -24,7 +29,13 @@ const PRESET_TEMPOS: Record<string, number> = {
 }
 
 export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): void {
-  const { enabled = true, seekAmount = 5, tempoStep = 0.1, displayMode = "karaoke" } = options ?? {}
+  const {
+    enabled = true,
+    seekAmount = 5,
+    tempoStep = 0.1,
+    displayMode = "karaoke",
+    onScoreBookNav,
+  } = options ?? {}
   const state = usePlayerState()
   const { play, pause, reset, seek, setScrollSpeed, getScrollSpeed } = usePlayerControls()
   const router = useRouter()
@@ -64,6 +75,7 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
         case "ArrowLeft": {
           event.preventDefault()
           if (displayMode === "scorebook") {
+            onScoreBookNav?.()
             scoreBookStore.prevPage()
           } else if (state._tag === "Playing" || state._tag === "Paused") {
             const newTime = Math.max(0, state.currentTime - seekAmount)
@@ -74,6 +86,7 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
         case "ArrowRight": {
           event.preventDefault()
           if (displayMode === "scorebook") {
+            onScoreBookNav?.()
             scoreBookStore.nextPage()
           } else if (state._tag === "Playing" || state._tag === "Paused") {
             const lyrics = state.lyrics
@@ -121,6 +134,7 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
     seekAmount,
     tempoStep,
     displayMode,
+    onScoreBookNav,
     play,
     pause,
     reset,

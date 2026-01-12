@@ -19,6 +19,7 @@ import {
   scoreBookStore,
   songEditsStore,
   useChordsState,
+  useCurrentLineIndex,
   useDetailedActivityStatus,
   useEditPayload,
   useIsEditMode,
@@ -246,9 +247,57 @@ export default function SongPageClient({
 
   const userEnabledMic = useRef(false)
 
+  // Score Book manual navigation mode
+  // When user navigates manually during playback, temporarily disable auto-follow
+  const MANUAL_MODE_TIMEOUT_MS = 4000
+  const [isScoreBookManualMode, setIsScoreBookManualMode] = useState(false)
+  const manualModeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const currentLineIndex = useCurrentLineIndex()
+  const isCurrentlyPlaying = playerState._tag === "Playing"
+
+  const enterScoreBookManualMode = useCallback(() => {
+    if (!isCurrentlyPlaying) return
+
+    setIsScoreBookManualMode(true)
+
+    // Clear any existing timeout
+    if (manualModeTimeoutRef.current) {
+      clearTimeout(manualModeTimeoutRef.current)
+    }
+
+    // Schedule return to auto mode and snap to current line's page
+    manualModeTimeoutRef.current = setTimeout(() => {
+      setIsScoreBookManualMode(false)
+      // Navigate to page containing current line when exiting manual mode
+      const targetPage = scoreBookStore.findPageForLine(currentLineIndex)
+      scoreBookStore.goToPage(targetPage)
+    }, MANUAL_MODE_TIMEOUT_MS)
+  }, [isCurrentlyPlaying, currentLineIndex])
+
+  // Clear manual mode timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (manualModeTimeoutRef.current) {
+        clearTimeout(manualModeTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // Exit manual mode when playback stops
+  useEffect(() => {
+    if (!isCurrentlyPlaying) {
+      setIsScoreBookManualMode(false)
+      if (manualModeTimeoutRef.current) {
+        clearTimeout(manualModeTimeoutRef.current)
+        manualModeTimeoutRef.current = null
+      }
+    }
+  }, [isCurrentlyPlaying])
+
   useKeyboardShortcuts({
     enabled: loadState._tag === "Loaded",
     displayMode: preferences.displayMode,
+    onScoreBookNav: enterScoreBookManualMode,
   })
 
   useTempoPreference({
@@ -751,6 +800,8 @@ export default function SongPageClient({
           <ScoreBookDisplay
             className="flex-1 pb-12"
             chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
+            isManualMode={isScoreBookManualMode}
+            enterManualMode={enterScoreBookManualMode}
           />
         ) : (
           <LyricsDisplay
