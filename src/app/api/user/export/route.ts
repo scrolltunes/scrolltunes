@@ -1,5 +1,4 @@
 import { auth } from "@/auth"
-import { db } from "@/lib/db"
 import {
   accounts,
   appUserProfiles,
@@ -10,37 +9,88 @@ import {
   userSpotifyTokens,
   users,
 } from "@/lib/db/schema"
+import { AuthError, DatabaseError, NotFoundError, UnauthorizedError } from "@/lib/errors"
+import { DbLayer, DbService } from "@/services/db"
 import { eq } from "drizzle-orm"
+import { Effect } from "effect"
 import { NextResponse } from "next/server"
 
-export async function GET() {
-  const session = await auth()
+const getExportData = Effect.gen(function* () {
+  const session = yield* Effect.tryPromise({
+    try: () => auth(),
+    catch: cause => new AuthError({ cause }),
+  })
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return yield* Effect.fail(new UnauthorizedError({}))
   }
 
   const userId = session.user.id
+  const { db } = yield* DbService
 
-  const [user] = await db.select().from(users).where(eq(users.id, userId))
+  // Fetch user, profile, songItems, settings, setlists, spotifyTokens, and spotifyAccount in parallel
+  const [
+    userResult,
+    profileResult,
+    songItems,
+    settings,
+    setlists,
+    spotifyTokensResult,
+    spotifyAccountResult,
+  ] = yield* Effect.all(
+    [
+      Effect.tryPromise({
+        try: () => db.select().from(users).where(eq(users.id, userId)),
+        catch: cause => new DatabaseError({ cause }),
+      }),
+      Effect.tryPromise({
+        try: () => db.select().from(appUserProfiles).where(eq(appUserProfiles.userId, userId)),
+        catch: cause => new DatabaseError({ cause }),
+      }),
+      Effect.tryPromise({
+        try: () => db.select().from(userSongItems).where(eq(userSongItems.userId, userId)),
+        catch: cause => new DatabaseError({ cause }),
+      }),
+      Effect.tryPromise({
+        try: () => db.select().from(userSongSettings).where(eq(userSongSettings.userId, userId)),
+        catch: cause => new DatabaseError({ cause }),
+      }),
+      Effect.tryPromise({
+        try: () => db.select().from(userSetlists).where(eq(userSetlists.userId, userId)),
+        catch: cause => new DatabaseError({ cause }),
+      }),
+      Effect.tryPromise({
+        try: () => db.select().from(userSpotifyTokens).where(eq(userSpotifyTokens.userId, userId)),
+        catch: cause => new DatabaseError({ cause }),
+      }),
+      Effect.tryPromise({
+        try: () => db.select().from(accounts).where(eq(accounts.userId, userId)),
+        catch: cause => new DatabaseError({ cause }),
+      }),
+    ],
+    { concurrency: 5 },
+  )
+
+  const user = userResult[0]
+  const profile = profileResult[0]
+  const spotifyTokens = spotifyTokensResult[0]
+  const spotifyAccount = spotifyAccountResult[0]
 
   if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 })
+    return yield* Effect.fail(new NotFoundError({ resource: "User", id: userId }))
   }
 
-  const [profile] = await db
-    .select()
-    .from(appUserProfiles)
-    .where(eq(appUserProfiles.userId, userId))
-
-  const songItems = await db.select().from(userSongItems).where(eq(userSongItems.userId, userId))
-
-  const settings = await db
-    .select()
-    .from(userSongSettings)
-    .where(eq(userSongSettings.userId, userId))
-
-  const setlists = await db.select().from(userSetlists).where(eq(userSetlists.userId, userId))
+  // Fetch setlist songs in parallel with concurrency limit
+  const setlistSongsResults = yield* Effect.all(
+    setlists.map(setlist =>
+      Effect.tryPromise({
+        try: () =>
+          db.select().from(userSetlistSongs).where(eq(userSetlistSongs.setlistId, setlist.id)),
+        catch: cause => new DatabaseError({ cause }),
+      }).pipe(Effect.map(songs => ({ setlistId: setlist.id, songs }))),
+    ),
+    { concurrency: 5 },
+  )
 
   const setlistSongsMap = new Map<
     string,
@@ -53,14 +103,9 @@ export async function GET() {
     }>
   >()
 
-  for (const setlist of setlists) {
-    const songs = await db
-      .select()
-      .from(userSetlistSongs)
-      .where(eq(userSetlistSongs.setlistId, setlist.id))
-
+  for (const { setlistId, songs } of setlistSongsResults) {
     setlistSongsMap.set(
-      setlist.id,
+      setlistId,
       songs.map(s => ({
         songId: s.songId,
         songProvider: s.songProvider,
@@ -71,14 +116,7 @@ export async function GET() {
     )
   }
 
-  const [spotifyTokens] = await db
-    .select()
-    .from(userSpotifyTokens)
-    .where(eq(userSpotifyTokens.userId, userId))
-
-  const [spotifyAccount] = await db.select().from(accounts).where(eq(accounts.userId, userId))
-
-  const exportData = {
+  return {
     generatedAt: new Date().toISOString(),
     user: {
       id: user.id,
@@ -138,10 +176,28 @@ export async function GET() {
         : null,
     },
   }
+})
+
+export async function GET() {
+  const exit = await Effect.runPromiseExit(getExportData.pipe(Effect.provide(DbLayer)))
+
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      if (cause.error instanceof UnauthorizedError) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      if (cause.error instanceof NotFoundError) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 })
+      }
+    }
+    console.error("Failed to export user data", exit.cause)
+    return NextResponse.json({ error: "Failed to export user data" }, { status: 500 })
+  }
 
   const dateStr = new Date().toISOString().split("T")[0]
 
-  return new NextResponse(JSON.stringify(exportData, null, 2), {
+  return new NextResponse(JSON.stringify(exit.value, null, 2), {
     status: 200,
     headers: {
       "Content-Type": "application/json",

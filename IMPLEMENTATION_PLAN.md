@@ -333,7 +333,7 @@ These files already follow Effect.ts patterns correctly:
   - Replace sequential awaits with Effect.all
   - Add concurrency limit for database queries
   - Use typed errors
-- [ ] Not started
+- [x] Completed
 
 ### Task 25: Migrate /user/delete route
 - **File**: `src/app/api/user/delete/route.ts` (modify)
@@ -587,6 +587,14 @@ These files already follow Effect.ts patterns correctly:
 - Effect.runPromiseExit with pattern matching for 401/500 responses
 - DELETE supports both single song deletion and clearing all history
 
+### Task 24: Migrate /user/export route
+- Converted GET handler to getExportData Effect using Effect.gen with Effect.tryPromise
+- Uses Effect.all with concurrency: 5 for parallel database queries (user, profile, songItems, settings, setlists, spotifyTokens, spotifyAccount)
+- Setlist songs are also fetched in parallel with Effect.all and concurrency: 5
+- Uses AuthError, UnauthorizedError, DatabaseError, NotFoundError from centralized errors.ts
+- Uses DbService/DbLayer for proper Effect dependency injection
+- Effect.runPromiseExit with pattern matching for 401/404/500 responses
+
 ---
 
 ## Notes
@@ -634,6 +642,6 @@ These files already follow Effect.ts patterns correctly:
 | P0: Foundation | 3 | 3 completed |
 | P0: Core Stores | 8 | 8 completed |
 | P1: API Routes (try/catch) | 4 | 4 completed |
-| P1: API Routes (await) | 12 | 8 completed |
+| P1: API Routes (await) | 12 | 9 completed |
 | P2: Cleanup | 4 | Not started |
-| **Total** | **31** | **23 completed** |
+| **Total** | **31** | **24 completed** |
