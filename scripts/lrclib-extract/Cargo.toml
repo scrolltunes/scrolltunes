@@ -11,6 +11,7 @@ regex = "1.10"
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 once_cell = "1.19"
+rustc-hash = "2.1"  # Fast non-cryptographic hashing (FxHash)
 
 [profile.release]
 lto = true

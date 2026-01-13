@@ -6,8 +6,16 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="$PROJECT_DIR/.env.local"
-DB_FILE="/Users/hmemcpy/git/music/lrclib-db-dump-20251209T092057Z-index.sqlite3"
 DB_NAME="scrolltunes-lrclib"
+
+# Check command line argument
+if [ -z "$1" ]; then
+  echo "Usage: $0 <path-to-sqlite-db>"
+  echo "Example: $0 /Users/hmemcpy/git/music/lrclib-spotify-db.sqlite3"
+  exit 1
+fi
+
+DB_FILE="$1"
 
 echo "=== Turso LRCLIB Upload Script ==="
 echo ""
@@ -17,6 +25,8 @@ if [ ! -f "$DB_FILE" ]; then
   echo "Error: Database file not found: $DB_FILE"
   exit 1
 fi
+
+echo "Database file: $DB_FILE"
 
 # Prepare the SQLite file (WAL mode)
 echo "Preparing database file..."

@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
 use rusqlite::{params, Connection};
-use std::collections::HashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -68,12 +68,11 @@ struct ScoredTrack {
 /// Spotify track info for matching
 #[derive(Clone, Debug)]
 struct SpotifyTrack {
-    rowid: i64,              // For joining with audio_features
     id: String,              // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
     #[allow(dead_code)]
-    name: String,            // Original title
+    name: String,            // Original title (kept for debugging)
     #[allow(dead_code)]
-    artist: String,          // Primary artist (from join)
+    artist: String,          // Primary artist (kept for debugging)
     duration_ms: i64,
     popularity: i32,         // 0-100
     isrc: Option<String>,    // For Deezer album art lookup
@@ -191,8 +190,8 @@ static SKIP_TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
 });
 
 // Cyrillic/Hebrew to Latin artist name mappings for deduplication
-static ARTIST_TRANSLITERATIONS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
-    let mut m = HashMap::new();
+static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
+    let mut m = FxHashMap::default();
     // Russian bands with both Cyrillic and Latin spellings
     m.insert("ддт", "ddt");
     m.insert("кино", "kino");
@@ -504,8 +503,8 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
     Ok(tracks)
 }
 
-fn group_tracks(tracks: Vec<Track>) -> HashMap<(String, String), Vec<Track>> {
-    let mut groups: HashMap<(String, String), Vec<Track>> = HashMap::new();
+fn group_tracks(tracks: Vec<Track>) -> FxHashMap<(String, String), Vec<Track>> {
+    let mut groups: FxHashMap<(String, String), Vec<Track>> = FxHashMap::default();
 
     for track in tracks {
         let key = (normalize_title(&track.title), normalize_artist(&track.artist));
@@ -515,7 +514,7 @@ fn group_tracks(tracks: Vec<Track>) -> HashMap<(String, String), Vec<Track>> {
     groups
 }
 
-fn process_groups(groups: HashMap<(String, String), Vec<Track>>) -> Vec<ScoredTrack> {
+fn process_groups(groups: FxHashMap<(String, String), Vec<Track>>) -> Vec<ScoredTrack> {
     let pb = create_progress_bar(groups.len() as u64, "Phase 2: Selecting canonical");
 
     let groups_vec: Vec<_> = groups.into_iter().collect();
@@ -557,113 +556,192 @@ fn optimize_database(conn: &Connection) -> Result<()> {
 // Spotify Enrichment Functions
 // ============================================================================
 
-/// Load Spotify tracks into lookup HashMap
-/// Key: (title_norm, artist_norm) → Vec of candidates
-fn load_spotify_tracks(
+/// Build LRCLIB index for streaming Spotify matching.
+/// Returns FxHashMap: (title_norm, artist_norm) → Vec<index into canonical_tracks>
+fn build_lrclib_index(canonical_tracks: &[ScoredTrack]) -> FxHashMap<(String, String), Vec<usize>> {
+    println!("[LRCLIB] Building lookup index for {} canonical tracks...", canonical_tracks.len());
+    let mut index: FxHashMap<(String, String), Vec<usize>> = FxHashMap::default();
+    for (idx, t) in canonical_tracks.iter().enumerate() {
+        let key = (t.title_norm.clone(), t.artist_norm.clone());
+        index.entry(key).or_default().push(idx);
+    }
+    println!("[LRCLIB] Index built with {} unique (title, artist) keys", index.len());
+    index
+}
+
+/// Stream Spotify tracks and match against LRCLIB index on-the-fly.
+/// Returns Vec<Option<SpotifyTrack>> aligned with canonical_tracks indices.
+/// This avoids loading 45M+ Spotify tracks into memory.
+fn stream_match_spotify(
     conn: &Connection,
     min_popularity: i32,
-) -> Result<HashMap<(String, String), Vec<SpotifyTrack>>> {
-    println!("[SPOTIFY] Loading tracks with popularity >= {}", min_popularity);
+    canonical_tracks: &[ScoredTrack],
+    lrclib_index: &FxHashMap<(String, String), Vec<usize>>,
+) -> Result<Vec<Option<SpotifyTrack>>> {
+    println!("[SPOTIFY] Streaming tracks with popularity >= {} and matching on-the-fly...", min_popularity);
 
-    // First, get count for progress bar
+    // Get count for progress bar
     let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM tracks t
-         JOIN track_artists ta ON ta.track_rowid = t.rowid AND ta.position = 0
-         JOIN artists a ON a.rowid = ta.artist_rowid
-         WHERE t.popularity >= ?",
+        "SELECT COUNT(*) FROM tracks WHERE popularity >= ?",
         [min_popularity],
         |row| row.get(0),
     )?;
 
-    let pb = create_progress_bar(count as u64, "Loading Spotify tracks");
+    let pb = create_progress_bar(count as u64, "Streaming Spotify & matching");
 
-    // Join tracks + track_artists + artists to get primary artist
+    // Join tracks + artists using correlated subquery for primary artist
     let sql = r#"
         SELECT
-            t.rowid,
             t.id,
             t.name,
             a.name as artist_name,
             t.duration_ms,
             t.popularity,
-            t.isrc,
+            t.external_id_isrc,
             t.album_rowid
         FROM tracks t
-        JOIN track_artists ta ON ta.track_rowid = t.rowid AND ta.position = 0
-        JOIN artists a ON a.rowid = ta.artist_rowid
+        JOIN artists a ON a.rowid = (
+            SELECT MIN(artist_rowid) FROM track_artists WHERE track_rowid = t.rowid
+        )
         WHERE t.popularity >= ?
     "#;
 
     let mut stmt = conn.prepare(sql)?;
     let mut rows = stmt.query([min_popularity])?;
 
-    let mut lookup: HashMap<(String, String), Vec<SpotifyTrack>> = HashMap::new();
-    let mut loaded_count = 0;
+    // One slot per canonical LRCLIB track - stores best Spotify match
+    let mut best_matches: Vec<Option<SpotifyTrack>> = vec![None; canonical_tracks.len()];
+    let mut scanned_count: u64 = 0;
+    let mut match_count: u64 = 0;
 
     while let Some(row) = rows.next()? {
-        let track = SpotifyTrack {
-            rowid: row.get(0)?,
-            id: row.get(1)?,
-            name: row.get(2)?,
-            artist: row.get(3)?,
-            duration_ms: row.get(4)?,
-            popularity: row.get(5)?,
-            isrc: row.get(6)?,
-            album_rowid: row.get(7)?,
+        let spotify_track = SpotifyTrack {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            artist: row.get(2)?,
+            duration_ms: row.get(3)?,
+            popularity: row.get(4)?,
+            isrc: row.get(5)?,
+            album_rowid: row.get(6)?,
         };
 
-        // Normalize using existing functions
-        let title_norm = normalize_title(&track.name);
-        let artist_norm = normalize_artist(&track.artist);
+        // Normalize and lookup in LRCLIB index
+        let title_norm = normalize_title(&spotify_track.name);
+        let artist_norm = normalize_artist(&spotify_track.artist);
         let key = (title_norm, artist_norm);
 
-        lookup.entry(key).or_default().push(track);
-        loaded_count += 1;
+        if let Some(lrclib_indices) = lrclib_index.get(&key) {
+            let spotify_duration_sec = spotify_track.duration_ms / 1000;
+
+            for &idx in lrclib_indices {
+                let lrclib = &canonical_tracks[idx];
+
+                // Duration filter: ±10 seconds
+                if (lrclib.track.duration_sec - spotify_duration_sec).abs() > 10 {
+                    continue;
+                }
+
+                // Keep best match by popularity
+                match &best_matches[idx] {
+                    Some(current) if current.popularity >= spotify_track.popularity => {}
+                    _ => {
+                        if best_matches[idx].is_none() {
+                            match_count += 1;
+                        }
+                        best_matches[idx] = Some(spotify_track.clone());
+                    }
+                }
+            }
+        }
+
+        scanned_count += 1;
         pb.inc(1);
     }
 
+    let match_rate = if !canonical_tracks.is_empty() {
+        100.0 * match_count as f64 / canonical_tracks.len() as f64
+    } else {
+        0.0
+    };
+
     pb.finish_with_message(format!(
-        "[SPOTIFY] Loaded {} tracks into {} groups",
-        loaded_count,
-        lookup.len()
+        "[SPOTIFY] Scanned {} tracks, matched {} LRCLIB tracks ({:.1}%)",
+        scanned_count, match_count, match_rate
     ));
 
-    Ok(lookup)
+    Ok(best_matches)
 }
 
-/// Load audio features into HashMap by track_rowid
-fn load_audio_features(conn: &Connection) -> Result<HashMap<i64, AudioFeatures>> {
-    println!("[AUDIO] Loading audio features...");
+/// Load audio features into FxHashMap, filtered to only needed track IDs.
+/// This avoids loading 40M+ rows - only keeps features for matched tracks.
+fn load_audio_features_filtered(
+    conn: &Connection,
+    needed_ids: &FxHashSet<String>,
+) -> Result<FxHashMap<String, AudioFeatures>> {
+    println!("[AUDIO] Loading audio features (filtered to {} needed IDs)...", needed_ids.len());
 
-    let count: i64 = conn.query_row("SELECT COUNT(*) FROM audio_features", [], |row| row.get(0))?;
-    let pb = create_progress_bar(count as u64, "Loading audio features");
+    let count: i64 =
+        conn.query_row("SELECT COUNT(*) FROM track_audio_features", [], |row| row.get(0))?;
+    let pb = create_progress_bar(count as u64, "Streaming audio features");
 
-    let sql = "SELECT track_rowid, tempo, key, mode, time_signature FROM audio_features";
+    // Actual schema: track_audio_features with track_id (Spotify ID string), tempo is INTEGER
+    let sql = "SELECT track_id, tempo, key, mode, time_signature FROM track_audio_features";
     let mut stmt = conn.prepare(sql)?;
     let mut rows = stmt.query([])?;
 
-    let mut lookup: HashMap<i64, AudioFeatures> = HashMap::new();
+    let mut lookup: FxHashMap<String, AudioFeatures> = FxHashMap::default();
 
     while let Some(row) = rows.next()? {
-        let rowid: i64 = row.get(0)?;
+        let track_id: String = row.get(0)?;
+        
+        // Only keep if in our needed set
+        if !needed_ids.contains(&track_id) {
+            pb.inc(1);
+            continue;
+        }
+
+        // tempo is REAL in actual schema
         let features = AudioFeatures {
             tempo: row.get(1)?,
             key: row.get(2)?,
             mode: row.get(3)?,
             time_signature: row.get(4)?,
         };
-        lookup.insert(rowid, features);
+        lookup.insert(track_id, features);
         pb.inc(1);
     }
 
-    pb.finish_with_message(format!("[AUDIO] Loaded {} audio feature records", lookup.len()));
+    pb.finish_with_message(format!(
+        "[AUDIO] Loaded {} audio features (filtered from {} total)",
+        lookup.len(),
+        count
+    ));
     Ok(lookup)
 }
 
-/// Load album image URLs into HashMap by album_rowid
-/// We select medium size (~300px) for optimal mobile display
-fn load_album_images(conn: &Connection) -> Result<HashMap<i64, String>> {
-    println!("[IMAGES] Loading album images (medium size)...");
+/// Collect needed Spotify track IDs and album rowids from best matches
+fn collect_needed_ids(best_matches: &[Option<SpotifyTrack>]) -> (FxHashSet<String>, FxHashSet<i64>) {
+    let mut track_ids: FxHashSet<String> = FxHashSet::default();
+    let mut album_rowids: FxHashSet<i64> = FxHashSet::default();
+    
+    for m in best_matches {
+        if let Some(s) = m {
+            track_ids.insert(s.id.clone());
+            album_rowids.insert(s.album_rowid);
+        }
+    }
+    
+    println!("[COLLECT] Need {} track IDs and {} album rowids", track_ids.len(), album_rowids.len());
+    (track_ids, album_rowids)
+}
+
+/// Load album image URLs filtered to only needed album rowids.
+/// We select medium size (~300px) for optimal mobile display.
+fn load_album_images_filtered(
+    conn: &Connection,
+    needed_album_rowids: &FxHashSet<i64>,
+) -> Result<FxHashMap<i64, String>> {
+    println!("[IMAGES] Loading album images (filtered to {} albums)...", needed_album_rowids.len());
 
     // Select images closest to 300px (medium size)
     let sql = r#"
@@ -675,10 +753,16 @@ fn load_album_images(conn: &Connection) -> Result<HashMap<i64, String>> {
     let mut stmt = conn.prepare(sql)?;
     let mut rows = stmt.query([])?;
 
-    let mut lookup: HashMap<i64, String> = HashMap::new();
+    let mut lookup: FxHashMap<i64, String> = FxHashMap::default();
 
     while let Some(row) = rows.next()? {
         let album_rowid: i64 = row.get(0)?;
+        
+        // Only keep if in our needed set
+        if !needed_album_rowids.contains(&album_rowid) {
+            continue;
+        }
+        
         let url: String = row.get(1)?;
         // Only keep first (closest to 300px) per album
         lookup.entry(album_rowid).or_insert(url);
@@ -688,43 +772,23 @@ fn load_album_images(conn: &Connection) -> Result<HashMap<i64, String>> {
     Ok(lookup)
 }
 
-/// Match a canonical LRCLIB track to the best Spotify version.
-/// LRCLIB tracks have lyrics, so they're already vocal (not instrumental).
-fn match_to_spotify<'a>(
-    lrclib: &ScoredTrack,
-    spotify_lookup: &'a HashMap<(String, String), Vec<SpotifyTrack>>,
-) -> Option<&'a SpotifyTrack> {
-    let key = (lrclib.title_norm.clone(), lrclib.artist_norm.clone());
-    let candidates = spotify_lookup.get(&key)?;
-
-    // Filter by duration (±10s), select highest popularity
-    candidates
-        .iter()
-        .filter(|s| {
-            let spotify_duration_sec = s.duration_ms / 1000;
-            (lrclib.track.duration_sec - spotify_duration_sec).abs() <= 10
-        })
-        .max_by_key(|s| s.popularity)
-}
-
-/// Enrich canonical LRCLIB tracks with Spotify data.
+/// Enrich canonical LRCLIB tracks with pre-matched Spotify data.
 /// LRCLIB is the source of truth — Spotify data is nullable enrichment.
-fn enrich_tracks(
+fn enrich_tracks_with_matches(
     canonical: Vec<ScoredTrack>,
-    spotify_lookup: &HashMap<(String, String), Vec<SpotifyTrack>>,
-    audio_lookup: &HashMap<i64, AudioFeatures>,
-    image_lookup: &HashMap<i64, String>,
+    best_matches: Vec<Option<SpotifyTrack>>,
+    audio_lookup: &FxHashMap<String, AudioFeatures>,
+    image_lookup: &FxHashMap<i64, String>,
 ) -> Vec<EnrichedTrack> {
     let pb = create_progress_bar(canonical.len() as u64, "Enriching with Spotify");
 
     let enriched: Vec<EnrichedTrack> = canonical
-        .into_par_iter()
-        .map(|lrclib| {
-            let spotify_match = match_to_spotify(&lrclib, spotify_lookup);
-
+        .into_iter()
+        .zip(best_matches.into_iter())
+        .map(|(lrclib, spotify_match)| {
             let enrichment = match spotify_match {
-                Some(s) => {
-                    let features = audio_lookup.get(&s.rowid);
+                Some(ref s) => {
+                    let features = audio_lookup.get(&s.id);
                     let album_image = image_lookup.get(&s.album_rowid).cloned();
 
                     (
@@ -997,47 +1061,67 @@ fn main() -> Result<()> {
     let tracks = read_tracks(&source_conn, artist_filter.as_ref())?;
     drop(source_conn);
 
-    // Phase 1b: Load Spotify lookup (if --spotify provided)
-    let spotify_lookup = if let Some(ref spotify_path) = args.spotify {
-        println!("\nOpening Spotify database: {:?}", spotify_path);
-        let spotify_conn = Connection::open(spotify_path)
-            .context("Failed to open Spotify database")?;
-        spotify_conn.execute_batch("PRAGMA mmap_size = 8589934592;")?;
-        load_spotify_tracks(&spotify_conn, args.min_popularity)?
-    } else {
-        HashMap::new()
-    };
-
-    // Phase 1c: Load audio features (if --audio-features provided)
-    let audio_lookup = if let Some(ref af_path) = args.audio_features {
-        println!("\nOpening audio features database: {:?}", af_path);
-        let af_conn = Connection::open(af_path)
-            .context("Failed to open audio features database")?;
-        af_conn.execute_batch("PRAGMA mmap_size = 4294967296;")?;
-        load_audio_features(&af_conn)?
-    } else {
-        HashMap::new()
-    };
-
-    // Phase 1d: Load album images (if --spotify provided)
-    let image_lookup = if let Some(ref spotify_path) = args.spotify {
-        let spotify_conn = Connection::open(spotify_path)
-            .context("Failed to open Spotify database for images")?;
-        load_album_images(&spotify_conn)?
-    } else {
-        HashMap::new()
-    };
-
-    // Phase 2: Group & select canonical
+    // Phase 2: Group & select canonical (before Spotify to build index)
     let groups = group_tracks(tracks);
     println!("\nFound {} unique (title, artist) groups", groups.len());
 
     let canonical_tracks = process_groups(groups);
 
-    // Phase 2b: Enrich with Spotify (if data available)
-    let enriched_tracks = if !spotify_lookup.is_empty() {
+    // Phase 3: Spotify enrichment (streaming approach)
+    let enriched_tracks = if let Some(ref spotify_path) = args.spotify {
+        // Build LRCLIB index for streaming match
+        let lrclib_index = build_lrclib_index(&canonical_tracks);
+
+        // Open Spotify DB with read-only optimizations
+        println!("\nOpening Spotify database: {:?}", spotify_path);
+        let spotify_conn = Connection::open(spotify_path)
+            .context("Failed to open Spotify database")?;
+        spotify_conn.execute_batch(
+            "PRAGMA query_only = 1;
+             PRAGMA journal_mode = OFF;
+             PRAGMA synchronous = OFF;
+             PRAGMA temp_store = MEMORY;
+             PRAGMA cache_size = -500000;
+             PRAGMA mmap_size = 8589934592;
+             PRAGMA locking_mode = EXCLUSIVE;",
+        )?;
+
+        // Stream Spotify and match on-the-fly (doesn't load all 45M into memory)
+        let best_matches = stream_match_spotify(
+            &spotify_conn,
+            args.min_popularity,
+            &canonical_tracks,
+            &lrclib_index,
+        )?;
+
+        // Collect IDs we actually need for audio features and images
+        let (needed_track_ids, needed_album_rowids) = collect_needed_ids(&best_matches);
+
+        // Load audio features filtered to matched tracks only
+        let audio_lookup = if let Some(ref af_path) = args.audio_features {
+            println!("\nOpening audio features database: {:?}", af_path);
+            let af_conn = Connection::open(af_path)
+                .context("Failed to open audio features database")?;
+            af_conn.execute_batch(
+                "PRAGMA query_only = 1;
+                 PRAGMA journal_mode = OFF;
+                 PRAGMA synchronous = OFF;
+                 PRAGMA temp_store = MEMORY;
+                 PRAGMA cache_size = -500000;
+                 PRAGMA mmap_size = 8589934592;
+                 PRAGMA locking_mode = EXCLUSIVE;",
+            )?;
+            load_audio_features_filtered(&af_conn, &needed_track_ids)?
+        } else {
+            FxHashMap::default()
+        };
+
+        // Load album images filtered to matched albums only
+        let image_lookup = load_album_images_filtered(&spotify_conn, &needed_album_rowids)?;
+
+        // Enrich using pre-matched data
         println!("\nEnriching with Spotify data...");
-        enrich_tracks(canonical_tracks, &spotify_lookup, &audio_lookup, &image_lookup)
+        enrich_tracks_with_matches(canonical_tracks, best_matches, &audio_lookup, &image_lookup)
     } else {
         // No Spotify data: convert to EnrichedTrack with NULL Spotify fields
         convert_to_enriched_without_spotify(canonical_tracks)
@@ -1073,7 +1157,7 @@ fn main() -> Result<()> {
     println!("\n{:=<60}", "");
     println!("Extraction complete!");
     println!("  Tracks: {}", enriched_tracks.len());
-    if !spotify_lookup.is_empty() {
+    if args.spotify.is_some() {
         println!("  Spotify matches: {} ({:.1}%)", matched_count, match_rate);
     }
     println!("  Output size: {:.2} MB", file_size as f64 / 1_048_576.0);
