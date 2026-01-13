@@ -2,14 +2,6 @@ import { getAlbumArt } from "@/lib/deezer-client"
 import { type LRCLibTrackResult, searchLRCLibTracks } from "@/lib/lyrics-client"
 import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import type { SearchResultTrack } from "@/lib/search-api-types"
-import {
-  type SpotifyError,
-  type SpotifyService,
-  type SpotifyTrack,
-  formatArtists,
-  getAlbumImageUrl,
-  searchTracksEffect,
-} from "@/lib/spotify-client"
 import type { FetchService } from "@/services/fetch"
 import type { ServerConfig } from "@/services/server-config"
 import { ServerLayer } from "@/services/server-layer"
@@ -18,105 +10,50 @@ import { Effect } from "effect"
 import { type NextRequest, NextResponse } from "next/server"
 
 /**
- * Search flow (Spotify-first with Turso verification):
- * 1. Search Spotify for top N results (popularity-ranked)
- * 2. For each result, verify LRCLIB availability via Turso FTS lookup
- * 3. Return Spotify metadata (album art, normalized names) + LRCLIB ID
- * 4. If Spotify fails, fall back to Turso direct search + Deezer album art
+ * Search flow (Turso-first with embedded Spotify enrichment):
+ * 1. Search Turso FTS for results (ranked by popularity, quality, BM25)
+ * 2. Enrich with album art (use stored URL or Deezer fallback)
+ * 3. If Turso fails/empty, fall back to LRCLIB API + Deezer album art
  */
-
-interface SpotifyTrackWithLrclib {
-  readonly spotifyTrack: SpotifyTrack
-  readonly lrclibMatch: TursoSearchResult
-  readonly normalizedName: string
-  readonly normalizedArtist: string
-  readonly normalizedAlbum: string
-}
 
 /**
- * Look up a Spotify track in Turso to get LRCLIB ID
+ * Enrich a Turso search result with album art
  */
-function findLrclibMatch(
-  track: SpotifyTrack,
-): Effect.Effect<SpotifyTrackWithLrclib | null, never, TursoService | ServerConfig> {
-  const title = track.name
-  const artist = formatArtists(track.artists)
-
-  const normalizedName = normalizeTrackName(title)
-  const normalizedArtist = normalizeArtistName(artist)
-  const normalizedAlbum = normalizeAlbumName(track.album.name)
-
+function enrichWithAlbumArt(
+  result: TursoSearchResult,
+): Effect.Effect<SearchResultTrack, never, FetchService> {
   return Effect.gen(function* () {
-    const turso = yield* TursoService
+    // Priority 1: Stored URL from Spotify dump (instant)
+    let albumArt = result.albumImageUrl
 
-    const durationSec = Math.round(track.duration_ms / 1000)
-    const match = yield* turso
-      .findByTitleArtist(title, artist, durationSec)
-      .pipe(Effect.catchAll(() => Effect.succeed(null)))
-
-    if (!match) return null
+    // Priority 2: Deezer lookup (if no stored URL)
+    if (!albumArt) {
+      albumArt = yield* Effect.tryPromise({
+        try: () => getAlbumArt(result.artist, result.title, "medium"),
+        catch: () => null,
+      }).pipe(Effect.catchAll(() => Effect.succeed(null)))
+    }
 
     return {
-      spotifyTrack: track,
-      lrclibMatch: match,
-      normalizedName,
-      normalizedArtist,
-      normalizedAlbum,
-    }
-  })
-}
-
-/**
- * Primary flow: Spotify search → Turso verification
- */
-function searchSpotifyWithTurso(
-  query: string,
-  limit: number,
-): Effect.Effect<SearchResultTrack[], SpotifyError, SpotifyService | TursoService | ServerConfig> {
-  return Effect.gen(function* () {
-    const spotifyResult = yield* searchTracksEffect(query, Math.min(limit + 2, 8))
-    const tracks = spotifyResult.tracks.items
-
-    if (tracks.length === 0) {
-      return []
-    }
-
-    const results = yield* Effect.all(tracks.map(findLrclibMatch), { concurrency: "unbounded" })
-
-    const withLyrics = results.filter((r): r is SpotifyTrackWithLrclib => r !== null)
-
-    const seenKeys = new Set<string>()
-    const seenLrclibIds = new Set<number>()
-    const deduplicated: SpotifyTrackWithLrclib[] = []
-
-    for (const result of withLyrics) {
-      const key = `${result.normalizedName.toLowerCase()}|${result.normalizedArtist.toLowerCase()}`
-      const lrclibId = result.lrclibMatch.id
-      if (seenKeys.has(key) || seenLrclibIds.has(lrclibId)) continue
-      seenKeys.add(key)
-      seenLrclibIds.add(lrclibId)
-      deduplicated.push(result)
-      if (deduplicated.length >= limit) break
-    }
-
-    return deduplicated.map(r => ({
-      id: `lrclib-${r.lrclibMatch.id}`,
-      lrclibId: r.lrclibMatch.id,
-      spotifyId: r.spotifyTrack.id,
-      name: r.normalizedName,
-      artist: r.normalizedArtist,
-      album: r.normalizedAlbum,
-      albumArt: getAlbumImageUrl(r.spotifyTrack.album, "medium") ?? undefined,
-      duration: r.spotifyTrack.duration_ms,
+      id: `lrclib-${result.id}`,
+      lrclibId: result.id,
+      spotifyId: result.spotifyId ?? undefined,
+      name: result.title,
+      artist: result.artist,
+      album: result.album ?? "",
+      albumArt: albumArt ?? undefined,
+      duration: result.durationSec * 1000,
       hasLyrics: true,
-    })) satisfies SearchResultTrack[]
+      popularity: result.popularity ?? undefined,
+      tempo: result.tempo ?? undefined,
+    } satisfies SearchResultTrack
   })
 }
 
 /**
- * Fallback flow: Turso direct search + Deezer album art
+ * Primary flow: Turso FTS search with popularity ranking
  */
-function searchTursoWithDeezer(
+function searchTurso(
   query: string,
   limit: number,
 ): Effect.Effect<SearchResultTrack[], never, TursoService | ServerConfig | FetchService> {
@@ -125,7 +62,7 @@ function searchTursoWithDeezer(
     const results = yield* turso.search(query, limit).pipe(
       Effect.catchAll(error => {
         console.log("[SEARCH] Turso search failed:", error.message)
-        return Effect.succeed([] as const)
+        return Effect.succeed([] as readonly TursoSearchResult[])
       }),
     )
 
@@ -135,40 +72,9 @@ function searchTursoWithDeezer(
 
     console.log(`[SEARCH] Turso returned ${results.length} results`)
 
+    // Enrich with album art (use stored URL or fallback to Deezer)
     const enriched = yield* Effect.all(
-      results.map(r =>
-        Effect.tryPromise({
-          try: () => getAlbumArt(r.artist, r.title, "medium"),
-          catch: () => null,
-        }).pipe(
-          Effect.map(
-            (albumArt): SearchResultTrack => ({
-              id: `lrclib-${r.id}`,
-              lrclibId: r.id,
-              spotifyId: undefined,
-              name: r.title,
-              artist: r.artist,
-              album: r.album ?? "",
-              albumArt: albumArt ?? undefined,
-              duration: r.durationSec * 1000,
-              hasLyrics: true,
-            }),
-          ),
-          Effect.catchAll(() =>
-            Effect.succeed<SearchResultTrack>({
-              id: `lrclib-${r.id}`,
-              lrclibId: r.id,
-              spotifyId: undefined,
-              name: r.title,
-              artist: r.artist,
-              album: r.album ?? "",
-              albumArt: undefined,
-              duration: r.durationSec * 1000,
-              hasLyrics: true,
-            }),
-          ),
-        ),
-      ),
+      results.map(r => enrichWithAlbumArt(r)),
       { concurrency: 4 },
     )
 
@@ -177,7 +83,7 @@ function searchTursoWithDeezer(
 }
 
 /**
- * LRCLIB API fallback (when both Spotify and Turso fail)
+ * LRCLIB API fallback (when Turso returns no results)
  */
 function searchLRCLibFallback(
   query: string,
@@ -221,6 +127,8 @@ function searchLRCLibFallback(
             albumArt: albumArt ?? undefined,
             duration: r.duration * 1000,
             hasLyrics: true,
+            popularity: undefined,
+            tempo: undefined,
           } satisfies SearchResultTrack
         }),
       ),
@@ -232,34 +140,20 @@ function searchLRCLibFallback(
 }
 
 /**
- * Combined search: Spotify → Turso → LRCLIB API
+ * Combined search: Turso → LRCLIB API fallback
  */
 function search(
   query: string,
   limit: number,
-): Effect.Effect<
-  SearchResultTrack[],
-  never,
-  FetchService | SpotifyService | TursoService | ServerConfig
-> {
-  return searchSpotifyWithTurso(query, limit).pipe(
+): Effect.Effect<SearchResultTrack[], never, FetchService | TursoService | ServerConfig> {
+  return searchTurso(query, limit).pipe(
     Effect.flatMap(results => {
       if (results.length > 0) {
-        console.log(`[SEARCH] Spotify+Turso returned ${results.length} results`)
+        console.log(`[SEARCH] Turso returned ${results.length} results`)
         return Effect.succeed(results)
       }
-      console.log("[SEARCH] Spotify+Turso returned no results, falling back to Turso direct")
-      return searchTursoWithDeezer(query, limit)
-    }),
-    Effect.catchAll(error => {
-      console.log("[SEARCH] Spotify failed, falling back to Turso direct:", error._tag)
-      return searchTursoWithDeezer(query, limit).pipe(
-        Effect.flatMap(results => {
-          if (results.length > 0) return Effect.succeed(results)
-          console.log("[SEARCH] Turso returned no results, falling back to LRCLIB API")
-          return searchLRCLibFallback(query, limit)
-        }),
-      )
+      console.log("[SEARCH] Turso returned no results, falling back to LRCLIB API")
+      return searchLRCLibFallback(query, limit)
     }),
   )
 }
