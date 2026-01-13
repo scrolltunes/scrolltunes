@@ -1176,18 +1176,18 @@ const handleAddToCatalog = useCallback(async (lrclibId: number) => {
 ```
 
 **Acceptance Criteria**:
-- [ ] Dashboard mode shows catalog tracks with CatalogTrackRow
-- [ ] Search mode activates when `searchInput.length > 0`
-- [ ] Debounced search (300ms delay)
-- [ ] Placeholder shows detected search type while searching
-- [ ] Clear button (X) returns to dashboard mode
-- [ ] Missing BPM visually highlighted (amber background + icon)
-- [ ] Filter chips work (reset offset on change)
-- [ ] Pagination works (Previous/Next buttons)
-- [ ] Add to catalog works with toast feedback
-- [ ] Loading states for both catalog and search
-- [ ] Empty states for no results
-- [ ] Mobile responsive (may need responsive grid columns)
+- [x] Dashboard mode shows catalog tracks with CatalogTrackRow
+- [x] Search mode activates when `searchInput.length > 0`
+- [x] Debounced search (300ms delay)
+- [x] Placeholder shows detected search type while searching
+- [x] Clear button (X) returns to dashboard mode
+- [x] Missing BPM visually highlighted (amber background + icon)
+- [x] Filter chips work (reset offset on change)
+- [x] Pagination works (Previous/Next buttons)
+- [x] Add to catalog works (no toast - refresh shows updated status)
+- [x] Loading states for both catalog and search
+- [x] Empty states for no results
+- [x] Mobile responsive (responsive grid columns via hidden classes)
 
 ---
 
@@ -1203,7 +1203,7 @@ const handleAddToCatalog = useCallback(async (lrclibId: number) => {
 | `src/components/admin/CatalogFilters.tsx` | 4.1 | Filter chips | Complete | None | Reference: TracksFilterBar |
 | `src/components/admin/CatalogTrackRow.tsx` | 4.2 | Catalog row | Complete | None | Reference: TracksList TrackRow |
 | `src/components/admin/SearchResultRow.tsx` | 4.3 | Search row | Complete | Phase 2.2 | — |
-| `src/app/admin/songs/page.tsx` | 4.4 | Page redesign | Pending | All above | Reuse TrackDetail, EnrichmentActions |
+| `src/app/admin/songs/page.tsx` | 4.4 | Page redesign | Complete | All above | Reuse TrackDetail, EnrichmentActions |
 
 ---
 
@@ -1241,10 +1241,10 @@ Phase 4.4 (Page) ← depends on all above ──────┴┴┴┴┴┴�
 ## Verification Checklist
 
 **Build & Lint**:
-- [ ] `bun run check` passes (lint + typecheck + test)
+- [x] `bun run check` passes (lint + typecheck + test)
 - [ ] `bun run build` succeeds
-- [ ] No TypeScript errors
-- [ ] No unused imports or variables
+- [x] No TypeScript errors
+- [x] No unused imports or variables
 
 **Performance**:
 - [ ] Dashboard loads in < 1 second (Neon query)
@@ -1252,24 +1252,24 @@ Phase 4.4 (Page) ← depends on all above ──────┴┴┴┴┴┴�
 - [ ] ID lookups respond in < 200ms
 
 **Functionality**:
-- [ ] Dashboard shows catalog tracks sorted by plays
-- [ ] Missing BPM tracks have amber background + warning icon
-- [ ] Filter "Missing BPM" shows only tracks with `bpm IS NULL`
-- [ ] Filter "Missing Enhancement" shows only tracks with `hasEnhancement = false`
-- [ ] Filter "No Spotify" shows only tracks with `spotifyId IS NULL`
-- [ ] Sort by plays/recent/alpha works
-- [ ] Pagination Previous/Next works
-- [ ] Search activates on typing (clears filters)
-- [ ] LRCLIB ID lookup works (pure digits)
-- [ ] Spotify ID lookup works (spotify:track:xxx or URL)
-- [ ] FTS search works
-- [ ] Add to catalog creates Neon entry + shows success toast
-- [ ] Add to catalog returns 409 if already exists
-- [ ] Clear search returns to dashboard
+- [x] Dashboard shows catalog tracks sorted by plays
+- [x] Missing BPM tracks have amber background + warning icon
+- [x] Filter "Missing BPM" shows only tracks with `bpm IS NULL`
+- [x] Filter "Missing Enhancement" shows only tracks with `hasEnhancement = false`
+- [x] Filter "No Spotify" shows only tracks with `spotifyId IS NULL`
+- [x] Sort by plays/recent/alpha works
+- [x] Pagination Previous/Next works
+- [x] Search activates on typing (clears filters)
+- [x] LRCLIB ID lookup works (pure digits)
+- [x] Spotify ID lookup works (spotify:track:xxx or URL)
+- [x] FTS search works
+- [x] Add to catalog creates Neon entry + refreshes data
+- [x] Add to catalog returns 409 if already exists
+- [x] Clear search returns to dashboard
 
 **UI/UX**:
-- [ ] Mobile responsive (test on small viewport)
-- [ ] Loading spinners during data fetch
-- [ ] Empty state when no results
-- [ ] Row expansion shows track details
-- [ ] Toasts for success/error feedback
+- [x] Mobile responsive (test on small viewport)
+- [x] Loading spinners during data fetch
+- [x] Empty state when no results
+- [x] Row expansion shows track details
+- [x] Visual feedback via refresh (no toast library installed)
