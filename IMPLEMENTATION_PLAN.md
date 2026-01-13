@@ -912,14 +912,16 @@ Copy Turso enrichment (spotifyId, tempo, key, albumArt) to Neon.
 
 ### Task 5.3: Spotify Search API Endpoint
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/app/api/admin/spotify/search/route.ts` (new file)
 
-Search Spotify API for matching tracks.
+Search Spotify API for matching tracks. Uses existing `SpotifyService` with `Effect.runPromiseExit` pattern and admin auth check.
 
 **Acceptance Criteria**:
-- [ ] Accepts `q` query param
-- [ ] Returns top 5 results
-- [ ] Handles rate limits gracefully
+- [x] Accepts `q` query param
+- [x] Returns top 5 results
+- [x] Handles rate limits gracefully (returns 429 status)
 
 ---
 
