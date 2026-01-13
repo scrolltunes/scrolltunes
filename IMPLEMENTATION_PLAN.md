@@ -193,6 +193,8 @@ Run `bun run db:push` to apply the schema to the database.
 
 ### Task 1.3: Create Logging Types and Helper
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/lib/bpm/bpm-log.ts` (new file)
 
 ```typescript
@@ -293,13 +295,13 @@ class BpmLogInsertError extends Data.TaggedClass("BpmLogInsertError")<{
 ```
 
 **Acceptance Criteria**:
-- [ ] File created at `src/lib/bpm/bpm-log.ts`
-- [ ] All types exported: `BpmProvider`, `BpmStage`, `BpmErrorReason`, `BpmLogEntry`
-- [ ] `logBpmAttempt` uses `Effect.runFork` (NOT `.then().catch()`)
-- [ ] `BpmLogInsertError` tagged error class defined
-- [ ] `mapErrorToReason` helper function exported
-- [ ] `errorDetail` truncated to 500 chars
-- [ ] `bun run typecheck` passes
+- [x] File created at `src/lib/bpm/bpm-log.ts`
+- [x] All types exported: `BpmProvider`, `BpmStage`, `BpmErrorReason`, `BpmLogEntry`
+- [x] `logBpmAttempt` uses `Effect.runFork` (NOT `.then().catch()`)
+- [x] `BpmLogInsertError` tagged error class defined
+- [x] `mapErrorToReason` helper function exported
+- [x] `errorDetail` truncated to 500 chars
+- [x] `bun run typecheck` passes
 
 ---
 
