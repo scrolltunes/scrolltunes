@@ -16,11 +16,6 @@ export {
   type UseWakeLockResult,
 } from "./useWakeLock"
 export {
-  useAutoHide,
-  type UseAutoHideOptions,
-  type UseAutoHideResult,
-} from "./useAutoHide"
-export {
   useDebounce,
   type UseDebounceOptions,
   type UseDebounceResult,

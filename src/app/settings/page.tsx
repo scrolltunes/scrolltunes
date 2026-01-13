@@ -27,7 +27,6 @@ import {
   SignOut,
   SlidersHorizontal,
   TextAa,
-  Timer,
   Trash,
   User,
   Warning,
@@ -773,10 +772,6 @@ export default function SettingsPage() {
     preferencesStore.setShakeToRestartEnabled(!preferences.shakeToRestartEnabled)
   }, [preferences.shakeToRestartEnabled])
 
-  const handleAutoHideChange = useCallback((value: number) => {
-    preferencesStore.setAutoHideControlsMs(value)
-  }, [])
-
   const handleThemeModeChange = useCallback((mode: ThemeMode) => {
     preferencesStore.setThemeMode(mode)
   }, [])
@@ -792,11 +787,6 @@ export default function SettingsPage() {
   const handleReset = useCallback(() => {
     preferencesStore.reset()
   }, [])
-
-  const formatAutoHide = (ms: number): string => {
-    if (ms === 0) return "Never"
-    return `${ms / 1000}s`
-  }
 
   const formatFontSize = (px: number): string => {
     if (px === SCOREBOOK_DEFAULT_FONT_SIZE) return `${px}px (default)`
@@ -884,17 +874,6 @@ export default function SettingsPage() {
                 label="Show chords"
                 description="Display chord symbols above lyrics"
                 icon={<MusicNotes size={20} weight="duotone" />}
-              />
-              <SliderSetting
-                value={preferences.autoHideControlsMs}
-                onChange={handleAutoHideChange}
-                label="Auto-hide toolbar"
-                description="Hide the song toolbar during playback after inactivity"
-                icon={<Timer size={20} weight="duotone" />}
-                min={0}
-                max={30000}
-                step={1000}
-                formatValue={formatAutoHide}
               />
             </div>
           </section>

@@ -190,8 +190,8 @@ export const SongActionBar = memo(function SongActionBar({
         </button>
       )}
 
-      {/* Edit button - desktop only, authenticated users */}
-      {isAuthenticated && onEditClick && (
+      {/* Edit button - hidden for now */}
+      {false && isAuthenticated && onEditClick && (
         <button
           type="button"
           onClick={onEditClick}

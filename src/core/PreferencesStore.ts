@@ -46,13 +46,6 @@ export type ActivationMode = "vad_energy" | "singing"
 export type VadEnvironment = "quiet" | "normal" | "noisy"
 
 /**
- * Display mode for lyrics rendering
- * - scorebook: Page-based display with manual/auto page flipping
- * - karaoke: Scrolling teleprompter display (default)
- */
-export type DisplayMode = "scorebook" | "karaoke"
-
-/**
  * Configuration for the singing detector (MediaPipe YAMNet)
  */
 export interface SingingDetectorConfig {
@@ -85,14 +78,12 @@ export interface Preferences {
   readonly wakeLockEnabled: boolean
   readonly doubleTapEnabled: boolean
   readonly shakeToRestartEnabled: boolean
-  readonly autoHideControlsMs: number
   readonly themeMode: ThemeMode
   readonly metronomeEnabled: boolean
   readonly fontSize: number
   readonly activationMode: ActivationMode
   readonly vadEnvironment: VadEnvironment
   readonly singingDetectorConfig: SingingDetectorConfig
-  readonly displayMode: DisplayMode
   readonly scoreBookShowChords: boolean
   readonly scoreBookFontSize: number
 }
@@ -101,14 +92,12 @@ const DEFAULT_PREFERENCES: Preferences = {
   wakeLockEnabled: true,
   doubleTapEnabled: true,
   shakeToRestartEnabled: false,
-  autoHideControlsMs: 3000,
   themeMode: "dark",
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,
   activationMode: "vad_energy",
   vadEnvironment: "normal",
   singingDetectorConfig: DEFAULT_SINGING_DETECTOR_CONFIG,
-  displayMode: "scorebook",
   scoreBookShowChords: false,
   scoreBookFontSize: SCOREBOOK_DEFAULT_FONT_SIZE,
 }
@@ -239,14 +228,6 @@ export class PreferencesStore {
     this.setState({ shakeToRestartEnabled: value })
   }
 
-  getAutoHideControlsMs(): number {
-    return this.state.autoHideControlsMs
-  }
-
-  setAutoHideControlsMs(value: number): void {
-    this.setState({ autoHideControlsMs: value })
-  }
-
   getThemeMode(): ThemeMode {
     return this.state.themeMode
   }
@@ -295,14 +276,6 @@ export class PreferencesStore {
     this.setState({
       singingDetectorConfig: { ...this.state.singingDetectorConfig, ...config },
     })
-  }
-
-  getDisplayMode(): DisplayMode {
-    return this.state.displayMode
-  }
-
-  setDisplayMode(value: DisplayMode): void {
-    this.setState({ displayMode: value })
   }
 
   getScoreBookShowChords(): boolean {

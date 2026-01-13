@@ -1,19 +1,12 @@
 "use client"
 
-import { type DisplayMode, scoreBookStore, usePlayerControls, usePlayerState } from "@/core"
+import { scoreBookStore, usePlayerControls, usePlayerState } from "@/core"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 export interface UseKeyboardShortcutsOptions {
   readonly enabled?: boolean
-  readonly seekAmount?: number
   readonly tempoStep?: number
-  /**
-   * Display mode determines ArrowLeft/ArrowRight behavior:
-   * - "scorebook": page navigation (prev/next page)
-   * - "karaoke": seek backward/forward (default behavior)
-   */
-  readonly displayMode?: DisplayMode
   /**
    * Callback when Score Book page navigation occurs via keyboard
    * Used to enter manual mode during playback
@@ -29,15 +22,9 @@ const PRESET_TEMPOS: Record<string, number> = {
 }
 
 export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): void {
-  const {
-    enabled = true,
-    seekAmount = 5,
-    tempoStep = 0.1,
-    displayMode = "karaoke",
-    onScoreBookNav,
-  } = options ?? {}
+  const { enabled = true, tempoStep = 0.1, onScoreBookNav } = options ?? {}
   const state = usePlayerState()
-  const { play, pause, reset, seek, setScrollSpeed, getScrollSpeed } = usePlayerControls()
+  const { play, pause, reset, setScrollSpeed, getScrollSpeed } = usePlayerControls()
   const router = useRouter()
 
   useEffect(() => {
@@ -74,25 +61,14 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
         }
         case "ArrowLeft": {
           event.preventDefault()
-          if (displayMode === "scorebook") {
-            onScoreBookNav?.()
-            scoreBookStore.prevPage()
-          } else if (state._tag === "Playing" || state._tag === "Paused") {
-            const newTime = Math.max(0, state.currentTime - seekAmount)
-            seek(newTime)
-          }
+          onScoreBookNav?.()
+          scoreBookStore.prevPage()
           break
         }
         case "ArrowRight": {
           event.preventDefault()
-          if (displayMode === "scorebook") {
-            onScoreBookNav?.()
-            scoreBookStore.nextPage()
-          } else if (state._tag === "Playing" || state._tag === "Paused") {
-            const lyrics = state.lyrics
-            const newTime = Math.min(lyrics.duration, state.currentTime + seekAmount)
-            seek(newTime)
-          }
+          onScoreBookNav?.()
+          scoreBookStore.nextPage()
           break
         }
         case "ArrowUp": {
@@ -128,19 +104,5 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [
-    enabled,
-    state,
-    seekAmount,
-    tempoStep,
-    displayMode,
-    onScoreBookNav,
-    play,
-    pause,
-    reset,
-    seek,
-    setScrollSpeed,
-    getScrollSpeed,
-    router,
-  ])
+  }, [enabled, state, tempoStep, onScoreBookNav, play, pause, reset, setScrollSpeed, getScrollSpeed, router])
 }
