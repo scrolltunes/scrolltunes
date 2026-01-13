@@ -273,31 +273,62 @@ DEFER (uncertain): Trust Silero
 
 ## 4. Search System
 
-### 4.1 Architecture: Spotify-First with Turso Verification
+### 4.1 Architecture: Turso-First with Embedded Spotify Metadata
+
+ScrollTunes uses a Turso-first search architecture with pre-enriched Spotify metadata (~4.2M songs, ~80% Spotify match rate):
 
 ```
-User search → Spotify Search (~100ms, popularity-ranked)
-           ↓ (max 8 results)
-           Turso Lookup (~100-350ms parallel)
+User search → Turso FTS Search (~100-350ms)
+           ↓ (popularity + quality + relevance ranking)
            ↓
-        Found → Return with Spotify metadata + LRCLIB ID
-     Not Found → Skip
+        Results → Return with embedded Spotify metadata
+           ↓
+     No results → LRCLIB API fallback + Deezer album art
 ```
 
-**Fallback chain:** Spotify + Turso → Turso Direct + Deezer → LRCLIB API + Deezer
+**Key insight:** Spotify metadata (popularity, tempo, album art URLs) is embedded during extraction, eliminating runtime Spotify API calls.
 
-### 4.2 Key Files
+### 4.2 Search Result Fields
+
+| Field | Source | Description |
+|-------|--------|-------------|
+| id | LRCLIB | Primary identifier (lrclib_id) |
+| title, artist, album | LRCLIB | Canonical metadata |
+| spotifyId | Spotify dump | For future integrations |
+| popularity | Spotify dump | 0-100, used for ranking |
+| tempo | Spotify dump | BPM |
+| musicalKey | Spotify dump | 0-11 pitch class |
+| mode | Spotify dump | 0=minor, 1=major |
+| albumImageUrl | Spotify dump | Medium (300px) CDN URL |
+| isrc | Spotify dump | For Deezer ISRC album art lookup |
+
+### 4.3 Album Art Resolution
+
+Three-tier priority chain:
+
+1. **Stored URL** (instant): `albumImageUrl` from Turso
+2. **Deezer ISRC** (~100ms): `/track/isrc:{isrc}` if ISRC available
+3. **Deezer Search** (~200ms): Title/artist search fallback
+
+### 4.4 BPM Resolution
+
+1. **Embedded** (instant): Use `tempo` field from Turso
+2. **Fallback**: ReccoBeats → GetSongBPM → Deezer → RapidAPI
+
+### 4.5 Key Files
 
 | File | Purpose |
 |------|---------|
 | `src/services/turso.ts` | TursoService with `search()`, `getById()`, `findByTitleArtist()` |
-| `src/app/api/search/route.ts` | Search endpoint |
+| `src/app/api/search/route.ts` | Search endpoint (Turso-first) |
 | `src/lib/turso-usage-tracker.ts` | Usage monitoring |
+| `src/lib/album-art.ts` | Three-tier album art resolution |
 
-### 4.3 Turso Schema
+### 4.6 Turso Schema
 
 ```sql
 CREATE TABLE tracks (
+  -- LRCLIB (source of truth)
   id           INTEGER PRIMARY KEY,  -- lrclib_id
   title        TEXT NOT NULL,
   artist       TEXT NOT NULL,
@@ -305,8 +336,19 @@ CREATE TABLE tracks (
   duration_sec INTEGER NOT NULL,
   title_norm   TEXT NOT NULL,
   artist_norm  TEXT NOT NULL,
-  quality      INTEGER NOT NULL      -- 80=studio, 50=live, 30=garbage
+  quality      INTEGER NOT NULL,     -- 80=studio, 50=live, 30=garbage
+  -- Spotify enrichment (all nullable)
+  spotify_id      TEXT,
+  popularity      INTEGER,           -- 0-100, NULL if no Spotify match
+  tempo           REAL,              -- BPM
+  musical_key     INTEGER,           -- 0-11 pitch class, -1=unknown
+  mode            INTEGER,           -- 0=minor, 1=major
+  time_signature  INTEGER,           -- 3-7
+  isrc            TEXT,
+  album_image_url TEXT               -- Medium (300px) Spotify CDN URL
 );
+
+CREATE INDEX idx_tracks_spotify_id ON tracks(spotify_id);
 
 CREATE VIRTUAL TABLE tracks_fts USING fts5(
   title, artist,
@@ -316,7 +358,24 @@ CREATE VIRTUAL TABLE tracks_fts USING fts5(
 );
 ```
 
-### 4.4 Quality Scoring
+### 4.7 Search Query
+
+```sql
+SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality,
+       t.spotify_id, t.popularity, t.tempo, t.musical_key, t.mode,
+       t.time_signature, t.isrc, t.album_image_url
+FROM tracks_fts fts
+JOIN tracks t ON fts.rowid = t.id
+WHERE tracks_fts MATCH ?
+ORDER BY
+  (t.popularity IS NOT NULL) DESC,  -- Enriched tracks first
+  t.popularity DESC,                 -- Most popular
+  t.quality DESC,                    -- Then by quality
+  -bm25(tracks_fts) ASC              -- Then by relevance
+LIMIT ?
+```
+
+### 4.8 Quality Scoring
 
 | Factor | Score |
 |--------|-------|

@@ -4,42 +4,40 @@
 
 ## Current Architecture (Implemented)
 
-### Spotify-First with Turso Verification
+### Turso-First with Embedded Spotify Metadata
+
+**Status: ✅ Implemented**
 
 ```
 User types "never too late"
          │
          ▼
-   ┌─────────────┐
-   │   Spotify   │  → ~100ms (popularity-ranked)
-   │   Search    │
-   └──────┬──────┘
-          │
-          ▼ (max 8 results)
-   ┌─────────────────────┐
-   │  Turso Lookup       │  → ~100-350ms (parallel, unbounded)
-   │  findByTitleArtist  │
-   │  phrase match       │
-   └──────────┬──────────┘
+   ┌─────────────────────────┐
+   │      Turso FTS Search   │  → ~100-350ms
+   │  ORDER BY popularity,   │     (popularity-ranked)
+   │    quality, relevance   │
+   └──────────┬──────────────┘
               │
-        ┌─────┴─────┐
-        │           │
-      Found     Not Found
-        │           │
-        ▼           ▼
-   Return with    Skip
-   Spotify metadata
-   + LRCLIB ID
+       ┌──────┴──────┐
+       │             │
+    Results      No results
+       │             │
+       ▼             ▼
+   Return with    LRCLIB API
+   embedded       fallback
+   Spotify data
 ```
 
-**Key insight:** Spotify handles popularity ranking; Turso just verifies LRCLIB availability.
+**Key changes from previous architecture:**
+- **No Spotify Search API calls** — Popularity ranking embedded in Turso
+- **~80% Spotify match rate** — BPM, popularity, album art pre-enriched
+- **Album art from stored URLs** — ~0ms for most tracks
+- **BPM from embedded tempo** — No provider cascade needed for most tracks
 
 ### Fallback Chain
 
 ```
-Spotify + Turso → Turso Direct + Deezer → LRCLIB API + Deezer
-      │                  │                      │
-   Primary          Spotify down           Both down
+Turso Search (primary) → LRCLIB API + Deezer (fallback)
 ```
 
 ### Implementation Files
@@ -47,18 +45,18 @@ Spotify + Turso → Turso Direct + Deezer → LRCLIB API + Deezer
 | File | Purpose |
 |------|---------|
 | `src/services/turso.ts` | TursoService with `search()`, `getById()`, `findByTitleArtist()` |
-| `src/app/api/search/route.ts` | Search endpoint with Spotify-first flow |
+| `src/app/api/search/route.ts` | Search endpoint (Turso-first) |
 | `src/lib/turso-usage-tracker.ts` | Usage monitoring via Platform API |
 | `src/app/api/cron/turso-usage/route.ts` | Hourly cron for usage alerts |
-| `scripts/lrclib-extract/` | Rust extraction tool for building index |
+| `src/lib/album-art.ts` | Three-tier album art resolution |
+| `scripts/lrclib-extract/` | Rust extraction tool with Spotify enrichment |
 
 ### Search Parameters
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| Spotify fetch count | `Math.min(limit + 2, 8)` | Enough for dedup, not too many Turso calls |
-| Turso concurrency | `"unbounded"` | Max parallelism for 5-8 lookups |
-| Deezer concurrency | `4` | Respect third-party rate limits |
+| Result limit | `10` | Reasonable page size |
+| Album art concurrency | `4` | For Deezer fallback |
 
 ## Performance
 
@@ -68,20 +66,29 @@ Spotify + Turso → Turso Direct + Deezer → LRCLIB API + Deezer
 |-------|---------|
 | Cold start (after idle) | 3-14s |
 | Warm | 75-350ms per query |
-| Parallel (8 queries) | ~100-350ms total |
 
 ### End-to-End Search Latency
 
 | Scenario | Expected |
 |----------|----------|
-| Spotify + Turso (warm) | ~400-600ms |
-| Turso direct (warm) | ~300-500ms |
+| Turso search (warm) | ~100-350ms |
 | LRCLIB API fallback | ~3-5s |
+
+### Improvements Achieved
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Search latency (p50) | ~500ms | ~100ms |
+| Album art latency | ~200ms | ~0ms (stored) |
+| BPM availability | ~70% | ~85% |
+| Spotify API calls/search | 1 | 0 |
+| External dependencies | 5 | 1 (Deezer fallback) |
 
 ## Turso Schema
 
 ```sql
 CREATE TABLE tracks (
+  -- LRCLIB (source of truth)
   id           INTEGER PRIMARY KEY,  -- lrclib_id
   title        TEXT NOT NULL,
   artist       TEXT NOT NULL,
@@ -89,8 +96,19 @@ CREATE TABLE tracks (
   duration_sec INTEGER NOT NULL,
   title_norm   TEXT NOT NULL,
   artist_norm  TEXT NOT NULL,
-  quality      INTEGER NOT NULL      -- 80=studio, 50=live, 30=garbage, etc.
+  quality      INTEGER NOT NULL,     -- 80=studio, 50=live, 30=garbage
+  -- Spotify enrichment (all nullable)
+  spotify_id      TEXT,
+  popularity      INTEGER,           -- 0-100, NULL if no Spotify match
+  tempo           REAL,              -- BPM
+  musical_key     INTEGER,           -- 0-11 pitch class, -1=unknown
+  mode            INTEGER,           -- 0=minor, 1=major
+  time_signature  INTEGER,           -- 3-7
+  isrc            TEXT,
+  album_image_url TEXT               -- Medium (300px) Spotify CDN URL
 );
+
+CREATE INDEX idx_tracks_spotify_id ON tracks(spotify_id);
 
 CREATE VIRTUAL TABLE tracks_fts USING fts5(
   title, artist,
@@ -100,24 +118,21 @@ CREATE VIRTUAL TABLE tracks_fts USING fts5(
 );
 ```
 
-### Query Patterns
+### Query Pattern
 
-**Spotify-first (phrase match):**
 ```sql
-SELECT t.* FROM tracks_fts fts
+SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality,
+       t.spotify_id, t.popularity, t.tempo, t.musical_key, t.mode,
+       t.time_signature, t.isrc, t.album_image_url
+FROM tracks_fts fts
 JOIN tracks t ON fts.rowid = t.id
-WHERE tracks_fts MATCH '"Never Too Late" "Three Days Grace"'
-ORDER BY t.quality DESC
-LIMIT 1
-```
-
-**Fallback (free-form search):**
-```sql
-SELECT t.* FROM tracks_fts fts
-JOIN tracks t ON fts.rowid = t.id
-WHERE tracks_fts MATCH 'never too late'
-ORDER BY -bm25(tracks_fts, 10.0, 1.0) + t.quality DESC
-LIMIT 10
+WHERE tracks_fts MATCH ?
+ORDER BY
+  (t.popularity IS NOT NULL) DESC,  -- Enriched tracks first
+  t.popularity DESC,                 -- Most popular
+  t.quality DESC,                    -- Then by quality
+  -bm25(tracks_fts) ASC              -- Then by relevance
+LIMIT ?
 ```
 
 ## Quality Scoring
@@ -203,37 +218,46 @@ This script:
 3. Gets new auth token
 4. Updates `.env.local` and Vercel
 
-## Why Spotify-First?
+## Design Decisions
 
-### Problem with Turso-First
+### Why Turso-First with Embedded Metadata?
 
-Without popularity data, BM25 ranking doesn't know that Three Days Grace's "Never Too Late" is more famous than Kylie Minogue's. Garbage titles with more term matches ranked higher.
+**Previous approach (Spotify-first):** Used Spotify Search API for popularity ranking, then verified each result against Turso. Required runtime API calls.
 
-### Solution
+**Current approach:** Pre-enrich Turso index with Spotify metadata during extraction. Benefits:
 
-Let Spotify handle popularity ranking. We just verify LRCLIB availability via Turso phrase match. Benefits:
+1. **No runtime Spotify API calls** — All data in Turso
+2. **Popularity ranking** — `popularity` field from Spotify dump
+3. **Instant album art** — `album_image_url` from Spotify dump
+4. **Instant BPM** — `tempo` field from Spotify audio features
+5. **Single query** — One Turso query returns everything
 
-1. **Popularity ranking** — Spotify knows what's popular
-2. **Album art** — Spotify provides high-quality images
-3. **Normalized metadata** — Spotify has clean artist/title
-4. **Fast verification** — Turso phrase match is O(1), ~100ms
+### Trade-offs
 
-### When Spotify Fails
+| Approach | Pros | Cons |
+|----------|------|------|
+| Turso-first (current) | Fast, no API calls, all data in one query | ~20% tracks lack Spotify match |
+| Spotify-first (previous) | 100% Spotify coverage | Slow, API rate limits, parallel Turso lookups |
 
-Fall back to Turso direct search with Deezer album art. Quality score helps rank results.
+### Fallback Strategy
+
+For the ~20% of tracks without Spotify enrichment:
+- **Album art:** Deezer ISRC lookup → Deezer search
+- **BPM:** Provider cascade (ReccoBeats → GetSongBPM → Deezer → RapidAPI)
 
 ## Open Questions (Resolved)
 
 | Question | Resolution |
 |----------|------------|
-| ~~Need complex BM25 + quality weighting?~~ | No, Spotify handles popularity |
-| ~~Rebuild index for new flow?~~ | No, existing index works |
+| ~~Need complex BM25 + quality weighting?~~ | Yes, combined with popularity |
+| ~~Rebuild index for new flow?~~ | Yes, with Spotify enrichment |
 | ~~Track Turso usage?~~ | Yes, hourly cron with alerts |
-| ~~Optimal concurrency?~~ | Unbounded (5-8 parallel lookups) |
+| ~~Spotify API dependency?~~ | Eliminated — data pre-enriched |
+| ~~Album art latency?~~ | Reduced to ~0ms with stored URLs |
 
 ## Future Optimizations
 
 1. **Vercel KV cache** — Cache Turso results for <10ms repeat queries
 2. **Embedded replicas** — Turso supports local SQLite replicas for ~1ms reads
 3. **Incremental updates** — Track new songs from fallback, batch import
-4. **Popularity enrichment** — Optional: add Spotify popularity to index for fallback ranking
+4. **Monthly refresh** — Re-run extraction to update popularity scores

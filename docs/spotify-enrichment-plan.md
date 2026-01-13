@@ -1,5 +1,7 @@
 # Spotify Metadata Enrichment Plan
 
+> **Status: ✅ IMPLEMENTED** — See `IMPLEMENTATION_PLAN.md` for detailed specs and implementation notes.
+
 > Integrating Anna's Archive Spotify dumps with LRCLIB for enhanced search and BPM lookup
 
 ## Source of Truth

@@ -39,7 +39,7 @@ bun run check        # lint + typecheck + test
 
 **Domain-specific specs** (in `docs/`):
 - `lrc-enhancement-system.md` — Word-level timing extraction from Guitar Pro
-- `search-optimization-plan.md` — Spotify-first + Turso search architecture
+- `search-optimization-plan.md` — Turso-first search with embedded Spotify metadata
 - `canonical-normalization.md` — Song deduplication and caching
 - `audio-classification-design.md` — YAMNet singing vs instrument detection
 - `sqlite-extraction-optimizations.md` — FTS5 and SQLite performance
@@ -78,8 +78,9 @@ Always use `SongListItem` from `@/components/ui` when displaying songs in lists.
 
 ### Turso (LRCLIB Search Index)
 - ~4.2M songs, FTS5 search
+- **Spotify enrichment**: popularity, tempo, album art URLs (~80% match rate)
 - **Always use MATCH queries**, never LIKE
-- Spotify-first search → Turso verification
+- Turso-first search with popularity ranking
 
 ## Best Practices
 
