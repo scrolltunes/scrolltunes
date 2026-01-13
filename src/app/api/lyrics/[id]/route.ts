@@ -35,6 +35,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     lyrics: result.lyrics,
     bpm: result.bpm,
     key: result.key,
+    timeSignature: result.timeSignature,
     albumArt: result.albumArt,
     albumArtLarge: result.albumArtLarge,
     spotifyId: result.spotifyId,

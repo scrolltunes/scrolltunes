@@ -32,7 +32,7 @@ This runs: `biome check . && bun run typecheck && bun run test`
 | [002-turso-schema-migration](specs/002-turso-schema-migration.md) | Deploy enriched database to Turso | **Complete** |
 | [003-search-api-turso-first](specs/003-search-api-turso-first.md) | Simplify search to Turso-first | **Complete** |
 | [004-album-art-optimization](specs/004-album-art-optimization.md) | Three-tier album art resolution | **Complete** |
-| [005-bpm-provider-refactor](specs/005-bpm-provider-refactor.md) | Use embedded tempo with fallback | Not Started |
+| [005-bpm-provider-refactor](specs/005-bpm-provider-refactor.md) | Use embedded tempo with fallback | **Complete** |
 | [006-documentation-cleanup](specs/006-documentation-cleanup.md) | Update docs, remove deprecated code | Not Started |
 
 ---

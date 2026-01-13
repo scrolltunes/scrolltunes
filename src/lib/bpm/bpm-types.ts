@@ -18,6 +18,13 @@ export interface BPMResult {
   readonly bpm: number
   readonly source: string
   readonly key: string | null
+  readonly timeSignature?: number | null
+}
+
+export interface BpmAttribution {
+  readonly provider: string
+  readonly url?: string
+  readonly requiresBacklink: boolean
 }
 
 const spotifyFilter = createSpotifyFilter()
