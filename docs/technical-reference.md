@@ -12,6 +12,10 @@
 6. [Caching Strategy](#6-caching-strategy)
 7. [BPM Provider System](#7-bpm-provider-system)
 8. [Database Optimizations](#8-database-optimizations)
+9. [Edit Mode System](#9-edit-mode-system)
+10. [Share Card System](#10-share-card-system)
+11. [Chord Enhancement System](#11-chord-enhancement-system)
+12. [ScoreBook Display System](#12-scorebook-display-system)
 
 ---
 
@@ -30,14 +34,30 @@ Standard LRC format with millisecond timestamps:
 **Parser implementation:** `src/lib/lyrics-parser.ts`
 
 ```typescript
-interface LrcLine {
-  startMs: number
-  text: string
-  words: string[]  // Split by whitespace
+// From src/core/LyricsPlayer.ts
+interface LyricLine {
+  readonly id: string
+  readonly text: string
+  readonly startTime: number  // in seconds
+  readonly endTime: number    // in seconds
+  readonly words?: readonly LyricWord[]  // word-level timing (from enhancement)
 }
 
-// Regex for line parsing
-const lineRegex = /^\[(\d{2}):(\d{2})\.(\d{2,3})\]\s*(.*)$/
+interface LyricWord {
+  readonly text: string
+  readonly startTime: number
+  readonly endTime: number
+}
+
+// Parser returns Lyrics (from @/core)
+interface Lyrics {
+  readonly songId: string
+  readonly title: string
+  readonly artist: string
+  readonly album?: string
+  readonly lines: readonly LyricLine[]
+  readonly duration: number  // total duration in seconds
+}
 ```
 
 ### 1.2 Word-Level Enhancement System
@@ -157,11 +177,23 @@ function computeLrcHash(lrc: string): string {
 **File:** `src/lib/silero-vad-config.ts`
 
 ```typescript
+interface SileroVADConfig {
+  readonly onnxWASMBasePath: string        // CDN path for ONNX WASM
+  readonly baseAssetPath: string           // CDN path for VAD model
+  readonly positiveSpeechThreshold: number // Trigger threshold (0-1)
+  readonly negativeSpeechThreshold: number // Release threshold (0-1)
+  readonly minSpeechMs: number             // Minimum speech duration
+  readonly redemptionMs: number            // Grace period after speech ends
+}
+
+// SILERO_PRESET_GUITAR (default)
 export const SILERO_PRESET_GUITAR: SileroVADConfig = {
-  positiveSpeechThreshold: 0.75,   // Trigger threshold
-  negativeSpeechThreshold: 0.45,   // Release threshold
-  minSpeechMs: 200,                // Minimum speech duration
-  redemptionMs: 350,               // Grace period after speech ends
+  onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/",
+  baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/",
+  positiveSpeechThreshold: 0.75,
+  negativeSpeechThreshold: 0.45,
+  minSpeechMs: 200,
+  redemptionMs: 350,
 }
 ```
 
@@ -384,31 +416,34 @@ CREATE TABLE song_lrclib_ids (
 ### 6.2 CachedLyrics Structure
 
 ```typescript
+// From src/lib/recent-songs-types.ts
 interface CachedLyrics {
-  version: number                    // Cache version (bump to invalidate)
-  lyrics: Lyrics
-  bpm: number | null
-  key: string | null
-  albumArt?: string
-  spotifyId?: string
-  bpmSource?: AttributionSource
-  hasEnhancement?: boolean
-  enhancement?: EnhancementPayload
-  hasChordEnhancement?: boolean
-  chordEnhancement?: ChordEnhancementPayload
-  cachedAt: number                   // Timestamp for TTL
+  readonly version?: number | undefined
+  readonly lyrics: Lyrics
+  readonly bpm: number | null
+  readonly key: string | null
+  readonly albumArt?: string | undefined
+  readonly albumArtLarge?: string | undefined
+  readonly spotifyId?: string | undefined
+  readonly bpmSource?: AttributionSource | undefined
+  readonly lyricsSource?: AttributionSource | undefined
+  readonly hasEnhancement?: boolean | undefined
+  readonly enhancement?: EnhancementPayload | null | undefined
+  readonly hasChordEnhancement?: boolean | undefined
+  readonly chordEnhancement?: ChordEnhancementPayloadV1 | null | undefined
+  readonly cachedAt: number  // timestamp (ms since epoch)
 }
 ```
 
 ### 6.3 Cache Invalidation
 
 ```typescript
-const CACHE_VERSION = 9  // Bump when schema changes
+export const LYRICS_CACHE_VERSION = 1  // Bump when schema changes
 const LYRICS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000  // 7 days
 
 function loadCachedLyrics(id: number): CachedLyrics | null {
   const parsed = JSON.parse(localStorage.getItem(key))
-  if (parsed.version !== CACHE_VERSION) return null  // Version mismatch
+  if (parsed.version !== LYRICS_CACHE_VERSION) return null  // Version mismatch
   if (Date.now() - parsed.cachedAt > LYRICS_CACHE_TTL_MS) return null  // TTL
   if (!parsed.lyrics?.lines?.length) return null  // Garbage
   return parsed
@@ -550,6 +585,219 @@ for (const chunk of tracks.chunks(WRITE_BATCH_SIZE)) {
   tx.commit()
 }
 ```
+
+---
+
+## 9. Edit Mode System
+
+User modifications to lyrics stored as patches. Never stores copyrighted LRCLIB text.
+
+### 9.1 Core Types
+
+**File:** `src/lib/song-edits/types.ts`
+
+```typescript
+type SectionType = "verse" | "chorus" | "bridge" | "pre-chorus" |
+                   "outro" | "intro" | "instrumental" | "custom"
+
+type LinePatchAction = "skip" | "modify" | "section"
+
+// Sparse storage - only modified lines have patches
+interface LinePatch {
+  readonly idx: number                // 0-based line index
+  readonly action: LinePatchAction
+  readonly skipped?: boolean          // for "skip" action
+  readonly customText?: string        // user-generated replacement
+  readonly sectionType?: SectionType
+  readonly sectionLabel?: string      // for "custom" section type
+}
+
+interface SongEditPatchPayload {
+  readonly version: 1
+  readonly lrcHash: string            // validates patches match current LRC
+  readonly createdAt: string          // ISO timestamp
+  readonly updatedAt: string
+  readonly linePatches: readonly LinePatch[]
+  readonly bpmOverride: number | null
+  readonly tempoMultiplier: number | null
+  readonly hasSkippedLines: boolean
+  readonly hasModifiedText: boolean
+  readonly hasSectionMarkers: boolean
+}
+```
+
+### 9.2 Key Patterns
+
+| Pattern | Description |
+|---------|-------------|
+| Index-based references | References by index (not content) for resilience to LRCLIB updates |
+| LRC hash validation | Detects misalignment when lyrics change |
+| 30-day localStorage cache | With server sync via `userApi` |
+| User-generated content only | Never stores copyrighted LRCLIB text |
+
+### 9.3 Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/core/SongEditsStore.ts` | State management, React hooks |
+| `src/lib/song-edits/types.ts` | Interfaces and helpers |
+| `src/lib/song-edits/apply-edits.ts` | Patch application logic |
+
+---
+
+## 10. Share Card System
+
+Lyrics share card designer with album-aware styling.
+
+### 10.1 Background Types
+
+```typescript
+type BackgroundType = "solid" | "gradient" | "albumArt" | "pattern"
+type PatternVariant = "none" | "dots" | "grid" | "waves"
+```
+
+### 10.2 Effects
+
+```typescript
+type EffectType = "none" | "vignette" | "blur" | "darken" |
+                  "desaturate" | "tint" | "gradient" | "duotone"
+```
+
+### 10.3 Quick Presets
+
+Album-aware color derivation:
+
+| Preset | Description |
+|--------|-------------|
+| `clean` | Neutral palette, minimal styling |
+| `vibrant` | Bold colors derived from album art |
+| `dark` | Dark backgrounds with light text |
+| `vintage` | Muted tones, retro aesthetics |
+
+### 10.4 Template System
+
+4 categories: `minimal`, `bold`, `vintage`, `artistic`
+
+Templates define partial state overrides for non-destructive application.
+
+### 10.5 Architecture
+
+- ShareExperienceStore with Effect.ts tagged events
+- History coalescing (500ms threshold for drag operations)
+- Export: Canvas → PNG/JPEG/WebP, clipboard, Web Share API
+
+### 10.6 Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/components/share/ShareExperience.tsx` | Main component |
+| `src/components/share/ShareExperienceStore.ts` | State management |
+| `src/components/share/designer/types.ts` | All type definitions |
+| `src/components/share/effects/index.ts` | Effect implementations |
+| `src/components/share/designer/templates/` | Template definitions |
+
+---
+
+## 11. Chord Enhancement System
+
+Chord extraction from Guitar Pro files aligned to LRC lyrics.
+
+### 11.1 Core Types
+
+**File:** `src/lib/gp/chord-types.ts`
+
+```typescript
+// Chord with absolute timing from GP file
+interface ChordEvent {
+  readonly startMs: number
+  readonly durationMs: number
+  readonly chord: string
+  readonly confidence: number  // 0-1
+}
+
+// Chord positioned within LRC line (relative timing)
+interface LineChord {
+  readonly start: number       // offset from line start (ms)
+  readonly dur?: number
+  readonly chord: string
+  readonly wordIdx?: number    // word-level alignment
+}
+
+interface ChordEnhancementPayloadV1 {
+  readonly patchFormatVersion: "chords-json-v1"
+  readonly algoVersion: string
+  readonly timeTransform?: TimeTransformV1
+  readonly track?: PayloadTrackInfo
+  readonly lines: readonly EnhancedChordLine[]
+}
+```
+
+### 11.2 Extraction Pipeline
+
+1. **Track Selection**: Guitar preference (+2), vocal penalty (-2), monophonic penalty (-2)
+2. **Chord Extraction**: Explicit `beat.chord` markers OR pitch-class histogram analysis
+3. **Alignment**: Time transform (offset or piecewise-linear), ±300ms inclusion window, max 4 chords/line
+
+### 11.3 Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/gp/chord-types.ts` | Type definitions |
+| `src/lib/gp/extract-chords.ts` | Extraction algorithm |
+| `src/lib/gp/align-chords.ts` | LRC alignment logic |
+
+---
+
+## 12. ScoreBook Display System
+
+Pagination system for lyrics display.
+
+### 12.1 Core Types
+
+**File:** `src/core/ScoreBookStore.ts`
+
+```typescript
+interface PageLineRange {
+  readonly start: number  // 0-indexed, inclusive
+  readonly end: number    // 0-indexed, inclusive
+}
+
+interface ScoreBookState {
+  readonly currentPage: number
+  readonly totalPages: number
+  readonly linesPerPage: number       // clamped 4-10
+  readonly pageLineRanges: readonly PageLineRange[]
+  readonly direction: 1 | -1          // navigation direction for transitions
+}
+```
+
+### 12.2 Tagged Events
+
+```typescript
+GoToPage { page: number }              // Navigate to specific page
+NextPage                               // Navigate forward
+PrevPage                               // Navigate backward
+SetPagination { totalLines, linesPerPage }  // Reconfigure on lyrics/viewport change
+```
+
+### 12.3 Pagination Algorithm
+
+1. Clamp `linesPerPage` to 4-10 range
+2. Calculate `totalPages = Math.ceil(totalLines / linesPerPage)` (min 1)
+3. Build page ranges: `start = i * linesPerPage`, `end = min(start + linesPerPage - 1, totalLines - 1)`
+4. Preserve current page position (clamp to new valid range)
+
+### 12.4 Helper Methods
+
+| Method | Purpose |
+|--------|---------|
+| `findPageForLine(lineIndex)` | O(1) page lookup |
+| `isOnLastLineOfPage(lineIndex)` | Boundary detection for transitions |
+| `isOnSecondToLastLineOfPage(lineIndex)` | Near-boundary warning |
+
+### 12.5 Key File
+
+`src/core/ScoreBookStore.ts`
 
 ---
 
