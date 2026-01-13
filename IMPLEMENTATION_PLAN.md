@@ -1047,14 +1047,23 @@ Modal for searching and linking Spotify tracks. Features:
 
 ### Task 5.10: EnrichmentActions Component
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/components/admin/EnrichmentActions.tsx` (new file)
 
-Action buttons: Copy from Turso, Find Spotify ID, Fetch BPM, Manual BPM.
+Action buttons: Copy from Turso, Find Spotify ID, Fetch BPM, Manual BPM, View Lyrics. Features:
+- Copy from Turso: Enabled when track has Turso enrichment and not already in catalog
+- Find Spotify: Always available, opens Spotify search modal
+- Fetch BPM: Enabled when track has no BPM (neither Turso nor Neon)
+- Manual BPM: Always available
+- View Lyrics: Opens song in player
+- Loading, success, and error states with visual feedback
+- Tooltips explaining button availability
 
 **Acceptance Criteria**:
-- [ ] Buttons conditionally enabled based on state
-- [ ] Loading states during API calls
-- [ ] Success/error feedback (toast or inline)
+- [x] Buttons conditionally enabled based on state
+- [x] Loading states during API calls
+- [x] Success/error feedback (toast or inline)
 
 ---
 
