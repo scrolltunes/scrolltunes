@@ -17,7 +17,14 @@ import { NextResponse } from "next/server"
 // Query Parameter Types
 // ============================================================================
 
-type Section = "summary" | "providers" | "timeseries" | "failures" | "missing" | "errors"
+type Section =
+  | "summary"
+  | "providers"
+  | "timeseries"
+  | "failures"
+  | "missing"
+  | "errors"
+  | "songDetail"
 type Period = "24h" | "7d" | "30d"
 type MissingType = "never" | "failed" | "problematic"
 
@@ -71,6 +78,18 @@ interface ErrorBreakdown {
   count: number
 }
 
+interface SongDetailAttempt {
+  id: number
+  stage: string
+  provider: string
+  success: boolean
+  bpm: number | null
+  errorReason: string | null
+  errorDetail: string | null
+  latencyMs: number | null
+  createdAt: string
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -87,7 +106,15 @@ function getPeriodInterval(period: Period): string {
 }
 
 function parseSection(value: string | null): Section | undefined {
-  const valid: Section[] = ["summary", "providers", "timeseries", "failures", "missing", "errors"]
+  const valid: Section[] = [
+    "summary",
+    "providers",
+    "timeseries",
+    "failures",
+    "missing",
+    "errors",
+    "songDetail",
+  ]
   return valid.includes(value as Section) ? (value as Section) : undefined
 }
 
@@ -366,6 +393,43 @@ const getErrorBreakdown = () =>
     })) satisfies ErrorBreakdown[]
   })
 
+const getSongDetail = (lrclibId: number) =>
+  Effect.gen(function* () {
+    const { db } = yield* DbService
+
+    const results = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({
+            id: bpmFetchLog.id,
+            stage: bpmFetchLog.stage,
+            provider: bpmFetchLog.provider,
+            success: bpmFetchLog.success,
+            bpm: bpmFetchLog.bpm,
+            errorReason: bpmFetchLog.errorReason,
+            errorDetail: bpmFetchLog.errorDetail,
+            latencyMs: bpmFetchLog.latencyMs,
+            createdAt: bpmFetchLog.createdAt,
+          })
+          .from(bpmFetchLog)
+          .where(eq(bpmFetchLog.lrclibId, lrclibId))
+          .orderBy(desc(bpmFetchLog.createdAt)),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    return results.map(row => ({
+      id: row.id,
+      stage: row.stage,
+      provider: row.provider,
+      success: row.success,
+      bpm: row.bpm,
+      errorReason: row.errorReason,
+      errorDetail: row.errorDetail,
+      latencyMs: row.latencyMs,
+      createdAt: row.createdAt.toISOString(),
+    })) satisfies SongDetailAttempt[]
+  })
+
 // ============================================================================
 // Main Effect
 // ============================================================================
@@ -403,6 +467,8 @@ const getBpmStats = (searchParams: URLSearchParams) =>
     const offset = Number.parseInt(searchParams.get("offset") ?? "0", 10)
     const limit = Math.min(Number.parseInt(searchParams.get("limit") ?? "50", 10), 100)
     const missingType = parseMissingType(searchParams.get("missingType"))
+    const lrclibIdParam = searchParams.get("lrclibId")
+    const lrclibId = lrclibIdParam ? Number.parseInt(lrclibIdParam, 10) : undefined
 
     if (!section) {
       return yield* Effect.fail(
@@ -424,6 +490,16 @@ const getBpmStats = (searchParams: URLSearchParams) =>
         return yield* getMissingSongs(missingType, offset, limit)
       case "errors":
         return yield* getErrorBreakdown()
+      case "songDetail": {
+        if (lrclibId === undefined || Number.isNaN(lrclibId)) {
+          return yield* Effect.fail(
+            new ValidationError({
+              message: "Missing required 'lrclibId' parameter for songDetail",
+            }),
+          )
+        }
+        return yield* getSongDetail(lrclibId)
+      }
     }
   })
 

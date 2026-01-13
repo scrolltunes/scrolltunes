@@ -728,14 +728,16 @@ Pivot table grouped by provider and error reason.
 
 ### Task 3.8: Song Detail Drill-Down
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/components/admin/BpmSongDetail.tsx` (new file)
 
-Modal showing all BPM fetch attempts for a single song.
+Modal showing all BPM fetch attempts for a single song. Also added `songDetail` section to the BPM stats API (`/api/admin/bpm-stats?section=songDetail&lrclibId=X`).
 
 **Acceptance Criteria**:
-- [ ] Modal opens on song click
-- [ ] Shows all attempts chronologically
-- [ ] Close button works
+- [x] Modal opens on song click
+- [x] Shows all attempts chronologically
+- [x] Close button works
 
 ---
 
