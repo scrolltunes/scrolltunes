@@ -3,12 +3,7 @@
 import { AmbientBackground } from "@/components/ui"
 import {
   type ActivationMode,
-  DEFAULT_FONT_SIZE,
   DEFAULT_SINGING_DETECTOR_CONFIG,
-  type DisplayMode,
-  FONT_SIZE_STEP,
-  MAX_FONT_SIZE,
-  MIN_FONT_SIZE,
   SCOREBOOK_DEFAULT_FONT_SIZE,
   SCOREBOOK_FONT_SIZE_STEP,
   SCOREBOOK_MAX_FONT_SIZE,
@@ -29,8 +24,6 @@ import {
   Microphone,
   Moon,
   MusicNotes,
-  Notebook,
-  Scroll,
   SignOut,
   SlidersHorizontal,
   TextAa,
@@ -784,16 +777,8 @@ export default function SettingsPage() {
     preferencesStore.setAutoHideControlsMs(value)
   }, [])
 
-  const handleFontSizeChange = useCallback((value: number) => {
-    preferencesStore.setFontSize(value)
-  }, [])
-
   const handleThemeModeChange = useCallback((mode: ThemeMode) => {
     preferencesStore.setThemeMode(mode)
-  }, [])
-
-  const handleDisplayModeChange = useCallback((mode: DisplayMode) => {
-    preferencesStore.setDisplayMode(mode)
   }, [])
 
   const handleToggleScoreBookChords = useCallback(() => {
@@ -814,11 +799,6 @@ export default function SettingsPage() {
   }
 
   const formatFontSize = (px: number): string => {
-    if (px === DEFAULT_FONT_SIZE) return `${px}px (default)`
-    return `${px}px`
-  }
-
-  const formatScoreBookFontSize = (px: number): string => {
     if (px === SCOREBOOK_DEFAULT_FONT_SIZE) return `${px}px (default)`
     return `${px}px`
   }
@@ -888,15 +868,22 @@ export default function SettingsPage() {
             </h2>
             <div className="space-y-3">
               <SliderSetting
-                value={preferences.fontSize}
-                onChange={handleFontSizeChange}
+                value={preferences.scoreBookFontSize}
+                onChange={handleScoreBookFontSizeChange}
                 label="Lyrics font size"
                 description="Adjust the size of lyrics text"
                 icon={<TextAa size={20} weight="duotone" />}
-                min={MIN_FONT_SIZE}
-                max={MAX_FONT_SIZE}
-                step={FONT_SIZE_STEP}
+                min={SCOREBOOK_MIN_FONT_SIZE}
+                max={SCOREBOOK_MAX_FONT_SIZE}
+                step={SCOREBOOK_FONT_SIZE_STEP}
                 formatValue={formatFontSize}
+              />
+              <Toggle
+                enabled={preferences.scoreBookShowChords}
+                onToggle={handleToggleScoreBookChords}
+                label="Show chords"
+                description="Display chord symbols above lyrics"
+                icon={<MusicNotes size={20} weight="duotone" />}
               />
               <SliderSetting
                 value={preferences.autoHideControlsMs}
@@ -909,62 +896,6 @@ export default function SettingsPage() {
                 step={1000}
                 formatValue={formatAutoHide}
               />
-            </div>
-          </section>
-
-          {/* Display Mode Section */}
-          <section>
-            <h2
-              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
-              style={{ color: "var(--color-text-muted)" }}
-            >
-              Display Mode
-            </h2>
-            <div className="space-y-3">
-              <RadioOption
-                selected={preferences.displayMode === "scorebook"}
-                onSelect={() => handleDisplayModeChange("scorebook")}
-                label="Score Book"
-                description="Page-based display with manual or auto page flipping"
-                icon={<Notebook size={20} weight="duotone" />}
-              />
-              <RadioOption
-                selected={preferences.displayMode === "karaoke"}
-                onSelect={() => handleDisplayModeChange("karaoke")}
-                label="Karaoke"
-                description="Scrolling teleprompter display"
-                icon={<Scroll size={20} weight="duotone" />}
-              />
-
-              {/* Score Book Options (only when Score Book mode is selected) */}
-              {preferences.displayMode === "scorebook" && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-3"
-                >
-                  <SliderSetting
-                    value={preferences.scoreBookFontSize}
-                    onChange={handleScoreBookFontSizeChange}
-                    label="Font size"
-                    description="Adjust the size of lyrics text in Score Book mode"
-                    icon={<TextAa size={20} weight="duotone" />}
-                    min={SCOREBOOK_MIN_FONT_SIZE}
-                    max={SCOREBOOK_MAX_FONT_SIZE}
-                    step={SCOREBOOK_FONT_SIZE_STEP}
-                    formatValue={formatScoreBookFontSize}
-                  />
-                  <Toggle
-                    enabled={preferences.scoreBookShowChords}
-                    onToggle={handleToggleScoreBookChords}
-                    label="Show chords"
-                    description="Display chord symbols above lyrics"
-                    icon={<MusicNotes size={20} weight="duotone" />}
-                  />
-                </motion.div>
-              )}
             </div>
           </section>
 
