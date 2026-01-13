@@ -681,15 +681,17 @@ Use `recharts` for stacked bar chart. Note: recharts was installed as it was not
 
 ### Task 3.5: Failures List Component
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/components/admin/BpmFailuresList.tsx` (new file)
 
-Paginated list of recent failures.
+Paginated list of recent failures with click-to-drill-down support.
 
 **Acceptance Criteria**:
-- [ ] List renders recent failures
-- [ ] Shows title, artist, provider, error reason, timestamp
-- [ ] Pagination controls work
-- [ ] Empty state when no failures
+- [x] List renders recent failures
+- [x] Shows title, artist, provider, error reason, timestamp
+- [x] Pagination controls work
+- [x] Empty state when no failures
 
 ---
 
