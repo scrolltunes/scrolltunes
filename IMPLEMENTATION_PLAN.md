@@ -630,6 +630,8 @@ See `specs/bpm-admin-dashboard.md` for full query details.
 
 ### Task 3.2: Summary Cards Component
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/components/admin/BpmStatsCards.tsx` (new file)
 
 Display 4 stat cards:
@@ -641,9 +643,9 @@ Display 4 stat cards:
 Follow styling from `src/app/admin/page.tsx` `StatCard` component.
 
 **Acceptance Criteria**:
-- [ ] 4 stat cards render
-- [ ] Loading skeleton state
-- [ ] Uses CSS variables for styling
+- [x] 4 stat cards render
+- [x] Loading skeleton state
+- [x] Uses CSS variables for styling
 
 ---
 
