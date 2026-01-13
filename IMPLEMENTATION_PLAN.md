@@ -980,14 +980,22 @@ Filter chips: All, Missing Spotify, Has Spotify, In Catalog, Missing BPM.
 
 ### Task 5.7: TracksList Component
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/components/admin/TracksList.tsx` (new file)
 
-Paginated table with expansion for detail panel.
+Paginated table with expansion for detail panel. Exports `TrackWithEnrichment` interface. Supports:
+- Loading state with skeleton rows
+- Empty state when no tracks
+- Pagination with page controls
+- Row expansion with customizable content via `renderExpandedContent` prop
+- Status badges for Spotify and Catalog presence
+- Popularity bar visualization
 
 **Acceptance Criteria**:
-- [ ] List renders with pagination
-- [ ] Columns: Art, Title/Artist, Duration, BPM, Popularity, Status, Actions
-- [ ] Row expansion toggles work
+- [x] List renders with pagination
+- [x] Columns: Art, Title/Artist, Duration, BPM, Popularity, Status, Actions
+- [x] Row expansion toggles work
 
 ---
 
