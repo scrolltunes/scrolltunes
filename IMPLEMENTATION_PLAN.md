@@ -12,7 +12,7 @@ Redesign `/admin/songs` from Turso-first (4.2M tracks, 20+ second load) to Neon-
 | [admin-track-search](specs/admin-track-search.md) | Search-only tracks endpoint | Complete |
 | [admin-add-to-catalog](specs/admin-add-to-catalog.md) | Add track to catalog endpoint | Complete |
 | [admin-catalog-hook](specs/admin-catalog-hook.md) | useAdminCatalog SWR hook | Complete |
-| [admin-songs-page-redesign](specs/admin-songs-page-redesign.md) | Page redesign | Pending |
+| [admin-songs-page-redesign](specs/admin-songs-page-redesign.md) | Page redesign | Complete |
 
 ## Research Findings
 
@@ -1242,7 +1242,7 @@ Phase 4.4 (Page) ← depends on all above ──────┴┴┴┴┴┴�
 
 **Build & Lint**:
 - [x] `bun run check` passes (lint + typecheck + test)
-- [ ] `bun run build` succeeds
+- [x] `bun run build` succeeds
 - [x] No TypeScript errors
 - [x] No unused imports or variables
 
