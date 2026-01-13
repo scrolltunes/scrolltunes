@@ -992,12 +992,12 @@ export function SearchResultRow({ result, onAddToCatalog, isAdding }: SearchResu
 | Action | 120px | "Add to catalog" button or "In catalog" badge |
 
 **Acceptance Criteria**:
-- [ ] Shows Turso track data (art, title, artist, album, duration)
-- [ ] Shows "Add to catalog" button if `inCatalog === false`
-- [ ] Shows "In catalog" badge with checkmark if `inCatalog === true`
-- [ ] Shows spinner during add operation (`isAdding` prop)
-- [ ] Button disabled during add operation
-- [ ] Calls `onAddToCatalog(lrclibId)` on button click
+- [x] Shows Turso track data (art, title, artist, album, duration)
+- [x] Shows "Add to catalog" button if `inCatalog === false`
+- [x] Shows "In catalog" badge with checkmark if `inCatalog === true`
+- [x] Shows spinner during add operation (`isAdding` prop)
+- [x] Button disabled during add operation
+- [x] Calls `onAddToCatalog(lrclibId)` on button click
 
 ### Task 4.4: Redesign admin songs page
 
@@ -1202,7 +1202,7 @@ const handleAddToCatalog = useCallback(async (lrclibId: number) => {
 | `src/hooks/useAdminTrackSearch.ts` | 3.2 | Search hook | Complete | Phase 2.1 | Exports shared types |
 | `src/components/admin/CatalogFilters.tsx` | 4.1 | Filter chips | Complete | None | Reference: TracksFilterBar |
 | `src/components/admin/CatalogTrackRow.tsx` | 4.2 | Catalog row | Complete | None | Reference: TracksList TrackRow |
-| `src/components/admin/SearchResultRow.tsx` | 4.3 | Search row | Pending | Phase 2.2 | — |
+| `src/components/admin/SearchResultRow.tsx` | 4.3 | Search row | Complete | Phase 2.2 | — |
 | `src/app/admin/songs/page.tsx` | 4.4 | Page redesign | Pending | All above | Reuse TrackDetail, EnrichmentActions |
 
 ---
