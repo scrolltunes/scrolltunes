@@ -151,8 +151,8 @@ This runs: `biome check . && bun run typecheck && bun run test`
 | [bpm-analytics-schema](specs/bpm-analytics-schema.md) | Database schema and types | ✅ Done |
 | [bpm-logging-helper](specs/bpm-logging-helper.md) | Fire-and-forget logging function | ✅ Done |
 | [bpm-instrumentation](specs/bpm-instrumentation.md) | Instrument Turso and provider cascade | ✅ Done |
-| [bpm-admin-dashboard](specs/bpm-admin-dashboard.md) | Admin page with analytics | Pending |
-| [bpm-retention-cleanup](specs/bpm-retention-cleanup.md) | 90-day log retention cron | Pending |
+| [bpm-admin-dashboard](specs/bpm-admin-dashboard.md) | Admin page with analytics | ✅ Done |
+| [bpm-retention-cleanup](specs/bpm-retention-cleanup.md) | 90-day log retention cron | ✅ Done |
 | [bpm-admin-tracks-browser](specs/bpm-admin-tracks-browser.md) | Full LRCLIB tracks browser with enrichment | Pending |
 
 ---
@@ -764,6 +764,8 @@ Compose all components into dashboard page. Also added BPM Analytics link to adm
 
 ### Task 4.1: Retention Cleanup Cron
 
+**Status**: ✅ COMPLETE
+
 **Files**:
 - `src/app/api/cron/cleanup-bpm-log/route.ts` (new file)
 - `vercel.json` (modify)
@@ -847,14 +849,14 @@ Update `vercel.json`:
 ```
 
 **Acceptance Criteria**:
-- [ ] Endpoint created at `/api/cron/cleanup-bpm-log`
-- [ ] Uses `Effect.runPromiseExit()` pattern (NOT try/catch)
-- [ ] Tagged error classes for auth and database errors
-- [ ] Protected with `CRON_SECRET` bearer token
-- [ ] Deletes records older than 90 days
-- [ ] Returns count of deleted records
-- [ ] `vercel.json` updated with cron schedule
-- [ ] `bun run typecheck` passes
+- [x] Endpoint created at `/api/cron/cleanup-bpm-log`
+- [x] Uses `Effect.runPromiseExit()` pattern (NOT try/catch)
+- [x] Tagged error classes for auth and database errors
+- [x] Protected with `CRON_SECRET` bearer token
+- [x] Deletes records older than 90 days
+- [x] Returns count of deleted records
+- [x] `vercel.json` updated with cron schedule
+- [x] `bun run typecheck` passes
 
 ---
 
@@ -1084,7 +1086,7 @@ After all phases complete:
 | Database migration | 1.2 | Run `bun run db:push` | ✅ Done (uses push workflow) |
 | `src/services/song-loader.ts` | 2.1, 2.2 | Update signature, add Turso logging | ✅ Done |
 | `src/services/bpm-providers.ts` | 2.3 | Add logging wrapper and `withLogging` method | ✅ Done |
-| `vercel.json` | 4.1 | Add cleanup cron | Pending |
+| `vercel.json` | 4.1 | Add cleanup cron | ✅ Done |
 | `src/app/admin/songs/page.tsx` | 5.11 | Replace with tracks browser | Pending |
 | `src/app/admin/page.tsx` | 3.9 | Add link to BPM stats page | ✅ Done |
 
