@@ -896,15 +896,17 @@ Query Turso tracks with optional Neon join for catalog status.
 
 ### Task 5.2: Copy Enrichment API Endpoint
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/app/api/admin/tracks/[lrclibId]/copy-enrichment/route.ts` (new file)
 
 Copy Turso enrichment (spotifyId, tempo, key, albumArt) to Neon.
 
 **Acceptance Criteria**:
-- [ ] Creates Neon song entry if needed
-- [ ] Creates `songLrclibIds` mapping
-- [ ] Copies all enrichment fields
-- [ ] Sets `bpmSource = "Turso"`
+- [x] Creates Neon song entry if needed
+- [x] Creates `songLrclibIds` mapping
+- [x] Copies all enrichment fields
+- [x] Sets `bpmSource = "Turso"`
 
 ---
 
