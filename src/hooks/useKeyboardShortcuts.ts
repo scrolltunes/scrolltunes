@@ -104,5 +104,16 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [enabled, state, tempoStep, onScoreBookNav, play, pause, reset, setScrollSpeed, getScrollSpeed, router])
+  }, [
+    enabled,
+    state,
+    tempoStep,
+    onScoreBookNav,
+    play,
+    pause,
+    reset,
+    setScrollSpeed,
+    getScrollSpeed,
+    router,
+  ])
 }

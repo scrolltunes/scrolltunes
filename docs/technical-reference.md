@@ -463,7 +463,7 @@ class BPMRateLimitError // Bubbles up
 | `src/lib/bpm/bpm-cache.ts` | In-memory caching |
 | `src/lib/bpm/reccobeats-client.ts` | ReccoBeats provider |
 | `src/lib/bpm/getsongbpm-client.ts` | GetSongBPM provider |
-| `src/lib/bpm/deezer-bpm-client.ts` | Deezer provider |
+| `src/lib/bpm/deezer-client.ts` | Deezer provider |
 
 ---
 
