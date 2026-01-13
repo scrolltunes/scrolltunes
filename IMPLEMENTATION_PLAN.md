@@ -4,6 +4,68 @@
 
 Implement BPM fetch logging, admin dashboard for analytics, and a comprehensive tracks browser for manual enrichment.
 
+## Architectural Requirements
+
+**All code MUST follow Effect.ts patterns as defined in `docs/architecture.md`.**
+
+### Key Requirements
+
+| Requirement | Pattern | Anti-Pattern |
+|-------------|---------|--------------|
+| Fire-and-forget | `Effect.runFork(effect.pipe(Effect.ignore))` | `.then().catch()`, `void fetch().catch()` |
+| API routes | `Effect.runPromiseExit()` + pattern match | `try/catch` with raw `await` |
+| Async operations | `Effect.tryPromise()` with tagged errors | Raw `Promise` or `async/await` |
+| Error handling | Tagged error classes via `Data.TaggedClass` | Plain `Error` or string throws |
+| Dependencies | `Layer` and `Context.Tag` | Direct imports of singletons |
+
+### Fire-and-Forget Pattern (from architecture.md)
+
+```typescript
+// ✅ Correct: Effect.runFork with Effect.ignore
+Effect.runFork(
+  someEffect.pipe(Effect.ignore)
+)
+
+// ✅ Correct: Effect.runFork with explicit error recovery
+Effect.runFork(
+  someEffect.pipe(
+    Effect.catchAll(() => Effect.sync(() => {
+      console.error("Operation failed")
+    }))
+  )
+)
+
+// ❌ Wrong: Promise .catch(() => {})
+fetch(url).catch(() => {})
+
+// ❌ Wrong: void fetch().catch()
+void fetch(url).catch(() => {})
+```
+
+### API Route Pattern (from architecture.md)
+
+```typescript
+export async function GET() {
+  const exit = await Effect.runPromiseExit(myEffect.pipe(Effect.provide(DbLayer)))
+
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      const error = cause.error
+      if (error._tag === "UnauthorizedError") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      // ... handle other error tags
+    }
+    return NextResponse.json({ error: "Server error" }, { status: 500 })
+  }
+
+  return NextResponse.json(exit.value)
+}
+```
+
+---
+
 ## Validation Command
 
 ```bash
@@ -16,17 +78,18 @@ This runs: `biome check . && bun run typecheck && bun run test`
 
 ## Gap Analysis
 
-**Analysis Date**: 2026-01-13
+**Analysis Date**: 2026-01-13 (Updated)
 
 ### Phase 1: Schema + Logging
 
 | Item | Current State | Required Change |
 |------|---------------|-----------------|
-| `bpmFetchLog` table | Does not exist | Add to `schema.ts` after line 414 |
-| `serial` import | NOT imported in pg-core imports | Add `serial` to import list on line 2 |
-| Migration file | Latest is `0003_add-album-art-cache.sql` | Create `0004_bpm_fetch_log.sql` |
+| `bpmFetchLog` table | ✅ Already exists in `schema.ts` lines 421-443 | None - DONE |
+| `serial` import | ✅ Already imported (line 11) | None - DONE |
+| Type exports | ✅ `BpmFetchLog`, `NewBpmFetchLog` exist (lines 491-492) | None - DONE |
+| Migration file | ⚠️ Latest is `0003_add-album-art-cache.sql` (idx: 3) | Create `0004_bpm_fetch_log.sql` |
 | Journal entry | idx: 3 is latest | Add idx: 4 entry |
-| `bpm-log.ts` types | Does not exist | Create new file |
+| `bpm-log.ts` types | Does not exist | Create new file with types + logging helper |
 
 ### Phase 2: Instrumentation
 
@@ -70,7 +133,7 @@ This runs: `biome check . && bun run typecheck && bun run test`
 
 | Spec | Description | Status |
 |------|-------------|--------|
-| [bpm-analytics-schema](specs/bpm-analytics-schema.md) | Database schema and types | Pending |
+| [bpm-analytics-schema](specs/bpm-analytics-schema.md) | Database schema and types | ✅ Schema done, migration pending |
 | [bpm-logging-helper](specs/bpm-logging-helper.md) | Fire-and-forget logging function | Pending |
 | [bpm-instrumentation](specs/bpm-instrumentation.md) | Instrument Turso and provider cascade | Pending |
 | [bpm-admin-dashboard](specs/bpm-admin-dashboard.md) | Admin page with analytics | Pending |
@@ -83,62 +146,12 @@ This runs: `biome check . && bun run typecheck && bun run test`
 
 ### Task 1.1: Add `bpmFetchLog` Table to Schema
 
-**Files**: `src/lib/db/schema.ts`
+**Status**: ✅ COMPLETE
 
-Add the following after line 414 (after `chordEnhancements` table):
-
-```typescript
-// ============================================================================
-// BPM Fetch Logging
-// ============================================================================
-
-export const bpmFetchLog = pgTable(
-  "bpm_fetch_log",
-  {
-    id: serial("id").primaryKey(),
-    lrclibId: integer("lrclib_id").notNull(),
-    songId: text("song_id"),
-    title: text("title").notNull(),
-    artist: text("artist").notNull(),
-    stage: text("stage").notNull(),
-    provider: text("provider").notNull(),
-    success: boolean("success").notNull(),
-    bpm: integer("bpm"),
-    errorReason: text("error_reason"),
-    errorDetail: text("error_detail"),
-    latencyMs: integer("latency_ms"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  table => [
-    index("idx_bpm_log_lrclib").on(table.lrclibId),
-    index("idx_bpm_log_created_provider").on(table.createdAt, table.provider),
-    index("idx_bpm_log_created").on(table.createdAt),
-  ],
-)
-
-export type BpmFetchLog = typeof bpmFetchLog.$inferSelect
-export type NewBpmFetchLog = typeof bpmFetchLog.$inferInsert
-```
-
-**Pre-requisite**: Add `serial` to imports at the top of the file (line 2-15):
-
-```typescript
-import {
-  boolean,
-  index,
-  integer,
-  jsonb,
-  pgEnum,
-  pgTable,
-  primaryKey,
-  real,
-  serial,  // ADD THIS
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-} from "drizzle-orm/pg-core"
-```
+The schema has already been added to `src/lib/db/schema.ts`:
+- `bpmFetchLog` table defined at lines 421-443
+- `serial` import already present at line 11
+- Type exports `BpmFetchLog` and `NewBpmFetchLog` at lines 491-492
 
 **Acceptance Criteria**:
 - [x] `serial` added to imports from `drizzle-orm/pg-core`
@@ -203,6 +216,7 @@ Run `bun run db:push` to apply migration.
 ```typescript
 import { db } from "@/lib/db"
 import { bpmFetchLog } from "@/lib/db/schema"
+import { Data, Effect } from "effect"
 
 // ============================================================================
 // Types
@@ -260,32 +274,47 @@ export function mapErrorToReason(error: unknown): BpmErrorReason {
 
 /**
  * Fire-and-forget BPM attempt logging.
- * Does not block the caller; errors are logged to console.
+ * Uses Effect.runFork per architecture.md requirements.
  */
 export function logBpmAttempt(entry: BpmLogEntry): void {
-  db.insert(bpmFetchLog)
-    .values({
-      lrclibId: entry.lrclibId,
-      songId: entry.songId ?? null,
-      title: entry.title,
-      artist: entry.artist,
-      stage: entry.stage,
-      provider: entry.provider,
-      success: entry.success,
-      bpm: entry.bpm ?? null,
-      errorReason: entry.errorReason ?? null,
-      errorDetail: entry.errorDetail?.slice(0, 500) ?? null,
-      latencyMs: entry.latencyMs ?? null,
-    })
-    .then(() => {})
-    .catch(err => console.error("[BPM Log] Insert failed:", err))
+  const insertEffect = Effect.tryPromise({
+    try: () =>
+      db.insert(bpmFetchLog).values({
+        lrclibId: entry.lrclibId,
+        songId: entry.songId ?? null,
+        title: entry.title,
+        artist: entry.artist,
+        stage: entry.stage,
+        provider: entry.provider,
+        success: entry.success,
+        bpm: entry.bpm ?? null,
+        errorReason: entry.errorReason ?? null,
+        errorDetail: entry.errorDetail?.slice(0, 500) ?? null,
+        latencyMs: entry.latencyMs ?? null,
+      }),
+    catch: error => new BpmLogInsertError({ cause: error }),
+  })
+
+  Effect.runFork(
+    insertEffect.pipe(
+      Effect.catchAll(err =>
+        Effect.sync(() => console.error("[BPM Log] Insert failed:", err.cause)),
+      ),
+    ),
+  )
 }
+
+// Tagged error for logging failures
+class BpmLogInsertError extends Data.TaggedClass("BpmLogInsertError")<{
+  readonly cause: unknown
+}> {}
 ```
 
 **Acceptance Criteria**:
 - [ ] File created at `src/lib/bpm/bpm-log.ts`
 - [ ] All types exported: `BpmProvider`, `BpmStage`, `BpmErrorReason`, `BpmLogEntry`
-- [ ] `logBpmAttempt` function exported and fire-and-forget
+- [ ] `logBpmAttempt` uses `Effect.runFork` (NOT `.then().catch()`)
+- [ ] `BpmLogInsertError` tagged error class defined
 - [ ] `mapErrorToReason` helper function exported
 - [ ] `errorDetail` truncated to 500 chars
 - [ ] `bun run typecheck` passes
@@ -813,31 +842,60 @@ Compose all components into dashboard page.
 // src/app/api/cron/cleanup-bpm-log/route.ts
 import { db } from "@/lib/db"
 import { bpmFetchLog } from "@/lib/db/schema"
+import { DatabaseError, UnauthorizedError } from "@/lib/errors"
 import { lt, sql } from "drizzle-orm"
+import { Data, Effect } from "effect"
 import { NextResponse } from "next/server"
+
+// Tagged error for auth failures specific to cron
+class CronAuthError extends Data.TaggedClass("CronAuthError")<object> {}
+
+const cleanupBpmLog = (authHeader: string | null) =>
+  Effect.gen(function* () {
+    // Verify cron secret
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return yield* Effect.fail(new CronAuthError({}))
+    }
+
+    // Delete old records
+    const result = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .delete(bpmFetchLog)
+          .where(lt(bpmFetchLog.createdAt, sql`NOW() - INTERVAL '90 days'`)),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    return { deleted: result.rowCount ?? 0 }
+  })
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization")
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const exit = await Effect.runPromiseExit(cleanupBpmLog(authHeader))
 
-  try {
-    const result = await db
-      .delete(bpmFetchLog)
-      .where(lt(bpmFetchLog.createdAt, sql`NOW() - INTERVAL '90 days'`))
-
-    return NextResponse.json({
-      success: true,
-      deleted: result.rowCount ?? 0,
-    })
-  } catch (error) {
-    console.error("[BPM Cleanup] Failed:", error)
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      const error = cause.error
+      if (error._tag === "CronAuthError") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      if (error._tag === "DatabaseError") {
+        console.error("[BPM Cleanup] Database error:", error.cause)
+        return NextResponse.json(
+          { success: false, error: "Database error" },
+          { status: 500 },
+        )
+      }
+    }
+    console.error("[BPM Cleanup] Failed:", exit.cause)
     return NextResponse.json(
-      { success: false, error: String(error) },
+      { success: false, error: "Server error" },
       { status: 500 },
     )
   }
+
+  return NextResponse.json({ success: true, ...exit.value })
 }
 ```
 
@@ -860,11 +918,13 @@ Update `vercel.json`:
 
 **Acceptance Criteria**:
 - [ ] Endpoint created at `/api/cron/cleanup-bpm-log`
+- [ ] Uses `Effect.runPromiseExit()` pattern (NOT try/catch)
+- [ ] Tagged error classes for auth and database errors
 - [ ] Protected with `CRON_SECRET` bearer token
 - [ ] Deletes records older than 90 days
 - [ ] Returns count of deleted records
 - [ ] `vercel.json` updated with cron schedule
-- [ ] Error handling with console logging
+- [ ] `bun run typecheck` passes
 
 ---
 
@@ -1088,15 +1148,15 @@ After all phases complete:
 
 ### Files to Modify
 
-| File | Phase | Changes |
-|------|-------|---------|
-| `src/lib/db/schema.ts` | 1.1 | Add `bpmFetchLog` table + types |
-| `drizzle/meta/_journal.json` | 1.2 | Add migration entry |
-| `src/services/song-loader.ts` | 2.1, 2.2 | Update signature, add Turso logging |
-| `src/services/bpm-providers.ts` | 2.3 | Add logging wrapper and `withLogging` method |
-| `vercel.json` | 4.1 | Add cleanup cron |
-| `src/app/admin/songs/page.tsx` | 5.11 | Replace with tracks browser |
-| `src/app/admin/page.tsx` | 3.9 | Add link to BPM stats page |
+| File | Phase | Changes | Status |
+|------|-------|---------|--------|
+| `src/lib/db/schema.ts` | 1.1 | Add `bpmFetchLog` table + types | ✅ Done |
+| `drizzle/meta/_journal.json` | 1.2 | Add migration entry | Pending |
+| `src/services/song-loader.ts` | 2.1, 2.2 | Update signature, add Turso logging | Pending |
+| `src/services/bpm-providers.ts` | 2.3 | Add logging wrapper and `withLogging` method | Pending |
+| `vercel.json` | 4.1 | Add cleanup cron | Pending |
+| `src/app/admin/songs/page.tsx` | 5.11 | Replace with tracks browser | Pending |
+| `src/app/admin/page.tsx` | 3.9 | Add link to BPM stats page | Pending |
 
 ---
 

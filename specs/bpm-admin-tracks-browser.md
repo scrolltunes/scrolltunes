@@ -4,6 +4,17 @@
 
 Replace the existing `/admin/songs` page with a comprehensive tracks browser that displays all 4.2M LRCLIB tracks from Turso, with enrichment status indicators and manual enrichment actions.
 
+## Architectural Requirements
+
+**This module MUST follow Effect.ts patterns as defined in `docs/architecture.md`.**
+
+- All API routes MUST use `Effect.runPromiseExit()` with pattern matching on exit
+- Tagged error classes for all error types (auth, database, validation, not found)
+- Do NOT use `try/catch` with raw `await`
+- Import shared errors from `@/lib/errors`
+- Use `Effect.gen` for composing database queries
+- Use `Effect.tryPromise` to wrap Turso and Neon calls
+
 ## Route
 
 `/admin/songs` (replaces existing page)
@@ -356,6 +367,8 @@ The existing `/admin/songs` page shows only Neon catalog songs. The new page:
 ## Acceptance Criteria
 
 - [ ] Page loads at `/admin/songs` with admin auth
+- [ ] All API routes use `Effect.runPromiseExit()` pattern
+- [ ] Tagged error classes for all error types
 - [ ] Tracks load from Turso with pagination (50 per page)
 - [ ] Search box performs FTS5 queries
 - [ ] Filter chips work: All, Missing Spotify, Has Spotify, In Catalog, Missing BPM
@@ -367,3 +380,4 @@ The existing `/admin/songs` page shows only Neon catalog songs. The new page:
 - [ ] "Manual BPM" opens form and saves to Neon
 - [ ] Responsive design for mobile
 - [ ] Loading states and error handling
+- [ ] `bun run typecheck` passes

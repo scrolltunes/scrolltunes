@@ -4,6 +4,16 @@
 
 Create an admin dashboard at `/admin/bpm-stats` showing BPM fetch analytics with summary cards, provider breakdown, time-series chart, and failure lists.
 
+## Architectural Requirements
+
+**This module MUST follow Effect.ts patterns as defined in `docs/architecture.md`.**
+
+- API routes MUST use `Effect.runPromiseExit()` with pattern matching on exit
+- Tagged error classes for all error types (auth, database, validation)
+- Do NOT use `try/catch` with raw `await`
+- Import shared errors from `@/lib/errors` (`AuthError`, `UnauthorizedError`, `DatabaseError`)
+- Use `Effect.gen` for composing database queries
+
 ## Route
 
 `/admin/bpm-stats`
@@ -111,6 +121,8 @@ Follow existing admin patterns:
 ## Acceptance Criteria
 
 - [ ] `/admin/bpm-stats` route created with admin auth check
+- [ ] API route uses `Effect.runPromiseExit()` pattern
+- [ ] Tagged error classes for auth/database errors
 - [ ] Summary cards show 24h metrics
 - [ ] Provider table shows breakdown with success rates
 - [ ] Time-series chart renders 30 days of data
@@ -120,3 +132,4 @@ Follow existing admin patterns:
 - [ ] Click song to see all attempts (drill-down modal)
 - [ ] Responsive design for mobile
 - [ ] Loading skeletons during data fetch
+- [ ] `bun run typecheck` passes

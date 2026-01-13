@@ -4,6 +4,15 @@
 
 Instrument the BPM fetch pipeline to log attempts at each stage: Turso lookup and provider cascade.
 
+## Architectural Requirements
+
+**This module MUST follow Effect.ts patterns as defined in `docs/architecture.md`.**
+
+- Use `Effect.tap` and `Effect.tapError` for logging (NOT try/catch)
+- Providers return `Effect.Effect<BPMResult, BPMError>`, not `Promise`
+- Logging wrapper must preserve Effect semantics
+- Do NOT use `async/await` with `try/catch` in provider wrapper
+
 ## Files to Modify
 
 1. `src/services/song-loader.ts` - Turso embedded tempo logging
@@ -95,46 +104,60 @@ Location: `src/services/bpm-providers.ts`
 
 ### Create Logging Wrapper
 
-```typescript
-import { logBpmAttempt, mapErrorToReason, type BpmStage, type BpmProvider } from "@/lib/bpm/bpm-log"
+Uses Effect.tap/tapError pattern (NOT try/catch):
 
-interface LoggingContext {
+```typescript
+import {
+  logBpmAttempt,
+  mapErrorToReason,
+  type BpmProvider as BpmProviderType,
+  type BpmStage,
+} from "@/lib/bpm/bpm-log"
+import type { BPMProvider } from "@/lib/bpm/bpm-provider"
+import type { BPMTrackQuery } from "@/lib/bpm/bpm-types"
+import { Effect } from "effect"
+
+export interface LoggingContext {
   lrclibId: number
   songId: string | undefined
   title: string
   artist: string
-  stage: BpmStage
 }
 
 function wrapProviderWithLogging(
   provider: BPMProvider,
+  stage: BpmStage,
   context: LoggingContext,
 ): BPMProvider {
   return {
     name: provider.name,
-    getBpm: async (query: BPMTrackQuery) => {
+    getBpm: (query: BPMTrackQuery) => {
       const start = Date.now()
-      try {
-        const result = await provider.getBpm(query)
-        logBpmAttempt({
-          ...context,
-          provider: provider.name as BpmProvider,
-          success: true,
-          bpm: result.bpm,
-          latencyMs: Date.now() - start,
-        })
-        return result
-      } catch (error) {
-        logBpmAttempt({
-          ...context,
-          provider: provider.name as BpmProvider,
-          success: false,
-          errorReason: mapErrorToReason(error),
-          errorDetail: String(error).slice(0, 500),
-          latencyMs: Date.now() - start,
-        })
-        throw error
-      }
+      return provider.getBpm(query).pipe(
+        Effect.tap(result => {
+          logBpmAttempt({
+            ...context,
+            stage,
+            provider: provider.name as BpmProviderType,
+            success: true,
+            bpm: result.bpm,
+            latencyMs: Date.now() - start,
+          })
+          return Effect.void
+        }),
+        Effect.tapError(error => {
+          logBpmAttempt({
+            ...context,
+            stage,
+            provider: provider.name as BpmProviderType,
+            success: false,
+            errorReason: mapErrorToReason(error),
+            errorDetail: String(error).slice(0, 500),
+            latencyMs: Date.now() - start,
+          })
+          return Effect.void
+        }),
+      )
     },
   }
 }
@@ -142,32 +165,56 @@ function wrapProviderWithLogging(
 
 ### Update Provider Cascade
 
-Pass logging context through the cascade:
+Add `withLogging` method to `BpmProvidersService`:
 
 ```typescript
-// In fetchBpmWithCascade or equivalent
-const loggingContext = {
-  lrclibId,
-  songId,
-  title,
-  artist,
+export interface BpmProvidersService {
+  readonly fallbackProviders: readonly BPMProvider[]
+  readonly raceProviders: readonly BPMProvider[]
+  readonly lastResortProvider: BPMProvider
+  /** Wrap providers with logging for a specific request context */
+  readonly withLogging: (context: LoggingContext) => {
+    fallbackProviders: readonly BPMProvider[]
+    raceProviders: readonly BPMProvider[]
+    lastResortProvider: BPMProvider
+  }
 }
 
-// Wrap fallback providers
-const wrappedFallback = fallbackProviders.map(p =>
-  wrapProviderWithLogging(p, { ...loggingContext, stage: "cascade_fallback" })
-)
+// Implementation in makeBpmProviders
+const withLogging = (context: LoggingContext) => ({
+  fallbackProviders: fallbackProviders.map(p =>
+    wrapProviderWithLogging(p, "cascade_fallback", context),
+  ),
+  raceProviders: raceProviders.map(p =>
+    wrapProviderWithLogging(p, "cascade_race", context),
+  ),
+  lastResortProvider: wrapProviderWithLogging(lastResortProvider, "last_resort", context),
+})
+```
 
-// Wrap race providers
-const wrappedRace = raceProviders.map(p =>
-  wrapProviderWithLogging(p, { ...loggingContext, stage: "cascade_race" })
-)
+### Usage in song-loader.ts
 
-// Wrap last resort
-const wrappedLastResort = wrapProviderWithLogging(
-  lastResortProvider,
-  { ...loggingContext, stage: "last_resort" }
-)
+```typescript
+function fireAndForgetBpmFetch(
+  songId: string,
+  lrclibId: number,
+  title: string,
+  artist: string,
+  spotifyId: string | undefined,
+) {
+  const loggingContext = { lrclibId, songId, title, artist }
+
+  const bpmEffect = BpmProviders.pipe(
+    Effect.flatMap(service => {
+      const { fallbackProviders, raceProviders, lastResortProvider } = service.withLogging(loggingContext)
+      // ... rest of cascade logic
+    }),
+  )
+
+  Effect.runPromise(bpmEffect.pipe(Effect.provide(ServerLayer))).catch(err =>
+    console.error("[BPM] Background fetch failed:", err),
+  )
+}
 ```
 
 ## Acceptance Criteria
@@ -175,7 +222,10 @@ const wrappedLastResort = wrapProviderWithLogging(
 - [ ] `fireAndForgetBpmFetch` signature updated to include `lrclibId`
 - [ ] All call sites updated with `lrclibId` parameter
 - [ ] Turso embedded tempo lookup logs success/failure with latency
+- [ ] Provider wrapper uses `Effect.tap`/`Effect.tapError` (NOT try/catch)
+- [ ] `withLogging` method added to `BpmProvidersService`
 - [ ] Provider cascade wraps each provider with logging
 - [ ] Each stage is correctly tagged: `turso_embedded`, `cascade_fallback`, `cascade_race`, `last_resort`
-- [ ] Logging does not block request response
+- [ ] Logging does not block request response (fire-and-forget via `Effect.runFork`)
 - [ ] Error details are captured and truncated
+- [ ] `bun run typecheck` passes

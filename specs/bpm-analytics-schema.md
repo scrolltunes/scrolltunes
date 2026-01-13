@@ -4,6 +4,10 @@
 
 Add database schema and types for logging BPM fetch attempts across all providers.
 
+## Architectural Note
+
+The types defined in `src/lib/bpm/bpm-log.ts` will be used with Effect.ts patterns. The logging helper (defined in the companion spec `bpm-logging-helper.md`) MUST use `Effect.runFork` for fire-and-forget database inserts as required by `docs/architecture.md`.
+
 ## Database Table: `bpm_fetch_log`
 
 ### Drizzle Schema
