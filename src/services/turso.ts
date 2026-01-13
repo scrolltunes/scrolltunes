@@ -61,9 +61,24 @@ const getClient = Effect.gen(function* () {
   return clientInstance
 })
 
+/**
+ * Convert user query to FTS5 prefix query.
+ * Appends * to the last word for autocomplete behavior.
+ * Example: "never too la" -> "never too la*"
+ */
+function toFtsQuery(query: string): string {
+  const trimmed = query.trim()
+  if (!trimmed) return trimmed
+  // If query already ends with *, don't add another
+  if (trimmed.endsWith("*")) return trimmed
+  // Append * to enable prefix matching on the last word
+  return `${trimmed}*`
+}
+
 const search = (query: string, limit = 10) =>
   Effect.gen(function* () {
-    console.log(`[TURSO] Searching for: "${query}" (limit: ${limit})`)
+    const ftsQuery = toFtsQuery(query)
+    console.log(`[TURSO] Searching for: "${query}" -> FTS: "${ftsQuery}" (limit: ${limit})`)
     const client = yield* getClient
 
     const result = yield* Effect.tryPromise({
@@ -83,7 +98,7 @@ const search = (query: string, limit = 10) =>
               -bm25(tracks_fts) ASC
             LIMIT ?
           `,
-          args: [query, limit],
+          args: [ftsQuery, limit],
         })
         return rs.rows
       },
