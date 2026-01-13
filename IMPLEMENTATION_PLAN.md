@@ -1001,15 +1001,23 @@ Paginated table with expansion for detail panel. Exports `TrackWithEnrichment` i
 
 ### Task 5.8: TrackDetail Component
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/components/admin/TrackDetail.tsx` (new file)
 
-Inline expansion panel showing enrichment status.
+Inline expansion panel showing enrichment status. Displays:
+- Track header with album art, title, artist, album, duration, quality
+- Turso (Spotify Enrichment) section with Spotify ID, tempo, key, popularity, ISRC
+- Neon (Catalog) section with catalog status, BPM, musical key, enhancement status
+- Supports action buttons via `renderActions` prop
+- Status indicators (checkmarks/crosses) for each field
+- Section status badges (complete/partial/none)
 
 **Acceptance Criteria**:
-- [ ] Shows Turso enrichment fields
-- [ ] Shows Neon enrichment status
-- [ ] Status indicators (checkmarks/crosses)
-- [ ] Action buttons visible
+- [x] Shows Turso enrichment fields
+- [x] Shows Neon enrichment status
+- [x] Status indicators (checkmarks/crosses)
+- [x] Action buttons visible
 
 ---
 
