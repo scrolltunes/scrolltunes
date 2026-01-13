@@ -153,7 +153,7 @@ This runs: `biome check . && bun run typecheck && bun run test`
 | [bpm-instrumentation](specs/bpm-instrumentation.md) | Instrument Turso and provider cascade | ✅ Done |
 | [bpm-admin-dashboard](specs/bpm-admin-dashboard.md) | Admin page with analytics | ✅ Done |
 | [bpm-retention-cleanup](specs/bpm-retention-cleanup.md) | 90-day log retention cron | ✅ Done |
-| [bpm-admin-tracks-browser](specs/bpm-admin-tracks-browser.md) | Full LRCLIB tracks browser with enrichment | Pending |
+| [bpm-admin-tracks-browser](specs/bpm-admin-tracks-browser.md) | Full LRCLIB tracks browser with enrichment | ✅ Done |
 
 ---
 
@@ -1069,9 +1069,11 @@ Action buttons: Copy from Turso, Find Spotify ID, Fetch BPM, Manual BPM, View Ly
 
 ### Task 5.11: Replace Admin Songs Page
 
-**Files**: `src/app/admin/songs/page.tsx` (replace existing 972-line file)
+**Status**: ✅ COMPLETE
 
-Compose all new components into the tracks browser.
+**Files**: `src/app/admin/songs/page.tsx` (replaced existing 972-line file)
+
+Composed all new components into the tracks browser.
 
 **Key changes from existing page**:
 - Data source: Turso tracks (not just Neon catalog)
@@ -1080,14 +1082,14 @@ Compose all new components into the tracks browser.
 - Row expansion with enrichment status
 
 **Acceptance Criteria**:
-- [ ] Page loads at `/admin/songs`
-- [ ] Tracks load from Turso with pagination
-- [ ] Search performs FTS5 queries
-- [ ] All filters work
-- [ ] Sort options work
-- [ ] Row expansion shows track details
-- [ ] All enrichment actions work
-- [ ] Mobile responsive
+- [x] Page loads at `/admin/songs`
+- [x] Tracks load from Turso with pagination
+- [x] Search performs FTS5 queries
+- [x] All filters work
+- [x] Sort options work
+- [x] Row expansion shows track details
+- [x] All enrichment actions work
+- [x] Mobile responsive
 
 ---
 
@@ -1095,10 +1097,10 @@ Compose all new components into the tracks browser.
 
 After all phases complete:
 
-- [ ] `bun run typecheck` - No type errors
-- [ ] `bun run lint` - No lint errors
-- [ ] `bun run test` - All tests pass
-- [ ] `bun run build` - Production build succeeds
+- [x] `bun run typecheck` - No type errors
+- [x] `bun run lint` - No lint errors
+- [x] `bun run test` - All tests pass
+- [x] `bun run build` - Production build succeeds
 - [ ] Load a song without BPM - Logs appear in `bpm_fetch_log` table
 - [ ] Visit `/admin/bpm-stats` - Dashboard loads with data
 - [ ] Visit `/admin/songs` - Tracks browser loads from Turso
@@ -1145,7 +1147,7 @@ After all phases complete:
 | `src/services/song-loader.ts` | 2.1, 2.2 | Update signature, add Turso logging | ✅ Done |
 | `src/services/bpm-providers.ts` | 2.3 | Add logging wrapper and `withLogging` method | ✅ Done |
 | `vercel.json` | 4.1 | Add cleanup cron | ✅ Done |
-| `src/app/admin/songs/page.tsx` | 5.11 | Replace with tracks browser | Pending |
+| `src/app/admin/songs/page.tsx` | 5.11 | Replace with tracks browser | ✅ Done |
 | `src/app/admin/page.tsx` | 3.9 | Add link to BPM stats page | ✅ Done |
 
 ---
