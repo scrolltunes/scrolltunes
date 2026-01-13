@@ -1,8 +1,70 @@
-# Implementation Plan: Spotify Metadata Enrichment
+# BPM Analytics Admin Implementation Plan
 
 ## Overview
 
-Enrich 4.2M LRCLIB tracks with Spotify metadata (BPM, popularity, album art) from Anna's Archive dumps. LRCLIB remains the source of truth - tracks only exist if they have synced lyrics. Spotify data is nullable enrichment.
+Implement BPM fetch logging, admin dashboard for analytics, and a comprehensive tracks browser for manual enrichment.
+
+## Architectural Requirements
+
+**All code MUST follow Effect.ts patterns as defined in `docs/architecture.md`.**
+
+### Key Requirements
+
+| Requirement | Pattern | Anti-Pattern |
+|-------------|---------|--------------|
+| Fire-and-forget | `Effect.runFork(effect.pipe(Effect.ignore))` | `.then().catch()`, `void fetch().catch()` |
+| API routes | `Effect.runPromiseExit()` + pattern match | `try/catch` with raw `await` |
+| Async operations | `Effect.tryPromise()` with tagged errors | Raw `Promise` or `async/await` |
+| Error handling | Tagged error classes via `Data.TaggedClass` | Plain `Error` or string throws |
+| Dependencies | `Layer` and `Context.Tag` | Direct imports of singletons |
+
+### Fire-and-Forget Pattern (from architecture.md)
+
+```typescript
+// ✅ Correct: Effect.runFork with Effect.ignore
+Effect.runFork(
+  someEffect.pipe(Effect.ignore)
+)
+
+// ✅ Correct: Effect.runFork with explicit error recovery
+Effect.runFork(
+  someEffect.pipe(
+    Effect.catchAll(() => Effect.sync(() => {
+      console.error("Operation failed")
+    }))
+  )
+)
+
+// ❌ Wrong: Promise .catch(() => {})
+fetch(url).catch(() => {})
+
+// ❌ Wrong: void fetch().catch()
+void fetch(url).catch(() => {})
+```
+
+### API Route Pattern (from architecture.md)
+
+```typescript
+export async function GET() {
+  const exit = await Effect.runPromiseExit(myEffect.pipe(Effect.provide(DbLayer)))
+
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      const error = cause.error
+      if (error._tag === "UnauthorizedError") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      // ... handle other error tags
+    }
+    return NextResponse.json({ error: "Server error" }, { status: 500 })
+  }
+
+  return NextResponse.json(exit.value)
+}
+```
+
+---
 
 ## Validation Command
 
@@ -12,1382 +74,1164 @@ bun run check
 
 This runs: `biome check . && bun run typecheck && bun run test`
 
-## Gap Analysis (Verified)
+---
 
-| Component | Current State | Required Changes |
-|-----------|---------------|------------------|
-| Rust Args | 5 args (lines 12-29) | Add 3 new args: `--spotify`, `--audio-features`, `--min-popularity` |
-| Rust Structs | `Track`, `ScoredTrack` only | Add `SpotifyTrack`, `AudioFeatures`, `EnrichedTrack` |
-| Turso Interface | 6 fields (lines 6-13) | Add 8 nullable fields for Spotify enrichment |
-| Search Route | Spotify-first flow | Convert to Turso-first, remove Spotify Search API |
-| SearchResultTrack | 9 fields (lines 5-15) | Add `popularity`, `tempo` fields |
-| BPMResult | 3 fields (lines 17-21) | Add `timeSignature`, `attribution` fields |
-| Deezer Client | Search only (lines 75-131) | Add ISRC lookup capability |
+## Gap Analysis
 
-## Specs
+**Analysis Date**: 2026-01-13 (Verified against source files)
+
+### Phase 1: Schema + Logging
+
+| Item | Current State | Required Change |
+|------|---------------|-----------------|
+| `bpmFetchLog` table | ✅ Already exists in `schema.ts` lines 421-443 | None - DONE |
+| `serial` import | ✅ Already imported (line 11) | None - DONE |
+| Type exports | ✅ `BpmFetchLog`, `NewBpmFetchLog` exist (lines 491-492) | None - DONE |
+| Migration | ✅ Uses `db:push` workflow (drizzle/ is gitignored) | Run `bun run db:push` - DONE |
+| `bpm-log.ts` types | Does not exist | Create new file with types + logging helper |
+
+### Phase 2: Instrumentation
+
+| Item | Current State | Required Change |
+|------|---------------|-----------------|
+| `fireAndForgetBpmFetch` | Lines 243-300 in `song-loader.ts`, params: `(songId, title, artist, spotifyId)` | Add `lrclibId` param after `songId` |
+| Call site | Line 541 in `song-loader.ts` | Update to pass `actualLrclibId` |
+| Turso lookup | Lines 514-543, uses `.then().catch()` on line 536-537 | Add timing + logging calls |
+| `bpm-providers.ts` | 59 lines, current interface at lines 12-16 has NO `withLogging` | Add `wrapProviderWithLogging` + `withLogging` method |
+
+**Critical Detail**: The current Turso caching on lines 528-537 uses `.then().catch()` which violates Effect.ts patterns - but this is existing code for caching, not logging. The new logging should use `Effect.runFork`.
+
+### Phase 3: Dashboard
+
+| Item | Current State | Required Change |
+|------|---------------|-----------------|
+| `/admin/bpm-stats` | Does not exist | Create new page |
+| BPM stats API | Does not exist | Create `/api/admin/bpm-stats/route.ts` |
+| Components | None exist | Create 7 new components in `src/components/admin/` |
+| Admin sidebar | Lines 336-354 in `admin/page.tsx`, has "Tools" section | Add "BPM Analytics" link |
+| Mobile tabs | Lines 270-306, has hardcoded tabs | Add "BPM Stats" tab |
+| Recharts | ✅ Already in project (`package.json`) | No install needed |
+
+**Pattern Reference**: `src/app/api/admin/stats/route.ts` shows exact Effect.ts API pattern with:
+- `Effect.gen` for composing queries
+- `DbLayer` for database dependency
+- `UnauthorizedError`, `ForbiddenError`, `DatabaseError` tagged errors from `@/lib/errors`
+- `Effect.runPromiseExit()` with pattern matching
+
+### Phase 4: Cron
+
+| Item | Current State | Required Change |
+|------|---------------|-----------------|
+| Cleanup endpoint | Does not exist | Create `/api/cron/cleanup-bpm-log/route.ts` |
+| `vercel.json` | 1 cron at line 4-7 (`/api/cron/turso-usage` at `0 6 * * *`) | Add second cron entry |
+
+### Phase 5: Tracks Browser
+
+| Item | Current State | Required Change |
+|------|---------------|-----------------|
+| `/admin/songs` page | 972 lines, Neon-only via `/api/admin/songs` | Replace with Turso-first implementation |
+| Current filters | Lines 54, 795-807: `all\|synced\|enhanced\|unenhanced` | Change to `all\|missing_spotify\|has_spotify\|in_catalog\|missing_bpm` |
+| Current components | `SongCard` (239-461), `SongRow` (463-653) - both load album art via `/api/lyrics/` | Reuse pattern, add expansion |
+| Tracks API | Does not exist | Create `/api/admin/tracks/route.ts` |
+| Enrichment APIs | Do not exist | Create 4 new API routes |
+| TursoService | ✅ Exists at `src/services/turso.ts` with `search`, `getById`, `findByTitleArtist` | Need paginated search with filter support |
+
+**TursoService Details** (verified in `src/services/turso.ts`):
+- Line 78-127: `search(query, limit)` - FTS5 search with popularity ordering
+- Line 129-169: `getById(lrclibId)` - Get single track by ID
+- Line 171-240: `findByTitleArtist(title, artist, targetDurationSec?)` - Best match search
+- Need to add: `searchWithFilters(query, filter, sort, offset, limit)` for admin tracks browser
+
+---
+
+## Specs Reference
 
 | Spec | Description | Status |
 |------|-------------|--------|
-| [001-rust-extraction-tool-enhancement](specs/001-rust-extraction-tool-enhancement.md) | Enhance Rust tool with Spotify matching | **Complete** |
-| [002-turso-schema-migration](specs/002-turso-schema-migration.md) | Deploy enriched database to Turso | **Complete** |
-| [003-search-api-turso-first](specs/003-search-api-turso-first.md) | Simplify search to Turso-first | **Complete** |
-| [004-album-art-optimization](specs/004-album-art-optimization.md) | Three-tier album art resolution | **Complete** |
-| [005-bpm-provider-refactor](specs/005-bpm-provider-refactor.md) | Use embedded tempo with fallback | **Complete** |
-| [006-documentation-cleanup](specs/006-documentation-cleanup.md) | Update docs, remove deprecated code | **Complete** |
+| [bpm-analytics-schema](specs/bpm-analytics-schema.md) | Database schema and types | ✅ Done |
+| [bpm-logging-helper](specs/bpm-logging-helper.md) | Fire-and-forget logging function | ✅ Done |
+| [bpm-instrumentation](specs/bpm-instrumentation.md) | Instrument Turso and provider cascade | ✅ Done |
+| [bpm-admin-dashboard](specs/bpm-admin-dashboard.md) | Admin page with analytics | ✅ Done |
+| [bpm-retention-cleanup](specs/bpm-retention-cleanup.md) | 90-day log retention cron | ✅ Done |
+| [bpm-admin-tracks-browser](specs/bpm-admin-tracks-browser.md) | Full LRCLIB tracks browser with enrichment | ✅ Done |
 
 ---
 
-## Phase 1: Rust Extraction Tool Enhancement
+## Phase 1: Foundation (P0)
 
-**Dependencies**: None (foundational)
-**Spec**: [001-rust-extraction-tool-enhancement.md](specs/001-rust-extraction-tool-enhancement.md)
-**Primary File**: `scripts/lrclib-extract/src/main.rs`
+### Task 1.1: Add `bpmFetchLog` Table to Schema
 
-### Task 1.1: Add CLI Arguments
+**Status**: ✅ COMPLETE
 
-**File**: `scripts/lrclib-extract/src/main.rs`
-**Location**: Lines 12-29 (Args struct)
-
-Add new arguments to the existing Args struct:
-
-```rust
-#[derive(Parser)]
-#[command(name = "lrclib-extract")]
-#[command(about = "Extract deduplicated LRCLIB search index with optional Spotify enrichment")]
-struct Args {
-    source: PathBuf,
-    output: PathBuf,
-
-    /// Path to spotify_clean.sqlite3 (optional, for enrichment)
-    #[arg(long)]
-    spotify: Option<PathBuf>,
-
-    /// Path to spotify_clean_audio_features.sqlite3 (optional, requires --spotify)
-    #[arg(long)]
-    audio_features: Option<PathBuf>,
-
-    /// Minimum Spotify popularity to include in lookup index (0-100)
-    #[arg(long, default_value = "1")]
-    min_popularity: i32,
-
-    #[arg(long, default_value = "0")]
-    workers: usize,
-
-    #[arg(long)]
-    test: Option<String>,
-
-    #[arg(long)]
-    artists: Option<String>,
-}
-```
+The schema has already been added to `src/lib/db/schema.ts`:
+- `bpmFetchLog` table defined at lines 421-443
+- `serial` import already present at line 11
+- Type exports `BpmFetchLog` and `NewBpmFetchLog` at lines 491-492
 
 **Acceptance Criteria**:
-- `--spotify`, `--audio-features`, `--min-popularity` args parse correctly
-- Running without `--spotify` produces identical output to current tool
-- Help text displays new options
+- [x] `serial` added to imports from `drizzle-orm/pg-core`
+- [x] `bpmFetchLog` table added to schema with all columns
+- [x] Three indexes defined: lrclib_id, created_at+provider, created_at
+- [x] Type exports added: `BpmFetchLog`, `NewBpmFetchLog`
+- [x] `bun run typecheck` passes
 
 ---
 
-### Task 1.2: Add New Structs
+### Task 1.2: Apply Database Migration
 
-**File**: `scripts/lrclib-extract/src/main.rs`
-**Location**: After existing structs (lines 42-48)
+**Status**: ✅ COMPLETE
 
-Add three new structs:
+**Note**: This project uses Drizzle's push workflow (`bun run db:push`) instead of migration files. The `drizzle/` directory is gitignored. Since Task 1.1 added the schema to `src/lib/db/schema.ts`, running `bun run db:push` will create the table.
 
-```rust
-/// Spotify track info for matching
-#[derive(Clone, Debug)]
-struct SpotifyTrack {
-    rowid: i64,
-    id: String,
-    name: String,
-    artist: String,
-    duration_ms: i64,
-    popularity: i32,
-    isrc: Option<String>,
-    album_rowid: i64,
-}
-
-/// Audio features from Spotify
-#[derive(Clone, Debug)]
-struct AudioFeatures {
-    tempo: Option<f64>,
-    key: Option<i32>,
-    mode: Option<i32>,
-    time_signature: Option<i32>,
-}
-
-/// Final enriched track for output
-#[derive(Clone, Debug)]
-struct EnrichedTrack {
-    // LRCLIB (source of truth)
-    lrclib_id: i64,
-    title: String,
-    artist: String,
-    album: Option<String>,
-    duration_sec: i64,
-    title_norm: String,
-    artist_norm: String,
-    quality: i32,
-    // Spotify enrichment (nullable)
-    spotify_id: Option<String>,
-    popularity: Option<i32>,
-    tempo: Option<f64>,
-    musical_key: Option<i32>,
-    mode: Option<i32>,
-    time_signature: Option<i32>,
-    isrc: Option<String>,
-    album_image_url: Option<String>,
-}
-```
+Run `bun run db:push` to apply the schema to the database.
 
 **Acceptance Criteria**:
-- Structs compile without errors
-- All fields match spec requirements
+- [x] Schema defined in `src/lib/db/schema.ts` (Task 1.1)
+- [x] Run `bun run db:push` to apply to database
 
 ---
 
-### Task 1.3: Implement load_spotify_tracks()
+### Task 1.3: Create Logging Types and Helper
 
-**File**: `scripts/lrclib-extract/src/main.rs`
-**Location**: New function
+**Status**: ✅ COMPLETE
 
-```rust
-fn load_spotify_tracks(
-    conn: &Connection,
-    min_popularity: i32,
-) -> Result<HashMap<(String, String), Vec<SpotifyTrack>>> {
-    println!("[SPOTIFY] Loading tracks with popularity >= {}", min_popularity);
-
-    let sql = r#"
-        SELECT
-            t.rowid,
-            t.id,
-            t.name,
-            a.name as artist_name,
-            t.duration_ms,
-            t.popularity,
-            t.isrc,
-            t.album_rowid
-        FROM tracks t
-        JOIN track_artists ta ON ta.track_rowid = t.rowid AND ta.position = 0
-        JOIN artists a ON a.rowid = ta.artist_rowid
-        WHERE t.popularity >= ?
-    "#;
-
-    // Build HashMap keyed by (title_norm, artist_norm)
-    // Use existing normalize_title() and normalize_artist() functions
-}
-```
-
-**Acceptance Criteria**:
-- Loads ~50M tracks with popularity >= 1
-- HashMap grouped by normalized (title, artist)
-- Memory usage under 4GB for track data
-- Progress bar shows loading status
-
----
-
-### Task 1.4: Implement load_audio_features()
-
-**File**: `scripts/lrclib-extract/src/main.rs`
-**Location**: New function
-
-```rust
-fn load_audio_features(conn: &Connection) -> Result<HashMap<i64, AudioFeatures>> {
-    println!("[AUDIO] Loading audio features...");
-
-    let sql = "SELECT track_rowid, tempo, key, mode, time_signature FROM audio_features";
-    // Build HashMap keyed by track_rowid
-}
-```
-
-**Acceptance Criteria**:
-- Loads all audio feature records
-- HashMap keyed by track_rowid for O(1) lookup
-- Memory usage under 2GB
-
----
-
-### Task 1.5: Implement load_album_images()
-
-**File**: `scripts/lrclib-extract/src/main.rs`
-**Location**: New function
-
-```rust
-fn load_album_images(conn: &Connection) -> Result<HashMap<i64, String>> {
-    println!("[IMAGES] Loading album images (medium size)...");
-
-    let sql = r#"
-        SELECT album_rowid, url
-        FROM album_images
-        WHERE height BETWEEN 250 AND 350
-        ORDER BY album_rowid, ABS(height - 300)
-    "#;
-    // Keep only first (closest to 300px) per album
-}
-```
-
-**Acceptance Criteria**:
-- Selects medium-size images (~300px)
-- One URL per album_rowid
-- Falls back gracefully if no images found
-
----
-
-### Task 1.6: Implement match_to_spotify()
-
-**File**: `scripts/lrclib-extract/src/main.rs`
-**Location**: New function
-
-```rust
-fn match_to_spotify<'a>(
-    lrclib: &ScoredTrack,
-    spotify_lookup: &'a HashMap<(String, String), Vec<SpotifyTrack>>,
-) -> Option<&'a SpotifyTrack> {
-    let key = (lrclib.title_norm.clone(), lrclib.artist_norm.clone());
-    let candidates = spotify_lookup.get(&key)?;
-
-    candidates
-        .iter()
-        .filter(|s| {
-            let spotify_duration_sec = s.duration_ms / 1000;
-            (lrclib.track.duration_sec - spotify_duration_sec).abs() <= 10
-        })
-        .max_by_key(|s| s.popularity)
-}
-```
-
-**Acceptance Criteria**:
-- Matches by normalized (title, artist)
-- Filters by duration ±10 seconds
-- Returns highest popularity match
-- Returns None if no match found
-
----
-
-### Task 1.7: Implement enrich_tracks()
-
-**File**: `scripts/lrclib-extract/src/main.rs`
-**Location**: New function
-
-```rust
-fn enrich_tracks(
-    canonical: Vec<ScoredTrack>,
-    spotify_lookup: &HashMap<(String, String), Vec<SpotifyTrack>>,
-    audio_lookup: &HashMap<i64, AudioFeatures>,
-    image_lookup: &HashMap<i64, String>,
-) -> Vec<EnrichedTrack> {
-    // Parallel iteration with rayon
-    // Match each LRCLIB track to Spotify
-    // Join with audio_features and album_images
-    // Report match statistics
-}
-```
-
-**Acceptance Criteria**:
-- Uses rayon for parallel processing
-- Reports match rate (target: ~80%)
-- Progress bar shows enrichment status
-- All LRCLIB tracks included (with NULL Spotify fields if no match)
-
----
-
-### Task 1.8: Update write_output() Schema
-
-**File**: `scripts/lrclib-extract/src/main.rs`
-**Location**: Lines 467-522 (write_output function)
-
-Update the CREATE TABLE statement to include new columns:
-
-```sql
-CREATE TABLE tracks (
-    -- LRCLIB (source of truth)
-    id INTEGER PRIMARY KEY,
-    title TEXT NOT NULL,
-    artist TEXT NOT NULL,
-    album TEXT,
-    duration_sec INTEGER NOT NULL,
-    title_norm TEXT NOT NULL,
-    artist_norm TEXT NOT NULL,
-    quality INTEGER NOT NULL,
-    -- Spotify enrichment (nullable)
-    spotify_id TEXT,
-    popularity INTEGER,
-    tempo REAL,
-    musical_key INTEGER,
-    mode INTEGER,
-    time_signature INTEGER,
-    isrc TEXT,
-    album_image_url TEXT
-);
-
-CREATE INDEX idx_tracks_spotify_id ON tracks(spotify_id);
-```
-
-Update INSERT statement to include all 16 columns.
-
-**Acceptance Criteria**:
-- Schema includes all 8 new columns
-- Index created on spotify_id
-- INSERT handles NULL values correctly
-- Output file ~1.05GB with enrichment
-
----
-
-### Task 1.9: Update Main Flow
-
-**File**: `scripts/lrclib-extract/src/main.rs`
-**Location**: main() function
-
-Add new phases to main():
-
-```rust
-fn main() -> Result<()> {
-    // ... existing setup ...
-
-    // Phase 1: Read LRCLIB tracks (existing)
-    let tracks = read_tracks(&source_conn, artist_filter.as_ref())?;
-
-    // Phase 1b: Load Spotify lookup (NEW)
-    let spotify_lookup = if let Some(ref spotify_path) = args.spotify {
-        let conn = Connection::open(spotify_path)?;
-        conn.execute_batch("PRAGMA mmap_size = 8589934592;")?;
-        load_spotify_tracks(&conn, args.min_popularity)?
-    } else {
-        HashMap::new()
-    };
-
-    // Phase 1c: Load audio features (NEW)
-    let audio_lookup = if let Some(ref af_path) = args.audio_features {
-        let conn = Connection::open(af_path)?;
-        load_audio_features(&conn)?
-    } else {
-        HashMap::new()
-    };
-
-    // Phase 1d: Load album images (NEW)
-    let image_lookup = if let Some(ref spotify_path) = args.spotify {
-        let conn = Connection::open(spotify_path)?;
-        load_album_images(&conn)?
-    } else {
-        HashMap::new()
-    };
-
-    // Phase 2: Group & select canonical (existing)
-    let groups = group_tracks(tracks);
-    let canonical_tracks = process_groups(groups);
-
-    // Phase 2b: Enrich with Spotify (NEW)
-    let enriched_tracks = if !spotify_lookup.is_empty() {
-        enrich_tracks(canonical_tracks, &spotify_lookup, &audio_lookup, &image_lookup)
-    } else {
-        // Convert to EnrichedTrack with NULL Spotify fields
-    };
-
-    // Phase 3-5: Write output, FTS, optimize (updated for new schema)
-}
-```
-
-**Acceptance Criteria**:
-- Phases execute in correct order
-- Memory-mapped file access for large databases
-- Progress bars for each phase
-- Final stats show match rate
-
----
-
-### Task 1.10: Update test_search() Output
-
-**File**: `scripts/lrclib-extract/src/main.rs`
-**Location**: test_search() function
-
-Update output format to show enrichment data:
-
-```
-[12345] Metallica - Nothing Else Matters (Black Album) [386s] quality=80 tempo=142.5 key=E minor pop=85
-```
-
-**Acceptance Criteria**:
-- Shows tempo, key, and popularity if available
-- Shows "no match" for tracks without Spotify data
-- Test query validates enrichment works
-
----
-
-## Phase 2: Turso Schema Migration
-
-**Dependencies**: Phase 1 complete
-**Spec**: [002-turso-schema-migration.md](specs/002-turso-schema-migration.md)
-**Primary File**: `src/services/turso.ts`
-
-### Task 2.1: Run Full Extraction
-
-**Command**:
-```bash
-cd scripts/lrclib-extract
-cargo build --release
-./target/release/lrclib-extract \
-  /path/to/lrclib.sqlite3 \
-  /path/to/output.sqlite3 \
-  --spotify /path/to/spotify_clean.sqlite3 \
-  --audio-features /path/to/spotify_clean_audio_features.sqlite3 \
-  --min-popularity 1
-```
-
-**Acceptance Criteria**:
-- Output database ~1.05GB
-- ~4.2M tracks
-- ~80% Spotify match rate
-- FTS5 index builds successfully
-
----
-
-### Task 2.2: Upload to Turso
-
-**Command**:
-```bash
-turso db shell scrolltunes-search < output.sqlite3
-```
-
-**Acceptance Criteria**:
-- Database uploads successfully
-- Size within free tier limit (5GB)
-- FTS5 queries work
-
----
-
-### Task 2.3: Update TursoSearchResult Interface
-
-**File**: `src/services/turso.ts`
-**Location**: Lines 6-13
+**Files**: `src/lib/bpm/bpm-log.ts` (new file)
 
 ```typescript
-export interface TursoSearchResult {
-  readonly id: number
-  readonly title: string
-  readonly artist: string
-  readonly album: string | null
-  readonly durationSec: number
-  readonly quality: number
-  // NEW: Spotify enrichment
-  readonly spotifyId: string | null
-  readonly popularity: number | null
-  readonly tempo: number | null
-  readonly musicalKey: number | null
-  readonly mode: number | null
-  readonly timeSignature: number | null
-  readonly isrc: string | null
-  readonly albumImageUrl: string | null
+import { db } from "@/lib/db"
+import { bpmFetchLog } from "@/lib/db/schema"
+import { Data, Effect } from "effect"
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export type BpmProvider =
+  | "Turso"
+  | "GetSongBPM"
+  | "Deezer"
+  | "ReccoBeats"
+  | "RapidAPISpotify"
+
+export type BpmStage =
+  | "turso_embedded"
+  | "cascade_fallback"
+  | "cascade_race"
+  | "last_resort"
+
+export type BpmErrorReason =
+  | "not_found"
+  | "rate_limit"
+  | "api_error"
+  | "timeout"
+  | "unknown"
+
+export interface BpmLogEntry {
+  lrclibId: number
+  songId?: string
+  title: string
+  artist: string
+  stage: BpmStage
+  provider: BpmProvider
+  success: boolean
+  bpm?: number
+  errorReason?: BpmErrorReason
+  errorDetail?: string
+  latencyMs?: number
 }
-```
 
-**Acceptance Criteria**:
-- All 8 new fields added
-- All new fields are nullable (null, not undefined)
-- TypeScript compiles without errors
-
----
-
-### Task 2.4: Update search() Query
-
-**File**: `src/services/turso.ts`
-**Location**: Lines 55-89
-
-Update SQL and result mapping:
-
-```typescript
-const search = (query: string, limit = 10) =>
-  Effect.gen(function* () {
-    const client = yield* getClient
-    const result = yield* Effect.tryPromise({
-      try: async () => {
-        const rs = await client.execute({
-          sql: `
-            SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality,
-                   t.spotify_id, t.popularity, t.tempo, t.musical_key, t.mode,
-                   t.time_signature, t.isrc, t.album_image_url
-            FROM tracks_fts fts
-            JOIN tracks t ON fts.rowid = t.id
-            WHERE tracks_fts MATCH ?
-            ORDER BY (t.popularity IS NOT NULL) DESC,
-                     t.popularity DESC,
-                     t.quality DESC,
-                     -bm25(tracks_fts) ASC
-            LIMIT ?
-          `,
-          args: [query, limit],
-        })
-        return rs.rows
-      },
-      catch: error => new TursoSearchError({ message: "Turso search failed", cause: error }),
-    })
-    // Map rows with new fields...
-  })
-```
-
-**Acceptance Criteria**:
-- Query includes all new columns
-- ORDER BY prioritizes enriched tracks
-- Result mapping handles NULL values
-
----
-
-### Task 2.5: Update getById() Query
-
-**File**: `src/services/turso.ts`
-**Location**: Lines 91-121
-
-Add new columns to SELECT and result mapping.
-
-**Acceptance Criteria**:
-- Query includes all new columns
-- Result mapping handles NULL values
-- Returns null if not found (existing behavior)
-
----
-
-### Task 2.6: Update findByTitleArtist() Query
-
-**File**: `src/services/turso.ts`
-**Location**: Lines 123-182
-
-Add new columns to SELECT and result mapping.
-
-**Acceptance Criteria**:
-- Query includes all new columns
-- Result mapping handles NULL values
-- Duration scoring still works correctly
-
----
-
-## Phase 3: Search API Updates
-
-**Dependencies**: Phase 2 complete
-**Spec**: [003-search-api-turso-first.md](specs/003-search-api-turso-first.md)
-**Primary File**: `src/app/api/search/route.ts`
-
-### Task 3.1: Remove Spotify Search Dependencies
-
-**File**: `src/app/api/search/route.ts`
-**Location**: Lines 7-12 (imports - verified)
-
-Remove these imports from `@/lib/spotify-client`:
-```typescript
-import {
-  formatArtists,
-  getAlbumImageUrl,
-  searchTracksEffect,
-  SpotifyError,
-  SpotifyService,
-  SpotifyTrack,
-} from "@/lib/spotify-client"
-```
-
-**Acceptance Criteria**:
-- Spotify client search imports removed
-- Keep any imports needed for other features (e.g., lyrics)
-- No TypeScript errors from missing imports
-
----
-
-### Task 3.2: Remove searchSpotifyWithTurso()
-
-**File**: `src/app/api/search/route.ts`
-**Location**: Lines 72-114 (verified)
-
-Delete the entire function. This function:
-- Calls `searchTracksEffect` to get Spotify results
-- Maps tracks through `findLrclibMatch` for Turso verification
-- Constructs `SearchResultTrack[]` with Spotify metadata
-
-**Acceptance Criteria**:
-- Function removed
-- No references to removed function in `search()` (lines 237-265)
-
----
-
-### Task 3.3: Remove findLrclibMatch()
-
-**File**: `src/app/api/search/route.ts`
-**Location**: Lines 39-67 (verified)
-
-Delete the entire function. Also remove:
-- `SpotifyTrackWithLrclib` interface (lines 28-34)
-
-**Acceptance Criteria**:
-- Function removed
-- Interface removed
-- No orphan references
-
----
-
-### Task 3.4: Create searchTurso() Function
-
-**File**: `src/app/api/search/route.ts`
-**Location**: New function (replace searchSpotifyWithTurso)
-
-```typescript
-const searchTurso = (query: string, limit: number) =>
-  Effect.gen(function* () {
-    const turso = yield* TursoService
-    const config = yield* ServerConfig
-
-    const results = yield* turso.search(query, limit).pipe(
-      Effect.catchAll(() => Effect.succeed([] as TursoSearchResult[]))
-    )
-
-    // Enrich with album art (parallel, concurrency: 4)
-    const enriched = yield* Effect.forEach(
-      results,
-      (result) => enrichWithAlbumArt(result),
-      { concurrency: 4 }
-    )
-
-    return enriched
-  })
-```
-
-**Acceptance Criteria**:
-- Direct Turso search (no Spotify API)
-- Handles Turso errors gracefully
-- Returns SearchResultTrack[]
-
----
-
-### Task 3.5: Create enrichWithAlbumArt() Helper
-
-**File**: `src/app/api/search/route.ts`
-**Location**: New function
-
-```typescript
-const enrichWithAlbumArt = (result: TursoSearchResult) =>
-  Effect.gen(function* () {
-    // Priority 1: Stored URL from Turso
-    let albumArt = result.albumImageUrl
-
-    // Priority 2: Deezer fallback if no stored URL
-    if (!albumArt) {
-      albumArt = yield* Effect.tryPromise({
-        try: () => getAlbumArt(result.artist, result.title, "medium"),
-        catch: () => null,
-      }).pipe(Effect.catchAll(() => Effect.succeed(null)))
-    }
-
-    return {
-      id: `lrclib-${result.id}`,
-      name: result.title,
-      artist: result.artist,
-      album: result.album ?? "",
-      albumArt: albumArt ?? undefined,
-      duration: result.durationSec * 1000,
-      hasLyrics: true,
-      lrclibId: result.id,
-      spotifyId: result.spotifyId ?? undefined,
-      popularity: result.popularity ?? undefined,
-      tempo: result.tempo ?? undefined,
-    } satisfies SearchResultTrack
-  })
-```
-
-**Acceptance Criteria**:
-- Uses stored albumImageUrl first
-- Falls back to Deezer if no stored URL
-- Maps all fields correctly
-
----
-
-### Task 3.6: Update SearchResultTrack Type
-
-**File**: `src/lib/search-api-types.ts`
-**Location**: Lines 5-15 (verified - currently has 9 fields)
-
-Current interface:
-```typescript
-export interface SearchResultTrack {
-  readonly id: string
-  readonly name: string
-  readonly artist: string
-  readonly album: string
-  readonly albumArt?: string | undefined
-  readonly duration: number
-  readonly hasLyrics: boolean
-  readonly spotifyId?: string | undefined
-  readonly lrclibId?: number | undefined
-}
-```
-
-Add two new fields:
-```typescript
-export interface SearchResultTrack {
-  readonly id: string
-  readonly name: string
-  readonly artist: string
-  readonly album: string
-  readonly albumArt?: string | undefined
-  readonly duration: number
-  readonly hasLyrics: boolean
-  readonly spotifyId?: string | undefined
-  readonly lrclibId?: number | undefined
-  // NEW: Enrichment fields from Turso
-  readonly popularity?: number | undefined
-  readonly tempo?: number | undefined
-}
-```
-
-**Acceptance Criteria**:
-- `popularity` field added (optional, 0-100)
-- `tempo` field added (optional, BPM)
-- Fields are optional (may be undefined)
-- TypeScript compiles without errors
-
----
-
-### Task 3.7: Update search() Function
-
-**File**: `src/app/api/search/route.ts`
-**Location**: Lines 237-265
-
-```typescript
-const search = (query: string, limit: number) =>
-  Effect.gen(function* () {
-    // Primary: Turso search
-    const tursoResults = yield* searchTurso(query, limit)
-
-    if (tursoResults.length > 0) {
-      return tursoResults
-    }
-
-    // Fallback: LRCLIB API
-    return yield* searchLRCLibFallback(query, limit)
-  })
-```
-
-**Acceptance Criteria**:
-- Turso is primary search path
-- LRCLIB API is fallback only
-- SpotifyService removed from dependencies
-
----
-
-### Task 3.8: Update Effect Dependencies
-
-**File**: `src/app/api/search/route.ts`
-**Location**: GET handler (lines 267-306)
-
-Remove SpotifyService from the Effect.provide() chain.
-
-**Acceptance Criteria**:
-- SpotifyService not in dependencies
-- Effect runs successfully without Spotify
-
----
-
-### Task 3.9: Review verify Route (Keep)
-
-**File**: `src/app/api/search/verify/route.ts`
-**Action**: Review - likely keep
-
-This route verifies LRCLIB lyrics availability by title/artist. It does NOT depend on Spotify:
-- Uses `searchLRCLibTracks()` from `@/lib/lyrics-client`
-- Returns `found: true/false` with LRCLIB ID if found
-- Still useful for external integrations checking lyrics availability
-
-**Decision**: **Keep this route** - it's independent of the Spotify→Turso search flow.
-
-**Acceptance Criteria**:
-- Route remains functional after other changes
-- No accidental dependency on removed code
-
----
-
-## Phase 4: Album Art Optimization
-
-**Dependencies**: Phase 3 complete
-**Spec**: [004-album-art-optimization.md](specs/004-album-art-optimization.md)
-**Primary File**: `src/lib/album-art.ts` (new)
-
-### Task 4.1: Create album-art.ts Module
-
-**File**: `src/lib/album-art.ts` (NEW FILE)
-
-```typescript
-import { Effect } from "effect"
-import { getAlbumArt, type AlbumArtSize } from "@/lib/deezer-client"
-import type { TursoSearchResult } from "@/services/turso"
+// ============================================================================
+// Helpers
+// ============================================================================
 
 /**
- * Get album art for a track using priority chain:
- * 1. Stored URL from Turso (instant)
- * 2. Deezer ISRC lookup (~100ms)
- * 3. Deezer search fallback (~200ms)
+ * Map error to standardized reason code.
  */
-export const getAlbumArtForTrack = (
-  track: TursoSearchResult,
-  size: AlbumArtSize = "medium"
-): Effect.Effect<string | null, never, never> =>
-  Effect.gen(function* () {
-    // Priority 1: Stored URL
-    if (track.albumImageUrl) {
-      return track.albumImageUrl
-    }
-
-    // Priority 2: Deezer ISRC lookup
-    if (track.isrc) {
-      const isrcResult = yield* Effect.tryPromise({
-        try: async () => {
-          const response = await fetch(
-            `https://api.deezer.com/track/isrc:${track.isrc}`
-          )
-          if (!response.ok) return null
-          const data = await response.json()
-          return data.album?.[`cover_${size}`] ?? null
-        },
-        catch: () => null,
-      }).pipe(Effect.catchAll(() => Effect.succeed(null)))
-
-      if (isrcResult) return isrcResult
-    }
-
-    // Priority 3: Deezer search fallback
-    return yield* Effect.tryPromise({
-      try: () => getAlbumArt(track.artist, track.title, size),
-      catch: () => null,
-    }).pipe(Effect.catchAll(() => Effect.succeed(null)))
-  })
-
-/**
- * Get large album art for share editor
- */
-export const getLargeAlbumArt = (
-  track: TursoSearchResult
-): Effect.Effect<string | null, never, never> =>
-  getAlbumArtForTrack(track, "xl")
-```
-
-**Acceptance Criteria**:
-- Three-tier priority chain
-- ISRC lookup uses Deezer API
-- All errors handled gracefully
-- Returns null on all failures
-
----
-
-### Task 4.2: Add ISRC Lookup to Deezer Client
-
-**File**: `src/lib/deezer-client.ts`
-**Location**: After existing functions
-
-```typescript
-/**
- * Look up track by ISRC (direct, no search)
- */
-export const getTrackByIsrc = (
-  isrc: string,
-  size: AlbumArtSize = "medium"
-): Effect.Effect<string | null, DeezerAPIError> =>
-  Effect.gen(function* () {
-    const url = `${DEEZER_BASE_URL}/track/isrc:${isrc}`
-
-    const response = yield* Effect.tryPromise({
-      try: () => fetch(url, { cache: "force-cache" }),
-      catch: error =>
-        new DeezerAPIError({
-          message: error instanceof Error ? error.message : "Network error",
-        }),
-    })
-
-    if (!response.ok) {
-      return null
-    }
-
-    const data = yield* Effect.tryPromise({
-      try: () => response.json() as Promise<DeezerTrack>,
-      catch: () => new DeezerAPIError({ message: "Failed to parse response" }),
-    })
-
-    const sizeKey = `cover_${size}` as keyof DeezerAlbum
-    return data.album?.[sizeKey] ?? null
-  })
-```
-
-**Acceptance Criteria**:
-- Direct ISRC lookup (no search)
-- Returns album art URL by size
-- Returns null if not found
-
----
-
-### Task 4.3: Update Search Route to Use Album Art Module
-
-**File**: `src/app/api/search/route.ts`
-
-Import and use the new album-art module in enrichWithAlbumArt().
-
-**Acceptance Criteria**:
-- Album art resolution uses priority chain
-- Stored URLs used when available
-- Deezer fallback works correctly
-
----
-
-## Phase 5: BPM Provider Refactor
-
-**Dependencies**: Phase 2 complete (can run parallel with Phase 3-4)
-**Spec**: [005-bpm-provider-refactor.md](specs/005-bpm-provider-refactor.md)
-**Primary Files**:
-- `src/lib/musical-key.ts` (new)
-- `src/lib/bpm/bpm-resolver.ts` (new)
-- `src/services/song-loader.ts`
-
-### Task 5.1: Create musical-key.ts
-
-**File**: `src/lib/musical-key.ts` (NEW FILE)
-
-```typescript
-const PITCH_CLASSES = [
-  "C", "C#", "D", "D#", "E", "F",
-  "F#", "G", "G#", "A", "A#", "B"
-] as const
-
-/**
- * Format musical key from Spotify pitch class + mode
- * @param key Pitch class (0-11), -1 for unknown
- * @param mode 0=minor, 1=major, null=unknown
- * @returns Formatted key string or null
- */
-export function formatMusicalKey(
-  key: number | null,
-  mode: number | null
-): string | null {
-  if (key === null || key === -1 || key < 0 || key > 11) {
-    return null
-  }
-
-  const pitch = PITCH_CLASSES[key]
-  if (pitch === undefined) return null
-
-  const modeName = mode === 1 ? "major" : mode === 0 ? "minor" : ""
-
-  return modeName ? `${pitch} ${modeName}` : pitch
-}
-```
-
-**Acceptance Criteria**:
-- formatMusicalKey(9, 0) returns "A minor"
-- formatMusicalKey(0, 1) returns "C major"
-- formatMusicalKey(-1, null) returns null
-- formatMusicalKey(7, null) returns "G"
-
----
-
-### Task 5.2: Create bpm-resolver.ts
-
-**File**: `src/lib/bpm/bpm-resolver.ts` (NEW FILE)
-
-```typescript
-import { Effect } from "effect"
-import type { BpmResult } from "./bpm-types"
-import { formatMusicalKey } from "@/lib/musical-key"
-
-export interface EmbeddedTempo {
-  readonly tempo: number | null
-  readonly musicalKey: number | null
-  readonly mode: number | null
-  readonly timeSignature: number | null
-}
-
-export interface BpmResultWithSource extends BpmResult {
-  readonly source: "embedded" | "provider"
-  readonly musicalKey?: string | null
-  readonly timeSignature?: number | null
+export function mapErrorToReason(error: unknown): BpmErrorReason {
+  const message = String(error).toLowerCase()
+  if (message.includes("not found") || message.includes("404")) return "not_found"
+  if (message.includes("rate limit") || message.includes("429")) return "rate_limit"
+  if (message.includes("timeout") || message.includes("timed out")) return "timeout"
+  if (message.includes("api") || message.includes("500") || message.includes("503")) return "api_error"
+  return "unknown"
 }
 
 /**
- * Resolve BPM with embedded tempo priority
+ * Fire-and-forget BPM attempt logging.
+ * Uses Effect.runFork per architecture.md requirements.
  */
-export const resolveBpm = (
-  embedded: EmbeddedTempo | null,
-  fallback: Effect.Effect<BpmResult, Error, never>
-): Effect.Effect<BpmResultWithSource, never, never> =>
-  Effect.gen(function* () {
-    // Priority 1: Embedded tempo from Turso
-    if (embedded?.tempo) {
-      return {
-        bpm: Math.round(embedded.tempo),
-        source: "embedded" as const,
-        musicalKey: formatMusicalKey(embedded.musicalKey, embedded.mode),
-        timeSignature: embedded.timeSignature,
-        attribution: {
-          provider: "Spotify",
-          url: "https://spotify.com",
-          requiresBacklink: false,
-        },
-      }
-    }
-
-    // Priority 2: Provider cascade
-    const result = yield* fallback.pipe(
-      Effect.map((r) => ({
-        ...r,
-        source: "provider" as const,
-      })),
-      Effect.catchAll(() =>
-        Effect.succeed({
-          bpm: null as unknown as number,
-          source: "provider" as const,
-          attribution: null,
-        })
-      )
-    )
-
-    return result
+export function logBpmAttempt(entry: BpmLogEntry): void {
+  const insertEffect = Effect.tryPromise({
+    try: () =>
+      db.insert(bpmFetchLog).values({
+        lrclibId: entry.lrclibId,
+        songId: entry.songId ?? null,
+        title: entry.title,
+        artist: entry.artist,
+        stage: entry.stage,
+        provider: entry.provider,
+        success: entry.success,
+        bpm: entry.bpm ?? null,
+        errorReason: entry.errorReason ?? null,
+        errorDetail: entry.errorDetail?.slice(0, 500) ?? null,
+        latencyMs: entry.latencyMs ?? null,
+      }),
+    catch: error => new BpmLogInsertError({ cause: error }),
   })
+
+  Effect.runFork(
+    insertEffect.pipe(
+      Effect.catchAll(err =>
+        Effect.sync(() => console.error("[BPM Log] Insert failed:", err.cause)),
+      ),
+    ),
+  )
+}
+
+// Tagged error for logging failures
+class BpmLogInsertError extends Data.TaggedClass("BpmLogInsertError")<{
+  readonly cause: unknown
+}> {}
 ```
 
 **Acceptance Criteria**:
-- Embedded tempo checked first
-- Provider cascade as fallback
-- Musical key formatted correctly
-- Source tracked for attribution
+- [x] File created at `src/lib/bpm/bpm-log.ts`
+- [x] All types exported: `BpmProvider`, `BpmStage`, `BpmErrorReason`, `BpmLogEntry`
+- [x] `logBpmAttempt` uses `Effect.runFork` (NOT `.then().catch()`)
+- [x] `BpmLogInsertError` tagged error class defined
+- [x] `mapErrorToReason` helper function exported
+- [x] `errorDetail` truncated to 500 chars
+- [x] `bun run typecheck` passes
 
 ---
 
-### Task 5.3: Update BpmResult Type
+## Phase 2: Instrumentation (P1)
 
-**File**: `src/lib/bpm/bpm-types.ts`
-**Location**: Lines 17-21 (verified)
+**Dependencies**: Phase 1 must be complete.
 
-Current interface:
-```typescript
-export interface BPMResult {
-  readonly bpm: number
-  readonly source: string      // Already exists - provider name
-  readonly key: string | null  // Already exists - musical key
-}
-```
+### Task 2.1: Update `fireAndForgetBpmFetch` Signature
 
-Add `timeSignature` field and `BpmAttribution` type:
+**Status**: ✅ COMPLETE
 
-```typescript
-export interface BPMResult {
-  readonly bpm: number
-  readonly source: string
-  readonly key: string | null
-  // NEW: Time signature from Spotify
-  readonly timeSignature?: number | null
-}
+**Files**: `src/services/song-loader.ts`
 
-// NEW: Attribution metadata for BPM source
-export interface BpmAttribution {
-  readonly provider: string
-  readonly url?: string
-  readonly requiresBacklink: boolean
-}
-```
-
-**Acceptance Criteria**:
-- `timeSignature` field added (optional for backward compatibility)
-- `BpmAttribution` type defined
-- Existing `source` and `key` fields preserved
-
----
-
-### Task 5.4: Update Song Loader for Embedded Tempo
-
-**File**: `src/services/song-loader.ts`
-**Location**: Lines 228-286 (verified - `fireAndForgetBpmFetch` function)
-
-The BPM fetch logic is in `fireAndForgetBpmFetch()` starting at line 228. Add embedded tempo check before provider cascade:
-
+**Current signature** (line 243-248):
 ```typescript
 function fireAndForgetBpmFetch(
   songId: string,
   title: string,
   artist: string,
   spotifyId: string | undefined,
-  embeddedTempo?: { tempo: number | null; musicalKey: number | null; mode: number | null } // NEW
+)
+```
+
+**Updated signature**:
+```typescript
+function fireAndForgetBpmFetch(
+  songId: string,
+  lrclibId: number,
+  title: string,
+  artist: string,
+  spotifyId: string | undefined,
+)
+```
+
+**Call site update** (line 541):
+```typescript
+// Before:
+fireAndForgetBpmFetch(cachedSong.songId, lyrics.title, lyrics.artist, resolvedSpotifyId)
+
+// After:
+fireAndForgetBpmFetch(cachedSong.songId, actualLrclibId, lyrics.title, lyrics.artist, resolvedSpotifyId)
+```
+
+**Acceptance Criteria**:
+- [x] Function signature updated with `lrclibId: number` parameter
+- [x] Call site updated to pass `actualLrclibId`
+- [x] `bun run typecheck` passes
+
+---
+
+### Task 2.2: Instrument Turso Embedded Tempo Lookup
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/services/song-loader.ts`
+
+Added import for `logBpmAttempt` and timing/logging calls around the Turso embedded tempo lookup.
+
+**Note**: Also updated `src/lib/bpm/bpm-log.ts` to fix `BpmLogEntry` interface for `exactOptionalPropertyTypes` compatibility by adding `| undefined` to optional properties.
+
+**Acceptance Criteria**:
+- [x] Import added for `logBpmAttempt`
+- [x] Timing captured for Turso lookup
+- [x] Success case logs with BPM value
+- [x] Failure case logs with "not_found" reason
+- [x] Logging is non-blocking
+- [x] `bun run typecheck` passes
+
+---
+
+### Task 2.3: Instrument Provider Cascade
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/services/bpm-providers.ts`
+
+Add imports and modify the provider creation to wrap with logging:
+
+```typescript
+import { withInMemoryCache } from "@/lib/bpm/bpm-cache"
+import type { BPMProvider } from "@/lib/bpm/bpm-provider"
+import type { BPMTrackQuery } from "@/lib/bpm/bpm-types"
+import { deezerBpmProvider } from "@/lib/bpm/deezer-client"
+import { getSongBpmProvider } from "@/lib/bpm/getsongbpm-client"
+import { rapidApiSpotifyProvider } from "@/lib/bpm/rapidapi-client"
+import { reccoBeatsProvider } from "@/lib/bpm/reccobeats-client"
+import {
+  logBpmAttempt,
+  mapErrorToReason,
+  type BpmProvider as BpmProviderType,
+  type BpmStage,
+} from "@/lib/bpm/bpm-log"
+import { Context, Effect, Layer } from "effect"
+import { PublicConfig } from "./public-config"
+import { ServerConfig } from "./server-config"
+
+// ============================================================================
+// Logging Context Interface
+// ============================================================================
+
+export interface LoggingContext {
+  lrclibId: number
+  songId: string | undefined
+  title: string
+  artist: string
+}
+
+// ============================================================================
+// Provider Wrapper with Logging
+// ============================================================================
+
+function wrapProviderWithLogging(
+  provider: BPMProvider,
+  stage: BpmStage,
+  context: LoggingContext,
+): BPMProvider {
+  return {
+    name: provider.name,
+    getBpm: (query: BPMTrackQuery) => {
+      const start = Date.now()
+      return provider.getBpm(query).pipe(
+        Effect.tap(result => {
+          logBpmAttempt({
+            ...context,
+            stage,
+            provider: provider.name as BpmProviderType,
+            success: true,
+            bpm: result.bpm,
+            latencyMs: Date.now() - start,
+          })
+          return Effect.void
+        }),
+        Effect.tapError(error => {
+          logBpmAttempt({
+            ...context,
+            stage,
+            provider: provider.name as BpmProviderType,
+            success: false,
+            errorReason: mapErrorToReason(error),
+            errorDetail: String(error).slice(0, 500),
+            latencyMs: Date.now() - start,
+          })
+          return Effect.void
+        }),
+      )
+    },
+  }
+}
+
+// ============================================================================
+// Service Interface (updated)
+// ============================================================================
+
+export interface BpmProvidersService {
+  readonly fallbackProviders: readonly BPMProvider[]
+  readonly raceProviders: readonly BPMProvider[]
+  readonly lastResortProvider: BPMProvider
+  /** Wrap providers with logging for a specific request context */
+  readonly withLogging: (context: LoggingContext) => {
+    fallbackProviders: readonly BPMProvider[]
+    raceProviders: readonly BPMProvider[]
+    lastResortProvider: BPMProvider
+  }
+}
+
+export class BpmProviders extends Context.Tag("BpmProviders")<
+  BpmProviders,
+  BpmProvidersService
+>() {}
+
+const makeBpmProviders = Effect.gen(function* () {
+  const publicConfig = yield* PublicConfig
+  const serverConfig = yield* ServerConfig
+
+  const withConfig = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    effect.pipe(
+      Effect.provideService(PublicConfig, publicConfig),
+      Effect.provideService(ServerConfig, serverConfig),
+    )
+
+  const wrapProvider = <R>(provider: BPMProvider<R>) => ({
+    name: provider.name,
+    getBpm: (query: BPMTrackQuery) => withConfig(provider.getBpm(query)),
+  })
+
+  const fallbackProviders = [
+    withInMemoryCache(wrapProvider(getSongBpmProvider)),
+    withInMemoryCache(wrapProvider(deezerBpmProvider)),
+  ]
+
+  const raceProviders = [
+    withInMemoryCache(wrapProvider(reccoBeatsProvider)),
+    withInMemoryCache(wrapProvider(getSongBpmProvider)),
+    withInMemoryCache(wrapProvider(deezerBpmProvider)),
+  ]
+
+  const lastResortProvider = withInMemoryCache(wrapProvider(rapidApiSpotifyProvider))
+
+  const withLogging = (context: LoggingContext) => ({
+    fallbackProviders: fallbackProviders.map(p =>
+      wrapProviderWithLogging(p, "cascade_fallback", context),
+    ),
+    raceProviders: raceProviders.map(p =>
+      wrapProviderWithLogging(p, "cascade_race", context),
+    ),
+    lastResortProvider: wrapProviderWithLogging(lastResortProvider, "last_resort", context),
+  })
+
+  return {
+    fallbackProviders,
+    raceProviders,
+    lastResortProvider,
+    withLogging,
+  }
+})
+
+export const BpmProvidersLive = Layer.effect(BpmProviders, makeBpmProviders)
+```
+
+**Then update** `src/services/song-loader.ts` `fireAndForgetBpmFetch` function (lines 243-300) to use logging:
+
+```typescript
+function fireAndForgetBpmFetch(
+  songId: string,
+  lrclibId: number,
+  title: string,
+  artist: string,
+  spotifyId: string | undefined,
 ) {
-  // NEW: Check embedded tempo first
-  if (embeddedTempo?.tempo) {
-    const bpm = Math.round(embeddedTempo.tempo)
-    const key = formatMusicalKey(embeddedTempo.musicalKey, embeddedTempo.mode)
-    // Update DB and return early
-    await db.update(songs).set({ bpm, musicalKey: key, bpmSource: "Spotify" })...
-    return
+  const loggingContext = { lrclibId, songId, title, artist }
+
+  const bpmEffect = BpmProviders.pipe(
+    Effect.flatMap(service => {
+      const { fallbackProviders, raceProviders, lastResortProvider } = service.withLogging(loggingContext)
+      const bpmQuery = { title, artist, spotifyId }
+
+      const primaryBpmEffect = spotifyId
+        ? getBpmRace(raceProviders, bpmQuery)
+        : getBpmWithFallback(fallbackProviders, bpmQuery)
+
+      const bpmWithLastResort = spotifyId
+        ? primaryBpmEffect.pipe(
+            Effect.catchAll(error =>
+              error._tag === "BPMNotFoundError"
+                ? lastResortProvider.getBpm(bpmQuery)
+                : Effect.fail(error),
+            ),
+          )
+        : primaryBpmEffect
+
+      return bpmWithLastResort.pipe(
+        Effect.catchAll(error => {
+          if (error._tag === "BPMAPIError") {
+            console.error("BPM API error:", error.status, error.message)
+          }
+          return Effect.succeed(null)
+        }),
+        Effect.catchAllDefect(defect => {
+          console.error("BPM defect:", defect)
+          return Effect.succeed(null)
+        }),
+      )
+    }),
+    Effect.flatMap(bpmResult => {
+      if (!bpmResult) return Effect.succeed(null)
+      return Effect.promise(async () => {
+        await db
+          .update(songs)
+          .set({
+            bpm: bpmResult.bpm,
+            musicalKey: bpmResult.key ?? null,
+            bpmSource: bpmResult.source,
+            updatedAt: new Date(),
+          })
+          .where(eq(songs.id, songId))
+        return bpmResult
+      })
+    }),
+  )
+
+  Effect.runPromise(bpmEffect.pipe(Effect.provide(ServerLayer))).catch(err =>
+    console.error("[BPM] Background fetch failed:", err),
+  )
+}
+```
+
+**Acceptance Criteria**:
+- [x] `LoggingContext` interface added
+- [x] `wrapProviderWithLogging` function created
+- [x] `withLogging` method added to `BpmProvidersService`
+- [x] `song-loader.ts` uses `withLogging` for cascade
+- [x] Each provider attempt is logged with correct stage
+- [x] Errors are captured with reason and truncated detail
+- [x] `bun run typecheck` passes
+
+---
+
+## Phase 3: BPM Analytics Dashboard (P2)
+
+**Dependencies**: Phase 2 must be complete (needs data to display).
+**Can run in parallel with**: Phase 5 (Tracks Browser).
+
+### Task 3.1: BPM Stats API Endpoint
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/app/api/admin/bpm-stats/route.ts` (new file)
+
+Create API endpoint following the pattern from `src/app/api/admin/stats/route.ts`:
+- Use Effect.ts for async operations
+- Auth check via `auth()` and `isAdmin` from profile
+- Support query params: `section`, `period`, `offset`, `limit`, `missingType`
+
+See `specs/bpm-admin-dashboard.md` for full query details.
+
+**Acceptance Criteria**:
+- [x] Route created with admin auth check
+- [x] Summary query returns: total attempts, success rate, songs without BPM, avg latency
+- [x] Provider breakdown query works
+- [x] Time-series query returns 30 days of data
+- [x] Failures query with pagination
+- [x] Missing songs queries for all three types
+- [x] Error breakdown query works
+
+---
+
+### Task 3.2: Summary Cards Component
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/components/admin/BpmStatsCards.tsx` (new file)
+
+Display 4 stat cards:
+- Total attempts (24h)
+- Success rate (%)
+- Songs without BPM
+- Avg latency (ms)
+
+Follow styling from `src/app/admin/page.tsx` `StatCard` component.
+
+**Acceptance Criteria**:
+- [x] 4 stat cards render
+- [x] Loading skeleton state
+- [x] Uses CSS variables for styling
+
+---
+
+### Task 3.3: Provider Table Component
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/components/admin/BpmProviderTable.tsx` (new file)
+
+Table with columns: Provider, Attempts, Successes, Rate (%), Avg Latency.
+
+**Acceptance Criteria**:
+- [x] Table renders provider breakdown
+- [x] Sorted by attempts descending
+- [x] Success rate calculated correctly
+
+---
+
+### Task 3.4: Time-Series Chart Component
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/components/admin/BpmTimeSeriesChart.tsx` (new file)
+
+Use `recharts` for stacked bar chart. Note: recharts was installed as it was not already in the project.
+
+**Acceptance Criteria**:
+- [x] Chart renders 30 days of data
+- [x] Stacked by provider
+- [x] Responsive width
+
+---
+
+### Task 3.5: Failures List Component
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/components/admin/BpmFailuresList.tsx` (new file)
+
+Paginated list of recent failures with click-to-drill-down support.
+
+**Acceptance Criteria**:
+- [x] List renders recent failures
+- [x] Shows title, artist, provider, error reason, timestamp
+- [x] Pagination controls work
+- [x] Empty state when no failures
+
+---
+
+### Task 3.6: Missing Songs Component
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/components/admin/BpmMissingSongs.tsx` (new file)
+
+Three tabs:
+1. Never had BPM
+2. All attempts failed
+3. Most problematic (highest fail count)
+
+**Acceptance Criteria**:
+- [x] Tab switching works
+- [x] Each tab shows paginated list
+- [x] Click song triggers drill-down
+
+---
+
+### Task 3.7: Error Breakdown Component
+
+**Files**: `src/components/admin/BpmErrorBreakdown.tsx` (new file)
+
+Pivot table grouped by provider and error reason.
+
+**Acceptance Criteria**:
+- [x] Table renders error counts
+- [x] Grouped by provider
+- [x] Shows all error reasons
+
+---
+
+### Task 3.8: Song Detail Drill-Down
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/components/admin/BpmSongDetail.tsx` (new file)
+
+Modal showing all BPM fetch attempts for a single song. Also added `songDetail` section to the BPM stats API (`/api/admin/bpm-stats?section=songDetail&lrclibId=X`).
+
+**Acceptance Criteria**:
+- [x] Modal opens on song click
+- [x] Shows all attempts chronologically
+- [x] Close button works
+
+---
+
+### Task 3.9: Dashboard Page
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/app/admin/bpm-stats/page.tsx` (new file)
+
+Compose all components into dashboard page. Also added BPM Analytics link to admin sidebar and mobile tabs in `src/app/admin/page.tsx`.
+
+**Acceptance Criteria**:
+- [x] Page renders at `/admin/bpm-stats`
+- [x] Admin auth check
+- [x] All sections visible
+- [x] Mobile responsive
+- [x] Add link from main admin page sidebar
+
+---
+
+## Phase 4: Maintenance (P3)
+
+**Dependencies**: Phase 1 must be complete.
+
+### Task 4.1: Retention Cleanup Cron
+
+**Status**: ✅ COMPLETE
+
+**Files**:
+- `src/app/api/cron/cleanup-bpm-log/route.ts` (new file)
+- `vercel.json` (modify)
+
+```typescript
+// src/app/api/cron/cleanup-bpm-log/route.ts
+import { db } from "@/lib/db"
+import { bpmFetchLog } from "@/lib/db/schema"
+import { DatabaseError, UnauthorizedError } from "@/lib/errors"
+import { lt, sql } from "drizzle-orm"
+import { Data, Effect } from "effect"
+import { NextResponse } from "next/server"
+
+// Tagged error for auth failures specific to cron
+class CronAuthError extends Data.TaggedClass("CronAuthError")<object> {}
+
+const cleanupBpmLog = (authHeader: string | null) =>
+  Effect.gen(function* () {
+    // Verify cron secret
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return yield* Effect.fail(new CronAuthError({}))
+    }
+
+    // Delete old records
+    const result = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .delete(bpmFetchLog)
+          .where(lt(bpmFetchLog.createdAt, sql`NOW() - INTERVAL '90 days'`)),
+      catch: cause => new DatabaseError({ cause }),
+    })
+
+    return { deleted: result.rowCount ?? 0 }
+  })
+
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization")
+  const exit = await Effect.runPromiseExit(cleanupBpmLog(authHeader))
+
+  if (exit._tag === "Failure") {
+    const cause = exit.cause
+    if (cause._tag === "Fail") {
+      const error = cause.error
+      if (error._tag === "CronAuthError") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      if (error._tag === "DatabaseError") {
+        console.error("[BPM Cleanup] Database error:", error.cause)
+        return NextResponse.json(
+          { success: false, error: "Database error" },
+          { status: 500 },
+        )
+      }
+    }
+    console.error("[BPM Cleanup] Failed:", exit.cause)
+    return NextResponse.json(
+      { success: false, error: "Server error" },
+      { status: 500 },
+    )
   }
 
-  // Existing provider cascade logic (lines 235-286)
-  const bpmEffect = BpmProviders.pipe(...)
+  return NextResponse.json({ success: true, ...exit.value })
+}
+```
+
+Update `vercel.json`:
+```json
+{
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/turso-usage",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-bpm-log",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }
 ```
 
 **Acceptance Criteria**:
-- Embedded tempo checked before provider cascade
-- Musical key formatted using `formatMusicalKey()`
-- Attribution shows "Spotify" for embedded BPM
-- Falls back to existing cascade when no embedded tempo
+- [x] Endpoint created at `/api/cron/cleanup-bpm-log`
+- [x] Uses `Effect.runPromiseExit()` pattern (NOT try/catch)
+- [x] Tagged error classes for auth and database errors
+- [x] Protected with `CRON_SECRET` bearer token
+- [x] Deletes records older than 90 days
+- [x] Returns count of deleted records
+- [x] `vercel.json` updated with cron schedule
+- [x] `bun run typecheck` passes
 
 ---
 
-### Task 5.5: Add Turso Lookup to Song Loader
+## Phase 5: Admin Tracks Browser (P2)
 
-**File**: `src/services/song-loader.ts`
+**Dependencies**: Phase 1 for schema (if using bpmFetchLog).
+**Can run in parallel with**: Phase 3 (Dashboard).
 
-Add Turso service dependency and fetch track data for embedded tempo.
+### Task 5.1: Tracks List API Endpoint
+
+**Status**: ✅ COMPLETE
+
+**Files**: `src/app/api/admin/tracks/route.ts` (new file)
+
+Query Turso tracks with optional Neon join for catalog status.
+
+**Query params**:
+- `q` - FTS5 search query
+- `filter` - `all` | `missing_spotify` | `has_spotify` | `in_catalog` | `missing_bpm`
+- `sort` - `popular` | `alpha`
+- `offset`, `limit`
+
+**Response**: `TrackWithEnrichment[]` as defined in spec.
+
+**Also added to `src/services/turso.ts`**:
+- `searchWithFilters` method for admin tracks with filter/sort/pagination
+- `getByIds` method for batch lookups
+- New types: `TursoFilter`, `TursoSort`, `TursoSearchWithFiltersOptions`, `TursoSearchWithFiltersResult`
 
 **Acceptance Criteria**:
-- TursoService imported
-- Track fetched by LRCLIB ID
-- Embedded tempo extracted if available
+- [x] Returns paginated Turso tracks
+- [x] FTS5 search with MATCH syntax
+- [x] All filters work correctly
+- [x] Includes Neon enrichment status via join
 
 ---
 
-### Task 5.6: Update Lyrics API Response
+### Task 5.2: Copy Enrichment API Endpoint
 
-**File**: `src/lib/lyrics-api-types.ts`
-**Location**: Lines 18-28
+**Status**: ✅ COMPLETE
 
-Consider adding timeSignature to response:
+**Files**: `src/app/api/admin/tracks/[lrclibId]/copy-enrichment/route.ts` (new file)
 
-```typescript
-export interface LyricsApiSuccessResponse {
-  readonly lyrics: Lyrics
-  readonly bpm: number | null
-  readonly key: string | null
-  readonly timeSignature?: number | null  // NEW
-  readonly albumArt?: string | null
-  readonly albumArtLarge?: string | null
-  readonly spotifyId?: string | null
-  readonly attribution: LyricsApiAttribution
-  readonly hasEnhancement?: boolean
-  readonly hasChordEnhancement?: boolean
-}
-```
+Copy Turso enrichment (spotifyId, tempo, key, albumArt) to Neon.
 
 **Acceptance Criteria**:
-- timeSignature field added (optional)
-- Response includes embedded metadata
+- [x] Creates Neon song entry if needed
+- [x] Creates `songLrclibIds` mapping
+- [x] Copies all enrichment fields
+- [x] Sets `bpmSource = "Turso"`
 
 ---
 
-## Phase 6: Documentation & Cleanup
+### Task 5.3: Spotify Search API Endpoint
 
-**Dependencies**: All previous phases complete
-**Spec**: [006-documentation-cleanup.md](specs/006-documentation-cleanup.md)
+**Status**: ✅ COMPLETE
 
-### Task 6.1: Update Technical Reference
+**Files**: `src/app/api/admin/spotify/search/route.ts` (new file)
 
-**File**: `docs/technical-reference.md`
-
-Add "Search Architecture" section:
-- Turso-first search flow
-- Popularity-based ranking
-- Album art resolution chain
-- BPM resolution priority
+Search Spotify API for matching tracks. Uses existing `SpotifyService` with `Effect.runPromiseExit` pattern and admin auth check.
 
 **Acceptance Criteria**:
-- Architecture accurately documented
-- Flow diagrams updated
-- Field descriptions complete
+- [x] Accepts `q` query param
+- [x] Returns top 5 results
+- [x] Handles rate limits gracefully (returns 429 status)
 
 ---
 
-### Task 6.2: Update Search Optimization Plan
+### Task 5.4: Link Spotify API Endpoint
 
-**File**: `docs/search-optimization-plan.md`
+**Status**: ✅ COMPLETE
 
-Mark Turso-first as implemented:
-- Update status to "Implemented"
-- Document actual match rate (~80%)
-- Note performance improvements
+**Files**:
+- `src/app/api/admin/tracks/[lrclibId]/link-spotify/route.ts` (new file)
+- `src/lib/spotify-client.ts` (modified - added `getAudioFeatures` method)
+
+Link a Spotify track and fetch audio features. Added `getAudioFeatures` method to `SpotifyService` to fetch tempo, key, and mode from Spotify's audio-features API endpoint.
 
 **Acceptance Criteria**:
-- Status reflects current implementation
-- Metrics documented
+- [x] Fetches Spotify audio features
+- [x] Creates Neon entry if needed
+- [x] Saves enrichment data
+- [x] Sets `bpmSource = "Spotify"`
 
 ---
 
-### Task 6.3: Update CLAUDE.md
+### Task 5.5: Fetch BPM API Endpoint
 
-**File**: `CLAUDE.md`
-**Location**: Database section (lines 73-82)
+**Status**: ✅ COMPLETE
 
-Add note about Spotify enrichment:
-```markdown
-### Turso (LRCLIB Search Index)
-- ~4.2M songs, FTS5 search
-- **Always use MATCH queries**, never LIKE
-- Turso-first search with popularity ranking
-- Spotify enrichment: BPM, key, album art (nullable)
-```
+**Files**: `src/app/api/admin/tracks/[lrclibId]/fetch-bpm/route.ts` (new file)
+
+Trigger BPM provider cascade synchronously. The endpoint:
+- Gets track from Turso
+- Runs each BPM provider sequentially (to capture all attempts)
+- Uses logging-wrapped providers for analytics
+- Saves successful BPM to Neon (creates song entry if needed)
+- Returns all provider attempts with latency, success/failure, and error details
 
 **Acceptance Criteria**:
-- Enrichment documented
-- Ranking strategy noted
+- [x] Triggers provider cascade
+- [x] Returns all attempts with success/failure
+- [x] Saves successful result to Neon
 
 ---
 
-### Task 6.4: Remove Deprecated Code
+### Task 5.6: TracksFilterBar Component
 
-**Files to review**:
-- `src/app/api/search/verify/route.ts` - Remove if unused
-- `src/app/api/search/route.ts` - Remove dead code
-- `src/lib/spotify-client.ts` - Remove search-only functions if unused
+**Files**: `src/components/admin/TracksFilterBar.tsx` (new file)
+
+Filter chips: All, Missing Spotify, Has Spotify, In Catalog, Missing BPM.
+
+**Status**: ✅ COMPLETE
 
 **Acceptance Criteria**:
-- No orphan imports
-- No unused functions
-- TypeScript compiles cleanly
+- [x] Chips render and are clickable
+- [x] Active state styling
+- [x] Filter change callback works
 
 ---
 
-### Task 6.5: Create Metrics Module
+### Task 5.7: TracksList Component
 
-**File**: `src/lib/metrics.ts` (NEW FILE)
+**Status**: ✅ COMPLETE
 
-```typescript
-interface SearchMetric {
-  readonly event: "search"
-  readonly query: string
-  readonly resultCount: number
-  readonly source: "turso" | "lrclib-api"
-  readonly latencyMs: number
-  readonly timestamp: string
-}
+**Files**: `src/components/admin/TracksList.tsx` (new file)
 
-interface BpmMetric {
-  readonly event: "bpm_lookup"
-  readonly lrclibId: number
-  readonly source: "embedded" | "reccobeats" | "getsongbpm" | "deezer" | "rapidapi" | "none"
-  readonly latencyMs: number
-  readonly timestamp: string
-}
-
-interface AlbumArtMetric {
-  readonly event: "album_art"
-  readonly source: "stored" | "isrc" | "search" | "none"
-  readonly latencyMs: number
-  readonly timestamp: string
-}
-
-export function logSearchMetrics(metric: SearchMetric): void {
-  console.log(JSON.stringify(metric))
-}
-
-export function logBpmMetrics(metric: BpmMetric): void {
-  console.log(JSON.stringify(metric))
-}
-
-export function logAlbumArtMetrics(metric: AlbumArtMetric): void {
-  console.log(JSON.stringify(metric))
-}
-```
+Paginated table with expansion for detail panel. Exports `TrackWithEnrichment` interface. Supports:
+- Loading state with skeleton rows
+- Empty state when no tracks
+- Pagination with page controls
+- Row expansion with customizable content via `renderExpandedContent` prop
+- Status badges for Spotify and Catalog presence
+- Popularity bar visualization
 
 **Acceptance Criteria**:
-- Structured JSON logging
-- Source tracking for each metric type
-- Latency captured
+- [x] List renders with pagination
+- [x] Columns: Art, Title/Artist, Duration, BPM, Popularity, Status, Actions
+- [x] Row expansion toggles work
 
 ---
 
-### Task 6.6: Final Validation
+### Task 5.8: TrackDetail Component
 
-**Command**:
-```bash
-bun run check
-```
+**Status**: ✅ COMPLETE
+
+**Files**: `src/components/admin/TrackDetail.tsx` (new file)
+
+Inline expansion panel showing enrichment status. Displays:
+- Track header with album art, title, artist, album, duration, quality
+- Turso (Spotify Enrichment) section with Spotify ID, tempo, key, popularity, ISRC
+- Neon (Catalog) section with catalog status, BPM, musical key, enhancement status
+- Supports action buttons via `renderActions` prop
+- Status indicators (checkmarks/crosses) for each field
+- Section status badges (complete/partial/none)
 
 **Acceptance Criteria**:
-- `biome check .` passes
-- `bun run typecheck` passes
-- `bun run test` passes
-- No console errors in `bun run dev`
+- [x] Shows Turso enrichment fields
+- [x] Shows Neon enrichment status
+- [x] Status indicators (checkmarks/crosses)
+- [x] Action buttons visible
 
 ---
 
-## Critical Paths
+### Task 5.9: SpotifySearchModal Component
 
-```
-Phase 1 (Rust) ──────► Phase 2 (Turso) ──────► Phase 3 (Search API)
-                                        │
-                                        ├────► Phase 4 (Album Art)
-                                        │
-                                        └────► Phase 5 (BPM)
-                                                      │
-                                                      ▼
-                                              Phase 6 (Docs)
-```
+**Status**: ✅ COMPLETE
 
-**Parallelization Opportunities**:
-- Phase 3, 4, 5 can be worked in parallel after Phase 2
-- Tasks within each phase are mostly sequential
-- Documentation (Phase 6) depends on all code changes
+**Files**: `src/components/admin/SpotifySearchModal.tsx` (new file)
 
----
+Modal for searching and linking Spotify tracks. Features:
+- Pre-fills search with track title + artist on open
+- Search input with keyboard enter support
+- Spotify green themed search button
+- Results list with album art, track name, artist, album, duration
+- Click to select triggers link action via `onSelect` callback
+- Loading and error states
+- Close disabled during linking to prevent interruption
 
-## Success Metrics
-
-| Metric | Current | Target |
-|--------|---------|--------|
-| Search latency (p50) | ~500ms | ~100ms |
-| Album art latency | ~200ms | ~0ms (stored) |
-| BPM availability | ~70% | ~85% |
-| Spotify API calls/search | 1 | 0 |
-| External dependencies | 5 | 1 (Deezer fallback) |
-| Turso storage | ~600MB | ~1.05GB |
+**Acceptance Criteria**:
+- [x] Modal opens/closes
+- [x] Pre-fills search with track title + artist
+- [x] Search calls API
+- [x] Results selectable
+- [x] Selection triggers link action
 
 ---
 
-## Risks & Mitigations
+### Task 5.10: EnrichmentActions Component
 
-| Risk | Mitigation |
-|------|------------|
-| Low match rate | Accept ~80%; fallback to providers for BPM |
-| Spotify URLs expire | Fall back to Deezer ISRC → search |
-| Memory usage | Filter by `min_popularity > 0` |
-| Extraction time | Use `--artists` for testing |
+**Status**: ✅ COMPLETE
+
+**Files**: `src/components/admin/EnrichmentActions.tsx` (new file)
+
+Action buttons: Copy from Turso, Find Spotify ID, Fetch BPM, Manual BPM, View Lyrics. Features:
+- Copy from Turso: Enabled when track has Turso enrichment and not already in catalog
+- Find Spotify: Always available, opens Spotify search modal
+- Fetch BPM: Enabled when track has no BPM (neither Turso nor Neon)
+- Manual BPM: Always available
+- View Lyrics: Opens song in player
+- Loading, success, and error states with visual feedback
+- Tooltips explaining button availability
+
+**Acceptance Criteria**:
+- [x] Buttons conditionally enabled based on state
+- [x] Loading states during API calls
+- [x] Success/error feedback (toast or inline)
 
 ---
 
-## File Reference (Verified Line Numbers)
+### Task 5.11: Replace Admin Songs Page
 
-### Files to Modify
+**Status**: ✅ COMPLETE
 
-| File | Phase | Key Lines | Changes |
-|------|-------|-----------|---------|
-| `scripts/lrclib-extract/src/main.rs` | 1 | 12-29 (Args), 33-48 (structs), 467-522 (write) | Add Spotify enrichment |
-| `src/services/turso.ts` | 2 | 6-13 (interface), 55-89 (search), 91-121 (getById), 123-182 (findByTitleArtist) | Update interface and queries |
-| `src/app/api/search/route.ts` | 3 | 7-12 (imports), 39-67 (findLrclibMatch), 72-114 (searchSpotifyWithTurso), 237-265 (search) | Remove Spotify, simplify flow |
-| `src/lib/search-api-types.ts` | 3 | 5-15 | Add popularity/tempo fields |
-| `src/lib/deezer-client.ts` | 4 | 75-131 | Add ISRC lookup function |
-| `src/lib/bpm/bpm-types.ts` | 5 | 17-21 | Add timeSignature field |
-| `src/services/song-loader.ts` | 5 | 228-286 | Integrate embedded tempo check |
-| `src/lib/lyrics-api-types.ts` | 5 | 18-28 (LyricsApiSuccessResponse) | Add timeSignature field |
-| `docs/technical-reference.md` | 6 | N/A | Update architecture |
-| `docs/search-optimization-plan.md` | 6 | N/A | Mark implemented |
-| `CLAUDE.md` | 6 | 73-82 | Add enrichment note |
+**Files**: `src/app/admin/songs/page.tsx` (replaced existing 972-line file)
 
-### New Files to Create
+Composed all new components into the tracks browser.
+
+**Key changes from existing page**:
+- Data source: Turso tracks (not just Neon catalog)
+- New filters: Missing Spotify, Has Spotify, In Catalog, Missing BPM
+- New actions: Copy from Turso, Find Spotify, Fetch BPM
+- Row expansion with enrichment status
+
+**Acceptance Criteria**:
+- [x] Page loads at `/admin/songs`
+- [x] Tracks load from Turso with pagination
+- [x] Search performs FTS5 queries
+- [x] All filters work
+- [x] Sort options work
+- [x] Row expansion shows track details
+- [x] All enrichment actions work
+- [x] Mobile responsive
+
+---
+
+## Verification Checklist
+
+After all phases complete:
+
+- [x] `bun run typecheck` - No type errors
+- [x] `bun run lint` - No lint errors
+- [x] `bun run test` - All tests pass
+- [x] `bun run build` - Production build succeeds
+- [ ] Load a song without BPM - Logs appear in `bpm_fetch_log` table
+- [ ] Visit `/admin/bpm-stats` - Dashboard loads with data
+- [ ] Visit `/admin/songs` - Tracks browser loads from Turso
+- [ ] Test enrichment actions: Copy, Find Spotify, Fetch BPM, Manual
+- [ ] Mobile responsive on all new pages
+
+---
+
+## File Reference
+
+### Files to Create
 
 | File | Phase | Purpose |
 |------|-------|---------|
-| `src/lib/album-art.ts` | 4 | Three-tier album art resolution |
-| `src/lib/musical-key.ts` | 5 | Format pitch class + mode to key string |
-| `src/lib/bpm/bpm-resolver.ts` | 5 | Unified BPM resolution with embedded priority |
-| `src/lib/metrics.ts` | 6 | Structured JSON logging for observability |
+| `src/lib/bpm/bpm-log.ts` | 1.3 | Logging types and helper |
+| `drizzle/0004_bpm_fetch_log.sql` | 1.2 | Database migration |
+| `src/app/api/admin/bpm-stats/route.ts` | 3.1 | BPM stats API |
+| `src/components/admin/BpmStatsCards.tsx` | 3.2 | Summary cards |
+| `src/components/admin/BpmProviderTable.tsx` | 3.3 | Provider breakdown |
+| `src/components/admin/BpmTimeSeriesChart.tsx` | 3.4 | Time-series chart |
+| `src/components/admin/BpmFailuresList.tsx` | 3.5 | Failures list |
+| `src/components/admin/BpmMissingSongs.tsx` | 3.6 | Missing songs tabs |
+| `src/components/admin/BpmErrorBreakdown.tsx` | 3.7 | Error breakdown |
+| `src/components/admin/BpmSongDetail.tsx` | 3.8 | Song detail modal |
+| `src/app/admin/bpm-stats/page.tsx` | 3.9 | Dashboard page |
+| `src/app/api/cron/cleanup-bpm-log/route.ts` | 4.1 | Retention cron |
+| `src/app/api/admin/tracks/route.ts` | 5.1 | Tracks list API |
+| `src/app/api/admin/tracks/[lrclibId]/copy-enrichment/route.ts` | 5.2 | Copy enrichment API |
+| `src/app/api/admin/spotify/search/route.ts` | 5.3 | Spotify search API |
+| `src/app/api/admin/tracks/[lrclibId]/link-spotify/route.ts` | 5.4 | Link Spotify API |
+| `src/app/api/admin/tracks/[lrclibId]/fetch-bpm/route.ts` | 5.5 | Fetch BPM API |
+| `src/components/admin/TracksFilterBar.tsx` | 5.6 | Filter chips |
+| `src/components/admin/TracksList.tsx` | 5.7 | Paginated tracks list |
+| `src/components/admin/TrackDetail.tsx` | 5.8 | Inline detail panel |
+| `src/components/admin/SpotifySearchModal.tsx` | 5.9 | Spotify search modal |
+| `src/components/admin/EnrichmentActions.tsx` | 5.10 | Action buttons |
 
-### Files to Keep (Previously Considered for Removal)
+### Files to Modify
 
-| File | Reason to Keep |
-|------|----------------|
-| `src/app/api/search/verify/route.ts` | Uses LRCLIB API directly, independent of Spotify search flow |
+| File | Phase | Changes | Status |
+|------|-------|---------|--------|
+| `src/lib/db/schema.ts` | 1.1 | Add `bpmFetchLog` table + types | ✅ Done |
+| Database migration | 1.2 | Run `bun run db:push` | ✅ Done (uses push workflow) |
+| `src/services/song-loader.ts` | 2.1, 2.2 | Update signature, add Turso logging | ✅ Done |
+| `src/services/bpm-providers.ts` | 2.3 | Add logging wrapper and `withLogging` method | ✅ Done |
+| `vercel.json` | 4.1 | Add cleanup cron | ✅ Done |
+| `src/app/admin/songs/page.tsx` | 5.11 | Replace with tracks browser | ✅ Done |
+| `src/app/admin/page.tsx` | 3.9 | Add link to BPM stats page | ✅ Done |
 
-### Functions to Remove (in search/route.ts)
+---
 
-| Function | Lines | Reason |
-|----------|-------|--------|
-| `findLrclibMatch()` | 39-67 | Replaced by Turso-first search |
-| `searchSpotifyWithTurso()` | 72-114 | Replaced by Turso-first search |
-| `SpotifyTrackWithLrclib` interface | 28-34 | No longer needed |
+## Critical Path
+
+```
+Phase 1 (Schema + Logging Types)
+        │
+        ▼
+Phase 2 (Instrumentation)
+        │
+        ├─────────────────────────────┐
+        ▼                             ▼
+Phase 3 (BPM Dashboard)      Phase 5 (Tracks Browser)
+        │                             │
+        ▼                             │
+Phase 4 (Cron)                        │
+        │                             │
+        └─────────────────────────────┘
+                    │
+                    ▼
+               Complete
+```
+
+**Parallelization Notes**:
+- Phase 3 and Phase 5 can run in parallel after Phase 2
+- Within Phase 3, tasks 3.2-3.8 (components) can run in parallel
+- Within Phase 5, tasks 5.6-5.10 (components) can run in parallel
+- Phase 4 only depends on Phase 1 (can start early)
+
+---
+
+## Implementation Summary
+
+### Task Complexity Breakdown
+
+| Phase | Task | Complexity | Est. Lines | Notes |
+|-------|------|------------|------------|-------|
+| 1.2 | Migration file | Simple | 20 | SQL only |
+| 1.3 | bpm-log.ts | Medium | 80 | New file with types + Effect pattern |
+| 2.1 | Update signature | Simple | 5 | Add parameter, update call site |
+| 2.2 | Turso logging | Medium | 30 | Add timing + 2 logging calls |
+| 2.3 | Provider logging | Complex | 150 | New interface, wrapper function, modify service |
+| 3.1 | BPM stats API | Complex | 200 | Multiple queries, Effect.gen pattern |
+| 3.2-3.8 | Dashboard components | Medium each | ~100 each | Can parallelize |
+| 3.9 | Dashboard page | Medium | 150 | Compose components |
+| 4.1 | Cleanup cron | Simple | 60 | Copy pattern from spec |
+| 5.1 | Tracks API | Complex | 250 | Turso + Neon join, filters |
+| 5.2-5.5 | Enrichment APIs | Medium each | ~80 each | Can parallelize |
+| 5.6-5.10 | Tracks components | Medium each | ~100 each | Can parallelize |
+| 5.11 | Replace songs page | Complex | 400 | Orchestrate new components |
+
+### Key Implementation Details
+
+**Phase 1 Critical Files**:
+- `src/lib/db/schema.ts` - ✅ Schema already defined (Task 1.1 complete)
+- Database migration - ✅ Uses `db:push` workflow (Task 1.2 complete)
+- `src/lib/bpm/bpm-log.ts` - MUST use `Effect.runFork`, NOT `.then().catch()`
+
+**Phase 2 Critical Files**:
+- `src/services/song-loader.ts` lines 243-300 and 514-543 - Add logging
+- `src/services/bpm-providers.ts` - Completely rewrite with `withLogging` method
+
+**Phase 3 Critical Files**:
+- Follow `src/app/api/admin/stats/route.ts` pattern exactly
+- Use `DbLayer` from `@/services/db`
+- Import errors from `@/lib/errors`
+
+**Phase 5 Critical Files**:
+- TursoService needs new method for admin search with filters
+- Cross-reference with `songLrclibIds` table for "in catalog" filter
+- Existing `SongCard`/`SongRow` patterns from `admin/songs/page.tsx` can be adapted
+
+### Recommended Execution Order
+
+1. **Phase 1.2** - Create migration (prerequisite for everything)
+2. **Phase 1.3** - Create bpm-log.ts (prerequisite for Phase 2)
+3. **Phase 2.1** - Update signature (quick win, enables 2.2-2.3)
+4. **Phase 2.2** - Add Turso logging (enables data collection)
+5. **Phase 2.3** - Add provider logging (completes instrumentation)
+6. **Phase 4.1** - Create cron (independent, can run early after Phase 1)
+7. **Phase 3.1** - Create BPM stats API (enables dashboard)
+8. **Phase 3.2-3.9** - Dashboard components and page (parallel)
+9. **Phase 5.1** - Tracks API (enables tracks browser)
+10. **Phase 5.2-5.5** - Enrichment APIs (parallel)
+11. **Phase 5.6-5.11** - Tracks browser components and page (parallel)

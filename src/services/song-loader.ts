@@ -5,6 +5,7 @@
 
 import type { Lyrics } from "@/core"
 import { getBpmRace, getBpmWithFallback } from "@/lib/bpm"
+import { logBpmAttempt } from "@/lib/bpm/bpm-log"
 import { db } from "@/lib/db"
 import { chordEnhancements, lrcWordEnhancements, songLrclibIds, songs } from "@/lib/db/schema"
 import { getAlbumArt } from "@/lib/deezer-client"
@@ -242,12 +243,17 @@ function getEmbeddedTempoFromTurso(lrclibId: number) {
 // Fire-and-forget BPM fetch for deferred loading
 function fireAndForgetBpmFetch(
   songId: string,
+  lrclibId: number,
   title: string,
   artist: string,
   spotifyId: string | undefined,
 ) {
+  const loggingContext = { lrclibId, songId, title, artist }
+
   const bpmEffect = BpmProviders.pipe(
-    Effect.flatMap(({ fallbackProviders, raceProviders, lastResortProvider }) => {
+    Effect.flatMap(service => {
+      const { fallbackProviders, raceProviders, lastResortProvider } =
+        service.withLogging(loggingContext)
       const bpmQuery = { title, artist, spotifyId }
 
       const primaryBpmEffect = spotifyId
@@ -513,6 +519,7 @@ export async function loadSongData(
     bpmSource = getBpmAttribution(cachedSong.bpmSource, cachedSong.bpmSourceUrl)
   } else {
     // Priority 2: Try embedded tempo from Turso (Spotify enrichment)
+    const tursoStart = Date.now()
     const tursoTrack = await Effect.runPromise(
       getEmbeddedTempoFromTurso(actualLrclibId).pipe(Effect.provide(ServerLayer)),
     )
@@ -522,6 +529,19 @@ export async function loadSongData(
       key = formatMusicalKey(tursoTrack.musicalKey, tursoTrack.mode)
       timeSignature = tursoTrack.timeSignature
       bpmSource = getBpmAttribution("Spotify")
+
+      // Log successful Turso lookup
+      logBpmAttempt({
+        lrclibId: actualLrclibId,
+        songId: cachedSong?.songId,
+        title: lyrics.title,
+        artist: lyrics.artist,
+        stage: "turso_embedded",
+        provider: "Turso",
+        success: true,
+        bpm,
+        latencyMs: Date.now() - tursoStart,
+      })
 
       // Cache the embedded BPM in Neon for future requests
       if (cachedSong) {
@@ -536,9 +556,30 @@ export async function loadSongData(
           .then(() => {})
           .catch(err => console.error("[BPM] Failed to cache embedded tempo:", err))
       }
-    } else if (cachedSong) {
+    } else {
+      // Log failed Turso lookup
+      logBpmAttempt({
+        lrclibId: actualLrclibId,
+        songId: cachedSong?.songId,
+        title: lyrics.title,
+        artist: lyrics.artist,
+        stage: "turso_embedded",
+        provider: "Turso",
+        success: false,
+        errorReason: "not_found",
+        latencyMs: Date.now() - tursoStart,
+      })
+
       // Priority 3: Defer BPM fetching to background provider cascade
-      fireAndForgetBpmFetch(cachedSong.songId, lyrics.title, lyrics.artist, resolvedSpotifyId)
+      if (cachedSong) {
+        fireAndForgetBpmFetch(
+          cachedSong.songId,
+          actualLrclibId,
+          lyrics.title,
+          lyrics.artist,
+          resolvedSpotifyId,
+        )
+      }
     }
   }
 

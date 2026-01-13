@@ -8,6 +8,7 @@ import {
   ChartBar,
   Heart,
   ListChecks,
+  Metronome,
   MusicNote,
   ShieldWarning,
   Users,
@@ -301,6 +302,14 @@ function MobileTabs({
           <MusicNote size={20} />
           <span>Songs</span>
         </Link>
+        <Link
+          href="/admin/bpm-stats"
+          className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors hover:brightness-125"
+          style={{ background: "var(--color-surface1)", color: "var(--color-text3)" }}
+        >
+          <Metronome size={20} />
+          <span>BPM Stats</span>
+        </Link>
       </div>
     </nav>
   )
@@ -348,6 +357,15 @@ function Sidebar({
         >
           <MusicNote size={20} />
           <span className="flex-1">Songs Catalog</span>
+          <ArrowSquareOut size={16} style={{ color: "var(--color-text-muted)" }} />
+        </Link>
+        <Link
+          href="/admin/bpm-stats"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:brightness-125"
+          style={{ color: "var(--color-text3)" }}
+        >
+          <Metronome size={20} />
+          <span className="flex-1">BPM Analytics</span>
           <ArrowSquareOut size={16} style={{ color: "var(--color-text-muted)" }} />
         </Link>
       </div>

@@ -1,95 +1,40 @@
 "use client"
 
 import { springs } from "@/animations"
+import { EnrichmentActions } from "@/components/admin/EnrichmentActions"
+import { SpotifySearchModal } from "@/components/admin/SpotifySearchModal"
+import { TrackDetail } from "@/components/admin/TrackDetail"
+import { type TracksFilter, TracksFilterBar } from "@/components/admin/TracksFilterBar"
+import { type TrackWithEnrichment, TracksList } from "@/components/admin/TracksList"
 import { useAccount, useIsAdmin } from "@/core"
-import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { makeCanonicalPath } from "@/lib/slug"
-import {
-  ArrowLeft,
-  CaretLeft,
-  CaretRight,
-  Check,
-  FunnelSimple,
-  List,
-  MagnifyingGlass,
-  Metronome,
-  MusicNote,
-  NotePencil,
-  PencilSimple,
-  ShieldWarning,
-  Sparkle,
-  SquaresFour,
-  Timer,
-  Trash,
-  X,
-} from "@phosphor-icons/react"
+import { ArrowLeft, ArrowsDownUp, MagnifyingGlass, ShieldWarning } from "@phosphor-icons/react"
 import { motion } from "motion/react"
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 
-interface Song {
-  id: string
-  title: string
-  artist: string
-  album: string | null
-  durationMs: number | null
-  bpm: number | null
-  musicalKey: string | null
-  bpmSource: string | null
-  bpmSourceUrl: string | null
-  hasSyncedLyrics: boolean
-  hasEnhancement: boolean
-  hasChordEnhancement: boolean
-  totalPlayCount: number
-  lrclibId: number | null
-}
+// ============================================================================
+// Types
+// ============================================================================
 
-interface SongsResponse {
-  songs: Song[]
+interface TracksResponse {
+  tracks: TrackWithEnrichment[]
   total: number
-  limit: number
   offset: number
+  hasMore: boolean
 }
 
-type FilterType = "all" | "synced" | "enhanced" | "unenhanced"
-type ViewType = "grid" | "list"
+type SortType = "popular" | "alpha"
 
-const LIMIT = 20
-const VIEW_TYPE_KEY = "scrolltunes:admin:songs:view"
+// ============================================================================
+// Constants
+// ============================================================================
 
-function loadViewType(): ViewType {
-  if (typeof window === "undefined") return "grid"
-  const stored = localStorage.getItem(VIEW_TYPE_KEY)
-  return stored === "list" ? "list" : "grid"
-}
+const LIMIT = 50
 
-function saveViewType(viewType: ViewType): void {
-  if (typeof window === "undefined") return
-  localStorage.setItem(VIEW_TYPE_KEY, viewType)
-}
-
-function formatDuration(ms: number | null): string {
-  if (!ms) return ""
-  const totalSeconds = Math.floor(ms / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`
-}
-
-const EDITS_CACHE_KEY_PREFIX = "scrolltunes:song-edits:"
-
-function checkHasEdits(lrclibId: number | null): boolean {
-  if (!lrclibId || typeof window === "undefined") return false
-  try {
-    const stored = localStorage.getItem(`${EDITS_CACHE_KEY_PREFIX}${lrclibId}`)
-    if (!stored) return false
-    const cached = JSON.parse(stored)
-    // Check if payload has any line patches
-    return cached?.payload?.linePatches?.length > 0
-  } catch {
-    return false
-  }
-}
+// ============================================================================
+// Header Component
+// ============================================================================
 
 function Header() {
   return (
@@ -113,6 +58,10 @@ function Header() {
     </header>
   )
 }
+
+// ============================================================================
+// Access Denied Component
+// ============================================================================
 
 function AccessDenied() {
   return (
@@ -151,6 +100,10 @@ function AccessDenied() {
   )
 }
 
+// ============================================================================
+// Loading Screen Component
+// ============================================================================
+
 function LoadingScreen() {
   return (
     <div
@@ -176,558 +129,165 @@ function LoadingScreen() {
   )
 }
 
-function LoadingGrid() {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div
-          key={i}
-          className="h-48 rounded-xl animate-pulse"
-          style={{ background: "var(--color-surface1)" }}
-        />
-      ))}
-    </div>
-  )
-}
+// ============================================================================
+// Main Component
+// ============================================================================
 
-function EmptyState({ hasSearch }: { hasSearch: boolean }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={springs.default}
-      className="flex flex-col items-center justify-center py-16 text-center"
-    >
-      <div
-        className="w-16 h-16 mb-4 rounded-2xl flex items-center justify-center"
-        style={{ background: "var(--color-surface1)" }}
-      >
-        <MusicNote size={32} style={{ color: "var(--color-text-muted)" }} />
-      </div>
-      <h3 className="text-lg font-medium mb-2" style={{ color: "var(--color-text2)" }}>
-        {hasSearch ? "No songs found" : "No songs yet"}
-      </h3>
-      <p style={{ color: "var(--color-text-muted)" }}>
-        {hasSearch ? "Try adjusting your search or filter" : "Songs will appear here once added"}
-      </p>
-    </motion.div>
-  )
-}
-
-function StatusBadge({
-  label,
-  active,
-}: {
-  label: string
-  active: boolean
-}) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full"
-      style={
-        active
-          ? { background: "var(--color-success-soft)", color: "var(--color-success)" }
-          : { background: "var(--color-surface2)", color: "var(--color-text-muted)" }
-      }
-    >
-      {active ? <Check size={12} weight="bold" /> : <X size={12} />}
-      {label}
-    </span>
-  )
-}
-
-function SongCard({
-  song,
-  index,
-  onDeleteSong,
-}: {
-  song: Song
-  index: number
-  onDeleteSong: (songId: string) => void
-}) {
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [albumArt, setAlbumArt] = useState<string | undefined>(undefined)
-  const [isLoadingArt, setIsLoadingArt] = useState(!!song.lrclibId)
-  const [hasEdits, setHasEdits] = useState(false)
-
-  // Check for cached edits on mount
-  useEffect(() => {
-    setHasEdits(checkHasEdits(song.lrclibId))
-  }, [song.lrclibId])
-
-  useEffect(() => {
-    if (!song.lrclibId) {
-      setIsLoadingArt(false)
-      return
-    }
-
-    const cached = loadCachedLyrics(song.lrclibId)
-    if (cached?.albumArt) {
-      setAlbumArt(cached.albumArt)
-      setIsLoadingArt(false)
-      return
-    }
-
-    let cancelled = false
-
-    fetch(`/api/lyrics/${song.lrclibId}`)
-      .then(async response => {
-        if (!response.ok || cancelled) {
-          if (!cancelled) setIsLoadingArt(false)
-          return
-        }
-
-        const data = await response.json()
-        if (cancelled) return
-
-        const art = data.albumArt as string | undefined
-        if (data.lyrics) {
-          saveCachedLyrics(song.lrclibId as number, {
-            lyrics: data.lyrics,
-            bpm: data.bpm ?? null,
-            key: data.key ?? null,
-            albumArt: art,
-            spotifyId: data.spotifyId ?? undefined,
-            bpmSource: data.attribution?.bpm ?? undefined,
-            lyricsSource: data.attribution?.lyrics ?? undefined,
-          })
-        }
-
-        setAlbumArt(art)
-        setIsLoadingArt(false)
-      })
-      .catch(() => {
-        if (!cancelled) setIsLoadingArt(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [song.lrclibId])
-
-  const handleDelete = async () => {
-    if (!confirm(`Permanently delete "${song.title}" by ${song.artist}? This cannot be undone.`))
-      return
-    setIsDeleting(true)
-    try {
-      const response = await fetch("/api/admin/songs", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ songId: song.id }),
-      })
-      if (response.ok) {
-        onDeleteSong(song.id)
-      }
-    } finally {
-      setIsDeleting(false)
-    }
-  }
-
-  const duration = formatDuration(song.durationMs)
-  const hasBpmInfo = song.bpm !== null || song.musicalKey !== null
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ ...springs.default, delay: index * 0.03 }}
-      className="rounded-xl flex flex-col transition-colors"
-      style={{ background: "var(--color-surface1)", border: "1px solid var(--color-border)" }}
-    >
-      <Link href={`/admin/songs/${song.id}`} className="p-4 flex gap-3">
-        <div
-          className="flex-shrink-0 w-[60px] h-[60px] rounded-lg flex items-center justify-center overflow-hidden"
-          style={{ background: "var(--color-surface2)" }}
-        >
-          {isLoadingArt ? (
-            <div
-              className="w-full h-full animate-pulse"
-              style={{ background: "var(--color-surface2)" }}
-            />
-          ) : albumArt ? (
-            <img src={albumArt} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <MusicNote size={24} weight="fill" style={{ color: "var(--color-text-muted)" }} />
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <span
-            className="font-medium transition-colors line-clamp-1"
-            style={{ color: "var(--color-text)" }}
-          >
-            {song.title}
-          </span>
-          <p className="text-sm line-clamp-1" style={{ color: "var(--color-text3)" }}>
-            {song.artist}
-          </p>
-          {song.album && (
-            <p className="text-xs line-clamp-1 mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-              {song.album}
-            </p>
-          )}
-        </div>
-      </Link>
-
-      <div className="px-4 pb-4 flex flex-col gap-3">
-        <div
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          {duration && (
-            <span className="flex items-center gap-1">
-              <Timer size={12} />
-              {duration}
-            </span>
-          )}
-          {hasBpmInfo && (
-            <span
-              className="flex items-center gap-1 cursor-help"
-              title={
-                song.bpmSource
-                  ? `Source: ${song.bpmSource}${song.bpmSourceUrl ? ` (${song.bpmSourceUrl})` : ""}`
-                  : undefined
-              }
-            >
-              <Metronome size={12} />
-              {song.bpm !== null && `${song.bpm} BPM`}
-              {song.bpm !== null && song.musicalKey && " · "}
-              {song.musicalKey}
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-1.5">
-          <StatusBadge label="Synced" active={song.hasSyncedLyrics} />
-          <StatusBadge label="Words" active={song.hasEnhancement} />
-          <StatusBadge label="Chords" active={song.hasChordEnhancement} />
-          <StatusBadge label="Edits" active={hasEdits} />
-        </div>
-
-        <div
-          className="flex items-center gap-2 pt-2"
-          style={{ borderTop: "1px solid var(--color-border)" }}
-        >
-          {song.lrclibId ? (
-            <>
-              {song.hasEnhancement ? (
-                <Link
-                  href={`/admin/enhance/${song.lrclibId}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-110"
-                  style={{ background: "var(--color-success)", color: "white" }}
-                >
-                  <PencilSimple size={14} />
-                  <span>Timing</span>
-                </Link>
-              ) : (
-                <Link
-                  href={`/admin/enhance/${song.lrclibId}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-110"
-                  style={{ background: "var(--color-accent)", color: "white" }}
-                >
-                  <Sparkle size={14} />
-                  <span>Enhance</span>
-                </Link>
-              )}
-              <Link
-                href={`${makeCanonicalPath({ id: song.lrclibId, title: song.title, artist: song.artist })}?edit=1`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors hover:brightness-110"
-                style={
-                  hasEdits
-                    ? { background: "var(--color-accent-soft)", color: "var(--color-accent)" }
-                    : { background: "var(--color-surface2)", color: "var(--color-text3)" }
-                }
-              >
-                <NotePencil size={14} />
-                <span>{hasEdits ? "Modified" : "Lyrics"}</span>
-              </Link>
-            </>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors disabled:opacity-50 ml-auto"
-            style={{ background: "var(--color-surface2)", color: "var(--color-text3)" }}
-            title="Delete song permanently"
-          >
-            <Trash size={14} />
-            <span>{isDeleting ? "..." : "Delete"}</span>
-          </button>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
-function SongRow({
-  song,
-  index,
-  onDeleteSong,
-}: {
-  song: Song
-  index: number
-  onDeleteSong: (songId: string) => void
-}) {
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [albumArt, setAlbumArt] = useState<string | undefined>(undefined)
-  const [isLoadingArt, setIsLoadingArt] = useState(!!song.lrclibId)
-  const [hasEdits, setHasEdits] = useState(false)
-
-  // Check for cached edits on mount
-  useEffect(() => {
-    setHasEdits(checkHasEdits(song.lrclibId))
-  }, [song.lrclibId])
-
-  useEffect(() => {
-    if (!song.lrclibId) {
-      setIsLoadingArt(false)
-      return
-    }
-
-    const cached = loadCachedLyrics(song.lrclibId)
-    if (cached?.albumArt) {
-      setAlbumArt(cached.albumArt)
-      setIsLoadingArt(false)
-      return
-    }
-
-    let cancelled = false
-
-    fetch(`/api/lyrics/${song.lrclibId}`)
-      .then(async response => {
-        if (!response.ok || cancelled) {
-          if (!cancelled) setIsLoadingArt(false)
-          return
-        }
-
-        const data = await response.json()
-        if (cancelled) return
-
-        const art = data.albumArt as string | undefined
-        if (data.lyrics) {
-          saveCachedLyrics(song.lrclibId as number, {
-            lyrics: data.lyrics,
-            bpm: data.bpm ?? null,
-            key: data.key ?? null,
-            albumArt: art,
-            spotifyId: data.spotifyId ?? undefined,
-            bpmSource: data.attribution?.bpm ?? undefined,
-            lyricsSource: data.attribution?.lyrics ?? undefined,
-          })
-        }
-
-        setAlbumArt(art)
-        setIsLoadingArt(false)
-      })
-      .catch(() => {
-        if (!cancelled) setIsLoadingArt(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [song.lrclibId])
-
-  const handleDelete = async () => {
-    if (!confirm(`Permanently delete "${song.title}" by ${song.artist}? This cannot be undone.`))
-      return
-    setIsDeleting(true)
-    try {
-      const response = await fetch("/api/admin/songs", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ songId: song.id }),
-      })
-      if (response.ok) {
-        onDeleteSong(song.id)
-      }
-    } finally {
-      setIsDeleting(false)
-    }
-  }
-
-  const duration = formatDuration(song.durationMs)
-
-  return (
-    <motion.tr
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ ...springs.default, delay: index * 0.02 }}
-      className="last:border-b-0 transition-colors"
-      style={{ borderBottom: "1px solid var(--color-border)" }}
-    >
-      <td className="px-4 py-3">
-        <Link href={`/admin/songs/${song.id}`} className="flex items-center gap-3">
-          <div
-            className="flex-shrink-0 w-10 h-10 rounded flex items-center justify-center overflow-hidden"
-            style={{ background: "var(--color-surface2)" }}
-          >
-            {isLoadingArt ? (
-              <div
-                className="w-full h-full animate-pulse"
-                style={{ background: "var(--color-surface2)" }}
-              />
-            ) : albumArt ? (
-              <img src={albumArt} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <MusicNote size={16} weight="fill" style={{ color: "var(--color-text-muted)" }} />
-            )}
-          </div>
-          <div className="min-w-0">
-            <span
-              className="font-medium transition-colors line-clamp-1"
-              style={{ color: "var(--color-text)" }}
-            >
-              {song.title}
-            </span>
-            <p className="text-sm line-clamp-1" style={{ color: "var(--color-text3)" }}>
-              {song.artist}
-            </p>
-          </div>
-        </Link>
-      </td>
-      <td className="px-4 py-3 hidden md:table-cell" style={{ color: "var(--color-text3)" }}>
-        {song.album || "—"}
-      </td>
-      <td className="px-4 py-3 hidden lg:table-cell" style={{ color: "var(--color-text3)" }}>
-        {duration || "—"}
-      </td>
-      <td className="px-4 py-3 hidden lg:table-cell" style={{ color: "var(--color-text3)" }}>
-        {song.bpm ? `${song.bpm}` : "—"}
-        {song.musicalKey && ` · ${song.musicalKey}`}
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center justify-center gap-1">
-          {song.hasSyncedLyrics && (
-            <span className="w-2 h-2 rounded-full bg-green-500" title="Synced" />
-          )}
-          {song.hasEnhancement && (
-            <span className="w-2 h-2 rounded-full bg-indigo-500" title="Enhanced" />
-          )}
-          {song.hasChordEnhancement && (
-            <span className="w-2 h-2 rounded-full bg-amber-500" title="Chords" />
-          )}
-          {hasEdits && <span className="w-2 h-2 rounded-full bg-purple-500" title="Has edits" />}
-        </div>
-      </td>
-      <td className="px-4 py-3 text-right">
-        <div className="flex items-center justify-end gap-2">
-          <span style={{ color: "var(--color-text3)" }}>
-            {song.totalPlayCount.toLocaleString()}
-          </span>
-          {song.lrclibId && (
-            <>
-              <Link
-                href={`/admin/enhance/${song.lrclibId}`}
-                className="p-1.5 transition-colors hover:brightness-125"
-                style={{ color: "var(--color-text-muted)" }}
-                title={song.hasEnhancement ? "Edit enhancement" : "Enhance"}
-              >
-                {song.hasEnhancement ? <PencilSimple size={16} /> : <Sparkle size={16} />}
-              </Link>
-              <Link
-                href={`${makeCanonicalPath({ id: song.lrclibId, title: song.title, artist: song.artist })}?edit=1`}
-                className="p-1.5 transition-colors hover:brightness-125"
-                style={{ color: hasEdits ? "var(--color-accent)" : "var(--color-text-muted)" }}
-                title={hasEdits ? "Edit lyrics (modified)" : "Edit lyrics"}
-              >
-                <NotePencil size={16} />
-              </Link>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="p-1.5 transition-colors disabled:opacity-50"
-            style={{ color: "var(--color-text-muted)" }}
-            title="Delete"
-          >
-            <Trash size={16} />
-          </button>
-        </div>
-      </td>
-    </motion.tr>
-  )
-}
-
-export default function AdminSongsPage() {
+export default function AdminTracksPage() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAccount()
   const isAdmin = useIsAdmin()
-  const [songs, setSongs] = useState<Song[]>([])
+
+  // State
+  const [tracks, setTracks] = useState<TrackWithEnrichment[]>([])
   const [total, setTotal] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [isDeletingAll, setIsDeletingAll] = useState(false)
   const [search, setSearch] = useState("")
-  const [filter, setFilter] = useState<FilterType>("all")
-  const [viewType, setViewType] = useState<ViewType>(loadViewType)
+  const [filter, setFilter] = useState<TracksFilter>("all")
+  const [sort, setSort] = useState<SortType>("popular")
   const [offset, setOffset] = useState(0)
 
-  const handleViewTypeChange = (newViewType: ViewType) => {
-    setViewType(newViewType)
-    saveViewType(newViewType)
-  }
+  // Spotify search modal state
+  const [spotifyModalTrack, setSpotifyModalTrack] = useState<TrackWithEnrichment | null>(null)
 
-  const handleDeleteAll = async () => {
-    const filterDesc =
-      filter === "all" && !search
-        ? "ALL songs"
-        : `${total} song${total !== 1 ? "s" : ""} matching current filter`
-    if (!confirm(`Permanently delete ${filterDesc}? This cannot be undone.`)) return
-
-    setIsDeletingAll(true)
-    try {
-      const response = await fetch("/api/admin/songs", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          deleteAll: true,
-          search: search || undefined,
-          filter,
-        }),
-      })
-      if (response.ok) {
-        setSongs([])
-        setTotal(0)
-        setOffset(0)
-      }
-    } finally {
-      setIsDeletingAll(false)
-    }
-  }
-
-  const fetchSongs = useCallback(async () => {
+  // Fetch tracks from API
+  const fetchTracks = useCallback(async () => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams()
-      if (search) params.set("search", search)
+      if (search) params.set("q", search)
       if (filter !== "all") params.set("filter", filter)
+      params.set("sort", sort)
       params.set("limit", LIMIT.toString())
       params.set("offset", offset.toString())
 
-      const response = await fetch(`/api/admin/songs?${params.toString()}`)
+      const response = await fetch(`/api/admin/tracks?${params.toString()}`)
       if (response.ok) {
-        const data = (await response.json()) as SongsResponse
-        setSongs(data.songs)
+        const data = (await response.json()) as TracksResponse
+        setTracks(data.tracks)
         setTotal(data.total)
+        setHasMore(data.hasMore)
       }
     } catch {
-      // Failed to fetch songs
+      // Failed to fetch tracks
     } finally {
       setIsLoading(false)
     }
-  }, [search, filter, offset])
+  }, [search, filter, sort, offset])
 
+  // Fetch on mount and when dependencies change
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) return
-    fetchSongs()
-  }, [isAuthenticated, isAdmin, fetchSongs])
+    fetchTracks()
+  }, [isAuthenticated, isAdmin, fetchTracks])
 
+  // Reset offset when filters change
   useEffect(() => {
     setOffset(0)
-  }, [search, filter])
+  }, [search, filter, sort])
 
+  // Handle search submit
+  const handleSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        setOffset(0)
+        fetchTracks()
+      }
+    },
+    [fetchTracks],
+  )
+
+  // Action handlers
+  const handleCopyFromTurso = useCallback(async (track: TrackWithEnrichment) => {
+    const response = await fetch(`/api/admin/tracks/${track.lrclibId}/copy-enrichment`, {
+      method: "POST",
+    })
+    if (!response.ok) {
+      const data = (await response.json()) as { error?: string }
+      throw new Error(data.error ?? "Failed to copy enrichment")
+    }
+  }, [])
+
+  const handleFindSpotify = useCallback((track: TrackWithEnrichment) => {
+    setSpotifyModalTrack(track)
+  }, [])
+
+  const handleSpotifySelect = useCallback(
+    async (spotifyId: string) => {
+      if (!spotifyModalTrack) return
+
+      const response = await fetch(`/api/admin/tracks/${spotifyModalTrack.lrclibId}/link-spotify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spotifyId }),
+      })
+
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string }
+        throw new Error(data.error ?? "Failed to link Spotify track")
+      }
+    },
+    [spotifyModalTrack],
+  )
+
+  const handleFetchBpm = useCallback(async (track: TrackWithEnrichment) => {
+    const response = await fetch(`/api/admin/tracks/${track.lrclibId}/fetch-bpm`, {
+      method: "POST",
+    })
+    if (!response.ok) {
+      const data = (await response.json()) as { error?: string }
+      throw new Error(data.error ?? "Failed to fetch BPM")
+    }
+  }, [])
+
+  const handleManualBpm = useCallback((track: TrackWithEnrichment) => {
+    // Navigate to song detail page for manual BPM entry
+    if (track.neonSongId) {
+      window.open(`/admin/songs/${track.neonSongId}`, "_blank")
+    } else {
+      // If not in catalog, show alert
+      alert("Track must be in catalog first. Use 'Copy from Turso' or 'Find Spotify' to add it.")
+    }
+  }, [])
+
+  const handleViewLyrics = useCallback((track: TrackWithEnrichment) => {
+    const path = makeCanonicalPath({
+      id: track.lrclibId,
+      title: track.title,
+      artist: track.artist,
+    })
+    window.open(path, "_blank")
+  }, [])
+
+  // Render expanded content
+  const renderExpandedContent = useCallback(
+    (track: TrackWithEnrichment) => (
+      <TrackDetail
+        track={track}
+        renderActions={t => (
+          <EnrichmentActions
+            track={t}
+            onCopyFromTurso={handleCopyFromTurso}
+            onFindSpotify={handleFindSpotify}
+            onFetchBpm={handleFetchBpm}
+            onManualBpm={handleManualBpm}
+            onViewLyrics={handleViewLyrics}
+            onRefresh={fetchTracks}
+          />
+        )}
+      />
+    ),
+    [
+      handleCopyFromTurso,
+      handleFindSpotify,
+      handleFetchBpm,
+      handleManualBpm,
+      handleViewLyrics,
+      fetchTracks,
+    ],
+  )
+
+  // Auth check
   if (isAuthLoading) {
     return <LoadingScreen />
   }
@@ -735,9 +295,6 @@ export default function AdminSongsPage() {
   if (!isAuthenticated || !isAdmin) {
     return <AccessDenied />
   }
-
-  const totalPages = Math.ceil(total / LIMIT)
-  const currentPage = Math.floor(offset / LIMIT) + 1
 
   return (
     <div
@@ -747,24 +304,27 @@ export default function AdminSongsPage() {
       <Header />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-6xl mx-auto">
+          {/* Page Title */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={springs.default}
             className="mb-8"
           >
-            <h1 className="text-2xl font-semibold mb-1">Songs Catalog</h1>
+            <h1 className="text-2xl font-semibold mb-1">Track Catalog</h1>
             <p style={{ color: "var(--color-text3)" }}>
-              {total} song{total !== 1 ? "s" : ""} in database
+              {total.toLocaleString()} track{total !== 1 ? "s" : ""} in LRCLIB database
             </p>
           </motion.div>
 
+          {/* Search and Sort */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...springs.default, delay: 0.1 }}
-            className="flex flex-col sm:flex-row gap-3 mb-6"
+            className="flex flex-col sm:flex-row gap-3 mb-4"
           >
+            {/* Search Input */}
             <div className="relative flex-1">
               <MagnifyingGlass
                 size={18}
@@ -773,9 +333,10 @@ export default function AdminSongsPage() {
               />
               <input
                 type="text"
-                placeholder="Search by artist or title..."
+                placeholder="Search tracks (FTS5)..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg focus:outline-none transition-colors"
                 style={{
                   background: "var(--color-surface1)",
@@ -784,15 +345,17 @@ export default function AdminSongsPage() {
                 }}
               />
             </div>
+
+            {/* Sort Dropdown */}
             <div className="relative">
-              <FunnelSimple
+              <ArrowsDownUp
                 size={18}
                 className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                 style={{ color: "var(--color-text-muted)" }}
               />
               <select
-                value={filter}
-                onChange={e => setFilter(e.target.value as FilterType)}
+                value={sort}
+                onChange={e => setSort(e.target.value as SortType)}
                 className="appearance-none pl-10 pr-10 py-2.5 rounded-lg focus:outline-none transition-colors cursor-pointer"
                 style={{
                   background: "var(--color-surface1)",
@@ -800,172 +363,54 @@ export default function AdminSongsPage() {
                   color: "var(--color-text)",
                 }}
               >
-                <option value="all">All</option>
-                <option value="synced">Synced</option>
-                <option value="enhanced">Enhanced</option>
-                <option value="unenhanced">Unenhanced</option>
+                <option value="popular">Popular first</option>
+                <option value="alpha">Alphabetical</option>
               </select>
             </div>
-            <div
-              className="flex items-center gap-1 rounded-lg p-1"
-              style={{
-                background: "var(--color-surface1)",
-                border: "1px solid var(--color-border)",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => handleViewTypeChange("grid")}
-                className="p-2 rounded transition-colors"
-                style={
-                  viewType === "grid"
-                    ? { background: "var(--color-surface2)", color: "var(--color-text)" }
-                    : { color: "var(--color-text-muted)" }
-                }
-                title="Grid view"
-              >
-                <SquaresFour size={18} />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleViewTypeChange("list")}
-                className="p-2 rounded transition-colors"
-                style={
-                  viewType === "list"
-                    ? { background: "var(--color-surface2)", color: "var(--color-text)" }
-                    : { color: "var(--color-text-muted)" }
-                }
-                title="List view"
-              >
-                <List size={18} />
-              </button>
-            </div>
-            {total > 0 && (
-              <button
-                type="button"
-                onClick={handleDeleteAll}
-                disabled={isDeletingAll}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50"
-                style={{ background: "var(--color-danger-soft)", color: "var(--color-danger)" }}
-              >
-                <Trash size={18} />
-                <span>{isDeletingAll ? "Deleting..." : "Delete all"}</span>
-              </button>
-            )}
           </motion.div>
 
-          {isLoading ? (
-            <LoadingGrid />
-          ) : songs.length === 0 ? (
-            <EmptyState hasSearch={search.length > 0 || filter !== "all"} />
-          ) : (
-            <>
-              {viewType === "grid" ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ ...springs.default, delay: 0.2 }}
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                >
-                  {songs.map((song, index) => (
-                    <SongCard
-                      key={`${song.id}-${index}`}
-                      song={song}
-                      index={index}
-                      onDeleteSong={songId => {
-                        setSongs(prev => prev.filter(s => s.id !== songId))
-                        setTotal(prev => prev - 1)
-                      }}
-                    />
-                  ))}
-                </motion.div>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ ...springs.default, delay: 0.2 }}
-                  className="rounded-xl overflow-hidden"
-                  style={{
-                    background: "var(--color-surface1)",
-                    border: "1px solid var(--color-border)",
-                  }}
-                >
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr
-                        className="text-left"
-                        style={{
-                          borderBottom: "1px solid var(--color-border)",
-                          color: "var(--color-text3)",
-                        }}
-                      >
-                        <th className="px-4 py-3 font-medium">Song</th>
-                        <th className="px-4 py-3 font-medium hidden md:table-cell">Album</th>
-                        <th className="px-4 py-3 font-medium hidden lg:table-cell">Duration</th>
-                        <th className="px-4 py-3 font-medium hidden lg:table-cell">BPM</th>
-                        <th className="px-4 py-3 font-medium text-center">Status</th>
-                        <th className="px-4 py-3 font-medium text-right">Plays</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {songs.map((song, index) => (
-                        <SongRow
-                          key={`${song.id}-${index}`}
-                          song={song}
-                          index={index}
-                          onDeleteSong={songId => {
-                            setSongs(prev => prev.filter(s => s.id !== songId))
-                            setTotal(prev => prev - 1)
-                          }}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                </motion.div>
-              )}
+          {/* Filter Bar */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...springs.default, delay: 0.15 }}
+            className="mb-6"
+          >
+            <TracksFilterBar filter={filter} onFilterChange={setFilter} />
+          </motion.div>
 
-              {totalPages > 1 && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ ...springs.default, delay: 0.3 }}
-                  className="flex items-center justify-between mt-6"
-                >
-                  <p className="text-sm" style={{ color: "var(--color-text3)" }}>
-                    Showing {offset + 1}–{Math.min(offset + LIMIT, total)} of {total}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOffset(Math.max(0, offset - LIMIT))}
-                      disabled={offset === 0}
-                      className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:brightness-125"
-                      style={{ background: "var(--color-surface1)", color: "var(--color-text3)" }}
-                    >
-                      <CaretLeft size={18} />
-                    </button>
-                    <span
-                      className="text-sm min-w-[80px] text-center"
-                      style={{ color: "var(--color-text3)" }}
-                    >
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setOffset(offset + LIMIT)}
-                      disabled={offset + LIMIT >= total}
-                      className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:brightness-125"
-                      style={{ background: "var(--color-surface1)", color: "var(--color-text3)" }}
-                    >
-                      <CaretRight size={18} />
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </>
-          )}
+          {/* Tracks List */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ ...springs.default, delay: 0.2 }}
+          >
+            <TracksList
+              tracks={tracks}
+              total={total}
+              offset={offset}
+              limit={LIMIT}
+              hasMore={hasMore}
+              isLoading={isLoading}
+              onPageChange={setOffset}
+              onTrackSelect={() => {}}
+              renderExpandedContent={renderExpandedContent}
+            />
+          </motion.div>
         </div>
       </main>
+
+      {/* Spotify Search Modal */}
+      {spotifyModalTrack && (
+        <SpotifySearchModal
+          isOpen={spotifyModalTrack !== null}
+          onClose={() => setSpotifyModalTrack(null)}
+          lrclibId={spotifyModalTrack.lrclibId}
+          title={spotifyModalTrack.title}
+          artist={spotifyModalTrack.artist}
+          onSelect={handleSpotifySelect}
+        />
+      )}
     </div>
   )
 }

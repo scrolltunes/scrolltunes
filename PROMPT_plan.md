@@ -1,31 +1,31 @@
-# Planning Mode
+# BPM Analytics Admin - Planning Mode
 
-You are in PLANNING mode. Your job is to create a detailed implementation plan for the Spotify metadata enrichment feature.
+You are in PLANNING mode for the BPM Analytics Admin feature.
 
 ## Phase 0: Orient
 
 ### 0a. Study specifications
-Read all files in `specs/` directory using parallel subagents:
-- `specs/001-rust-extraction-tool-enhancement.md`
-- `specs/002-turso-schema-migration.md`
-- `specs/003-search-api-turso-first.md`
-- `specs/004-album-art-optimization.md`
-- `specs/005-bpm-provider-refactor.md`
-- `specs/006-documentation-cleanup.md`
+Read all files in `specs/` directory:
+- `specs/bpm-analytics-schema.md`
+- `specs/bpm-logging-helper.md`
+- `specs/bpm-instrumentation.md`
+- `specs/bpm-admin-dashboard.md`
+- `specs/bpm-retention-cleanup.md`
+- `specs/bpm-admin-tracks-browser.md`
 
 ### 0b. Study existing implementation
-Use parallel subagents to analyze relevant source directories:
-- `scripts/lrclib-extract/src/main.rs` - Rust extraction tool
-- `src/services/turso.ts` - Turso service layer
-- `src/app/api/search/route.ts` - Search API
-- `src/lib/bpm/` - BPM providers
-- `src/lib/deezer-client.ts` - Deezer integration
+Analyze relevant source files:
+- `src/lib/db/schema.ts` - Drizzle schema patterns
+- `src/services/song-loader.ts` - Song loading and BPM fetch flow
+- `src/services/bpm-providers.ts` - Current BPM provider structure
+- `src/app/admin/page.tsx` - Admin auth pattern
+- `src/app/api/admin/stats/route.ts` - Effect.ts API route pattern
 
 ### 0c. Study the current plan
 Read `IMPLEMENTATION_PLAN.md` for the overall structure.
 
 ### 0d. Study the original design doc
-Read `docs/spotify-enrichment-plan.md` for complete context.
+Read `docs/bpm-analytics-admin.md` for complete context.
 
 ### 0e. Study project rules
 Read `CLAUDE.md` for project conventions:
@@ -38,10 +38,12 @@ Read `CLAUDE.md` for project conventions:
 ## Phase 1: Gap Analysis
 
 Compare specs against current implementation:
-- What changes are needed in the Rust extraction tool?
-- What TypeScript interfaces need updating?
-- What API routes need modification?
-- What new files need to be created?
+- What changes are needed in the database schema?
+- What TypeScript interfaces need creating?
+- Where exactly should logging be added?
+- What admin components need to be built?
+- How should the tracks browser integrate with existing admin songs page?
+- What API endpoints are needed for enrichment actions?
 
 **CRITICAL**: Verify all assumptions by reading actual source files.
 
@@ -54,16 +56,10 @@ Update `IMPLEMENTATION_PLAN.md` with:
 - Dependencies between tasks
 - Clear acceptance criteria
 
-Priority guidelines:
-- Phase 1 (Rust): Foundation, must complete first
-- Phase 2 (Turso): Blocks all TypeScript work
-- Phases 3-5: Can partially parallelize
-- Phase 6 (Docs): Final cleanup
-
 ## Guardrails
 
 999. NEVER implement code in planning mode
-1000. Use up to 10 parallel subagents for analysis
+1000. Use parallel subagents for analysis
 1001. Each task must be completable in ONE loop iteration
 1002. Verify all file paths exist before referencing
 
@@ -78,4 +74,4 @@ When plan is complete:
 - @CLAUDE.md
 - @specs/*
 - @IMPLEMENTATION_PLAN.md
-- @docs/spotify-enrichment-plan.md
+- @docs/bpm-analytics-admin.md

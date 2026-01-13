@@ -1,4 +1,4 @@
-# Building Mode
+# BPM Analytics Admin - Build Mode
 
 You are in BUILDING mode. Implement ONE task from the plan, validate, commit, exit.
 
@@ -8,7 +8,6 @@ You are in BUILDING mode. Implement ONE task from the plan, validate, commit, ex
 Read `CLAUDE.md` for project rules:
 - Use bun exclusively (not npm/node)
 - Effect.ts for async operations
-- useSyncExternalStore with class-based stores
 - No `any` types, no `@ts-ignore`
 - Path alias: `@/*` → `src/*`
 
@@ -24,7 +23,7 @@ If ALL tasks are complete:
 3. Check for uncommitted changes: `git status --porcelain`
 4. If there are uncommitted changes:
    - Stage all changes: `git add -A`
-   - Commit with message: `feat: complete Spotify metadata enrichment`
+   - Commit with message: `feat: complete BPM analytics admin dashboard`
 5. Output the completion signal: **RALPH_COMPLETE**
 6. Exit immediately
 
@@ -38,68 +37,56 @@ Read the relevant spec file for the current task from `specs/`.
 
 ### 1b. Study existing code
 Read the source files that need modification:
-
-For Rust tasks:
-- `scripts/lrclib-extract/src/main.rs`
-- `scripts/lrclib-extract/Cargo.toml`
-
-For TypeScript tasks:
-- `src/services/turso.ts`
-- `src/app/api/search/route.ts`
-- `src/lib/search-api-types.ts`
-- `src/lib/bpm/bpm-types.ts`
-- `src/lib/deezer-client.ts`
+- `src/lib/db/schema.ts` - Drizzle schema
+- `src/services/song-loader.ts` - Song loading
+- `src/services/bpm-providers.ts` - BPM providers
+- `src/services/turso.ts` - Turso service
+- `src/app/admin/page.tsx` - Admin patterns
+- `src/app/admin/songs/page.tsx` - Existing songs page (for Phase 5)
+- `src/app/api/admin/stats/route.ts` - API patterns
 
 ### 1c. Implement
 Make the code changes for this ONE task. Follow project patterns:
 
-For Rust:
-- Use `rusqlite` for SQLite operations
-- Use `rayon` for parallel processing
-- Use `HashMap` for lookups
-- Follow existing normalization patterns
+For Database:
+- Use Drizzle's pgTable for schema
+- Follow existing index patterns
+- Export types with $inferSelect
 
-For TypeScript:
-- Use Effect.ts for async operations
-- Use proper null handling (nullable vs optional)
-- Follow existing TursoService patterns
-- Use `@/` import alias
+For Logging:
+- Fire-and-forget (don't await)
+- Catch errors and log to console
+- Truncate long strings
+
+For Components:
+- Use CSS variables for styling
+- Use motion for animations
+- Use Phosphor icons
+- Follow existing admin component patterns
 
 ### 1d. Validate
 Run validation command: `bun run check`
 
 This runs: `biome check . && bun run typecheck && bun run test`
 
-For Rust changes, also run:
-```bash
-cd scripts/lrclib-extract && cargo build --release
-```
-
 Must pass before proceeding. If it fails, fix and retry.
 
 ## Phase 2: Update Plan
 
 Mark the task complete in `IMPLEMENTATION_PLAN.md`:
-- Update status in the specs table
+- Check the checkbox: `- [x]`
 - Note any discoveries or deviations
 
 ## Phase 3: Commit
 
 Create atomic commit with conventional commit format:
 ```
-feat(component): short description
+feat(bpm-analytics): short description
 
 Details if needed.
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
-
-Component examples:
-- `feat(extraction)` - Rust extraction tool
-- `feat(turso)` - Turso schema/service
-- `feat(search)` - Search API
-- `feat(bpm)` - BPM resolution
-- `docs` - Documentation updates
 
 ## Guardrails
 
@@ -107,7 +94,7 @@ Component examples:
 1000. Read specs and source files before modifying
 1001. Validation MUST pass before commit
 1002. Handle NULL values gracefully
-1003. Maintain backwards compatibility where possible
+1003. Maintain backwards compatibility
 
 ## Exit Conditions
 
@@ -122,4 +109,4 @@ Component examples:
 - @CLAUDE.md
 - @IMPLEMENTATION_PLAN.md
 - @specs/*
-- @docs/spotify-enrichment-plan.md
+- @docs/bpm-analytics-admin.md
