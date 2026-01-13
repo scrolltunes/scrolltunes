@@ -945,14 +945,21 @@ Link a Spotify track and fetch audio features. Added `getAudioFeatures` method t
 
 ### Task 5.5: Fetch BPM API Endpoint
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/app/api/admin/tracks/[lrclibId]/fetch-bpm/route.ts` (new file)
 
-Trigger BPM provider cascade synchronously.
+Trigger BPM provider cascade synchronously. The endpoint:
+- Gets track from Turso
+- Runs each BPM provider sequentially (to capture all attempts)
+- Uses logging-wrapped providers for analytics
+- Saves successful BPM to Neon (creates song entry if needed)
+- Returns all provider attempts with latency, success/failure, and error details
 
 **Acceptance Criteria**:
-- [ ] Triggers provider cascade
-- [ ] Returns all attempts with success/failure
-- [ ] Saves successful result to Neon
+- [x] Triggers provider cascade
+- [x] Returns all attempts with success/failure
+- [x] Saves successful result to Neon
 
 ---
 
