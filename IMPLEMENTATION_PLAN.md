@@ -606,6 +606,8 @@ function fireAndForgetBpmFetch(
 
 ### Task 3.1: BPM Stats API Endpoint
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/app/api/admin/bpm-stats/route.ts` (new file)
 
 Create API endpoint following the pattern from `src/app/api/admin/stats/route.ts`:
@@ -616,13 +618,13 @@ Create API endpoint following the pattern from `src/app/api/admin/stats/route.ts
 See `specs/bpm-admin-dashboard.md` for full query details.
 
 **Acceptance Criteria**:
-- [ ] Route created with admin auth check
-- [ ] Summary query returns: total attempts, success rate, songs without BPM, avg latency
-- [ ] Provider breakdown query works
-- [ ] Time-series query returns 30 days of data
-- [ ] Failures query with pagination
-- [ ] Missing songs queries for all three types
-- [ ] Error breakdown query works
+- [x] Route created with admin auth check
+- [x] Summary query returns: total attempts, success rate, songs without BPM, avg latency
+- [x] Provider breakdown query works
+- [x] Time-series query returns 30 days of data
+- [x] Failures query with pagination
+- [x] Missing songs queries for all three types
+- [x] Error breakdown query works
 
 ---
 
