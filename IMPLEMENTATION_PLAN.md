@@ -666,14 +666,16 @@ Table with columns: Provider, Attempts, Successes, Rate (%), Avg Latency.
 
 ### Task 3.4: Time-Series Chart Component
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/components/admin/BpmTimeSeriesChart.tsx` (new file)
 
-Use `recharts` (already in project) for stacked bar chart.
+Use `recharts` for stacked bar chart. Note: recharts was installed as it was not already in the project.
 
 **Acceptance Criteria**:
-- [ ] Chart renders 30 days of data
-- [ ] Stacked by provider
-- [ ] Responsive width
+- [x] Chart renders 30 days of data
+- [x] Stacked by provider
+- [x] Responsive width
 
 ---
 

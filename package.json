@@ -39,6 +39,7 @@
     "onnxruntime-web": "^1.23.2",
     "react": "19.2.1",
     "react-dom": "19.2.1",
+    "recharts": "^3.6.0",
     "tone": "^15"
   },
   "devDependencies": {
