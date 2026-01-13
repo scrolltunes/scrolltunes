@@ -78,7 +78,7 @@ This runs: `biome check . && bun run typecheck && bun run test`
 
 ## Gap Analysis
 
-**Analysis Date**: 2026-01-13 (Updated)
+**Analysis Date**: 2026-01-13 (Verified against source files)
 
 ### Phase 1: Schema + Logging
 
@@ -87,18 +87,19 @@ This runs: `biome check . && bun run typecheck && bun run test`
 | `bpmFetchLog` table | ✅ Already exists in `schema.ts` lines 421-443 | None - DONE |
 | `serial` import | ✅ Already imported (line 11) | None - DONE |
 | Type exports | ✅ `BpmFetchLog`, `NewBpmFetchLog` exist (lines 491-492) | None - DONE |
-| Migration file | ⚠️ Latest is `0003_add-album-art-cache.sql` (idx: 3) | Create `0004_bpm_fetch_log.sql` |
-| Journal entry | idx: 3 is latest | Add idx: 4 entry |
+| Migration | ✅ Uses `db:push` workflow (drizzle/ is gitignored) | Run `bun run db:push` - DONE |
 | `bpm-log.ts` types | Does not exist | Create new file with types + logging helper |
 
 ### Phase 2: Instrumentation
 
 | Item | Current State | Required Change |
 |------|---------------|-----------------|
-| `fireAndForgetBpmFetch` | Lines 243-300, params: `(songId, title, artist, spotifyId)` | Add `lrclibId` param after `songId` |
-| Call site | Line 541 | Update to pass `actualLrclibId` |
-| Turso logging | Lines 516-538, no logging | Add timing + logging calls |
-| `bpm-providers.ts` | 59 lines, no logging | Add `wrapProviderWithLogging` + `withLogging` method |
+| `fireAndForgetBpmFetch` | Lines 243-300 in `song-loader.ts`, params: `(songId, title, artist, spotifyId)` | Add `lrclibId` param after `songId` |
+| Call site | Line 541 in `song-loader.ts` | Update to pass `actualLrclibId` |
+| Turso lookup | Lines 514-543, uses `.then().catch()` on line 536-537 | Add timing + logging calls |
+| `bpm-providers.ts` | 59 lines, current interface at lines 12-16 has NO `withLogging` | Add `wrapProviderWithLogging` + `withLogging` method |
+
+**Critical Detail**: The current Turso caching on lines 528-537 uses `.then().catch()` which violates Effect.ts patterns - but this is existing code for caching, not logging. The new logging should use `Effect.runFork`.
 
 ### Phase 3: Dashboard
 
@@ -107,25 +108,39 @@ This runs: `biome check . && bun run typecheck && bun run test`
 | `/admin/bpm-stats` | Does not exist | Create new page |
 | BPM stats API | Does not exist | Create `/api/admin/bpm-stats/route.ts` |
 | Components | None exist | Create 7 new components in `src/components/admin/` |
-| Admin sidebar | No BPM stats link | Add link to dashboard |
-| Recharts | Already in project | No install needed |
+| Admin sidebar | Lines 336-354 in `admin/page.tsx`, has "Tools" section | Add "BPM Analytics" link |
+| Mobile tabs | Lines 270-306, has hardcoded tabs | Add "BPM Stats" tab |
+| Recharts | ✅ Already in project (`package.json`) | No install needed |
+
+**Pattern Reference**: `src/app/api/admin/stats/route.ts` shows exact Effect.ts API pattern with:
+- `Effect.gen` for composing queries
+- `DbLayer` for database dependency
+- `UnauthorizedError`, `ForbiddenError`, `DatabaseError` tagged errors from `@/lib/errors`
+- `Effect.runPromiseExit()` with pattern matching
 
 ### Phase 4: Cron
 
 | Item | Current State | Required Change |
 |------|---------------|-----------------|
 | Cleanup endpoint | Does not exist | Create `/api/cron/cleanup-bpm-log/route.ts` |
-| `vercel.json` | 1 cron (`/api/cron/turso-usage`) | Add second cron entry |
+| `vercel.json` | 1 cron at line 4-7 (`/api/cron/turso-usage` at `0 6 * * *`) | Add second cron entry |
 
 ### Phase 5: Tracks Browser
 
 | Item | Current State | Required Change |
 |------|---------------|-----------------|
-| `/admin/songs` page | 972 lines, Neon-only | Replace with Turso-first implementation |
-| Filters | `all\|synced\|enhanced\|unenhanced` | Change to `all\|missing_spotify\|has_spotify\|in_catalog\|missing_bpm` |
+| `/admin/songs` page | 972 lines, Neon-only via `/api/admin/songs` | Replace with Turso-first implementation |
+| Current filters | Lines 54, 795-807: `all\|synced\|enhanced\|unenhanced` | Change to `all\|missing_spotify\|has_spotify\|in_catalog\|missing_bpm` |
+| Current components | `SongCard` (239-461), `SongRow` (463-653) - both load album art via `/api/lyrics/` | Reuse pattern, add expansion |
 | Tracks API | Does not exist | Create `/api/admin/tracks/route.ts` |
 | Enrichment APIs | Do not exist | Create 4 new API routes |
-| Components | Existing `SongCard`/`SongRow` | Create new modular components |
+| TursoService | ✅ Exists at `src/services/turso.ts` with `search`, `getById`, `findByTitleArtist` | Need paginated search with filter support |
+
+**TursoService Details** (verified in `src/services/turso.ts`):
+- Line 78-127: `search(query, limit)` - FTS5 search with popularity ordering
+- Line 129-169: `getById(lrclibId)` - Get single track by ID
+- Line 171-240: `findByTitleArtist(title, artist, targetDurationSec?)` - Best match search
+- Need to add: `searchWithFilters(query, filter, sort, offset, limit)` for admin tracks browser
 
 ---
 
@@ -162,50 +177,17 @@ The schema has already been added to `src/lib/db/schema.ts`:
 
 ---
 
-### Task 1.2: Create Database Migration
+### Task 1.2: Apply Database Migration
 
-**Files**: `drizzle/0004_bpm_fetch_log.sql`
+**Status**: ✅ COMPLETE
 
-```sql
--- Add BPM fetch logging table for analytics
-CREATE TABLE bpm_fetch_log (
-  id SERIAL PRIMARY KEY,
-  lrclib_id INTEGER NOT NULL,
-  song_id TEXT,
-  title TEXT NOT NULL,
-  artist TEXT NOT NULL,
-  stage TEXT NOT NULL,
-  provider TEXT NOT NULL,
-  success BOOLEAN NOT NULL,
-  bpm INTEGER,
-  error_reason TEXT,
-  error_detail TEXT,
-  latency_ms INTEGER,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+**Note**: This project uses Drizzle's push workflow (`bun run db:push`) instead of migration files. The `drizzle/` directory is gitignored. Since Task 1.1 added the schema to `src/lib/db/schema.ts`, running `bun run db:push` will create the table.
 
-CREATE INDEX idx_bpm_log_lrclib ON bpm_fetch_log(lrclib_id);
-CREATE INDEX idx_bpm_log_created_provider ON bpm_fetch_log(created_at, provider);
-CREATE INDEX idx_bpm_log_created ON bpm_fetch_log(created_at);
-```
-
-**Post-task**: Update `drizzle/meta/_journal.json` with new entry:
-```json
-{
-  "idx": 4,
-  "version": "7",
-  "when": <timestamp>,
-  "tag": "0004_bpm_fetch_log",
-  "breakpoints": true
-}
-```
-
-Run `bun run db:push` to apply migration.
+Run `bun run db:push` to apply the schema to the database.
 
 **Acceptance Criteria**:
-- [ ] Migration file created
-- [ ] Journal updated
-- [ ] Migration applies successfully
+- [x] Schema defined in `src/lib/db/schema.ts` (Task 1.1)
+- [x] Run `bun run db:push` to apply to database
 
 ---
 
@@ -1151,7 +1133,7 @@ After all phases complete:
 | File | Phase | Changes | Status |
 |------|-------|---------|--------|
 | `src/lib/db/schema.ts` | 1.1 | Add `bpmFetchLog` table + types | ✅ Done |
-| `drizzle/meta/_journal.json` | 1.2 | Add migration entry | Pending |
+| Database migration | 1.2 | Run `bun run db:push` | ✅ Done (uses push workflow) |
 | `src/services/song-loader.ts` | 2.1, 2.2 | Update signature, add Turso logging | Pending |
 | `src/services/bpm-providers.ts` | 2.3 | Add logging wrapper and `withLogging` method | Pending |
 | `vercel.json` | 4.1 | Add cleanup cron | Pending |
@@ -1186,3 +1168,60 @@ Phase 4 (Cron)                        │
 - Within Phase 3, tasks 3.2-3.8 (components) can run in parallel
 - Within Phase 5, tasks 5.6-5.10 (components) can run in parallel
 - Phase 4 only depends on Phase 1 (can start early)
+
+---
+
+## Implementation Summary
+
+### Task Complexity Breakdown
+
+| Phase | Task | Complexity | Est. Lines | Notes |
+|-------|------|------------|------------|-------|
+| 1.2 | Migration file | Simple | 20 | SQL only |
+| 1.3 | bpm-log.ts | Medium | 80 | New file with types + Effect pattern |
+| 2.1 | Update signature | Simple | 5 | Add parameter, update call site |
+| 2.2 | Turso logging | Medium | 30 | Add timing + 2 logging calls |
+| 2.3 | Provider logging | Complex | 150 | New interface, wrapper function, modify service |
+| 3.1 | BPM stats API | Complex | 200 | Multiple queries, Effect.gen pattern |
+| 3.2-3.8 | Dashboard components | Medium each | ~100 each | Can parallelize |
+| 3.9 | Dashboard page | Medium | 150 | Compose components |
+| 4.1 | Cleanup cron | Simple | 60 | Copy pattern from spec |
+| 5.1 | Tracks API | Complex | 250 | Turso + Neon join, filters |
+| 5.2-5.5 | Enrichment APIs | Medium each | ~80 each | Can parallelize |
+| 5.6-5.10 | Tracks components | Medium each | ~100 each | Can parallelize |
+| 5.11 | Replace songs page | Complex | 400 | Orchestrate new components |
+
+### Key Implementation Details
+
+**Phase 1 Critical Files**:
+- `src/lib/db/schema.ts` - ✅ Schema already defined (Task 1.1 complete)
+- Database migration - ✅ Uses `db:push` workflow (Task 1.2 complete)
+- `src/lib/bpm/bpm-log.ts` - MUST use `Effect.runFork`, NOT `.then().catch()`
+
+**Phase 2 Critical Files**:
+- `src/services/song-loader.ts` lines 243-300 and 514-543 - Add logging
+- `src/services/bpm-providers.ts` - Completely rewrite with `withLogging` method
+
+**Phase 3 Critical Files**:
+- Follow `src/app/api/admin/stats/route.ts` pattern exactly
+- Use `DbLayer` from `@/services/db`
+- Import errors from `@/lib/errors`
+
+**Phase 5 Critical Files**:
+- TursoService needs new method for admin search with filters
+- Cross-reference with `songLrclibIds` table for "in catalog" filter
+- Existing `SongCard`/`SongRow` patterns from `admin/songs/page.tsx` can be adapted
+
+### Recommended Execution Order
+
+1. **Phase 1.2** - Create migration (prerequisite for everything)
+2. **Phase 1.3** - Create bpm-log.ts (prerequisite for Phase 2)
+3. **Phase 2.1** - Update signature (quick win, enables 2.2-2.3)
+4. **Phase 2.2** - Add Turso logging (enables data collection)
+5. **Phase 2.3** - Add provider logging (completes instrumentation)
+6. **Phase 4.1** - Create cron (independent, can run early after Phase 1)
+7. **Phase 3.1** - Create BPM stats API (enables dashboard)
+8. **Phase 3.2-3.9** - Dashboard components and page (parallel)
+9. **Phase 5.1** - Tracks API (enables tracks browser)
+10. **Phase 5.2-5.5** - Enrichment APIs (parallel)
+11. **Phase 5.6-5.11** - Tracks browser components and page (parallel)
