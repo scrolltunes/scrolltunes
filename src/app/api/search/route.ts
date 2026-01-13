@@ -1,3 +1,4 @@
+import { getAlbumArtForTrack } from "@/lib/album-art"
 import { getAlbumArt } from "@/lib/deezer-client"
 import { type LRCLibTrackResult, searchLRCLibTracks } from "@/lib/lyrics-client"
 import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
@@ -17,22 +18,16 @@ import { type NextRequest, NextResponse } from "next/server"
  */
 
 /**
- * Enrich a Turso search result with album art
+ * Enrich a Turso search result with album art using three-tier priority:
+ * 1. Stored URL from Turso (instant)
+ * 2. Deezer ISRC lookup (~100ms)
+ * 3. Deezer search fallback (~200ms)
  */
 function enrichWithAlbumArt(
   result: TursoSearchResult,
 ): Effect.Effect<SearchResultTrack, never, FetchService> {
   return Effect.gen(function* () {
-    // Priority 1: Stored URL from Spotify dump (instant)
-    let albumArt = result.albumImageUrl
-
-    // Priority 2: Deezer lookup (if no stored URL)
-    if (!albumArt) {
-      albumArt = yield* Effect.tryPromise({
-        try: () => getAlbumArt(result.artist, result.title, "medium"),
-        catch: () => null,
-      }).pipe(Effect.catchAll(() => Effect.succeed(null)))
-    }
+    const albumArt = yield* getAlbumArtForTrack(result, "medium")
 
     return {
       id: `lrclib-${result.id}`,
