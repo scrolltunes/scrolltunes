@@ -10,7 +10,7 @@ Redesign `/admin/songs` from Turso-first (4.2M tracks, 20+ second load) to Neon-
 |------|-------------|--------|
 | [admin-catalog-api](specs/admin-catalog-api.md) | Catalog API endpoint | Complete |
 | [admin-track-search](specs/admin-track-search.md) | Search-only tracks endpoint | Complete |
-| [admin-add-to-catalog](specs/admin-add-to-catalog.md) | Add track to catalog endpoint | Pending |
+| [admin-add-to-catalog](specs/admin-add-to-catalog.md) | Add track to catalog endpoint | Complete |
 | [admin-catalog-hook](specs/admin-catalog-hook.md) | useAdminCatalog SWR hook | Pending |
 | [admin-songs-page-redesign](specs/admin-songs-page-redesign.md) | Page redesign | Pending |
 
@@ -506,13 +506,13 @@ if (error._tag === "ConflictError") {
 ```
 
 **Acceptance Criteria**:
-- [ ] Creates new song in Neon with all fields from Turso
-- [ ] Links LRCLIB ID via `songLrclibIds` table
-- [ ] Copies BPM/key from Turso if available (`bpmSource: "Turso"`)
-- [ ] Sets `hasSyncedLyrics: true` (LRCLIB tracks have synced lyrics)
-- [ ] Returns 409 ConflictError if LRCLIB ID already in catalog
-- [ ] Returns 404 NotFoundError if LRCLIB ID not found in Turso
-- [ ] Admin auth required
+- [x] Creates new song in Neon with all fields from Turso
+- [x] Links LRCLIB ID via `songLrclibIds` table
+- [x] Copies BPM/key from Turso if available (`bpmSource: "Turso"`)
+- [x] Sets `hasSyncedLyrics: true` (LRCLIB tracks have synced lyrics)
+- [x] Returns 409 ConflictError if LRCLIB ID already in catalog
+- [x] Returns 404 NotFoundError if LRCLIB ID not found in Turso
+- [x] Admin auth required
 
 ---
 
@@ -1197,7 +1197,7 @@ const handleAddToCatalog = useCallback(async (lrclibId: number) => {
 |------|-------|---------|--------|--------------|-------|
 | `src/app/api/admin/catalog/route.ts` | 1.1 | Catalog API | Complete | None | Use DbLayer only |
 | `src/app/api/admin/tracks/search/route.ts` | 2.1 | Search API | Complete | None | Use ServerLayer (needs Turso) |
-| `src/app/api/admin/tracks/[lrclibId]/add-to-catalog/route.ts` | 2.2 | Add to catalog | Pending | None | Reference: copy-enrichment route |
+| `src/app/api/admin/tracks/[lrclibId]/add-to-catalog/route.ts` | 2.2 | Add to catalog | Complete | None | Reference: copy-enrichment route |
 | `src/hooks/useAdminCatalog.ts` | 3.1 | Catalog hook | Pending | Phase 1.1 | Exports shared types |
 | `src/hooks/useAdminTrackSearch.ts` | 3.2 | Search hook | Pending | Phase 2.1 | Exports shared types |
 | `src/components/admin/CatalogFilters.tsx` | 4.1 | Filter chips | Pending | None | Reference: TracksFilterBar |
