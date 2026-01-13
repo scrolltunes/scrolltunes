@@ -887,15 +887,15 @@ export function CatalogTrackRow({ track, isExpanded, onToggle }: CatalogTrackRow
 | E | 40px | CheckCircle if `hasEnhancement` |
 
 **Acceptance Criteria**:
-- [ ] Shows album art (lazy loaded with `loading="lazy"`)
-- [ ] Shows title with warning icon if no BPM
-- [ ] Shows artist below title
-- [ ] Shows usage metrics (plays, users, last played)
-- [ ] Shows BPM (amber color if missing)
-- [ ] Shows green checkmark if enhanced
-- [ ] Subtle amber background on rows missing BPM
-- [ ] Click expands/collapses for details
-- [ ] Uses existing TrackDetail/EnrichmentActions in expanded view
+- [x] Shows album art (lazy loaded with `loading="lazy"`)
+- [x] Shows title with warning icon if no BPM
+- [x] Shows artist below title
+- [x] Shows usage metrics (plays, users, last played)
+- [x] Shows BPM (amber color if missing)
+- [x] Shows green checkmark if enhanced
+- [x] Subtle amber background on rows missing BPM
+- [x] Click expands/collapses for details
+- [x] Uses existing TrackDetail/EnrichmentActions in expanded view
 
 ### Task 4.3: Create SearchResultRow component
 
@@ -1201,7 +1201,7 @@ const handleAddToCatalog = useCallback(async (lrclibId: number) => {
 | `src/hooks/useAdminCatalog.ts` | 3.1 | Catalog hook | Complete | Phase 1.1 | Exports shared types |
 | `src/hooks/useAdminTrackSearch.ts` | 3.2 | Search hook | Complete | Phase 2.1 | Exports shared types |
 | `src/components/admin/CatalogFilters.tsx` | 4.1 | Filter chips | Complete | None | Reference: TracksFilterBar |
-| `src/components/admin/CatalogTrackRow.tsx` | 4.2 | Catalog row | Pending | None | Reference: TracksList TrackRow |
+| `src/components/admin/CatalogTrackRow.tsx` | 4.2 | Catalog row | Complete | None | Reference: TracksList TrackRow |
 | `src/components/admin/SearchResultRow.tsx` | 4.3 | Search row | Pending | Phase 2.2 | — |
 | `src/app/admin/songs/page.tsx` | 4.4 | Page redesign | Pending | All above | Reuse TrackDetail, EnrichmentActions |
 
