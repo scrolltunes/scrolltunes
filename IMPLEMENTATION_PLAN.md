@@ -969,10 +969,12 @@ Trigger BPM provider cascade synchronously. The endpoint:
 
 Filter chips: All, Missing Spotify, Has Spotify, In Catalog, Missing BPM.
 
+**Status**: ✅ COMPLETE
+
 **Acceptance Criteria**:
-- [ ] Chips render and are clickable
-- [ ] Active state styling
-- [ ] Filter change callback works
+- [x] Chips render and are clickable
+- [x] Active state styling
+- [x] Filter change callback works
 
 ---
 
