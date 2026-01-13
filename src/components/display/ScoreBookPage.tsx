@@ -2,6 +2,7 @@
 
 import type { LyricLine as LyricLineType } from "@/core"
 import type { LyricChordPosition } from "@/lib/chords"
+import { ArrowBendDownRight } from "@phosphor-icons/react"
 
 import { memo } from "react"
 import { StaticLyricLine } from "./StaticLyricLine"
@@ -69,6 +70,14 @@ export interface ScoreBookPageProps {
    * Whether text is right-to-left
    */
   readonly isRTL?: boolean
+  /**
+   * Preview line from next page (shown faded at bottom)
+   */
+  readonly previewLine?: LyricLineType
+  /**
+   * Global index of the preview line
+   */
+  readonly previewLineIndex?: number
 }
 
 /**
@@ -90,6 +99,8 @@ export const ScoreBookPage = memo(function ScoreBookPage({
   onLineClick,
   lineChordData,
   isRTL = false,
+  previewLine,
+  previewLineIndex,
 }: ScoreBookPageProps) {
   return (
     <div className="flex flex-col gap-2 px-4 py-2">
@@ -121,6 +132,35 @@ export const ScoreBookPage = memo(function ScoreBookPage({
           </div>
         )
       })}
+
+      {/* Preview of next page's first line */}
+      {previewLine && (
+        <div
+          className="relative mt-3 opacity-30"
+          style={{
+            maskImage: "linear-gradient(to bottom, black 0%, black 50%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 50%, transparent 100%)",
+          }}
+        >
+          <div className="flex items-center justify-center gap-1">
+            <ArrowBendDownRight
+              size={14}
+              weight="regular"
+              className="shrink-0"
+              style={{ color: "var(--color-text3)" }}
+            />
+            <span
+              className="truncate"
+              style={{
+                fontSize: `${Math.round(fontSize * 0.7)}px`,
+                color: "var(--color-text3)",
+              }}
+            >
+              {previewLine.text}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
 })

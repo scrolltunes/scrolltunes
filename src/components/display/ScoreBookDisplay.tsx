@@ -245,6 +245,11 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
     return lyrics.lines.slice(currentPageRange.start, currentPageRange.end + 1)
   }, [lyrics, currentPageRange])
 
+  // Get preview line from next page (first line of next page)
+  const nextPageRange = pageLineRanges[currentPage + 1]
+  const previewLine = nextPageRange && lyrics ? lyrics.lines[nextPageRange.start] : undefined
+  const previewLineIndex = nextPageRange?.start
+
   // Calculate page progress (0-1) - no memo for smooth continuous updates
   let pageProgress = 0
   if (currentPageLines.length > 0) {
@@ -346,7 +351,7 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
         <AnimatePresence mode="wait" initial={false} custom={direction}>
           <motion.div
             key={currentPage}
-            className="absolute inset-0 pt-16 pb-20 px-14 lg:px-16 overflow-hidden"
+            className="absolute inset-0 pt-16 pb-20 px-4 sm:px-8 lg:px-12 overflow-hidden"
             custom={direction}
             variants={animationVariants}
             initial="enter"
@@ -363,6 +368,8 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
               onLineClick={handleLineClick}
               lineChordData={lineChordData}
               isRTL={isRTL}
+              {...(previewLine && { previewLine })}
+              {...(previewLineIndex !== undefined && { previewLineIndex })}
             />
           </motion.div>
         </AnimatePresence>
