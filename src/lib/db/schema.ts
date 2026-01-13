@@ -8,6 +8,7 @@ import {
   pgTable,
   primaryKey,
   real,
+  serial,
   text,
   timestamp,
   uniqueIndex,
@@ -414,6 +415,34 @@ export const chordEnhancements = pgTable(
 )
 
 // ============================================================================
+// BPM Fetch Logging
+// ============================================================================
+
+export const bpmFetchLog = pgTable(
+  "bpm_fetch_log",
+  {
+    id: serial("id").primaryKey(),
+    lrclibId: integer("lrclib_id").notNull(),
+    songId: text("song_id"),
+    title: text("title").notNull(),
+    artist: text("artist").notNull(),
+    stage: text("stage").notNull(),
+    provider: text("provider").notNull(),
+    success: boolean("success").notNull(),
+    bpm: integer("bpm"),
+    errorReason: text("error_reason"),
+    errorDetail: text("error_detail"),
+    latencyMs: integer("latency_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  table => [
+    index("idx_bpm_log_lrclib").on(table.lrclibId),
+    index("idx_bpm_log_created_provider").on(table.createdAt, table.provider),
+    index("idx_bpm_log_created").on(table.createdAt),
+  ],
+)
+
+// ============================================================================
 // Type Exports
 // ============================================================================
 
@@ -458,3 +487,6 @@ export type NewLrcWordEnhancement = typeof lrcWordEnhancements.$inferInsert
 
 export type ChordEnhancement = typeof chordEnhancements.$inferSelect
 export type NewChordEnhancement = typeof chordEnhancements.$inferInsert
+
+export type BpmFetchLog = typeof bpmFetchLog.$inferSelect
+export type NewBpmFetchLog = typeof bpmFetchLog.$inferInsert
