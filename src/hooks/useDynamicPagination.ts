@@ -24,9 +24,9 @@ const MOBILE_BREAKPOINT = 640
 const MOBILE_LINE_HEIGHT_MULTIPLIER = 1.8
 const MOBILE_FIXED_SPACING = 35
 
-// Desktop: tighter spacing, less text wrapping
+// Desktop: accounts for preview line at bottom
 const DESKTOP_LINE_HEIGHT_MULTIPLIER = 1.3
-const DESKTOP_FIXED_SPACING = 22
+const DESKTOP_FIXED_SPACING = 28
 
 export function useDynamicPagination(
   options: UseDynamicPaginationOptions,

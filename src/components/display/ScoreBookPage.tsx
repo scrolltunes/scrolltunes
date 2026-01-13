@@ -135,25 +135,19 @@ export const ScoreBookPage = memo(function ScoreBookPage({
 
       {/* Preview of next page's first line */}
       {previewLine && (
-        <div
-          className="relative mt-3 opacity-30"
-          style={{
-            maskImage: "linear-gradient(to bottom, black 0%, black 50%, transparent 100%)",
-            WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 50%, transparent 100%)",
-          }}
-        >
+        <div className="relative mt-3 opacity-50">
           <div className="flex items-center justify-center gap-1">
             <ArrowBendDownRight
               size={14}
               weight="regular"
               className="shrink-0"
-              style={{ color: "var(--color-text3)" }}
+              style={{ color: "var(--color-text)" }}
             />
             <span
               className="truncate"
               style={{
                 fontSize: `${Math.round(fontSize * 0.7)}px`,
-                color: "var(--color-text3)",
+                color: "var(--color-text)",
               }}
             >
               {previewLine.text}
