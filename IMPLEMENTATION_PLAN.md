@@ -602,13 +602,13 @@ export function useAdminCatalog(params: UseAdminCatalogParams = {}) {
 ```
 
 **Acceptance Criteria**:
-- [ ] Fetches catalog data from `/api/admin/catalog`
-- [ ] Supports filter param (all, missing_bpm, missing_enhancement, missing_spotify)
-- [ ] Supports sort param (plays, recent, alpha)
-- [ ] Supports pagination (offset, limit)
-- [ ] Caches responses (60s deduping interval)
-- [ ] `mutate()` invalidates cache and refetches
-- [ ] Handles fetch errors properly
+- [x] Fetches catalog data from `/api/admin/catalog`
+- [x] Supports filter param (all, missing_bpm, missing_enhancement, missing_spotify)
+- [x] Supports sort param (plays, recent, alpha)
+- [x] Supports pagination (offset, limit)
+- [x] Caches responses (60s deduping interval)
+- [x] `mutate()` invalidates cache and refetches
+- [x] Handles fetch errors properly
 
 ### Task 3.2: Create useAdminTrackSearch hook
 
@@ -1198,7 +1198,7 @@ const handleAddToCatalog = useCallback(async (lrclibId: number) => {
 | `src/app/api/admin/catalog/route.ts` | 1.1 | Catalog API | Complete | None | Use DbLayer only |
 | `src/app/api/admin/tracks/search/route.ts` | 2.1 | Search API | Complete | None | Use ServerLayer (needs Turso) |
 | `src/app/api/admin/tracks/[lrclibId]/add-to-catalog/route.ts` | 2.2 | Add to catalog | Complete | None | Reference: copy-enrichment route |
-| `src/hooks/useAdminCatalog.ts` | 3.1 | Catalog hook | Pending | Phase 1.1 | Exports shared types |
+| `src/hooks/useAdminCatalog.ts` | 3.1 | Catalog hook | Complete | Phase 1.1 | Exports shared types |
 | `src/hooks/useAdminTrackSearch.ts` | 3.2 | Search hook | Pending | Phase 2.1 | Exports shared types |
 | `src/components/admin/CatalogFilters.tsx` | 4.1 | Filter chips | Pending | None | Reference: TracksFilterBar |
 | `src/components/admin/CatalogTrackRow.tsx` | 4.2 | Catalog row | Pending | None | Reference: TracksList TrackRow |
