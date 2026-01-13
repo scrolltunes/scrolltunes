@@ -10,6 +10,15 @@ export interface TursoSearchResult {
   readonly album: string | null
   readonly durationSec: number
   readonly quality: number
+  // Spotify enrichment (all nullable)
+  readonly spotifyId: string | null
+  readonly popularity: number | null
+  readonly tempo: number | null
+  readonly musicalKey: number | null
+  readonly mode: number | null
+  readonly timeSignature: number | null
+  readonly isrc: string | null
+  readonly albumImageUrl: string | null
 }
 
 export class TursoSearchError extends Data.TaggedClass("TursoSearchError")<{
@@ -61,11 +70,17 @@ const search = (query: string, limit = 10) =>
       try: async () => {
         const rs = await client.execute({
           sql: `
-            SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality
+            SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality,
+                   t.spotify_id, t.popularity, t.tempo, t.musical_key, t.mode,
+                   t.time_signature, t.isrc, t.album_image_url
             FROM tracks_fts fts
             JOIN tracks t ON fts.rowid = t.id
             WHERE tracks_fts MATCH ?
-            ORDER BY -bm25(tracks_fts, 10.0, 1.0) + t.quality DESC, t.id ASC
+            ORDER BY
+              (t.popularity IS NOT NULL) DESC,
+              t.popularity DESC,
+              t.quality DESC,
+              -bm25(tracks_fts) ASC
             LIMIT ?
           `,
           args: [query, limit],
@@ -85,6 +100,14 @@ const search = (query: string, limit = 10) =>
       album: row.album as string | null,
       durationSec: row.duration_sec as number,
       quality: row.quality as number,
+      spotifyId: row.spotify_id as string | null,
+      popularity: row.popularity as number | null,
+      tempo: row.tempo as number | null,
+      musicalKey: row.musical_key as number | null,
+      mode: row.mode as number | null,
+      timeSignature: row.time_signature as number | null,
+      isrc: row.isrc as string | null,
+      albumImageUrl: row.album_image_url as string | null,
     }))
   })
 
@@ -96,7 +119,9 @@ const getById = (lrclibId: number) =>
       try: async () => {
         const rs = await client.execute({
           sql: `
-            SELECT id, title, artist, album, duration_sec, quality
+            SELECT id, title, artist, album, duration_sec, quality,
+                   spotify_id, popularity, tempo, musical_key, mode,
+                   time_signature, isrc, album_image_url
             FROM tracks
             WHERE id = ?
             LIMIT 1
@@ -117,6 +142,14 @@ const getById = (lrclibId: number) =>
       album: result.album as string | null,
       durationSec: result.duration_sec as number,
       quality: result.quality as number,
+      spotifyId: result.spotify_id as string | null,
+      popularity: result.popularity as number | null,
+      tempo: result.tempo as number | null,
+      musicalKey: result.musical_key as number | null,
+      mode: result.mode as number | null,
+      timeSignature: result.time_signature as number | null,
+      isrc: result.isrc as string | null,
+      albumImageUrl: result.album_image_url as string | null,
     }
   })
 
@@ -138,7 +171,9 @@ const findByTitleArtist = (title: string, artist: string, targetDurationSec?: nu
       try: async () => {
         const rs = await client.execute({
           sql: `
-            SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality
+            SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality,
+                   t.spotify_id, t.popularity, t.tempo, t.musical_key, t.mode,
+                   t.time_signature, t.isrc, t.album_image_url
             FROM tracks_fts fts
             JOIN tracks t ON fts.rowid = t.id
             WHERE tracks_fts MATCH ?
@@ -162,6 +197,14 @@ const findByTitleArtist = (title: string, artist: string, targetDurationSec?: nu
       album: row.album as string | null,
       durationSec: row.duration_sec as number,
       quality: row.quality as number,
+      spotifyId: row.spotify_id as string | null,
+      popularity: row.popularity as number | null,
+      tempo: row.tempo as number | null,
+      musicalKey: row.musical_key as number | null,
+      mode: row.mode as number | null,
+      timeSignature: row.time_signature as number | null,
+      isrc: row.isrc as string | null,
+      albumImageUrl: row.album_image_url as string | null,
     }))
 
     if (targetDurationSec === undefined) {
