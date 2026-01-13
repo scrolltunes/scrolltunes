@@ -720,9 +720,9 @@ Three tabs:
 Pivot table grouped by provider and error reason.
 
 **Acceptance Criteria**:
-- [ ] Table renders error counts
-- [ ] Grouped by provider
-- [ ] Shows all error reasons
+- [x] Table renders error counts
+- [x] Grouped by provider
+- [x] Shows all error reasons
 
 ---
 
