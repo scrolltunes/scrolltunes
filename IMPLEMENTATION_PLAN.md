@@ -651,14 +651,16 @@ Follow styling from `src/app/admin/page.tsx` `StatCard` component.
 
 ### Task 3.3: Provider Table Component
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/components/admin/BpmProviderTable.tsx` (new file)
 
 Table with columns: Provider, Attempts, Successes, Rate (%), Avg Latency.
 
 **Acceptance Criteria**:
-- [ ] Table renders provider breakdown
-- [ ] Sorted by attempts descending
-- [ ] Success rate calculated correctly
+- [x] Table renders provider breakdown
+- [x] Sorted by attempts descending
+- [x] Success rate calculated correctly
 
 ---
 
