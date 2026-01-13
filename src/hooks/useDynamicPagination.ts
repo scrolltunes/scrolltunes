@@ -45,13 +45,13 @@ export function useDynamicPagination(
 
       // Measure container height and subtract content area padding
       const availableHeight = contentElement.clientHeight - CONTENT_PADDING
-      
+
       // Use different line height calculation based on screen width
       const isMobile = window.innerWidth < MOBILE_BREAKPOINT
       const multiplier = isMobile ? MOBILE_LINE_HEIGHT_MULTIPLIER : DESKTOP_LINE_HEIGHT_MULTIPLIER
       const fixedSpacing = isMobile ? MOBILE_FIXED_SPACING : DESKTOP_FIXED_SPACING
       const lineHeight = fontSize * multiplier + fixedSpacing
-      
+
       const calculatedLines = Math.floor(availableHeight / lineHeight)
       const clampedLines = Math.max(MIN_LINES, Math.min(calculatedLines, MAX_LINES))
 

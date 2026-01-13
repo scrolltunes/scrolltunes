@@ -178,7 +178,9 @@ export const FloatingMetronome = memo(function FloatingMetronome({
               aria-label="Metronome settings"
             >
               <div className="mb-3">
-                <div className="mb-1.5 text-xs" style={{ color: "var(--color-text3)" }}>Mode</div>
+                <div className="mb-1.5 text-xs" style={{ color: "var(--color-text3)" }}>
+                  Mode
+                </div>
                 <div className="flex gap-1">
                   {(["click", "visual", "both"] as const).map(mode => (
                     <button

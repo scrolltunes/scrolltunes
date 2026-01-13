@@ -72,7 +72,7 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const isAdmin = useIsAdmin()
 
   // ScoreBook pagination state
-  const { currentPage, totalPages, linesPerPage, pageLineRanges } = useScoreBookState()
+  const { currentPage, totalPages, linesPerPage, pageLineRanges, direction } = useScoreBookState()
 
   // Container ref for swipe gestures
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -275,7 +275,7 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
     : variants.pageFlip
 
   const transitionConfig = prefersReducedMotion
-    ? { duration: 0.3, ease: "easeInOut" }
+    ? { duration: 0.25, ease: "easeInOut" }
     : springs.pageFlip
 
   if (!lyrics) {
@@ -296,14 +296,22 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   return (
     <div className={`flex h-full ${className}`} aria-label="Score Book lyrics display">
       {/* Main content area */}
-      <div ref={containerRef} className="relative flex-1 min-h-0 h-full overflow-hidden" {...swipeHandlers}>
+      <div
+        ref={containerRef}
+        className="relative flex-1 min-h-0 h-full overflow-hidden"
+        {...swipeHandlers}
+      >
         {/* Page progress bar */}
-        <div className="absolute top-0 left-0 right-0 h-1 z-40" style={{ background: "var(--color-progress-track)" }}>
+        <div
+          className="absolute top-0 left-0 right-0 h-1 z-40"
+          style={{ background: "var(--color-progress-track)" }}
+        >
           <div
             className="h-full w-full origin-left"
             style={{
               transform: `scaleX(${pageProgress})`,
-              background: "linear-gradient(90deg, var(--color-progress-start) 0%, var(--color-progress-end) 100%)",
+              background:
+                "linear-gradient(90deg, var(--color-progress-start) 0%, var(--color-progress-end) 100%)",
             }}
           />
         </div>
@@ -314,25 +322,32 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
         {/* Debug overlay - admin only */}
         {isAdmin && (
           <div className="absolute top-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono leading-relaxed">
-            <div>Lines: {currentPageLines.length} | Store: {linesPerPage} | Calc: {calculatedLinesPerPage}</div>
-            <div>H: {debugHeight}px | Page: {currentPage + 1}/{totalPages}</div>
-            <div>Ranges: {pageLineRanges.length} | Range: {currentPageRange ? `${currentPageRange.start}-${currentPageRange.end}` : "none"}</div>
-            <div>Font: {scoreBookFontSize}px | Total: {totalLines}</div>
+            <div>
+              Lines: {currentPageLines.length} | Store: {linesPerPage} | Calc:{" "}
+              {calculatedLinesPerPage}
+            </div>
+            <div>
+              H: {debugHeight}px | Page: {currentPage + 1}/{totalPages}
+            </div>
+            <div>
+              Ranges: {pageLineRanges.length} | Range:{" "}
+              {currentPageRange ? `${currentPageRange.start}-${currentPageRange.end}` : "none"}
+            </div>
+            <div>
+              Font: {scoreBookFontSize}px | Total: {totalLines}
+            </div>
           </div>
         )}
 
         {/* Hidden measurement div - measures container height */}
-        <div
-          ref={contentRef}
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-        />
+        <div ref={contentRef} className="absolute inset-0 pointer-events-none" aria-hidden="true" />
 
         {/* Animated page container */}
-        <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence mode="wait" initial={false} custom={direction}>
           <motion.div
             key={currentPage}
             className="absolute inset-0 pt-16 pb-20 px-14 lg:px-16 overflow-hidden"
+            custom={direction}
             variants={animationVariants}
             initial="enter"
             animate="center"

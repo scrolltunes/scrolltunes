@@ -64,11 +64,11 @@ export const springs = {
     stiffness: 500,
     damping: 30,
   },
-  // Page flip animation for Score Book mode (instant, slideshow-style)
+  // Page flip animation for Score Book mode
   pageFlip: {
     type: "tween" as const,
-    duration: 0.08,
-    ease: "easeOut" as const,
+    duration: 0.1,
+    ease: [0.25, 0.1, 0.25, 1] as const,
   },
 }
 
@@ -150,11 +150,20 @@ export const variants = {
     active: { opacity: 1, scale: 1.02, y: 0 },
     upcoming: { opacity: 0.7, scale: 1, y: 0 },
   },
-  // Page flip animation for Score Book mode
+  // Page flip animation for Score Book mode (direction-aware via custom prop)
   pageFlip: {
-    enter: { opacity: 0, x: "100%" },
-    center: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: "-100%" },
+    enter: (direction: number) => ({
+      opacity: 0,
+      x: direction > 0 ? "40%" : "-40%",
+    }),
+    center: {
+      opacity: 1,
+      x: 0,
+    },
+    exit: (direction: number) => ({
+      opacity: 0,
+      x: direction > 0 ? "-40%" : "40%",
+    }),
   },
 }
 

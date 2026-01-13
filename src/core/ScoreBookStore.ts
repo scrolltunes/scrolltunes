@@ -21,6 +21,8 @@ export interface ScoreBookState {
   readonly totalPages: number
   readonly linesPerPage: number
   readonly pageLineRanges: readonly PageLineRange[]
+  /** Navigation direction: 1 = forward, -1 = backward */
+  readonly direction: 1 | -1
 }
 
 // --- Tagged Events ---
@@ -59,6 +61,7 @@ const DEFAULT_STATE: ScoreBookState = {
   totalPages: 0,
   linesPerPage: 6,
   pageLineRanges: [],
+  direction: 1,
 }
 
 // --- ScoreBookStore Class ---
@@ -117,7 +120,8 @@ export class ScoreBookStore {
   goToPage(page: number): void {
     const clampedPage = Math.max(0, Math.min(page, this.state.totalPages - 1))
     if (clampedPage !== this.state.currentPage && this.state.totalPages > 0) {
-      this.setState({ currentPage: clampedPage })
+      const direction = clampedPage > this.state.currentPage ? 1 : -1
+      this.setState({ currentPage: clampedPage, direction })
     }
   }
 
@@ -126,7 +130,7 @@ export class ScoreBookStore {
    */
   nextPage(): void {
     if (this.state.currentPage < this.state.totalPages - 1) {
-      this.setState({ currentPage: this.state.currentPage + 1 })
+      this.setState({ currentPage: this.state.currentPage + 1, direction: 1 })
     }
   }
 
@@ -135,7 +139,7 @@ export class ScoreBookStore {
    */
   prevPage(): void {
     if (this.state.currentPage > 0) {
-      this.setState({ currentPage: this.state.currentPage - 1 })
+      this.setState({ currentPage: this.state.currentPage - 1, direction: -1 })
     }
   }
 

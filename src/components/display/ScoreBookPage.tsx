@@ -124,4 +124,3 @@ export const ScoreBookPage = memo(function ScoreBookPage({
     </div>
   )
 })
-
