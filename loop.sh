@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Ralph Wiggum Loop (Enhanced)
+# Ralph Wiggum Loop - BPM Analytics Admin
 # Reference: https://github.com/ghuntley/how-to-ralph-wiggum
 #
 # Features:
@@ -49,15 +49,13 @@ seconds_until_next_hour() {
   echo $seconds_until
 }
 
-# Calculate seconds until specific reset time (e.g., midnight UTC, 5am local)
+# Calculate seconds until specific reset time
 seconds_until_daily_reset() {
-  # Assuming daily reset at 5:00 AM local time (adjust as needed)
   local reset_hour=5
   local now=$(date +%s)
   local today_reset=$(date -v${reset_hour}H -v0M -v0S +%s 2>/dev/null || date -d "today ${reset_hour}:00:00" +%s)
 
   if [[ $now -ge $today_reset ]]; then
-    # Reset already passed today, calculate for tomorrow
     local tomorrow_reset=$((today_reset + 86400))
     echo $((tomorrow_reset - now))
   else
@@ -78,7 +76,7 @@ countdown() {
     sleep 1
     ((seconds--))
   done
-  printf "\r%-80s\r" " "  # Clear the line
+  printf "\r%-80s\r" " "
 }
 
 # Check if error indicates usage limit exceeded
@@ -86,24 +84,18 @@ is_usage_limit_error() {
   local output="$1"
   local exit_code="$2"
 
-  # Check for Claude Max/Pro subscription limits (exact message)
-  # Format: "Claude usage limit reached. Your limit will reset at Oct 7, 1am."
   if [[ "$output" =~ "Claude usage limit reached" ]]; then
     return 0
   fi
 
-  # Check for API rate_limit_error (structured JSON from API)
-  # Format: {"type":"error","error":{"type":"rate_limit_error",...}}
   if [[ "$output" =~ \"type\":\"rate_limit_error\" ]]; then
     return 0
   fi
 
-  # Check for API overloaded_error (529 status)
   if [[ "$output" =~ \"type\":\"overloaded_error\" ]]; then
     return 0
   fi
 
-  # Check for HTTP 429/529 status codes in error output
   if [[ "$output" =~ Error:\ 429 ]] || [[ "$output" =~ Error:\ 529 ]]; then
     return 0
   fi
@@ -115,39 +107,32 @@ is_usage_limit_error() {
 get_sleep_duration() {
   local output="$1"
 
-  # Check for Claude subscription reset time
-  # Format: "Your limit will reset at Oct 7, 1am" or "reset at Jan 12, 3pm"
   if [[ "$output" =~ "reset at "([A-Za-z]+)" "([0-9]+)", "([0-9]+)(am|pm) ]]; then
     local month="${BASH_REMATCH[1]}"
     local day="${BASH_REMATCH[2]}"
     local hour="${BASH_REMATCH[3]}"
     local ampm="${BASH_REMATCH[4]}"
 
-    # Convert to 24-hour format
     if [[ "$ampm" == "pm" && "$hour" != "12" ]]; then
       hour=$((hour + 12))
     elif [[ "$ampm" == "am" && "$hour" == "12" ]]; then
       hour=0
     fi
 
-    # Calculate seconds until reset (macOS date syntax)
     local reset_time=$(date -j -f "%b %d %H" "$month $day $hour" +%s 2>/dev/null)
     if [[ -n "$reset_time" ]]; then
       local now=$(date +%s)
       local diff=$((reset_time - now))
-      # If reset time is in the past, it's next month/year
       if [[ $diff -lt 0 ]]; then
-        diff=$((diff + 86400 * 30))  # Add ~30 days
+        diff=$((diff + 86400 * 30))
       fi
-      echo $((diff + 60))  # Add 1 minute buffer
+      echo $((diff + 60))
       return
     fi
   fi
 
-  # Try to extract reset time from API error message
-  # Pattern: "try again in X minutes/hours"
   if [[ "$output" =~ "try again in "([0-9]+)" minute" ]]; then
-    echo $(( ${BASH_REMATCH[1]} * 60 + 60 ))  # Add 1 minute buffer
+    echo $(( ${BASH_REMATCH[1]} * 60 + 60 ))
     return
   fi
 
@@ -156,13 +141,11 @@ get_sleep_duration() {
     return
   fi
 
-  # Check for daily limit vs hourly limit
   if [[ "$output" =~ (daily|day|24.?hour) ]]; then
     seconds_until_daily_reset
     return
   fi
 
-  # Default: wait until next hour boundary + 1 minute buffer
   local wait_time=$(seconds_until_next_hour)
   echo $((wait_time + 60))
 }
@@ -177,7 +160,6 @@ handle_usage_limit() {
   echo -e "${YELLOW}Claude usage limit exceeded. Waiting for reset...${NC}"
   echo ""
 
-  # Show when we expect to resume
   local resume_time=$(date -v+${sleep_duration}S "+%Y-%m-%d %H:%M:%S" 2>/dev/null || date -d "+${sleep_duration} seconds" "+%Y-%m-%d %H:%M:%S")
   echo -e "Expected resume: ${CYAN}${resume_time}${NC}"
   echo ""
@@ -188,11 +170,11 @@ handle_usage_limit() {
   echo -e "${GREEN}Usage limit should be reset. Resuming...${NC}"
   echo ""
 
-  # Reset consecutive failures after successful wait
   CONSECUTIVE_FAILURES=0
 }
 
 echo -e "${GREEN}Ralph loop: $(echo "$MODE" | tr '[:lower:]' '[:upper:]') mode${NC}"
+echo -e "${GREEN}Feature: BPM Analytics Admin${NC}"
 [[ $MAX_ITERATIONS -gt 0 ]] && echo "Max iterations: $MAX_ITERATIONS"
 echo "Press Ctrl+C to stop"
 echo "---"
@@ -203,7 +185,6 @@ while true; do
   echo -e "${GREEN}=== Iteration $ITERATION ===${NC}"
   echo ""
 
-  # Capture both stdout and stderr, and exit code
   TEMP_OUTPUT=$(mktemp)
   set +e
 
@@ -218,15 +199,12 @@ while true; do
   rm -f "$TEMP_OUTPUT"
   set -e
 
-  # Check for usage limit errors
   if is_usage_limit_error "$OUTPUT" "$EXIT_CODE"; then
     handle_usage_limit "$OUTPUT"
-    # Don't count this as an iteration - retry the same iteration
     ITERATION=$((ITERATION - 1))
     continue
   fi
 
-  # Check for other errors
   if [[ $EXIT_CODE -ne 0 ]]; then
     CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
     echo ""
@@ -239,18 +217,16 @@ while true; do
 
     echo -e "${YELLOW}Retrying in 30 seconds... (failure $CONSECUTIVE_FAILURES/$MAX_CONSECUTIVE_FAILURES)${NC}"
     sleep 30
-    ITERATION=$((ITERATION - 1))  # Retry same iteration
+    ITERATION=$((ITERATION - 1))
     continue
   fi
 
-  # Success - reset failure counter
   CONSECUTIVE_FAILURES=0
 
-  # Check for completion signal from Claude
   if [[ "$OUTPUT" =~ "RALPH_COMPLETE" ]]; then
     echo ""
     echo -e "${GREEN}=== All Tasks Complete ===${NC}"
-    echo -e "${GREEN}Claude has signaled that all tasks are finished.${NC}"
+    echo -e "${GREEN}BPM Analytics Admin implementation finished.${NC}"
     break
   fi
 
