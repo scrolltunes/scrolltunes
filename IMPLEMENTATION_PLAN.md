@@ -354,95 +354,21 @@ fireAndForgetBpmFetch(cachedSong.songId, actualLrclibId, lyrics.title, lyrics.ar
 
 ### Task 2.2: Instrument Turso Embedded Tempo Lookup
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/services/song-loader.ts`
 
-Add import at top:
-```typescript
-import { logBpmAttempt } from "@/lib/bpm/bpm-log"
-```
+Added import for `logBpmAttempt` and timing/logging calls around the Turso embedded tempo lookup.
 
-Modify the Turso tempo check section (around lines 514-543) to add logging:
-
-```typescript
-// BPM handling: use cached, embedded tempo, or defer fetching
-let bpm: number | null = null
-let key: string | null = null
-let timeSignature: number | null = null
-let bpmSource: AttributionSource | null = null
-
-if (hasCachedBpm && cachedSong && cachedSong.bpmSource) {
-  // Priority 1: Use cached BPM from Neon catalog (no logging - already have BPM)
-  bpm = cachedSong.bpm
-  key = cachedSong.musicalKey
-  bpmSource = getBpmAttribution(cachedSong.bpmSource, cachedSong.bpmSourceUrl)
-} else {
-  // Priority 2: Try embedded tempo from Turso (Spotify enrichment)
-  const tursoStart = Date.now()
-  const tursoTrack = await Effect.runPromise(
-    getEmbeddedTempoFromTurso(actualLrclibId).pipe(Effect.provide(ServerLayer)),
-  )
-
-  if (tursoTrack?.tempo !== null && tursoTrack?.tempo !== undefined) {
-    bpm = Math.round(tursoTrack.tempo)
-    key = formatMusicalKey(tursoTrack.musicalKey, tursoTrack.mode)
-    timeSignature = tursoTrack.timeSignature
-    bpmSource = getBpmAttribution("Spotify")
-
-    // Log successful Turso lookup
-    logBpmAttempt({
-      lrclibId: actualLrclibId,
-      songId: cachedSong?.songId,
-      title: lyrics.title,
-      artist: lyrics.artist,
-      stage: "turso_embedded",
-      provider: "Turso",
-      success: true,
-      bpm,
-      latencyMs: Date.now() - tursoStart,
-    })
-
-    // Cache the embedded BPM in Neon for future requests
-    if (cachedSong) {
-      db.update(songs)
-        .set({
-          bpm,
-          musicalKey: key,
-          bpmSource: "Spotify",
-          updatedAt: new Date(),
-        })
-        .where(eq(songs.id, cachedSong.songId))
-        .then(() => {})
-        .catch(err => console.error("[BPM] Failed to cache embedded tempo:", err))
-    }
-  } else {
-    // Log failed Turso lookup
-    logBpmAttempt({
-      lrclibId: actualLrclibId,
-      songId: cachedSong?.songId,
-      title: lyrics.title,
-      artist: lyrics.artist,
-      stage: "turso_embedded",
-      provider: "Turso",
-      success: false,
-      errorReason: "not_found",
-      latencyMs: Date.now() - tursoStart,
-    })
-
-    // Priority 3: Defer BPM fetching to background provider cascade
-    if (cachedSong) {
-      fireAndForgetBpmFetch(cachedSong.songId, actualLrclibId, lyrics.title, lyrics.artist, resolvedSpotifyId)
-    }
-  }
-}
-```
+**Note**: Also updated `src/lib/bpm/bpm-log.ts` to fix `BpmLogEntry` interface for `exactOptionalPropertyTypes` compatibility by adding `| undefined` to optional properties.
 
 **Acceptance Criteria**:
-- [ ] Import added for `logBpmAttempt`
-- [ ] Timing captured for Turso lookup
-- [ ] Success case logs with BPM value
-- [ ] Failure case logs with "not_found" reason
-- [ ] Logging is non-blocking
-- [ ] `bun run typecheck` passes
+- [x] Import added for `logBpmAttempt`
+- [x] Timing captured for Turso lookup
+- [x] Success case logs with BPM value
+- [x] Failure case logs with "not_found" reason
+- [x] Logging is non-blocking
+- [x] `bun run typecheck` passes
 
 ---
 

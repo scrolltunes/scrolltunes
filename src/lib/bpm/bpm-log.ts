@@ -14,16 +14,16 @@ export type BpmErrorReason = "not_found" | "rate_limit" | "api_error" | "timeout
 
 export interface BpmLogEntry {
   lrclibId: number
-  songId?: string
+  songId?: string | undefined
   title: string
   artist: string
   stage: BpmStage
   provider: BpmProvider
   success: boolean
-  bpm?: number
-  errorReason?: BpmErrorReason
-  errorDetail?: string
-  latencyMs?: number
+  bpm?: number | undefined
+  errorReason?: BpmErrorReason | undefined
+  errorDetail?: string | undefined
+  latencyMs?: number | undefined
 }
 
 // ============================================================================
