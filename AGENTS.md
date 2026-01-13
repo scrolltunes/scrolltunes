@@ -33,9 +33,16 @@ bun run check        # lint + typecheck + test
 
 | Document | Purpose |
 |----------|---------|
-| **docs/architecture.md** | Tech stack, project structure, design patterns |
-| **docs/design.md** | Features backlog, product requirements |
+| **docs/architecture.md** | Tech stack, project structure, Effect.ts patterns |
+| **docs/technical-reference.md** | LRC parsing, VAD, audio classification, search, caching, BPM |
 | **TODO.md** | Implementation progress tracking |
+
+**Domain-specific specs** (in `docs/`):
+- `lrc-enhancement-system.md` — Word-level timing extraction from Guitar Pro
+- `search-optimization-plan.md` — Spotify-first + Turso search architecture
+- `canonical-normalization.md` — Song deduplication and caching
+- `audio-classification-design.md` — YAMNet singing vs instrument detection
+- `sqlite-extraction-optimizations.md` — FTS5 and SQLite performance
 
 ## Code Style
 
@@ -55,7 +62,7 @@ Use `useSyncExternalStore` with class-based stores. No Redux/Zustand.
 - Tagged events with `Data.TaggedClass`
 
 ### Core Stores
-All in `@/core`: `LyricsPlayer`, `VoiceActivityStore`, `RecentSongsStore`, `AccountStore`, `FavoritesStore`, `SetlistsStore`, `PreferencesStore`
+All in `@/core`: `LyricsPlayer`, `VoiceActivityStore`, `SingingDetectionService`, `AudioClassifierService`, `RecentSongsStore`, `AccountStore`, `FavoritesStore`, `SetlistsStore`, `PreferencesStore`, `ScoreBookStore`, `SongEditsStore`
 
 ### SoundSystem
 Singleton at `@/sounds` owns AudioContext via Tone.js. Lazy init after user gesture.
