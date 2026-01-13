@@ -766,12 +766,12 @@ export function CatalogFilters({ filter, onFilterChange, counts }: CatalogFilter
 ```
 
 **Acceptance Criteria**:
-- [ ] Shows 4 filter chips: All, Missing BPM, Missing Enhancement, No Spotify
-- [ ] "Missing BPM" chip uses amber/warning color when active
-- [ ] Other chips use primary color when active
-- [ ] Shows counts in parentheses when `counts` prop provided
-- [ ] Click changes active filter
-- [ ] Follows existing TracksFilterBar styling patterns
+- [x] Shows 4 filter chips: All, Missing BPM, Missing Enhancement, No Spotify
+- [x] "Missing BPM" chip uses amber/warning color when active
+- [x] Other chips use primary color when active
+- [x] Shows counts in parentheses when `counts` prop provided
+- [x] Click changes active filter
+- [x] Follows existing TracksFilterBar styling patterns
 
 ### Task 4.2: Create CatalogTrackRow component
 
@@ -1200,7 +1200,7 @@ const handleAddToCatalog = useCallback(async (lrclibId: number) => {
 | `src/app/api/admin/tracks/[lrclibId]/add-to-catalog/route.ts` | 2.2 | Add to catalog | Complete | None | Reference: copy-enrichment route |
 | `src/hooks/useAdminCatalog.ts` | 3.1 | Catalog hook | Complete | Phase 1.1 | Exports shared types |
 | `src/hooks/useAdminTrackSearch.ts` | 3.2 | Search hook | Complete | Phase 2.1 | Exports shared types |
-| `src/components/admin/CatalogFilters.tsx` | 4.1 | Filter chips | Pending | None | Reference: TracksFilterBar |
+| `src/components/admin/CatalogFilters.tsx` | 4.1 | Filter chips | Complete | None | Reference: TracksFilterBar |
 | `src/components/admin/CatalogTrackRow.tsx` | 4.2 | Catalog row | Pending | None | Reference: TracksList TrackRow |
 | `src/components/admin/SearchResultRow.tsx` | 4.3 | Search row | Pending | Phase 2.2 | — |
 | `src/app/admin/songs/page.tsx` | 4.4 | Page redesign | Pending | All above | Reuse TrackDetail, EnrichmentActions |
