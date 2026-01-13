@@ -743,16 +743,18 @@ Modal showing all BPM fetch attempts for a single song. Also added `songDetail` 
 
 ### Task 3.9: Dashboard Page
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/app/admin/bpm-stats/page.tsx` (new file)
 
-Compose all components into dashboard page.
+Compose all components into dashboard page. Also added BPM Analytics link to admin sidebar and mobile tabs in `src/app/admin/page.tsx`.
 
 **Acceptance Criteria**:
-- [ ] Page renders at `/admin/bpm-stats`
-- [ ] Admin auth check
-- [ ] All sections visible
-- [ ] Mobile responsive
-- [ ] Add link from main admin page sidebar
+- [x] Page renders at `/admin/bpm-stats`
+- [x] Admin auth check
+- [x] All sections visible
+- [x] Mobile responsive
+- [x] Add link from main admin page sidebar
 
 ---
 
@@ -1084,7 +1086,7 @@ After all phases complete:
 | `src/services/bpm-providers.ts` | 2.3 | Add logging wrapper and `withLogging` method | ✅ Done |
 | `vercel.json` | 4.1 | Add cleanup cron | Pending |
 | `src/app/admin/songs/page.tsx` | 5.11 | Replace with tracks browser | Pending |
-| `src/app/admin/page.tsx` | 3.9 | Add link to BPM stats page | Pending |
+| `src/app/admin/page.tsx` | 3.9 | Add link to BPM stats page | ✅ Done |
 
 ---
 
