@@ -15,6 +15,7 @@ import {
   findBestAlternativeLyrics,
   getLyricsById,
 } from "@/lib/lyrics-client"
+import { formatMusicalKey } from "@/lib/musical-key"
 import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import {
   type SpotifyService,
@@ -25,6 +26,7 @@ import {
 } from "@/lib/spotify-client"
 import { BpmProviders } from "@/services/bpm-providers"
 import { ServerLayer } from "@/services/server-layer"
+import { TursoService } from "@/services/turso"
 import { eq } from "drizzle-orm"
 import { Effect } from "effect"
 
@@ -38,6 +40,7 @@ export interface SongDataSuccess {
   readonly lyrics: Lyrics
   readonly bpm: number | null
   readonly key: string | null
+  readonly timeSignature: number | null
   readonly albumArt: string | null
   readonly albumArtLarge: string | null
   readonly spotifyId: string | null
@@ -210,6 +213,8 @@ function getBpmAttribution(source: string, sourceUrl?: string | null): Attributi
   }
 
   switch (source) {
+    case "Spotify":
+      return { name: "Spotify", url: "https://www.spotify.com" }
     case "ReccoBeats":
       return { name: "ReccoBeats", url: "https://reccobeats.com" }
     case "Deezer":
@@ -223,6 +228,15 @@ function getBpmAttribution(source: string, sourceUrl?: string | null): Attributi
     default:
       return { name: source || "GetSongBPM", url: "https://getsongbpm.com" }
   }
+}
+
+// Fetch embedded tempo data from Turso by LRCLIB ID
+function getEmbeddedTempoFromTurso(lrclibId: number) {
+  return Effect.gen(function* () {
+    const turso = yield* TursoService
+    const result = yield* turso.getById(lrclibId).pipe(Effect.catchAll(() => Effect.succeed(null)))
+    return result
+  })
 }
 
 // Fire-and-forget BPM fetch for deferred loading
@@ -485,18 +499,47 @@ export async function loadSongData(
   // Check if enhancements exist (deferred loading - client fetches payload separately)
   const { hasEnhancement, hasChordEnhancement } = await checkEnhancementsExist(actualLrclibId)
 
-  // BPM handling: use cached or defer fetching
+  // BPM handling: use cached, embedded tempo, or defer fetching
   let bpm: number | null = null
   let key: string | null = null
+  let timeSignature: number | null = null
   let bpmSource: AttributionSource | null = null
 
   if (hasCachedBpm && cachedSong && cachedSong.bpmSource) {
+    // Priority 1: Use cached BPM from Neon catalog
+    // Note: timeSignature is not cached in Neon, only available from Turso
     bpm = cachedSong.bpm
     key = cachedSong.musicalKey
     bpmSource = getBpmAttribution(cachedSong.bpmSource, cachedSong.bpmSourceUrl)
-  } else if (cachedSong) {
-    // Defer BPM fetching to background - return null for now
-    fireAndForgetBpmFetch(cachedSong.songId, lyrics.title, lyrics.artist, resolvedSpotifyId)
+  } else {
+    // Priority 2: Try embedded tempo from Turso (Spotify enrichment)
+    const tursoTrack = await Effect.runPromise(
+      getEmbeddedTempoFromTurso(actualLrclibId).pipe(Effect.provide(ServerLayer)),
+    )
+
+    if (tursoTrack?.tempo !== null && tursoTrack?.tempo !== undefined) {
+      bpm = Math.round(tursoTrack.tempo)
+      key = formatMusicalKey(tursoTrack.musicalKey, tursoTrack.mode)
+      timeSignature = tursoTrack.timeSignature
+      bpmSource = getBpmAttribution("Spotify")
+
+      // Cache the embedded BPM in Neon for future requests
+      if (cachedSong) {
+        db.update(songs)
+          .set({
+            bpm,
+            musicalKey: key,
+            bpmSource: "Spotify",
+            updatedAt: new Date(),
+          })
+          .where(eq(songs.id, cachedSong.songId))
+          .then(() => {})
+          .catch(err => console.error("[BPM] Failed to cache embedded tempo:", err))
+      }
+    } else if (cachedSong) {
+      // Priority 3: Defer BPM fetching to background provider cascade
+      fireAndForgetBpmFetch(cachedSong.songId, lyrics.title, lyrics.artist, resolvedSpotifyId)
+    }
   }
 
   // Fire-and-forget catalog update (with album art)
@@ -524,6 +567,7 @@ export async function loadSongData(
     lyrics: normalizedLyrics,
     bpm,
     key,
+    timeSignature,
     albumArt,
     albumArtLarge,
     spotifyId: resolvedSpotifyId ?? null,

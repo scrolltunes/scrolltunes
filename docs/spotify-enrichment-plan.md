@@ -1,6 +1,29 @@
 # Spotify Metadata Enrichment Plan
 
-> Integrating Anna's Archive Spotify dumps with LRCLIB for enhanced search and BPM lookup
+> **Status: ✅ IMPLEMENTED & EXTRACTED** — Extraction completed January 2026.
+
+> Enriching LRCLIB search index with Spotify metadata (BPM, popularity, album art)
+
+## Extraction Results
+
+| Metric | Value |
+|--------|-------|
+| **LRCLIB canonical tracks** | 4,145,124 |
+| **Spotify matches** | 1,923,424 (46.4%) |
+| **Output database size** | 898 MB |
+| **Extraction time** | ~41 minutes |
+
+### Match Rate Analysis
+
+Tested against Spotify Top 10k and Billboard 1997 charts:
+- **Spotify Top 10k**: 80% match rate (16/20 sampled)
+- **Billboard 1997**: 70% match rate (14/20 sampled)
+
+**Common reasons for non-matches:**
+- Featured artist order differs (LRCLIB: "Artist feat. Other" vs Spotify primary artist only)
+- Title variations (remixes, suffixes like "[SV]")
+- Song not in LRCLIB (no synced lyrics available)
+- Non-Latin character artist names
 
 ## Source of Truth
 
@@ -19,7 +42,7 @@
 
 ## Executive Summary
 
-With access to the Spotify metadata dumps (`spotify_clean.sqlite3` + `spotify_clean_audio_features.sqlite3`), we can:
+With Spotify metadata enrichment, we can:
 
 1. **Eliminate BPM provider cascade** — Spotify's `tempo` field replaces ReccoBeats/GetSongBPM/Deezer/RapidAPI
 2. **Add popularity ranking to Turso** — No more Spotify API dependency for search
@@ -30,72 +53,88 @@ With access to the Spotify metadata dumps (`spotify_clean.sqlite3` + `spotify_cl
 
 ## 1. Source Data Schemas
 
-### 1.1 spotify_clean.sqlite3 (Inferred from API docs)
+### 1.1 Spotify Tracks Database Schema
 
 ```sql
 -- Main tracks table (256M rows)
 CREATE TABLE tracks (
-  rowid INTEGER PRIMARY KEY,
-  id TEXT NOT NULL UNIQUE,           -- Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
+  rowid INTEGER PRIMARY KEY NOT NULL,
+  id TEXT NOT NULL,                   -- Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
+  fetched_at INTEGER NOT NULL,
   name TEXT NOT NULL,                 -- Track title
-  album_rowid INTEGER,                -- FK to albums
-  duration_ms INTEGER NOT NULL,
+  preview_url TEXT,
+  album_rowid INTEGER NOT NULL,       -- FK to albums
+  track_number INTEGER NOT NULL,
+  external_id_isrc TEXT,              -- ISRC identifier
   popularity INTEGER NOT NULL,        -- 0-100, higher = more popular
-  explicit BOOLEAN,
-
-  disc_number INTEGER,
-  track_number INTEGER
+  available_markets_rowid INTEGER NOT NULL,
+  disc_number INTEGER NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  explicit INTEGER NOT NULL
 );
 
 -- Track-to-artist mapping (many-to-many)
+-- NOTE: No position column - use MIN(artist_rowid) as primary artist heuristic
 CREATE TABLE track_artists (
-  track_rowid INTEGER,
-  artist_rowid INTEGER,
-  position INTEGER                    -- 0 = primary artist
+  track_rowid INTEGER NOT NULL,
+  artist_rowid INTEGER NOT NULL
 );
 
 CREATE TABLE artists (
-  rowid INTEGER PRIMARY KEY,
-  id TEXT NOT NULL UNIQUE,            -- Spotify artist ID
+  rowid INTEGER PRIMARY KEY NOT NULL,
+  id TEXT NOT NULL,                   -- Spotify artist ID
+  fetched_at INTEGER NOT NULL,
   name TEXT NOT NULL,
-  popularity INTEGER,
-  followers INTEGER
+  followers_total INTEGER NOT NULL,
+  popularity INTEGER NOT NULL
 );
 
 CREATE TABLE albums (
-  rowid INTEGER PRIMARY KEY,
-  id TEXT NOT NULL UNIQUE,            -- Spotify album ID
+  rowid INTEGER PRIMARY KEY NOT NULL,
+  id TEXT NOT NULL,                   -- Spotify album ID
+  fetched_at INTEGER NOT NULL,
   name TEXT NOT NULL,
-  album_type TEXT,                    -- "album", "single", "compilation"
-  release_date TEXT,
-  total_tracks INTEGER
+  album_type TEXT NOT NULL,           -- "album", "single", "compilation"
+  available_markets_rowid INTEGER NOT NULL,
+  external_id_upc TEXT,
+  copyright_c TEXT,
+  copyright_p TEXT,
+  label TEXT NOT NULL,
+  popularity INTEGER NOT NULL,
+  release_date TEXT NOT NULL,
+  release_date_precision TEXT NOT NULL,
+  total_tracks INTEGER NOT NULL
 );
 
 CREATE TABLE album_images (
-  album_rowid INTEGER,
-  url TEXT NOT NULL,
-  height INTEGER,
-  width INTEGER
+  album_rowid INTEGER NOT NULL,
+  width INTEGER NOT NULL,
+  height INTEGER NOT NULL,
+  url TEXT NOT NULL
 );
 ```
 
-### 1.2 spotify_clean_audio_features.sqlite3 (From API docs)
+### 1.2 Audio Features Database Schema
 
 ```sql
-CREATE TABLE audio_features (
-  track_rowid INTEGER PRIMARY KEY,    -- FK to tracks
+CREATE TABLE track_audio_features (
+  rowid INTEGER PRIMARY KEY NOT NULL,
+  track_id TEXT NOT NULL,             -- Spotify track ID (joins on tracks.id, NOT rowid)
+  fetched_at INTEGER NOT NULL,
+  null_response INTEGER NOT NULL,
+  duration_ms INTEGER,
+  time_signature INTEGER,             -- 3-7 (beats per bar)
   tempo REAL,                         -- BPM (e.g., 118.211)
   key INTEGER,                        -- Pitch class: 0=C, 1=C#, ..., 11=B, -1=unknown
   mode INTEGER,                       -- 0=minor, 1=major
-  time_signature INTEGER,             -- 3-7 (beats per bar)
   danceability REAL,                  -- 0.0-1.0
   energy REAL,                        -- 0.0-1.0
-  instrumentalness REAL,              -- 0.0-1.0 (>0.5 = likely instrumental)
-  acousticness REAL,                  -- 0.0-1.0
+  loudness REAL,                      -- dB, typically -60 to 0
   speechiness REAL,                   -- 0.0-1.0
-  valence REAL,                       -- 0.0-1.0 (musical positiveness)
+  acousticness REAL,                  -- 0.0-1.0
+  instrumentalness REAL,              -- 0.0-1.0 (>0.5 = likely instrumental)
   liveness REAL,                      -- 0.0-1.0 (audience presence)
-  loudness REAL                       -- dB, typically -60 to 0
+  valence REAL                        -- 0.0-1.0 (musical positiveness)
 );
 ```
 
@@ -355,11 +394,11 @@ struct Args {
     /// Path to output SQLite database
     output: PathBuf,
 
-    /// Path to spotify_clean.sqlite3 (optional, for enrichment)
+    /// Path to Spotify tracks database (optional, for enrichment)
     #[arg(long)]
     spotify: Option<PathBuf>,
 
-    /// Path to spotify_clean_audio_features.sqlite3 (optional, requires --spotify)
+    /// Path to Spotify audio features database (optional, requires --spotify)
     #[arg(long)]
     audio_features: Option<PathBuf>,
 
@@ -385,8 +424,8 @@ struct Args {
 ./lrclib-extract \
   /path/to/lrclib.sqlite3 \
   /path/to/output.sqlite3 \
-  --spotify /path/to/spotify_clean.sqlite3 \
-  --audio-features /path/to/spotify_clean_audio_features.sqlite3 \
+  --spotify /path/to/spotify-tracks.sqlite3 \
+  --audio-features /path/to/spotify-audio-features.sqlite3 \
   --min-popularity 1 \
   --test "everlong foo fighters"
 ```
@@ -1014,7 +1053,7 @@ Song loads → Check DB cache → Race providers:
 ```
 Song loads → tempo field already in search result
      │
-     ├── tempo != NULL → Use directly (no attribution needed!)
+     ├── tempo != NULL → Use directly (show "via Spotify")
      │
      └── tempo == NULL → Fall back to current provider cascade
 ```
@@ -1032,23 +1071,33 @@ if (tursoTrack.tempo) {
   return {
     bpm: Math.round(tursoTrack.tempo),
     key: formatMusicalKey(tursoTrack.musical_key, tursoTrack.mode),
-    bpmAttribution: null, // No attribution needed for embedded data
+    bpmAttribution: {
+      provider: "Spotify",
+      url: "https://spotify.com",
+      requiresBacklink: false,
+    },
   }
 }
 // Fall back to providers only if tempo is NULL
 const bpmResult = await getBpmWithFallback(...)
 ```
 
-### 6.4 Attribution Implications
+### 6.4 Attribution Handling
 
-**Current:** "BPM data from ReccoBeats" with required backlink
+| Source | Attribution | Backlink Required |
+|--------|-------------|-------------------|
+| Embedded (Spotify dump) | "via Spotify" | No |
+| ReccoBeats | "via ReccoBeats" | Yes |
+| GetSongBPM | "via GetSongBPM" | Yes |
+| Deezer | "via Deezer" | Yes |
+| RapidAPI Spotify | "via Spotify (RapidAPI)" | No |
 
-**New:** For Spotify-sourced tempo:
-- No attribution required (we own the data)
-- Cleaner UI (no external links)
-- Faster (no API calls)
+**Benefits of embedded tempo:**
+- Instant (no API calls)
+- Consistent attribution ("via Spotify")
+- Includes musical key and time signature
 
-**Fallback:** When tempo is NULL, show attribution as before.
+**Fallback:** When tempo is NULL, use provider cascade with appropriate attribution.
 
 ---
 
@@ -1094,10 +1143,10 @@ function formatMusicalKey(key: number | null, mode: number | null): string | nul
 **Source of Truth:** LRCLIB — tracks only exist if they have synced lyrics. Spotify data is nullable enrichment.
 
 **Data Sources:**
-| File | Contents | Used For |
-|------|----------|----------|
-| `spotify_clean.sqlite3` | tracks, artists, albums, album_images | Matching, album art URLs |
-| `spotify_clean_audio_features.sqlite3` | tempo, key, mode, time_signature | BPM and musical metadata |
+| Database | Contents | Used For |
+|----------|----------|----------|
+| Spotify tracks | tracks, artists, albums, album_images | Matching, album art URLs |
+| Audio features | tempo, key, mode, time_signature | BPM and musical metadata |
 
 **New Turso Fields:**
 - `spotify_id`, `popularity`, `tempo`, `musical_key`, `mode`, `time_signature`, `isrc`, `album_image_url`

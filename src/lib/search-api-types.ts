@@ -12,6 +12,9 @@ export interface SearchResultTrack {
   readonly hasLyrics: boolean
   readonly spotifyId?: string | undefined
   readonly lrclibId?: number | undefined
+  // Enrichment data from Turso (Spotify dump)
+  readonly popularity?: number | undefined
+  readonly tempo?: number | undefined
 }
 
 export interface SearchApiResponse {
