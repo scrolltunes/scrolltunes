@@ -61,6 +61,17 @@ export interface SpotifySearchResult {
   }
 }
 
+export interface SpotifyAudioFeatures {
+  readonly id: string
+  readonly tempo: number
+  readonly key: number // 0-11 (C to B), -1 if unknown
+  readonly mode: number // 0 = minor, 1 = major
+  readonly time_signature: number
+  readonly danceability: number
+  readonly energy: number
+  readonly valence: number
+}
+
 export class SpotifyService extends Context.Tag("SpotifyService")<
   SpotifyService,
   {
@@ -69,6 +80,9 @@ export class SpotifyService extends Context.Tag("SpotifyService")<
       limit?: number,
     ) => Effect.Effect<SpotifySearchResult, SpotifyError>
     readonly getTrack: (trackId: string) => Effect.Effect<SpotifyTrack, SpotifyError>
+    readonly getAudioFeatures: (
+      trackId: string,
+    ) => Effect.Effect<SpotifyAudioFeatures, SpotifyError>
   }
 >() {}
 
@@ -227,6 +241,9 @@ const searchTracksRaw = (query: string, limit = 20) =>
 const getTrackRaw = (trackId: string) =>
   spotifyFetch<SpotifyTrack>(`/tracks/${encodeURIComponent(trackId)}`)
 
+const getAudioFeaturesRaw = (trackId: string) =>
+  spotifyFetch<SpotifyAudioFeatures>(`/audio-features/${encodeURIComponent(trackId)}`)
+
 const makeSpotifyService = Effect.gen(function* () {
   const serverConfig = yield* ServerConfig
   const fetchService = yield* FetchService
@@ -240,6 +257,7 @@ const makeSpotifyService = Effect.gen(function* () {
   return {
     searchTracks: (query: string, limit?: number) => provideDeps(searchTracksRaw(query, limit)),
     getTrack: (trackId: string) => provideDeps(getTrackRaw(trackId)),
+    getAudioFeatures: (trackId: string) => provideDeps(getAudioFeaturesRaw(trackId)),
   }
 })
 
@@ -258,6 +276,11 @@ export const getTrackEffect = (
 ): Effect.Effect<SpotifyTrack, SpotifyError, SpotifyService> =>
   SpotifyService.pipe(Effect.flatMap(service => service.getTrack(trackId)))
 
+export const getAudioFeaturesEffect = (
+  trackId: string,
+): Effect.Effect<SpotifyAudioFeatures, SpotifyError, SpotifyService> =>
+  SpotifyService.pipe(Effect.flatMap(service => service.getAudioFeatures(trackId)))
+
 // --- Public API (Async wrappers) ---
 
 export async function searchTracks(query: string, limit?: number): Promise<SpotifySearchResult> {
@@ -268,6 +291,12 @@ export async function searchTracks(query: string, limit?: number): Promise<Spoti
 
 export async function getTrack(trackId: string): Promise<SpotifyTrack> {
   return Effect.runPromise(getTrackEffect(trackId).pipe(Effect.provide(SpotifyRuntimeLayer)))
+}
+
+export async function getAudioFeatures(trackId: string): Promise<SpotifyAudioFeatures> {
+  return Effect.runPromise(
+    getAudioFeaturesEffect(trackId).pipe(Effect.provide(SpotifyRuntimeLayer)),
+  )
 }
 
 // --- Utility Functions ---
@@ -301,4 +330,20 @@ export function formatDuration(ms: number): string {
 
 export function formatArtists(artists: readonly SpotifyArtist[]): string {
   return artists.map(a => a.name).join(", ")
+}
+
+/**
+ * Format Spotify musical key to human-readable string.
+ * Key is 0-11 (C to B), -1 if unknown.
+ * Mode is 0 (minor) or 1 (major).
+ */
+export function formatMusicalKey(key: number, mode: number): string | null {
+  if (key < 0 || key > 11) return null
+
+  const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+  const note = notes[key]
+  if (!note) return null
+
+  const modeStr = mode === 1 ? "major" : mode === 0 ? "minor" : ""
+  return modeStr ? `${note} ${modeStr}` : note
 }

@@ -927,15 +927,19 @@ Search Spotify API for matching tracks. Uses existing `SpotifyService` with `Eff
 
 ### Task 5.4: Link Spotify API Endpoint
 
-**Files**: `src/app/api/admin/tracks/[lrclibId]/link-spotify/route.ts` (new file)
+**Status**: ✅ COMPLETE
 
-Link a Spotify track and fetch audio features.
+**Files**:
+- `src/app/api/admin/tracks/[lrclibId]/link-spotify/route.ts` (new file)
+- `src/lib/spotify-client.ts` (modified - added `getAudioFeatures` method)
+
+Link a Spotify track and fetch audio features. Added `getAudioFeatures` method to `SpotifyService` to fetch tempo, key, and mode from Spotify's audio-features API endpoint.
 
 **Acceptance Criteria**:
-- [ ] Fetches Spotify audio features
-- [ ] Creates Neon entry if needed
-- [ ] Saves enrichment data
-- [ ] Sets `bpmSource = "Spotify"`
+- [x] Fetches Spotify audio features
+- [x] Creates Neon entry if needed
+- [x] Saves enrichment data
+- [x] Sets `bpmSource = "Spotify"`
 
 ---
 
