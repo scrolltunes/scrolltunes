@@ -311,6 +311,8 @@ class BpmLogInsertError extends Data.TaggedClass("BpmLogInsertError")<{
 
 ### Task 2.1: Update `fireAndForgetBpmFetch` Signature
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/services/song-loader.ts`
 
 **Current signature** (line 243-248):
@@ -344,9 +346,9 @@ fireAndForgetBpmFetch(cachedSong.songId, actualLrclibId, lyrics.title, lyrics.ar
 ```
 
 **Acceptance Criteria**:
-- [ ] Function signature updated with `lrclibId: number` parameter
-- [ ] Call site updated to pass `actualLrclibId`
-- [ ] `bun run typecheck` passes
+- [x] Function signature updated with `lrclibId: number` parameter
+- [x] Call site updated to pass `actualLrclibId`
+- [x] `bun run typecheck` passes
 
 ---
 

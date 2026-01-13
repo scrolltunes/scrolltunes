@@ -242,6 +242,7 @@ function getEmbeddedTempoFromTurso(lrclibId: number) {
 // Fire-and-forget BPM fetch for deferred loading
 function fireAndForgetBpmFetch(
   songId: string,
+  lrclibId: number,
   title: string,
   artist: string,
   spotifyId: string | undefined,
@@ -538,7 +539,13 @@ export async function loadSongData(
       }
     } else if (cachedSong) {
       // Priority 3: Defer BPM fetching to background provider cascade
-      fireAndForgetBpmFetch(cachedSong.songId, lyrics.title, lyrics.artist, resolvedSpotifyId)
+      fireAndForgetBpmFetch(
+        cachedSong.songId,
+        actualLrclibId,
+        lyrics.title,
+        lyrics.artist,
+        resolvedSpotifyId,
+      )
     }
   }
 
