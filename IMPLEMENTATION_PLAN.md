@@ -1023,16 +1023,25 @@ Inline expansion panel showing enrichment status. Displays:
 
 ### Task 5.9: SpotifySearchModal Component
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/components/admin/SpotifySearchModal.tsx` (new file)
 
-Modal for searching and linking Spotify tracks.
+Modal for searching and linking Spotify tracks. Features:
+- Pre-fills search with track title + artist on open
+- Search input with keyboard enter support
+- Spotify green themed search button
+- Results list with album art, track name, artist, album, duration
+- Click to select triggers link action via `onSelect` callback
+- Loading and error states
+- Close disabled during linking to prevent interruption
 
 **Acceptance Criteria**:
-- [ ] Modal opens/closes
-- [ ] Pre-fills search with track title + artist
-- [ ] Search calls API
-- [ ] Results selectable
-- [ ] Selection triggers link action
+- [x] Modal opens/closes
+- [x] Pre-fills search with track title + artist
+- [x] Search calls API
+- [x] Results selectable
+- [x] Selection triggers link action
 
 ---
 
