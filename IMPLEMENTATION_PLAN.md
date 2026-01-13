@@ -148,9 +148,9 @@ This runs: `biome check . && bun run typecheck && bun run test`
 
 | Spec | Description | Status |
 |------|-------------|--------|
-| [bpm-analytics-schema](specs/bpm-analytics-schema.md) | Database schema and types | ✅ Schema done, migration pending |
-| [bpm-logging-helper](specs/bpm-logging-helper.md) | Fire-and-forget logging function | Pending |
-| [bpm-instrumentation](specs/bpm-instrumentation.md) | Instrument Turso and provider cascade | Pending |
+| [bpm-analytics-schema](specs/bpm-analytics-schema.md) | Database schema and types | ✅ Done |
+| [bpm-logging-helper](specs/bpm-logging-helper.md) | Fire-and-forget logging function | ✅ Done |
+| [bpm-instrumentation](specs/bpm-instrumentation.md) | Instrument Turso and provider cascade | ✅ Done |
 | [bpm-admin-dashboard](specs/bpm-admin-dashboard.md) | Admin page with analytics | Pending |
 | [bpm-retention-cleanup](specs/bpm-retention-cleanup.md) | 90-day log retention cron | Pending |
 | [bpm-admin-tracks-browser](specs/bpm-admin-tracks-browser.md) | Full LRCLIB tracks browser with enrichment | Pending |
@@ -374,6 +374,8 @@ Added import for `logBpmAttempt` and timing/logging calls around the Turso embed
 
 ### Task 2.3: Instrument Provider Cascade
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/services/bpm-providers.ts`
 
 Add imports and modify the provider creation to wrap with logging:
@@ -587,13 +589,13 @@ function fireAndForgetBpmFetch(
 ```
 
 **Acceptance Criteria**:
-- [ ] `LoggingContext` interface added
-- [ ] `wrapProviderWithLogging` function created
-- [ ] `withLogging` method added to `BpmProvidersService`
-- [ ] `song-loader.ts` uses `withLogging` for cascade
-- [ ] Each provider attempt is logged with correct stage
-- [ ] Errors are captured with reason and truncated detail
-- [ ] `bun run typecheck` passes
+- [x] `LoggingContext` interface added
+- [x] `wrapProviderWithLogging` function created
+- [x] `withLogging` method added to `BpmProvidersService`
+- [x] `song-loader.ts` uses `withLogging` for cascade
+- [x] Each provider attempt is logged with correct stage
+- [x] Errors are captured with reason and truncated detail
+- [x] `bun run typecheck` passes
 
 ---
 
@@ -1064,8 +1066,8 @@ After all phases complete:
 |------|-------|---------|--------|
 | `src/lib/db/schema.ts` | 1.1 | Add `bpmFetchLog` table + types | ✅ Done |
 | Database migration | 1.2 | Run `bun run db:push` | ✅ Done (uses push workflow) |
-| `src/services/song-loader.ts` | 2.1, 2.2 | Update signature, add Turso logging | Pending |
-| `src/services/bpm-providers.ts` | 2.3 | Add logging wrapper and `withLogging` method | Pending |
+| `src/services/song-loader.ts` | 2.1, 2.2 | Update signature, add Turso logging | ✅ Done |
+| `src/services/bpm-providers.ts` | 2.3 | Add logging wrapper and `withLogging` method | ✅ Done |
 | `vercel.json` | 4.1 | Add cleanup cron | Pending |
 | `src/app/admin/songs/page.tsx` | 5.11 | Replace with tracks browser | Pending |
 | `src/app/admin/page.tsx` | 3.9 | Add link to BPM stats page | Pending |

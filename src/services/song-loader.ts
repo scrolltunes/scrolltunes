@@ -248,8 +248,12 @@ function fireAndForgetBpmFetch(
   artist: string,
   spotifyId: string | undefined,
 ) {
+  const loggingContext = { lrclibId, songId, title, artist }
+
   const bpmEffect = BpmProviders.pipe(
-    Effect.flatMap(({ fallbackProviders, raceProviders, lastResortProvider }) => {
+    Effect.flatMap(service => {
+      const { fallbackProviders, raceProviders, lastResortProvider } =
+        service.withLogging(loggingContext)
       const bpmQuery = { title, artist, spotifyId }
 
       const primaryBpmEffect = spotifyId
