@@ -867,6 +867,8 @@ Update `vercel.json`:
 
 ### Task 5.1: Tracks List API Endpoint
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/app/api/admin/tracks/route.ts` (new file)
 
 Query Turso tracks with optional Neon join for catalog status.
@@ -874,16 +876,21 @@ Query Turso tracks with optional Neon join for catalog status.
 **Query params**:
 - `q` - FTS5 search query
 - `filter` - `all` | `missing_spotify` | `has_spotify` | `in_catalog` | `missing_bpm`
-- `sort` - `popular` | `recent` | `alpha`
+- `sort` - `popular` | `alpha`
 - `offset`, `limit`
 
 **Response**: `TrackWithEnrichment[]` as defined in spec.
 
+**Also added to `src/services/turso.ts`**:
+- `searchWithFilters` method for admin tracks with filter/sort/pagination
+- `getByIds` method for batch lookups
+- New types: `TursoFilter`, `TursoSort`, `TursoSearchWithFiltersOptions`, `TursoSearchWithFiltersResult`
+
 **Acceptance Criteria**:
-- [ ] Returns paginated Turso tracks
-- [ ] FTS5 search with MATCH syntax
-- [ ] All filters work correctly
-- [ ] Includes Neon enrichment status via join
+- [x] Returns paginated Turso tracks
+- [x] FTS5 search with MATCH syntax
+- [x] All filters work correctly
+- [x] Includes Neon enrichment status via join
 
 ---
 

@@ -26,6 +26,23 @@ export class TursoSearchError extends Data.TaggedClass("TursoSearchError")<{
   readonly cause?: unknown
 }> {}
 
+export type TursoFilter = "all" | "missing_spotify" | "has_spotify"
+export type TursoSort = "popular" | "alpha"
+
+export interface TursoSearchWithFiltersOptions {
+  readonly query?: string | undefined
+  readonly filter: TursoFilter
+  readonly sort: TursoSort
+  readonly offset: number
+  readonly limit: number
+  readonly lrclibIds?: readonly number[] | undefined
+}
+
+export interface TursoSearchWithFiltersResult {
+  readonly tracks: readonly TursoSearchResult[]
+  readonly total: number
+}
+
 export class TursoService extends Context.Tag("TursoService")<
   TursoService,
   {
@@ -41,6 +58,12 @@ export class TursoService extends Context.Tag("TursoService")<
       artist: string,
       targetDurationSec?: number,
     ) => Effect.Effect<TursoSearchResult | null, TursoSearchError, ServerConfig>
+    readonly searchWithFilters: (
+      options: TursoSearchWithFiltersOptions,
+    ) => Effect.Effect<TursoSearchWithFiltersResult, TursoSearchError, ServerConfig>
+    readonly getByIds: (
+      lrclibIds: readonly number[],
+    ) => Effect.Effect<readonly TursoSearchResult[], TursoSearchError, ServerConfig>
   }
 >() {}
 
@@ -239,8 +262,148 @@ const findByTitleArtist = (title: string, artist: string, targetDurationSec?: nu
     return scored[0] ?? null
   })
 
+const searchWithFilters = (options: TursoSearchWithFiltersOptions) =>
+  Effect.gen(function* () {
+    const client = yield* getClient
+
+    // Build WHERE clauses
+    const whereClauses: string[] = []
+    const args: (string | number)[] = []
+
+    // FTS search if query provided
+    if (options.query?.trim()) {
+      const ftsQuery = toFtsQuery(options.query)
+      whereClauses.push("tracks_fts MATCH ?")
+      args.push(ftsQuery)
+    }
+
+    // Spotify filter
+    if (options.filter === "missing_spotify") {
+      whereClauses.push("t.spotify_id IS NULL")
+    } else if (options.filter === "has_spotify") {
+      whereClauses.push("t.spotify_id IS NOT NULL")
+    }
+
+    // Filter by specific lrclib IDs if provided
+    if (options.lrclibIds && options.lrclibIds.length > 0) {
+      const placeholders = options.lrclibIds.map(() => "?").join(", ")
+      whereClauses.push(`t.id IN (${placeholders})`)
+      args.push(...options.lrclibIds)
+    }
+
+    const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : ""
+
+    // Build ORDER BY
+    let orderBy: string
+    if (options.sort === "alpha") {
+      orderBy = "t.artist, t.title"
+    } else {
+      // popular (default)
+      orderBy = "(t.popularity IS NOT NULL) DESC, t.popularity DESC, t.quality DESC"
+    }
+
+    // Build the main query
+    // Use FTS table only if search query is provided
+    const fromClause = options.query?.trim()
+      ? "FROM tracks_fts fts JOIN tracks t ON fts.rowid = t.id"
+      : "FROM tracks t"
+
+    const [countResult, tracksResult] = yield* Effect.tryPromise({
+      try: async () => {
+        // Get count
+        const countSql = `SELECT COUNT(*) as total ${fromClause} ${whereClause}`
+        const countRs = await client.execute({ sql: countSql, args })
+
+        // Get tracks with pagination
+        const tracksSql = `
+          SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality,
+                 t.spotify_id, t.popularity, t.tempo, t.musical_key, t.mode,
+                 t.time_signature, t.isrc, t.album_image_url
+          ${fromClause}
+          ${whereClause}
+          ORDER BY ${orderBy}
+          LIMIT ? OFFSET ?
+        `
+        const tracksRs = await client.execute({
+          sql: tracksSql,
+          args: [...args, options.limit, options.offset],
+        })
+
+        return [countRs.rows[0], tracksRs.rows] as const
+      },
+      catch: error => {
+        console.error("[TURSO] searchWithFilters error:", error)
+        return new TursoSearchError({ message: "Turso searchWithFilters failed", cause: error })
+      },
+    })
+
+    const total = (countResult?.total as number) ?? 0
+    const tracks = tracksResult.map(row => ({
+      id: row.id as number,
+      title: row.title as string,
+      artist: row.artist as string,
+      album: row.album as string | null,
+      durationSec: row.duration_sec as number,
+      quality: row.quality as number,
+      spotifyId: row.spotify_id as string | null,
+      popularity: row.popularity as number | null,
+      tempo: row.tempo as number | null,
+      musicalKey: row.musical_key as number | null,
+      mode: row.mode as number | null,
+      timeSignature: row.time_signature as number | null,
+      isrc: row.isrc as string | null,
+      albumImageUrl: row.album_image_url as string | null,
+    }))
+
+    return { tracks, total }
+  })
+
+const getByIds = (lrclibIds: readonly number[]) =>
+  Effect.gen(function* () {
+    if (lrclibIds.length === 0) return []
+
+    const client = yield* getClient
+
+    const placeholders = lrclibIds.map(() => "?").join(", ")
+    const result = yield* Effect.tryPromise({
+      try: async () => {
+        const rs = await client.execute({
+          sql: `
+            SELECT id, title, artist, album, duration_sec, quality,
+                   spotify_id, popularity, tempo, musical_key, mode,
+                   time_signature, isrc, album_image_url
+            FROM tracks
+            WHERE id IN (${placeholders})
+          `,
+          args: [...lrclibIds],
+        })
+        return rs.rows
+      },
+      catch: error => new TursoSearchError({ message: "Turso getByIds failed", cause: error }),
+    })
+
+    return result.map(row => ({
+      id: row.id as number,
+      title: row.title as string,
+      artist: row.artist as string,
+      album: row.album as string | null,
+      durationSec: row.duration_sec as number,
+      quality: row.quality as number,
+      spotifyId: row.spotify_id as string | null,
+      popularity: row.popularity as number | null,
+      tempo: row.tempo as number | null,
+      musicalKey: row.musical_key as number | null,
+      mode: row.mode as number | null,
+      timeSignature: row.time_signature as number | null,
+      isrc: row.isrc as string | null,
+      albumImageUrl: row.album_image_url as string | null,
+    }))
+  })
+
 export const TursoServiceLive = Layer.succeed(TursoService, {
   search,
   getById,
   findByTitleArtist,
+  searchWithFilters,
+  getByIds,
 })
