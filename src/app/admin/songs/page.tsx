@@ -619,7 +619,7 @@ export default function AdminTracksPage() {
                       ) : (
                         catalogData.data?.tracks.map((track, index) => (
                           <CatalogTrackRow
-                            key={track.id}
+                            key={`${track.id}-${track.lrclibId ?? index}`}
                             track={track}
                             index={index}
                             isExpanded={expandedId === track.id}
