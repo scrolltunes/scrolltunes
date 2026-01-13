@@ -9,13 +9,31 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
+/// Extract deduplicated LRCLIB search index with optional Spotify enrichment.
+///
+/// LRCLIB is the source of truth. Tracks are only included if they have synced lyrics.
+/// Spotify data (BPM, popularity, album art) is enrichment metadata — nullable and optional.
 #[derive(Parser)]
 #[command(name = "lrclib-extract")]
-#[command(about = "Extract deduplicated LRCLIB search index from SQLite dump")]
+#[command(about = "Extract deduplicated LRCLIB search index with optional Spotify enrichment")]
 struct Args {
+    /// Path to LRCLIB SQLite dump (source of truth)
     source: PathBuf,
 
+    /// Path to output SQLite database
     output: PathBuf,
+
+    /// Path to spotify_clean.sqlite3 (optional, for enrichment)
+    #[arg(long)]
+    spotify: Option<PathBuf>,
+
+    /// Path to spotify_clean_audio_features.sqlite3 (optional, requires --spotify)
+    #[arg(long)]
+    audio_features: Option<PathBuf>,
+
+    /// Minimum Spotify popularity to include in lookup index (0-100)
+    #[arg(long, default_value = "1")]
+    min_popularity: i32,
 
     #[arg(long, default_value = "0")]
     workers: usize,
@@ -45,6 +63,56 @@ struct ScoredTrack {
     title_norm: String,
     artist_norm: String,
     quality: i32,
+}
+
+/// Spotify track info for matching
+#[derive(Clone, Debug)]
+struct SpotifyTrack {
+    rowid: i64,              // For joining with audio_features
+    id: String,              // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
+    #[allow(dead_code)]
+    name: String,            // Original title
+    #[allow(dead_code)]
+    artist: String,          // Primary artist (from join)
+    duration_ms: i64,
+    popularity: i32,         // 0-100
+    isrc: Option<String>,    // For Deezer album art lookup
+    album_rowid: i64,        // For album_images lookup
+}
+
+/// Audio features from Spotify
+#[derive(Clone, Debug)]
+struct AudioFeatures {
+    tempo: Option<f64>,           // BPM
+    key: Option<i32>,             // -1 to 11 (pitch class)
+    mode: Option<i32>,            // 0=minor, 1=major
+    time_signature: Option<i32>,  // 3-7
+}
+
+/// Final enriched track for output.
+/// LRCLIB fields are always present (source of truth).
+/// Spotify fields are nullable (enrichment, NULL if no match).
+#[derive(Clone, Debug)]
+struct EnrichedTrack {
+    // From LRCLIB (source of truth, always present)
+    lrclib_id: i64,
+    title: String,
+    artist: String,
+    album: Option<String>,
+    duration_sec: i64,
+    title_norm: String,
+    artist_norm: String,
+    quality: i32,
+
+    // From Spotify (enrichment, all nullable)
+    spotify_id: Option<String>,
+    popularity: Option<i32>,         // NULL if no match (not 0)
+    tempo: Option<f64>,
+    musical_key: Option<i32>,
+    mode: Option<i32>,
+    time_signature: Option<i32>,
+    isrc: Option<String>,
+    album_image_url: Option<String>, // Medium (300px) Spotify CDN URL
 }
 
 static TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
@@ -464,63 +532,6 @@ fn process_groups(groups: HashMap<(String, String), Vec<Track>>) -> Vec<ScoredTr
     results
 }
 
-fn write_output(conn: &mut Connection, tracks: &[ScoredTrack]) -> Result<()> {
-    conn.execute_batch(
-        "PRAGMA journal_mode = WAL;
-        PRAGMA synchronous = NORMAL;
-        PRAGMA cache_size = -64000;
-        PRAGMA temp_store = MEMORY;
-
-        CREATE TABLE tracks (
-            id INTEGER PRIMARY KEY,
-            title TEXT NOT NULL,
-            artist TEXT NOT NULL,
-            album TEXT,
-            duration_sec INTEGER NOT NULL,
-            title_norm TEXT NOT NULL,
-            artist_norm TEXT NOT NULL,
-            quality INTEGER NOT NULL
-        );
-
-        CREATE VIRTUAL TABLE tracks_fts USING fts5(
-            title, artist,
-            content='tracks',
-            content_rowid='id',
-            tokenize='porter'
-        );",
-    )?;
-
-    let pb = create_progress_bar(tracks.len() as u64, "Phase 3: Writing output");
-
-    for chunk in tracks.chunks(WRITE_BATCH_SIZE) {
-        let tx = conn.transaction()?;
-        {
-            let mut stmt = tx.prepare_cached(
-                "INSERT INTO tracks (id, title, artist, album, duration_sec, title_norm, artist_norm, quality)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            )?;
-
-            for st in chunk {
-                stmt.execute(params![
-                    st.track.id,
-                    st.track.title,
-                    st.track.artist,
-                    st.track.album,
-                    st.track.duration_sec,
-                    st.title_norm,
-                    st.artist_norm,
-                    st.quality,
-                ])?;
-                pb.inc(1);
-            }
-        }
-        tx.commit()?;
-    }
-
-    pb.finish_with_message(format!("Phase 3: Wrote {} tracks", tracks.len()));
-    Ok(())
-}
-
 fn build_fts_index(conn: &Connection) -> Result<()> {
     let spinner = create_spinner("Phase 4: Building FTS index");
 
@@ -542,16 +553,360 @@ fn optimize_database(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn test_search(conn: &Connection, query: &str) -> Result<()> {
+// ============================================================================
+// Spotify Enrichment Functions
+// ============================================================================
+
+/// Load Spotify tracks into lookup HashMap
+/// Key: (title_norm, artist_norm) → Vec of candidates
+fn load_spotify_tracks(
+    conn: &Connection,
+    min_popularity: i32,
+) -> Result<HashMap<(String, String), Vec<SpotifyTrack>>> {
+    println!("[SPOTIFY] Loading tracks with popularity >= {}", min_popularity);
+
+    // First, get count for progress bar
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM tracks t
+         JOIN track_artists ta ON ta.track_rowid = t.rowid AND ta.position = 0
+         JOIN artists a ON a.rowid = ta.artist_rowid
+         WHERE t.popularity >= ?",
+        [min_popularity],
+        |row| row.get(0),
+    )?;
+
+    let pb = create_progress_bar(count as u64, "Loading Spotify tracks");
+
+    // Join tracks + track_artists + artists to get primary artist
+    let sql = r#"
+        SELECT
+            t.rowid,
+            t.id,
+            t.name,
+            a.name as artist_name,
+            t.duration_ms,
+            t.popularity,
+            t.isrc,
+            t.album_rowid
+        FROM tracks t
+        JOIN track_artists ta ON ta.track_rowid = t.rowid AND ta.position = 0
+        JOIN artists a ON a.rowid = ta.artist_rowid
+        WHERE t.popularity >= ?
+    "#;
+
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query([min_popularity])?;
+
+    let mut lookup: HashMap<(String, String), Vec<SpotifyTrack>> = HashMap::new();
+    let mut loaded_count = 0;
+
+    while let Some(row) = rows.next()? {
+        let track = SpotifyTrack {
+            rowid: row.get(0)?,
+            id: row.get(1)?,
+            name: row.get(2)?,
+            artist: row.get(3)?,
+            duration_ms: row.get(4)?,
+            popularity: row.get(5)?,
+            isrc: row.get(6)?,
+            album_rowid: row.get(7)?,
+        };
+
+        // Normalize using existing functions
+        let title_norm = normalize_title(&track.name);
+        let artist_norm = normalize_artist(&track.artist);
+        let key = (title_norm, artist_norm);
+
+        lookup.entry(key).or_default().push(track);
+        loaded_count += 1;
+        pb.inc(1);
+    }
+
+    pb.finish_with_message(format!(
+        "[SPOTIFY] Loaded {} tracks into {} groups",
+        loaded_count,
+        lookup.len()
+    ));
+
+    Ok(lookup)
+}
+
+/// Load audio features into HashMap by track_rowid
+fn load_audio_features(conn: &Connection) -> Result<HashMap<i64, AudioFeatures>> {
+    println!("[AUDIO] Loading audio features...");
+
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM audio_features", [], |row| row.get(0))?;
+    let pb = create_progress_bar(count as u64, "Loading audio features");
+
+    let sql = "SELECT track_rowid, tempo, key, mode, time_signature FROM audio_features";
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query([])?;
+
+    let mut lookup: HashMap<i64, AudioFeatures> = HashMap::new();
+
+    while let Some(row) = rows.next()? {
+        let rowid: i64 = row.get(0)?;
+        let features = AudioFeatures {
+            tempo: row.get(1)?,
+            key: row.get(2)?,
+            mode: row.get(3)?,
+            time_signature: row.get(4)?,
+        };
+        lookup.insert(rowid, features);
+        pb.inc(1);
+    }
+
+    pb.finish_with_message(format!("[AUDIO] Loaded {} audio feature records", lookup.len()));
+    Ok(lookup)
+}
+
+/// Load album image URLs into HashMap by album_rowid
+/// We select medium size (~300px) for optimal mobile display
+fn load_album_images(conn: &Connection) -> Result<HashMap<i64, String>> {
+    println!("[IMAGES] Loading album images (medium size)...");
+
+    // Select images closest to 300px (medium size)
+    let sql = r#"
+        SELECT album_rowid, url
+        FROM album_images
+        WHERE height BETWEEN 250 AND 350
+        ORDER BY album_rowid, ABS(height - 300)
+    "#;
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query([])?;
+
+    let mut lookup: HashMap<i64, String> = HashMap::new();
+
+    while let Some(row) = rows.next()? {
+        let album_rowid: i64 = row.get(0)?;
+        let url: String = row.get(1)?;
+        // Only keep first (closest to 300px) per album
+        lookup.entry(album_rowid).or_insert(url);
+    }
+
+    println!("[IMAGES] Loaded {} album image URLs", lookup.len());
+    Ok(lookup)
+}
+
+/// Match a canonical LRCLIB track to the best Spotify version.
+/// LRCLIB tracks have lyrics, so they're already vocal (not instrumental).
+fn match_to_spotify<'a>(
+    lrclib: &ScoredTrack,
+    spotify_lookup: &'a HashMap<(String, String), Vec<SpotifyTrack>>,
+) -> Option<&'a SpotifyTrack> {
+    let key = (lrclib.title_norm.clone(), lrclib.artist_norm.clone());
+    let candidates = spotify_lookup.get(&key)?;
+
+    // Filter by duration (±10s), select highest popularity
+    candidates
+        .iter()
+        .filter(|s| {
+            let spotify_duration_sec = s.duration_ms / 1000;
+            (lrclib.track.duration_sec - spotify_duration_sec).abs() <= 10
+        })
+        .max_by_key(|s| s.popularity)
+}
+
+/// Enrich canonical LRCLIB tracks with Spotify data.
+/// LRCLIB is the source of truth — Spotify data is nullable enrichment.
+fn enrich_tracks(
+    canonical: Vec<ScoredTrack>,
+    spotify_lookup: &HashMap<(String, String), Vec<SpotifyTrack>>,
+    audio_lookup: &HashMap<i64, AudioFeatures>,
+    image_lookup: &HashMap<i64, String>,
+) -> Vec<EnrichedTrack> {
+    let pb = create_progress_bar(canonical.len() as u64, "Enriching with Spotify");
+
+    let enriched: Vec<EnrichedTrack> = canonical
+        .into_par_iter()
+        .map(|lrclib| {
+            let spotify_match = match_to_spotify(&lrclib, spotify_lookup);
+
+            let enrichment = match spotify_match {
+                Some(s) => {
+                    let features = audio_lookup.get(&s.rowid);
+                    let album_image = image_lookup.get(&s.album_rowid).cloned();
+
+                    (
+                        Some(s.id.clone()),
+                        Some(s.popularity),
+                        features.and_then(|f| f.tempo),
+                        features.and_then(|f| f.key),
+                        features.and_then(|f| f.mode),
+                        features.and_then(|f| f.time_signature),
+                        s.isrc.clone(),
+                        album_image,
+                    )
+                }
+                None => (None, None, None, None, None, None, None, None),
+            };
+
+            pb.inc(1);
+
+            EnrichedTrack {
+                // LRCLIB (source of truth, always present)
+                lrclib_id: lrclib.track.id,
+                title: lrclib.track.title,
+                artist: lrclib.track.artist,
+                album: lrclib.track.album,
+                duration_sec: lrclib.track.duration_sec,
+                title_norm: lrclib.title_norm,
+                artist_norm: lrclib.artist_norm,
+                quality: lrclib.quality,
+                // Spotify (enrichment, nullable)
+                spotify_id: enrichment.0,
+                popularity: enrichment.1,
+                tempo: enrichment.2,
+                musical_key: enrichment.3,
+                mode: enrichment.4,
+                time_signature: enrichment.5,
+                isrc: enrichment.6,
+                album_image_url: enrichment.7,
+            }
+        })
+        .collect();
+
+    let matched_count = enriched.iter().filter(|t| t.spotify_id.is_some()).count();
+    let match_rate = if !enriched.is_empty() {
+        100.0 * matched_count as f64 / enriched.len() as f64
+    } else {
+        0.0
+    };
+
+    pb.finish_with_message(format!(
+        "Enriched {} tracks ({} with Spotify match, {:.1}%)",
+        enriched.len(),
+        matched_count,
+        match_rate
+    ));
+
+    enriched
+}
+
+/// Convert ScoredTrack to EnrichedTrack with NULL Spotify fields
+fn convert_to_enriched_without_spotify(tracks: Vec<ScoredTrack>) -> Vec<EnrichedTrack> {
+    tracks
+        .into_iter()
+        .map(|t| EnrichedTrack {
+            // LRCLIB (source of truth)
+            lrclib_id: t.track.id,
+            title: t.track.title,
+            artist: t.track.artist,
+            album: t.track.album,
+            duration_sec: t.track.duration_sec,
+            title_norm: t.title_norm,
+            artist_norm: t.artist_norm,
+            quality: t.quality,
+            // Spotify (all NULL when no enrichment)
+            spotify_id: None,
+            popularity: None,
+            tempo: None,
+            musical_key: None,
+            mode: None,
+            time_signature: None,
+            isrc: None,
+            album_image_url: None,
+        })
+        .collect()
+}
+
+/// Write enriched tracks to output database
+fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Result<()> {
+    conn.execute_batch(
+        "PRAGMA journal_mode = WAL;
+        PRAGMA synchronous = NORMAL;
+        PRAGMA cache_size = -64000;
+        PRAGMA temp_store = MEMORY;
+
+        CREATE TABLE tracks (
+            -- LRCLIB (source of truth, always present)
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            album TEXT,
+            duration_sec INTEGER NOT NULL,
+            title_norm TEXT NOT NULL,
+            artist_norm TEXT NOT NULL,
+            quality INTEGER NOT NULL,
+
+            -- Spotify enrichment (all nullable, NULL = no match)
+            spotify_id TEXT,
+            popularity INTEGER,
+            tempo REAL,
+            musical_key INTEGER,
+            mode INTEGER,
+            time_signature INTEGER,
+            isrc TEXT,
+            album_image_url TEXT
+        );
+
+        CREATE INDEX idx_tracks_spotify_id ON tracks(spotify_id);
+
+        CREATE VIRTUAL TABLE tracks_fts USING fts5(
+            title, artist,
+            content='tracks',
+            content_rowid='id',
+            tokenize='porter'
+        );",
+    )?;
+
+    let pb = create_progress_bar(tracks.len() as u64, "Phase 3: Writing enriched tracks");
+
+    for chunk in tracks.chunks(WRITE_BATCH_SIZE) {
+        let tx = conn.transaction()?;
+        {
+            let mut stmt = tx.prepare_cached(
+                "INSERT INTO tracks (
+                    id, title, artist, album, duration_sec,
+                    title_norm, artist_norm, quality,
+                    spotify_id, popularity, tempo, musical_key, mode, time_signature,
+                    isrc, album_image_url
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+            )?;
+
+            for t in chunk {
+                stmt.execute(params![
+                    // LRCLIB (source of truth)
+                    t.lrclib_id,
+                    t.title,
+                    t.artist,
+                    t.album,
+                    t.duration_sec,
+                    t.title_norm,
+                    t.artist_norm,
+                    t.quality,
+                    // Spotify (enrichment, nullable)
+                    t.spotify_id,
+                    t.popularity,
+                    t.tempo,
+                    t.musical_key,
+                    t.mode,
+                    t.time_signature,
+                    t.isrc,
+                    t.album_image_url,
+                ])?;
+                pb.inc(1);
+            }
+        }
+        tx.commit()?;
+    }
+
+    pb.finish_with_message(format!("Phase 3: Wrote {} enriched tracks", tracks.len()));
+    Ok(())
+}
+
+/// Test search with enrichment data display
+fn test_search_enriched(conn: &Connection, query: &str) -> Result<()> {
     println!("\nSearch results for '{}':", query);
-    println!("{:-<80}", "");
+    println!("{:-<100}", "");
 
     let mut stmt = conn.prepare(
-        "SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality
+        "SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality,
+                t.tempo, t.musical_key, t.mode, t.popularity
          FROM tracks_fts fts
          JOIN tracks t ON fts.rowid = t.id
          WHERE tracks_fts MATCH ?1
-         ORDER BY t.quality DESC
+         ORDER BY COALESCE(t.popularity, 0) DESC, t.quality DESC
          LIMIT 10",
     )?;
 
@@ -565,15 +920,38 @@ fn test_search(conn: &Connection, query: &str) -> Result<()> {
         let album: Option<String> = row.get(3)?;
         let duration: i64 = row.get(4)?;
         let quality: i32 = row.get(5)?;
+        let tempo: Option<f64> = row.get(6)?;
+        let musical_key: Option<i32> = row.get(7)?;
+        let mode: Option<i32> = row.get(8)?;
+        let popularity: Option<i32> = row.get(9)?;
+
+        // Format key if available
+        let key_str = match (musical_key, mode) {
+            (Some(k), Some(m)) if k >= 0 && k <= 11 => {
+                let pitch_classes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+                let mode_str = if m == 1 { "major" } else { "minor" };
+                format!("key={} {}", pitch_classes[k as usize], mode_str)
+            }
+            _ => String::new(),
+        };
+
+        // Format tempo if available
+        let tempo_str = tempo.map_or(String::new(), |t| format!("tempo={:.1}", t));
+
+        // Format popularity if available
+        let pop_str = popularity.map_or("no match".to_string(), |p| format!("pop={}", p));
 
         println!(
-            "[{}] {} - {} ({}) [{}s] quality={}",
+            "[{}] {} - {} ({}) [{}s] quality={} {} {} {}",
             id,
             artist,
             title,
             album.unwrap_or_else(|| "Unknown".to_string()),
             duration,
-            quality
+            quality,
+            tempo_str,
+            key_str,
+            pop_str
         );
         count += 1;
     }
@@ -597,6 +975,7 @@ fn main() -> Result<()> {
 
     let start = Instant::now();
 
+    // Phase 1: Read LRCLIB tracks (source of truth)
     println!("Opening source database: {:?}", args.source);
     let source_conn = Connection::open(&args.source)
         .context("Failed to open source database")?;
@@ -618,36 +997,91 @@ fn main() -> Result<()> {
     let tracks = read_tracks(&source_conn, artist_filter.as_ref())?;
     drop(source_conn);
 
+    // Phase 1b: Load Spotify lookup (if --spotify provided)
+    let spotify_lookup = if let Some(ref spotify_path) = args.spotify {
+        println!("\nOpening Spotify database: {:?}", spotify_path);
+        let spotify_conn = Connection::open(spotify_path)
+            .context("Failed to open Spotify database")?;
+        spotify_conn.execute_batch("PRAGMA mmap_size = 8589934592;")?;
+        load_spotify_tracks(&spotify_conn, args.min_popularity)?
+    } else {
+        HashMap::new()
+    };
+
+    // Phase 1c: Load audio features (if --audio-features provided)
+    let audio_lookup = if let Some(ref af_path) = args.audio_features {
+        println!("\nOpening audio features database: {:?}", af_path);
+        let af_conn = Connection::open(af_path)
+            .context("Failed to open audio features database")?;
+        af_conn.execute_batch("PRAGMA mmap_size = 4294967296;")?;
+        load_audio_features(&af_conn)?
+    } else {
+        HashMap::new()
+    };
+
+    // Phase 1d: Load album images (if --spotify provided)
+    let image_lookup = if let Some(ref spotify_path) = args.spotify {
+        let spotify_conn = Connection::open(spotify_path)
+            .context("Failed to open Spotify database for images")?;
+        load_album_images(&spotify_conn)?
+    } else {
+        HashMap::new()
+    };
+
+    // Phase 2: Group & select canonical
     let groups = group_tracks(tracks);
-    println!("Found {} unique (title, artist) groups", groups.len());
+    println!("\nFound {} unique (title, artist) groups", groups.len());
 
     let canonical_tracks = process_groups(groups);
 
+    // Phase 2b: Enrich with Spotify (if data available)
+    let enriched_tracks = if !spotify_lookup.is_empty() {
+        println!("\nEnriching with Spotify data...");
+        enrich_tracks(canonical_tracks, &spotify_lookup, &audio_lookup, &image_lookup)
+    } else {
+        // No Spotify data: convert to EnrichedTrack with NULL Spotify fields
+        convert_to_enriched_without_spotify(canonical_tracks)
+    };
+
+    // Phase 3: Write output
     if args.output.exists() {
         std::fs::remove_file(&args.output)
             .context("Failed to remove existing output file")?;
     }
 
-    println!("Creating output database: {:?}", args.output);
+    println!("\nCreating output database: {:?}", args.output);
     let mut output_conn = Connection::open(&args.output)
         .context("Failed to create output database")?;
 
-    write_output(&mut output_conn, &canonical_tracks)?;
+    write_enriched_output(&mut output_conn, &enriched_tracks)?;
+
+    // Phase 4-5: FTS & optimize
     build_fts_index(&output_conn)?;
     optimize_database(&output_conn)?;
 
     let elapsed = start.elapsed();
     let file_size = std::fs::metadata(&args.output)?.len();
 
+    // Calculate match statistics
+    let matched_count = enriched_tracks.iter().filter(|t| t.spotify_id.is_some()).count();
+    let match_rate = if !enriched_tracks.is_empty() {
+        100.0 * matched_count as f64 / enriched_tracks.len() as f64
+    } else {
+        0.0
+    };
+
     println!("\n{:=<60}", "");
     println!("Extraction complete!");
-    println!("  Tracks: {}", canonical_tracks.len());
+    println!("  Tracks: {}", enriched_tracks.len());
+    if !spotify_lookup.is_empty() {
+        println!("  Spotify matches: {} ({:.1}%)", matched_count, match_rate);
+    }
     println!("  Output size: {:.2} MB", file_size as f64 / 1_048_576.0);
     println!("  Elapsed: {:.2}s", elapsed.as_secs_f64());
     println!("{:=<60}", "");
 
     if let Some(query) = args.test {
-        test_search(&output_conn, &query)?;
+        test_search_enriched(&output_conn, &query)?;
     }
 
     Ok(())

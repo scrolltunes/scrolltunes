@@ -28,7 +28,7 @@ This runs: `biome check . && bun run typecheck && bun run test`
 
 | Spec | Description | Status |
 |------|-------------|--------|
-| [001-rust-extraction-tool-enhancement](specs/001-rust-extraction-tool-enhancement.md) | Enhance Rust tool with Spotify matching | Not Started |
+| [001-rust-extraction-tool-enhancement](specs/001-rust-extraction-tool-enhancement.md) | Enhance Rust tool with Spotify matching | **Complete** |
 | [002-turso-schema-migration](specs/002-turso-schema-migration.md) | Deploy enriched database to Turso | Not Started |
 | [003-search-api-turso-first](specs/003-search-api-turso-first.md) | Simplify search to Turso-first | Not Started |
 | [004-album-art-optimization](specs/004-album-art-optimization.md) | Three-tier album art resolution | Not Started |
