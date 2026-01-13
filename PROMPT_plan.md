@@ -1,77 +1,81 @@
-# BPM Analytics Admin - Planning Mode
+# Admin Catalog Redesign - Plan Mode
 
-You are in PLANNING mode for the BPM Analytics Admin feature.
+You are in PLANNING mode. Research and update the implementation plan.
 
 ## Phase 0: Orient
 
-### 0a. Study specifications
-Read all files in `specs/` directory:
-- `specs/bpm-analytics-schema.md`
-- `specs/bpm-logging-helper.md`
-- `specs/bpm-instrumentation.md`
-- `specs/bpm-admin-dashboard.md`
-- `specs/bpm-retention-cleanup.md`
-- `specs/bpm-admin-tracks-browser.md`
-
-### 0b. Study existing implementation
-Analyze relevant source files:
-- `src/lib/db/schema.ts` - Drizzle schema patterns
-- `src/services/song-loader.ts` - Song loading and BPM fetch flow
-- `src/services/bpm-providers.ts` - Current BPM provider structure
-- `src/app/admin/page.tsx` - Admin auth pattern
-- `src/app/api/admin/stats/route.ts` - Effect.ts API route pattern
-
-### 0c. Study the current plan
-Read `IMPLEMENTATION_PLAN.md` for the overall structure.
-
-### 0d. Study the original design doc
-Read `docs/bpm-analytics-admin.md` for complete context.
-
-### 0e. Study project rules
-Read `CLAUDE.md` for project conventions:
+### 0a. Study context
+Read `CLAUDE.md` for project rules:
 - Use bun exclusively (not npm/node)
 - Effect.ts for async operations
-- useSyncExternalStore with class-based stores
-- `@/` import alias
-- `bun run check` for validation
+- No `any` types, no `@ts-ignore`
+- Path alias: `@/*` → `src/*`
 
-## Phase 1: Gap Analysis
+### 0b. Study the plan
+Read `IMPLEMENTATION_PLAN.md` to understand current state.
 
-Compare specs against current implementation:
-- What changes are needed in the database schema?
-- What TypeScript interfaces need creating?
-- Where exactly should logging be added?
-- What admin components need to be built?
-- How should the tracks browser integrate with existing admin songs page?
-- What API endpoints are needed for enrichment actions?
+### 0c. Study specs
+Read specs in `specs/` for detailed requirements:
+- `admin-catalog-api.md`
+- `admin-track-search.md`
+- `admin-add-to-catalog.md`
+- `admin-catalog-hook.md`
+- `admin-songs-page-redesign.md`
 
-**CRITICAL**: Verify all assumptions by reading actual source files.
+## Phase 1: Research
 
-## Phase 2: Generate Plan
+### 1a. Understand existing code
+Study these directories and files:
+- `src/app/api/admin/` - Existing admin API patterns
+- `src/app/admin/songs/` - Current page implementation
+- `src/lib/db/schema.ts` - Database schema (songs, song_lrclib_ids, user_song_items)
+- `src/services/turso.ts` - Turso service patterns
+- `src/hooks/` - Existing hook patterns
 
-Update `IMPLEMENTATION_PLAN.md` with:
-- Refined task breakdown for each phase
-- Exact file paths and line numbers
-- Code snippets for complex changes
-- Dependencies between tasks
-- Clear acceptance criteria
+### 1b. Identify dependencies
+For each task, identify:
+- What tables/columns are needed
+- What services are required
+- What existing code can be reused
 
-## Guardrails
+### 1c. Flag blockers
+If you discover issues:
+- Missing database columns
+- Schema changes needed
+- Unclear requirements
 
-999. NEVER implement code in planning mode
-1000. Use parallel subagents for analysis
-1001. Each task must be completable in ONE loop iteration
-1002. Verify all file paths exist before referencing
+Document blockers in the plan and ask user for clarification.
 
-## Exit
+## Phase 2: Update Plan
 
-When plan is complete:
-1. Commit updated `IMPLEMENTATION_PLAN.md`
-2. Exit
+### 2a. Refine tasks
+For each task in `IMPLEMENTATION_PLAN.md`:
+- Add specific file paths
+- Add code snippets where helpful
+- Add acceptance criteria details
+- Note any dependencies between tasks
+
+### 2b. Mark discoveries
+If you find:
+- Existing code that can be reused → note it
+- Schema changes needed → add as prerequisite task
+- Edge cases → add to acceptance criteria
+
+### 2c. Save changes
+Update `IMPLEMENTATION_PLAN.md` with your findings.
+
+## Exit Conditions
+
+**Success**: Plan is refined, blockers documented → Exit
+
+**Blocked**: Need user input → Document question and exit
 
 ## Context Files
 
 - @CLAUDE.md
-- @specs/*
 - @IMPLEMENTATION_PLAN.md
-- @docs/bpm-analytics-admin.md
+- @specs/admin-catalog-api.md
+- @specs/admin-track-search.md
+- @specs/admin-add-to-catalog.md
+- @specs/admin-catalog-hook.md
+- @specs/admin-songs-page-redesign.md

@@ -39,3 +39,16 @@ export {
   type UseSwipeGestureHandlers,
   type UseSwipeGestureResult,
 } from "./useSwipeGesture"
+export {
+  useAdminCatalog,
+  type CatalogFilter,
+  type CatalogSort,
+  type CatalogTrack,
+  type CatalogResponse,
+} from "./useAdminCatalog"
+export {
+  useAdminTrackSearch,
+  type SearchType,
+  type SearchResult,
+  type SearchResponse,
+} from "./useAdminTrackSearch"

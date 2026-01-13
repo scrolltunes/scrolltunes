@@ -56,7 +56,7 @@ function StatusRow({ label, value, hasValue }: StatusRowProps) {
       ) : (
         <X size={14} weight="bold" style={{ color: "var(--color-text-muted)" }} />
       )}
-      <span style={{ color: "var(--color-text-muted)" }}>{label}:</span>
+      <span className="font-medium" style={{ color: "var(--color-text3)" }}>{label}:</span>
       <span
         className="tabular-nums"
         style={{ color: hasValue ? "var(--color-text)" : "var(--color-text-muted)" }}
@@ -157,44 +157,33 @@ export function TrackDetail({ track, renderActions }: TrackDetailProps) {
       transition={springs.default}
       className="p-4"
     >
-      {/* Track Header */}
-      <div className="flex items-start gap-4 mb-6">
-        <div
-          className="flex-shrink-0 w-20 h-20 rounded-lg flex items-center justify-center overflow-hidden"
-          style={{ background: "var(--color-surface2)" }}
-        >
-          {track.albumImageUrl ? (
-            <img src={track.albumImageUrl} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <MusicNote size={32} weight="fill" style={{ color: "var(--color-text-muted)" }} />
-          )}
+      {/* Track Info */}
+      <div
+        className="flex items-center gap-6 mb-6 px-4 py-3 rounded-xl text-sm"
+        style={{
+          background: "var(--color-surface2)",
+          border: "1px solid var(--color-border)",
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <Clock size={16} style={{ color: "var(--color-text-muted)" }} />
+          <span className="font-medium" style={{ color: "var(--color-text3)" }}>Duration:</span>
+          <span className="tabular-nums" style={{ color: "var(--color-text)" }}>
+            {formatDuration(track.durationSec)}
+          </span>
         </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-lg truncate" style={{ color: "var(--color-text)" }}>
-            {track.title}
-          </h3>
-          <p className="text-sm truncate" style={{ color: "var(--color-text3)" }}>
-            {track.artist}
-          </p>
-          {track.album && (
-            <p className="text-sm truncate mt-1" style={{ color: "var(--color-text-muted)" }}>
-              {track.album}
-            </p>
-          )}
-          <div
-            className="flex items-center gap-4 mt-2 text-xs"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            <span className="flex items-center gap-1">
-              <Clock size={12} />
-              {formatDuration(track.durationSec)}
-            </span>
-            <span className="flex items-center gap-1">
-              <Textbox size={12} />
-              Quality: {track.quality}
-            </span>
-            <span className="tabular-nums">LRCLIB #{track.lrclibId}</span>
-          </div>
+        <div className="flex items-center gap-2">
+          <Textbox size={16} style={{ color: "var(--color-text-muted)" }} />
+          <span className="font-medium" style={{ color: "var(--color-text3)" }}>Quality:</span>
+          <span className="tabular-nums" style={{ color: "var(--color-text)" }}>
+            {track.quality}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-medium" style={{ color: "var(--color-text3)" }}>LRCLIB:</span>
+          <span className="tabular-nums" style={{ color: "var(--color-text)" }}>
+            {track.lrclibId}
+          </span>
         </div>
       </div>
 
@@ -210,7 +199,7 @@ export function TrackDetail({ track, renderActions }: TrackDetailProps) {
         >
           <SectionHeader
             icon={<SpotifyLogo size={18} style={{ color: "var(--color-accent)" }} />}
-            title="Turso (Spotify Enrichment)"
+            title="Spotify Metadata"
             subtitle={
               tursoStatus === "complete"
                 ? "All fields available"
@@ -223,7 +212,7 @@ export function TrackDetail({ track, renderActions }: TrackDetailProps) {
           <div className="space-y-2">
             <StatusRow
               label="Spotify ID"
-              value={tursoSpotifyId ? `${tursoSpotifyId.slice(0, 12)}...` : null}
+              value={tursoSpotifyId}
               hasValue={tursoSpotifyId !== null}
             />
             <StatusRow
