@@ -46,3 +46,9 @@ export {
   type CatalogTrack,
   type CatalogResponse,
 } from "./useAdminCatalog"
+export {
+  useAdminTrackSearch,
+  type SearchType,
+  type SearchResult,
+  type SearchResponse,
+} from "./useAdminTrackSearch"
