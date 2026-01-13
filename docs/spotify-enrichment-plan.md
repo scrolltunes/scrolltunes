@@ -1014,7 +1014,7 @@ Song loads → Check DB cache → Race providers:
 ```
 Song loads → tempo field already in search result
      │
-     ├── tempo != NULL → Use directly (no attribution needed!)
+     ├── tempo != NULL → Use directly (show "via Spotify")
      │
      └── tempo == NULL → Fall back to current provider cascade
 ```
@@ -1032,23 +1032,33 @@ if (tursoTrack.tempo) {
   return {
     bpm: Math.round(tursoTrack.tempo),
     key: formatMusicalKey(tursoTrack.musical_key, tursoTrack.mode),
-    bpmAttribution: null, // No attribution needed for embedded data
+    bpmAttribution: {
+      provider: "Spotify",
+      url: "https://spotify.com",
+      requiresBacklink: false,
+    },
   }
 }
 // Fall back to providers only if tempo is NULL
 const bpmResult = await getBpmWithFallback(...)
 ```
 
-### 6.4 Attribution Implications
+### 6.4 Attribution Handling
 
-**Current:** "BPM data from ReccoBeats" with required backlink
+| Source | Attribution | Backlink Required |
+|--------|-------------|-------------------|
+| Embedded (Spotify dump) | "via Spotify" | No |
+| ReccoBeats | "via ReccoBeats" | Yes |
+| GetSongBPM | "via GetSongBPM" | Yes |
+| Deezer | "via Deezer" | Yes |
+| RapidAPI Spotify | "via Spotify (RapidAPI)" | No |
 
-**New:** For Spotify-sourced tempo:
-- No attribution required (we own the data)
-- Cleaner UI (no external links)
-- Faster (no API calls)
+**Benefits of embedded tempo:**
+- Instant (no API calls)
+- Consistent attribution ("via Spotify")
+- Includes musical key and time signature
 
-**Fallback:** When tempo is NULL, show attribution as before.
+**Fallback:** When tempo is NULL, use provider cascade with appropriate attribution.
 
 ---
 
