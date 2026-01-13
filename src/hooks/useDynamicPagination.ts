@@ -15,12 +15,18 @@ export interface UseDynamicPaginationResult {
 
 const MIN_LINES = 3
 const MAX_LINES = 10
-// Text line height multiplier (typical readable text)
-const TEXT_LINE_HEIGHT = 1.5
-// Fixed spacing per line: gap-2 (8px) + padding + highlight box margins
-const FIXED_LINE_SPACING = 38
 // Content area padding: pt-16 (64px) + pb-20 (80px)
 const CONTENT_PADDING = 144
+// Mobile breakpoint (matches typical phone width)
+const MOBILE_BREAKPOINT = 640
+
+// Mobile: more conservative due to text wrapping on narrow screens
+const MOBILE_LINE_HEIGHT_MULTIPLIER = 1.8
+const MOBILE_FIXED_SPACING = 35
+
+// Desktop: tighter spacing, less text wrapping
+const DESKTOP_LINE_HEIGHT_MULTIPLIER = 1.3
+const DESKTOP_FIXED_SPACING = 22
 
 export function useDynamicPagination(
   options: UseDynamicPaginationOptions,
@@ -39,8 +45,13 @@ export function useDynamicPagination(
 
       // Measure container height and subtract content area padding
       const availableHeight = contentElement.clientHeight - CONTENT_PADDING
-      // Line height = proportional text height + fixed spacing
-      const lineHeight = fontSize * TEXT_LINE_HEIGHT + FIXED_LINE_SPACING
+      
+      // Use different line height calculation based on screen width
+      const isMobile = window.innerWidth < MOBILE_BREAKPOINT
+      const multiplier = isMobile ? MOBILE_LINE_HEIGHT_MULTIPLIER : DESKTOP_LINE_HEIGHT_MULTIPLIER
+      const fixedSpacing = isMobile ? MOBILE_FIXED_SPACING : DESKTOP_FIXED_SPACING
+      const lineHeight = fontSize * multiplier + fixedSpacing
+      
       const calculatedLines = Math.floor(availableHeight / lineHeight)
       const clampedLines = Math.max(MIN_LINES, Math.min(calculatedLines, MAX_LINES))
 

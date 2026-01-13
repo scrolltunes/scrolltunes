@@ -7,6 +7,7 @@ import {
   useChordsData,
   useContinuousTime,
   useCurrentLineIndex,
+  useIsAdmin,
   usePlayerControls,
   usePlayerState,
   usePreferences,
@@ -68,6 +69,7 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const transposeSemitones = useTranspose()
   const prefersReducedMotion = useReducedMotion()
   const currentTime = useContinuousTime()
+  const isAdmin = useIsAdmin()
 
   // ScoreBook pagination state
   const { currentPage, totalPages, linesPerPage, pageLineRanges } = useScoreBookState()
@@ -88,9 +90,15 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
     totalLines,
   })
 
+  // Reset pagination when song changes (must be first to avoid race conditions)
+  const songId = lyrics?.songId
+  useEffect(() => {
+    scoreBookStore.reset()
+  }, [songId])
+
   // Update ScoreBookStore when pagination parameters change
   useEffect(() => {
-    if (totalLines > 0) {
+    if (totalLines > 0 && calculatedLinesPerPage > 0) {
       scoreBookStore.setPagination(totalLines, calculatedLinesPerPage)
     }
   }, [totalLines, calculatedLinesPerPage])
@@ -105,12 +113,6 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
     scoreBookStore.goToPage(targetPage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calculatedLinesPerPage])
-
-  // Reset pagination when song changes
-  const songId = lyrics?.songId
-  useEffect(() => {
-    scoreBookStore.reset()
-  }, [songId])
 
   // Auto-advance page when current line crosses page boundary during playback
   // Respects manual mode - when user navigates manually, auto-advance is paused
@@ -309,10 +311,15 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
         {/* Page indicator */}
         <PageIndicator currentPage={currentPage + 1} totalPages={totalPages} />
 
-        {/* Debug overlay */}
-        <div className="absolute top-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono">
-          Lines: {currentPageLines.length} / {linesPerPage} | H: {debugHeight}px
-        </div>
+        {/* Debug overlay - admin only */}
+        {isAdmin && (
+          <div className="absolute top-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono leading-relaxed">
+            <div>Lines: {currentPageLines.length} | Store: {linesPerPage} | Calc: {calculatedLinesPerPage}</div>
+            <div>H: {debugHeight}px | Page: {currentPage + 1}/{totalPages}</div>
+            <div>Ranges: {pageLineRanges.length} | Range: {currentPageRange ? `${currentPageRange.start}-${currentPageRange.end}` : "none"}</div>
+            <div>Font: {scoreBookFontSize}px | Total: {totalLines}</div>
+          </div>
+        )}
 
         {/* Hidden measurement div - measures container height */}
         <div
