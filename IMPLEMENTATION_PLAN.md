@@ -697,6 +697,8 @@ Paginated list of recent failures with click-to-drill-down support.
 
 ### Task 3.6: Missing Songs Component
 
+**Status**: ✅ COMPLETE
+
 **Files**: `src/components/admin/BpmMissingSongs.tsx` (new file)
 
 Three tabs:
@@ -705,9 +707,9 @@ Three tabs:
 3. Most problematic (highest fail count)
 
 **Acceptance Criteria**:
-- [ ] Tab switching works
-- [ ] Each tab shows paginated list
-- [ ] Click song triggers drill-down
+- [x] Tab switching works
+- [x] Each tab shows paginated list
+- [x] Click song triggers drill-down
 
 ---
 
