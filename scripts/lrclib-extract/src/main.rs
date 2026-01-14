@@ -49,6 +49,11 @@ struct Args {
 
 const WRITE_BATCH_SIZE: usize = 10_000;
 
+// Score thresholds for combined scoring (spec-04)
+const ACCEPT_THRESHOLD: i32 = 80;       // Minimum score to accept a match
+#[allow(dead_code)]
+const LOW_CONFIDENCE_THRESHOLD: i32 = 120; // Below this, log as low-confidence
+
 #[derive(Clone, Debug)]
 struct Track {
     id: i64,
@@ -414,14 +419,114 @@ fn has_garbage_title_pattern(title: &str) -> bool {
 fn title_contains_artist(title: &str, artist: &str) -> bool {
     let title_lower = title.to_lowercase();
     let artist_lower = artist.to_lowercase();
-    
+
     // Skip if artist is too short (avoid false positives like "a" or "the")
     if artist_lower.len() < 3 {
         return false;
     }
-    
+
     // Check if title contains the artist name
     title_lower.contains(&artist_lower)
+}
+
+/// Graduated duration score (spec-04).
+/// Replaces hard ±10s cutoff with graduated scoring.
+fn duration_score(lrclib_sec: i64, spotify_ms: i64) -> i32 {
+    let diff = (lrclib_sec - spotify_ms / 1000).abs();
+    match diff {
+        0..=2 => 100,   // Near-perfect
+        3..=5 => 80,    // Excellent
+        6..=10 => 50,   // Good
+        11..=15 => 25,  // Acceptable (currently rejected with hard ±10s!)
+        16..=30 => 10,  // Poor but possible
+        _ => -1000,     // Hard reject
+    }
+}
+
+/// Compute similarity between two normalized artist names (0.0 to 1.0).
+/// Uses Jaccard similarity on word tokens.
+fn compute_artist_similarity(a: &str, b: &str) -> f64 {
+    if a == b {
+        return 1.0;
+    }
+
+    // Tokenize and compute Jaccard similarity
+    let tokens_a: FxHashSet<&str> = a.split_whitespace().collect();
+    let tokens_b: FxHashSet<&str> = b.split_whitespace().collect();
+
+    if tokens_a.is_empty() || tokens_b.is_empty() {
+        return 0.0;
+    }
+
+    let intersection = tokens_a.intersection(&tokens_b).count();
+    let union = tokens_a.union(&tokens_b).count();
+
+    intersection as f64 / union as f64
+}
+
+/// Combined scoring with guardrails against false positives (spec-04).
+/// Returns score >= ACCEPT_THRESHOLD for acceptable matches, or negative for rejections.
+fn combined_score(
+    lrclib: &Track,
+    lrclib_quality: i32,
+    spotify: &SpotifyTrack,
+    group_artist_norm: &str,
+) -> i32 {
+    let spotify_duration_sec = spotify.duration_ms / 1000;
+    let duration_diff = (lrclib.duration_sec - spotify_duration_sec).abs();
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GUARDRAIL 1: Hard duration rejection
+    // Reject if diff > 30s OR diff > 25% of song length (whichever is larger)
+    // ═══════════════════════════════════════════════════════════════════════
+    let max_allowed_diff = 30_i64.max((spotify_duration_sec as f64 * 0.25) as i64);
+    if duration_diff > max_allowed_diff {
+        return -1000;
+    }
+
+    // Duration score (graduated)
+    let dur_score = match duration_diff {
+        0..=2 => 100,
+        3..=5 => 80,
+        6..=10 => 50,
+        11..=15 => 25,
+        16..=30 => 10,
+        _ => 0,
+    };
+
+    let mut score = dur_score;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GUARDRAIL 2: Artist verification
+    // Even though we matched on (title_norm, artist_norm), double-check
+    // ═══════════════════════════════════════════════════════════════════════
+    let spotify_artist_norm = normalize_artist(&spotify.artist);
+    let artist_match = if spotify_artist_norm == group_artist_norm {
+        50  // Exact match
+    } else {
+        let sim = compute_artist_similarity(&spotify_artist_norm, group_artist_norm);
+        if sim < 0.3 {
+            return -500;  // Artist mismatch - reject
+        }
+        (sim * 30.0) as i32  // Partial credit
+    };
+    score += artist_match;
+
+    // LRCLIB quality score (existing logic, typically -50 to +80)
+    score += lrclib_quality;
+
+    // Title cleanliness bonus
+    if !has_garbage_title_pattern(&lrclib.title) {
+        score += 30;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GUARDRAIL 3: Popularity as tiebreaker only (bounded)
+    // Keep influence bounded (0-10 points, not 0-20)
+    // ═══════════════════════════════════════════════════════════════════════
+    score += spotify.popularity / 10;
+
+    score  // Typical range: 80-250 for good matches
 }
 
 fn compute_quality_score(track: &Track, median_duration: Option<i64>) -> i32 {
@@ -1478,5 +1583,119 @@ mod tests {
             normalize_title("03 - Beyoncé - Single Ladies (Remastered 2020)"),
             "beyonce - single ladies"
         );
+    }
+
+    // ========================================================================
+    // Spec-04: Combined Scoring Tests
+    // ========================================================================
+
+    #[test]
+    fn test_duration_score() {
+        // Perfect match (0s diff)
+        assert_eq!(duration_score(429, 429_000), 100);
+        // 1s off
+        assert_eq!(duration_score(430, 429_000), 100);
+        // 3s off
+        assert_eq!(duration_score(432, 429_000), 80);
+        // 7s off
+        assert_eq!(duration_score(436, 429_000), 50);
+        // 15s off (currently rejected with hard ±10s, now acceptable)
+        assert_eq!(duration_score(414, 429_000), 25);
+        // 29s off
+        assert_eq!(duration_score(400, 429_000), 10);
+        // 35s off - hard reject (diff > 30s)
+        assert_eq!(duration_score(394, 429_000), -1000);
+    }
+
+    #[test]
+    fn test_artist_similarity() {
+        // Exact match
+        assert!((compute_artist_similarity("type o negative", "type o negative") - 1.0).abs() < 0.001);
+        // Partial match (3 of 4 tokens)
+        let sim = compute_artist_similarity("type o negative", "type o");
+        assert!(sim > 0.5 && sim < 1.0);
+        // Different artists
+        assert!(compute_artist_similarity("metallica", "beatles") < 0.3);
+        // Empty strings
+        assert_eq!(compute_artist_similarity("", "metallica"), 0.0);
+        assert_eq!(compute_artist_similarity("metallica", ""), 0.0);
+    }
+
+    #[test]
+    fn test_combined_score_basics() {
+        let lrclib_track = Track {
+            id: 1,
+            title: "Love You To Death".to_string(),
+            artist: "Type O Negative".to_string(),
+            album: Some("October Rust".to_string()),
+            duration_sec: 429,
+        };
+        let spotify_track = SpotifyTrack {
+            id: "abc123".to_string(),
+            name: "Love You to Death".to_string(),
+            artist: "Type O Negative".to_string(),
+            duration_ms: 429_000,
+            popularity: 64,
+            isrc: None,
+            album_rowid: 1,
+        };
+
+        let score = combined_score(&lrclib_track, 40, &spotify_track, "type o negative");
+
+        // Should be a good match:
+        // duration: 100 (perfect)
+        // artist: 50 (exact match)
+        // quality: 40 (passed in)
+        // clean title bonus: 30 (no garbage pattern)
+        // popularity: 6 (64/10)
+        // Total: 226
+        assert!(score >= ACCEPT_THRESHOLD);
+        assert_eq!(score, 226);
+    }
+
+    #[test]
+    fn test_combined_score_duration_reject() {
+        let lrclib_track = Track {
+            id: 1,
+            title: "Song".to_string(),
+            artist: "Artist".to_string(),
+            album: None,
+            duration_sec: 300,
+        };
+        let spotify_track = SpotifyTrack {
+            id: "abc123".to_string(),
+            name: "Song".to_string(),
+            artist: "Artist".to_string(),
+            duration_ms: 200_000, // 100s diff - way over 30s limit
+            popularity: 80,
+            isrc: None,
+            album_rowid: 1,
+        };
+
+        let score = combined_score(&lrclib_track, 40, &spotify_track, "artist");
+        assert!(score < 0); // Should be rejected
+    }
+
+    #[test]
+    fn test_combined_score_artist_mismatch() {
+        let lrclib_track = Track {
+            id: 1,
+            title: "Song".to_string(),
+            artist: "Artist One".to_string(),
+            album: None,
+            duration_sec: 200,
+        };
+        let spotify_track = SpotifyTrack {
+            id: "abc123".to_string(),
+            name: "Song".to_string(),
+            artist: "Completely Different".to_string(), // No token overlap
+            duration_ms: 200_000,
+            popularity: 80,
+            isrc: None,
+            album_rowid: 1,
+        };
+
+        let score = combined_score(&lrclib_track, 40, &spotify_track, "artist one");
+        assert!(score < 0); // Should be rejected due to artist mismatch
     }
 }
