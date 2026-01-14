@@ -8,7 +8,7 @@ You are in BUILDING mode. Implement ONE task from the plan, validate, commit, ex
 Read `CLAUDE.md` for project rules.
 
 ### 0b. Study the plan
-Read `IMPLEMENTATION_PLAN_V3.md` and `CURRENT_PLAN.md` to understand current state.
+Read `IMPLEMENTATION_PLAN.md` and `CURRENT_PLAN.md` to understand current state.
 
 ### 0c. Check for completion
 **IMPORTANT**: Check if ALL tasks in the plan are marked complete.
@@ -30,12 +30,12 @@ If tasks remain, choose the next incomplete task in dependency order.
 
 ### 1a. Read specs first
 Read the relevant spec file for the current task from `specs/`:
-- `spec-01-normalization-unification.md` - Single-source normalization
+- `spec-01-normalization.md` - Single-source normalization
 - `spec-02-topk-candidates.md` - Top-K candidates per key
-- `spec-03-multi-artist-verification.md` - Multi-artist scoring
-- `spec-04-pop0-fallback-fix.md` - Pop=0 fallback fix
+- `spec-03-multi-artist.md` - Multi-artist scoring
+- `spec-04-pop0-fallback.md` - Pop=0 fallback fix
 - `spec-05-adaptive-duration.md` - Adaptive duration tolerance
-- `spec-06-title-first-rescue.md` - Title-first rescue pass
+- `spec-06-title-rescue.md` - Title-first rescue pass
 - `spec-07-instrumentation.md` - Instrumentation & evaluation
 
 ### 1b. Study existing code
@@ -62,7 +62,7 @@ Must pass before proceeding. If it fails, fix and retry.
 
 ## Phase 2: Update Plan
 
-Mark the task complete in `IMPLEMENTATION_PLAN_V3.md`:
+Mark the task complete in `IMPLEMENTATION_PLAN.md`:
 - Check the checkbox: `- [x]`
 - Update status in tables
 - Note any discoveries or deviations
@@ -97,13 +97,13 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ## Context Files
 
 - @CLAUDE.md
-- @IMPLEMENTATION_PLAN_V3.md
+- @IMPLEMENTATION_PLAN.md
 - @CURRENT_PLAN.md
-- @specs/spec-01-normalization-unification.md
+- @specs/spec-01-normalization.md
 - @specs/spec-02-topk-candidates.md
-- @specs/spec-03-multi-artist-verification.md
-- @specs/spec-04-pop0-fallback-fix.md
+- @specs/spec-03-multi-artist.md
+- @specs/spec-04-pop0-fallback.md
 - @specs/spec-05-adaptive-duration.md
-- @specs/spec-06-title-first-rescue.md
+- @specs/spec-06-title-rescue.md
 - @specs/spec-07-instrumentation.md
 - @docs/lrclib-extraction-technical-report.md

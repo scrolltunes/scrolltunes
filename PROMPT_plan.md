@@ -7,26 +7,29 @@ You are implementing improvements to the LRCLIB-Spotify enrichment pipeline (v3)
 Read these files to understand the current state:
 - `docs/lrclib-extraction-technical-report.md` - Current methodology and limitations
 - `docs/lrclib-enrichment-v2-spec.md` - Current implementation details
-- `IMPLEMENTATION_PLAN_V3.md` - The implementation plan you're following
+- `IMPLEMENTATION_PLAN.md` - The implementation plan you're following
 
 ## Available Specs (v3)
 
 The `specs/` directory contains detailed specifications:
-- `spec-01-normalization-unification.md` - Single-source normalization (Foundation)
+- `spec-01-normalization.md` - Single-source normalization (Foundation)
 - `spec-02-topk-candidates.md` - Top-K candidates per key (+2-4%)
-- `spec-03-multi-artist-verification.md` - Multi-artist scoring (+1-2%)
-- `spec-04-pop0-fallback-fix.md` - Pop=0 fallback fix (+0.5-1%)
+- `spec-03-multi-artist.md` - Multi-artist scoring (+1-2%)
+- `spec-04-pop0-fallback.md` - Pop=0 fallback fix (+0.5-1%)
 - `spec-05-adaptive-duration.md` - Adaptive duration tolerance (+1-2%)
-- `spec-06-title-first-rescue.md` - Title-first rescue pass (+2-4%)
+- `spec-06-title-rescue.md` - Title-first rescue pass (+2-4%)
 - `spec-07-instrumentation.md` - Instrumentation & evaluation
+
+## Source Analysis
+- [Data Scientist Recommendations](/Users/hmemcpy/Downloads/lrclib_spotify_enrichment_recommendations.md)
 
 ## Your Task
 
-1. Read `IMPLEMENTATION_PLAN_V3.md` to see current progress
+1. Read `IMPLEMENTATION_PLAN.md` to see current progress
 2. Find the next uncompleted task (marked `[ ]`)
 3. Read the corresponding spec file from `specs/`
 4. Create a detailed implementation plan for JUST that spec
-5. Update the task status in `IMPLEMENTATION_PLAN_V3.md` to in-progress
+5. Update the task status in `IMPLEMENTATION_PLAN.md` to in-progress
 6. Write your plan to `CURRENT_PLAN.md`
 
 ## Planning Guidelines

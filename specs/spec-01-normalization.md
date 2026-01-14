@@ -1,148 +1,93 @@
-# Spec 01: Normalization Improvements
+# Spec 01: Normalization Unification
 
-## Overview
+> Single-source normalization code shared between all extraction tools
 
-Enhance title and artist normalization to fix matching failures caused by track number prefixes, artist names in titles, diacritics, and encoding issues.
+## Problem Statement
 
-## Current State
+Normalization code is duplicated between `main.rs` (lrclib-extract) and `normalize-spotify.rs`. Any divergence between these implementations produces `no_candidates` failures by construction in an exact-key pipeline.
 
-`normalize_title()` in `scripts/lrclib-extract/src/main.rs` (lines 242-248) strips:
-- Remaster suffixes
-- Live/acoustic tags
-- Edition markers
-- Version markers
-- Featuring tags
+**Evidence of drift:** The ARTIST_TRANSLITERATIONS map had 73 Russian entries in `main.rs` but only 19 in `normalize-spotify.rs` until manually synced.
 
-Missing:
-- Track number prefixes (`03 - Song`)
-- Artist name prefixes (`Artist - Song`)
-- Diacritic folding (`Beyonce` vs `Beyonce`)
-- Mojibake cleanup (`Song Title\uFFFD`)
-- Punctuation normalization (curly quotes)
+## Requirements
 
-## Changes Required
+### R1.1: Shared Normalization Module
 
-### 1. Add Track Number Prefix Regex
+Create `src/normalize.rs` as a shared module containing:
 
 ```rust
-static TRACK_NUMBER_PREFIX: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)^(?:track\s*)?\d{1,4}\s*[-–—._]\s*").unwrap()
-);
+// Core normalization functions
+pub fn normalize_title(title: &str) -> String;
+pub fn normalize_artist(artist: &str) -> String;
+pub fn fold_to_ascii(s: &str) -> String;
+pub fn normalize_punctuation(s: &str) -> String;
+
+// Shared data
+pub static ARTIST_TRANSLITERATIONS: phf::Map<&'static str, &'static str>;
+pub static TITLE_PATTERNS: Lazy<Vec<Regex>>;
+pub static ARTIST_PATTERNS: Lazy<Vec<Regex>>;
 ```
 
-### 2. Add 2-Arg Normalize Function
+### R1.2: Remove Duplicated Code
 
-```rust
-fn normalize_title_with_artist(title: &str, artist: &str) -> String {
-    let mut result = title.to_string();
+- Delete normalization functions from `main.rs`
+- Delete normalization functions from `normalize-spotify.rs`
+- Both binaries import from `normalize.rs`
 
-    // Strip track number first
-    result = TRACK_NUMBER_PREFIX.replace(&result, "").to_string();
+### R1.3: Golden Tests
 
-    // Strip artist prefix
-    let artist_norm = normalize_artist(artist);
-    if artist_norm.len() >= 3 {
-        let escaped = regex::escape(&artist_norm);
-        let prefix_re = Regex::new(&format!(r"(?i)^\s*{}\s*[-–—:]\s*", escaped)).unwrap();
-        result = prefix_re.replace(&result, "").to_string();
-    }
+Create `src/normalize_tests.rs` with test cases covering:
 
-    // Existing patterns
-    for pattern in TITLE_PATTERNS.iter() {
-        result = pattern.replace_all(&result, "").to_string();
-    }
+| Category | Examples |
+|----------|----------|
+| Diacritics | "Björk" → "bjork", "Motörhead" → "motorhead" |
+| Track numbers | "01 - Song" → "song", "03. Title" → "title" |
+| Brackets | "Song [Live]" → "song", "Title (Remaster)" → "title" |
+| "The" handling | "The Beatles" → "beatles", "Band, The" → "band" |
+| Cyrillic | "Кино" → "kino", "ДДТ" → "ddt" |
+| Hebrew | "אייל גולן" → "eyal golan" (via dictionary) |
+| Multi-artist | "A feat. B" → "a", "X & Y" → "x" |
+| Separators | "A/B" → "a", "A,B" → "a", "A&B" → "a" |
 
-    fold_to_ascii(&result).trim().to_string()
-}
+### R1.4: Compile-Time Enforcement
+
+- Use `mod normalize;` in both binaries (not copy-paste)
+- CI should fail if normalization code exists outside the shared module
+
+## Implementation Notes
+
+### File Structure
+
+```
+scripts/lrclib-extract/
+├── src/
+│   ├── main.rs           # Uses normalize module
+│   ├── normalize.rs      # NEW: Shared normalization
+│   ├── normalize_tests.rs # NEW: Golden tests
+│   └── bin/
+│       └── normalize-spotify.rs  # Uses normalize module
 ```
 
-### 3. Add Unicode Normalization
+### Migration Steps
 
-Add to `Cargo.toml`:
-```toml
-unicode-normalization = "0.1"
-```
+1. Create `normalize.rs` with all normalization code from `main.rs`
+2. Update `main.rs` to use `mod normalize; use normalize::*;`
+3. Update `normalize-spotify.rs` to use `crate::normalize::*;`
+4. Add golden tests
+5. Verify both binaries produce identical output
 
-Add function:
-```rust
-use unicode_normalization::UnicodeNormalization;
+## Acceptance Criteria
 
-fn fold_to_ascii(s: &str) -> String {
-    s.nfkd()
-        .filter(|c| !is_combining_mark(*c))
-        .collect::<String>()
-        .to_lowercase()
-}
+- [ ] Single `normalize.rs` file contains all normalization logic
+- [ ] Both binaries compile and use shared module
+- [ ] Golden tests pass for all categories above
+- [ ] Rebuilding normalized index produces identical output
+- [ ] No normalization code outside `normalize.rs`
 
-fn is_combining_mark(c: char) -> bool {
-    matches!(c as u32, 0x0300..=0x036F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0xFE20..=0xFE2F)
-}
-```
+## Dependencies
 
-### 4. Add Mojibake Cleanup
+None - this is the foundation for all other improvements.
 
-```rust
-static MOJIBAKE_SUFFIX: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"[\uFFFD\u{FFFD}]+$").unwrap()
-);
-```
+## Estimated Impact
 
-### 5. Add Punctuation Normalization
-
-```rust
-fn normalize_punctuation(s: &str) -> String {
-    s.replace([''', '''], "'")
-     .replace(['"', '"'], "\"")
-     .replace(['´', '`'], "'")
-     .replace(" & ", " and ")
-}
-```
-
-## Integration Points
-
-- Update all calls to `normalize_title()` to use `normalize_title_with_artist()` where artist is available
-- Apply in `build_groups_and_index()` and Spotify streaming normalization
-- Apply `fold_to_ascii()` as final step in both title and artist normalization
-
-## Tests
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_track_number_stripping() {
-        assert_eq!(normalize_title("03 - Love You To Death"), "love you to death");
-        assert_eq!(normalize_title("Track 5 - Song Name"), "song name");
-    }
-
-    #[test]
-    fn test_diacritic_folding() {
-        assert_eq!(fold_to_ascii("Beyonce"), "beyonce");
-        assert_eq!(fold_to_ascii("naive"), "naive");
-    }
-
-    #[test]
-    fn test_artist_prefix_stripping() {
-        assert_eq!(
-            normalize_title_with_artist("Type O Negative - Love You To Death", "Type O Negative"),
-            "love you to death"
-        );
-    }
-}
-```
-
-## Validation
-
-```bash
-cd scripts/lrclib-extract && cargo test
-```
-
-## Done When
-
-- [ ] Track numbers stripped from title_norm
-- [ ] Artist prefixes stripped from title_norm
-- [ ] Diacritics folded (Beyonce matches Beyonce)
-- [ ] Mojibake suffixes removed
-- [ ] All tests pass
+- Prevents future drift-related failures
+- Foundation for measuring other improvements accurately

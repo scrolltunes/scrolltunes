@@ -1,147 +1,111 @@
-# LRCLIB-Spotify Enrichment v2 Implementation Plan
+# LRCLIB-Spotify Enrichment v3: Implementation Plan
 
-## Goal
+> Improving match rate from 57.5% toward 65-72%
 
-Improve Spotify match rate from 46% to 65-72% through enhanced normalization, delayed canonical selection, graduated scoring, and query optimization.
+**Generated:** January 2026
+**Target:** 65-72% match rate, <60 min extraction time
+**Source:** [Data Scientist Recommendations](/Users/hmemcpy/Downloads/lrclib_spotify_enrichment_recommendations.md)
+
+---
+
+## Overview
+
+This plan implements recommendations from the senior data scientist's analysis to improve the LRCLIB-Spotify matching pipeline. Changes are ordered by dependency and expected impact.
+
+## Current Baseline
+
+| Metric | Value |
+|--------|-------|
+| Match rate | 57.5% |
+| Unique groups | 3,834,157 |
+| Spotify matches | 2,203,300 |
+| Extraction time | ~48 min |
 
 ## Specs
 
-| Spec | Description | Status |
-|------|-------------|--------|
-| [spec-01](specs/spec-01-normalization.md) | Normalization improvements | Complete |
-| [spec-02](specs/spec-02-query-optimization.md) | Query optimization | Complete |
-| [spec-03](specs/spec-03-delayed-canonical.md) | Delayed canonical selection | Complete |
-| [spec-04](specs/spec-04-combined-scoring.md) | Combined scoring system | Complete |
-| [spec-05](specs/spec-05-failure-logging.md) | Match failure logging | Complete |
+| Spec | Description | Est. Impact |
+|------|-------------|-------------|
+| [spec-01](specs/spec-01-normalization.md) | Single-source normalization | Foundation |
+| [spec-02](specs/spec-02-topk-candidates.md) | Top-K candidates per key | +2-4% |
+| [spec-03](specs/spec-03-multi-artist.md) | Multi-artist scoring | +1-2% |
+| [spec-04](specs/spec-04-pop0-fallback.md) | Pop=0 fallback fix | +0.5-1% |
+| [spec-05](specs/spec-05-adaptive-duration.md) | Adaptive duration tolerance | +1-2% |
+| [spec-06](specs/spec-06-title-rescue.md) | Title-first rescue pass | +2-4% |
+| [spec-07](specs/spec-07-instrumentation.md) | Instrumentation & evaluation | Measurement |
 
-## Implementation Order
+## Implementation Phases
 
-### Phase 1: Normalization (spec-01)
+### Phase 1: Foundation (Required First)
 
-**Files:** `scripts/lrclib-extract/src/main.rs`, `scripts/lrclib-extract/Cargo.toml`
+| # | Task | Spec | Status |
+|---|------|------|--------|
+| 1.1 | Extract normalization to shared module | spec-01 | [ ] |
+| 1.2 | Add golden tests for normalization | spec-01 | [ ] |
+| 1.3 | Add instrumentation framework | spec-07 | [ ] |
+| 1.4 | Verify both binaries use shared module | spec-01 | [ ] |
 
-1. Add `unicode-normalization = "0.1"` to Cargo.toml
-2. Add `TRACK_NUMBER_PREFIX` regex
-3. Add `MOJIBAKE_SUFFIX` regex
-4. Implement `fold_to_ascii()` function
-5. Implement `is_combining_mark()` helper
-6. Implement `normalize_punctuation()` function
-7. Create `normalize_title_with_artist()` 2-arg function
-8. Update `normalize_title()` to use new helpers
-9. Add unit tests for normalization
-10. Run `cargo test`
+**Checkpoint:** Rebuild normalized index, verify identical output to current.
 
-### Phase 2: Data Structures (spec-03)
+### Phase 2: Quick Wins
 
-**Files:** `scripts/lrclib-extract/src/main.rs`
+| # | Task | Spec | Status |
+|---|------|------|--------|
+| 2.1 | Fix pop=0 fallback condition | spec-04 | [ ] |
+| 2.2 | Implement adaptive duration tolerance | spec-05 | [ ] |
+| 2.3 | Add multi-artist verification | spec-03 | [ ] |
 
-1. Add `LrclibGroup` struct
-2. Update `ScoredTrack` to remove redundant fields
-3. Create type aliases: `LrclibIndex`, `TitleOnlyIndex`
-4. Run `cargo test`
+**Checkpoint:** Run extraction, measure impact of each change.
 
-### Phase 3: Query Optimization (spec-02)
+### Phase 3: High-Value Changes
 
-**Files:** `scripts/lrclib-extract/src/main.rs`
+| # | Task | Spec | Status |
+|---|------|------|--------|
+| 3.1 | Implement top-K candidates schema | spec-02 | [ ] |
+| 3.2 | Update normalize-spotify for new schema | spec-02 | [ ] |
+| 3.3 | Update lrclib-extract for multi-candidate scoring | spec-02 | [ ] |
+| 3.4 | Rebuild normalized index | spec-02 | [ ] |
+| 3.5 | Implement title-first rescue pass | spec-06 | [ ] |
 
-1. Update `read_tracks()` to use optimized JOIN query
-2. Create `SpotifyTrackPartial` struct
-3. Implement `batch_fetch_primary_artists()` function
-4. Update `stream_match_spotify()` for 2-phase approach
-5. Implement `load_audio_features_batched()` function
-6. Implement `load_album_images_batched()` function
-7. Run `cargo test`
+**Checkpoint:** Full extraction run, validate against audit sample.
 
-### Phase 4: Combined Scoring (spec-04)
+---
 
-**Files:** `scripts/lrclib-extract/src/main.rs`
+## Expected Outcomes
 
-1. Implement `duration_score()` function
-2. Implement `compute_artist_similarity()` function
-3. Implement `combined_score()` function with guardrails
-4. Add score threshold constants
-5. Add unit tests for scoring
-6. Run `cargo test`
+| Phase | Cumulative Match Rate |
+|-------|----------------------|
+| Baseline | 57.5% |
+| After Phase 2 | 60-62% |
+| After Phase 3 | 65-68% |
 
-### Phase 5: Delayed Canonical (spec-03)
-
-**Files:** `scripts/lrclib-extract/src/main.rs`
-
-1. Implement `build_groups_and_index()` function
-2. Implement `build_title_only_index()` helper
-3. Update `stream_and_match_spotify()` to score all variants
-4. Implement `select_canonical_and_enrich()` function
-5. Update main flow to use new pipeline
-6. Run `cargo test`
-
-### Phase 6: Failure Logging (spec-05)
-
-**Files:** `scripts/lrclib-extract/src/main.rs`, `scripts/lrclib-extract/Cargo.toml`
-
-1. Add `serde = { version = "1.0", features = ["derive"] }` to Cargo.toml
-2. Add `serde_json = "1.0"` to Cargo.toml
-3. Add `SpotifyCandidate` struct with Serialize
-4. Add `FailureReason` enum
-5. Add `match_failures` table schema
-6. Implement `should_log_failure()` function
-7. Implement `log_match_failure()` function
-8. Add logging calls during matching
-9. Run `cargo test`
-
-### Phase 7: Integration & Validation
-
-1. Build release: `cargo build --release`
-2. Run test extraction with `--artists "type o negative"`
-3. Verify Type O Negative "Love You to Death" matches
-4. Run full extraction and measure:
-   - Match rate (target: >= 65%)
-   - Runtime (target: ~25-30 min)
-   - Peak memory (target: < 3 GB)
-5. Query `match_failures` table for insights
-
-## Validation Commands
+## Commands Reference
 
 ```bash
-# In scripts/lrclib-extract/
-cargo test
+# Build
+cd /Users/hmemcpy/git/scrolltunes/scripts/lrclib-extract
 cargo build --release
 
-# Test extraction
+# Run tests
+cargo test
+
+# Rebuild normalized index
+./target/release/normalize-spotify \
+  /Users/hmemcpy/git/music/spotify_clean.sqlite3 \
+  /Users/hmemcpy/git/music/spotify_normalized.sqlite3
+
+# Run extraction with stats
 ./target/release/lrclib-extract \
-    /path/to/lrclib-dump.sqlite3 \
-    /tmp/test-output.sqlite3 \
-    --spotify /path/to/spotify_clean.sqlite3 \
-    --audio-features /path/to/spotify_audio_features.sqlite3 \
-    --artists "type o negative" \
-    --test "love you to death"
-
-# Validation queries on output
-sqlite3 /tmp/test-output.sqlite3 "
-SELECT id, title, duration_sec, spotify_id, popularity
-FROM tracks
-WHERE artist_norm = 'type o negative'
-  AND title_norm = 'love you to death';
-"
-
-# Check for track number prefixes (should be 0)
-sqlite3 /tmp/test-output.sqlite3 "
-SELECT COUNT(*) FROM tracks WHERE title_norm GLOB '[0-9]* - *';
-"
+  /Users/hmemcpy/git/music/lrclib-db-dump-20251209T092057Z.sqlite3 \
+  /Users/hmemcpy/git/music/lrclib-enriched.sqlite3 \
+  --spotify /Users/hmemcpy/git/music/spotify_clean.sqlite3 \
+  --spotify-normalized /Users/hmemcpy/git/music/spotify_normalized.sqlite3 \
+  --audio-features /Users/hmemcpy/git/music/spotify_clean_audio_features.sqlite3 \
+  --export-stats /tmp/extraction_stats.json
 ```
 
 ## Success Criteria
 
 - [ ] All tests pass (`cargo test`)
-- [ ] Build succeeds (`cargo build --release`)
-- [ ] Type O Negative test case matches
-- [ ] 0 tracks with track number prefixes in title_norm
-- [ ] Match rate >= 65% on full extraction
-- [ ] Runtime <= 35 min
-- [ ] Peak memory < 3 GB
-
-## Rollback Plan
-
-The existing `main.rs` is preserved. If issues arise:
-1. Revert changes to main.rs
-2. Run `cargo build --release`
-3. Re-extract with previous version
+- [ ] Match rate >= 65%
+- [ ] Runtime <= 60 min
+- [ ] Audit sample precision >= 95%
