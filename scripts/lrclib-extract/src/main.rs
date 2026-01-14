@@ -8,6 +8,7 @@ use rusqlite::{params, Connection};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::path::PathBuf;
 use std::time::Instant;
+use unicode_normalization::UnicodeNormalization;
 
 /// Extract deduplicated LRCLIB search index with optional Spotify enrichment.
 ///
@@ -129,6 +130,16 @@ static TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     ]
 });
 
+/// Matches track number prefixes like "03 - ", "Track 5 - ", "01. ", etc.
+static TRACK_NUMBER_PREFIX: Lazy<Regex> = Lazy::new(||
+    Regex::new(r"(?i)^(?:track\s*)?\d{1,4}\s*[-–—._]\s*").unwrap()
+);
+
+/// Matches mojibake replacement characters at end of string
+static MOJIBAKE_SUFFIX: Lazy<Regex> = Lazy::new(||
+    Regex::new(r"[\u{FFFD}]+$").unwrap()
+);
+
 static ARTIST_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         Regex::new(r"(?i)\s+(?:feat\.?|ft\.?|featuring|with|&|,|;|/)\s+.*").unwrap(),
@@ -239,21 +250,82 @@ fn should_skip_title(title: &str) -> bool {
     SKIP_TITLE_PATTERNS.iter().any(|p| p.is_match(title))
 }
 
+/// Check if a character is a Unicode combining mark (diacritical mark).
+/// Used to filter out accents during normalization.
+fn is_combining_mark(c: char) -> bool {
+    matches!(c as u32, 0x0300..=0x036F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0xFE20..=0xFE2F)
+}
+
+/// Fold Unicode text to ASCII by applying NFKD decomposition and removing combining marks.
+/// e.g., "Beyoncé" → "beyonce", "naïve" → "naive"
+fn fold_to_ascii(s: &str) -> String {
+    s.nfkd()
+        .filter(|c| !is_combining_mark(*c))
+        .collect::<String>()
+        .to_lowercase()
+}
+
+/// Normalize punctuation by converting curly quotes to straight quotes and & to and.
+fn normalize_punctuation(s: &str) -> String {
+    s.replace(['\u{2018}', '\u{2019}'], "'")  // Left/right single curly quotes
+        .replace(['\u{201C}', '\u{201D}'], "\"")  // Left/right double curly quotes
+        .replace(['\u{00B4}', '\u{0060}'], "'")  // Acute accent and grave accent
+        .replace(" & ", " and ")
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
 fn normalize_title(title: &str) -> String {
-    let mut result = title.to_string();
+    let mut result = normalize_punctuation(title);
+
+    // Strip track number prefix
+    result = TRACK_NUMBER_PREFIX.replace(&result, "").to_string();
+
+    // Strip mojibake suffix
+    result = MOJIBAKE_SUFFIX.replace(&result, "").to_string();
+
+    // Apply existing patterns
     for pattern in TITLE_PATTERNS.iter() {
         result = pattern.replace_all(&result, "").to_string();
     }
-    result.trim().to_lowercase()
+
+    fold_to_ascii(&result).trim().to_string()
+}
+
+/// Normalize title with artist context to strip artist prefix from title.
+/// e.g., "Type O Negative - Love You To Death" with artist "Type O Negative" → "love you to death"
+fn normalize_title_with_artist(title: &str, artist: &str) -> String {
+    let mut result = normalize_punctuation(title);
+
+    // Strip track number prefix
+    result = TRACK_NUMBER_PREFIX.replace(&result, "").to_string();
+
+    // Strip artist prefix if artist is long enough (avoid false positives for short names)
+    let artist_norm = normalize_artist(artist);
+    if artist_norm.len() >= 3 {
+        let escaped = regex::escape(&artist_norm);
+        if let Ok(prefix_re) = Regex::new(&format!(r"(?i)^\s*{}\s*[-–—:]\s*", escaped)) {
+            result = prefix_re.replace(&result, "").to_string();
+        }
+    }
+
+    // Strip mojibake suffix
+    result = MOJIBAKE_SUFFIX.replace(&result, "").to_string();
+
+    // Apply existing patterns
+    for pattern in TITLE_PATTERNS.iter() {
+        result = pattern.replace_all(&result, "").to_string();
+    }
+
+    fold_to_ascii(&result).trim().to_string()
 }
 
 fn normalize_artist(artist: &str) -> String {
-    let mut result = artist.to_string();
+    let mut result = normalize_punctuation(artist);
     for pattern in ARTIST_PATTERNS.iter() {
         result = pattern.replace_all(&result, "").to_string();
     }
-    let normalized = result.trim().to_lowercase();
-    
+    let normalized = fold_to_ascii(&result).trim().to_string();
+
     // Apply transliteration for known Cyrillic artists
     ARTIST_TRANSLITERATIONS
         .get(normalized.as_str())
@@ -383,7 +455,7 @@ fn select_canonical(tracks: Vec<Track>) -> Option<ScoredTrack> {
         None
     };
 
-    let title_norm = normalize_title(&tracks[0].title);
+    let title_norm = normalize_title_with_artist(&tracks[0].title, &tracks[0].artist);
     let artist_norm = normalize_artist(&tracks[0].artist);
 
     tracks
@@ -507,7 +579,7 @@ fn group_tracks(tracks: Vec<Track>) -> FxHashMap<(String, String), Vec<Track>> {
     let mut groups: FxHashMap<(String, String), Vec<Track>> = FxHashMap::default();
 
     for track in tracks {
-        let key = (normalize_title(&track.title), normalize_artist(&track.artist));
+        let key = (normalize_title_with_artist(&track.title, &track.artist), normalize_artist(&track.artist));
         groups.entry(key).or_default().push(track);
     }
 
@@ -626,7 +698,7 @@ fn stream_match_spotify(
         };
 
         // Normalize and lookup in LRCLIB index
-        let title_norm = normalize_title(&spotify_track.name);
+        let title_norm = normalize_title_with_artist(&spotify_track.name, &spotify_track.artist);
         let artist_norm = normalize_artist(&spotify_track.artist);
         let key = (title_norm, artist_norm);
 
@@ -1169,4 +1241,59 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_track_number_stripping() {
+        assert_eq!(normalize_title("03 - Love You To Death"), "love you to death");
+        assert_eq!(normalize_title("Track 5 - Song Name"), "song name");
+        assert_eq!(normalize_title("01. First Song"), "first song");
+        assert_eq!(normalize_title("0958 - Artist - Song"), "artist - song");
+    }
+
+    #[test]
+    fn test_diacritic_folding() {
+        assert_eq!(fold_to_ascii("Beyoncé"), "beyonce");
+        assert_eq!(fold_to_ascii("naïve"), "naive");
+        assert_eq!(fold_to_ascii("Motörhead"), "motorhead");
+        assert_eq!(fold_to_ascii("Sigur Rós"), "sigur ros");
+    }
+
+    #[test]
+    fn test_artist_prefix_stripping() {
+        assert_eq!(
+            normalize_title_with_artist("Type O Negative - Love You To Death", "Type O Negative"),
+            "love you to death"
+        );
+        assert_eq!(
+            normalize_title_with_artist("Metallica: Enter Sandman", "Metallica"),
+            "enter sandman"
+        );
+    }
+
+    #[test]
+    fn test_punctuation_normalization() {
+        assert_eq!(normalize_punctuation("Rock \u{2018}n\u{2019} Roll"), "Rock 'n' Roll");
+        assert_eq!(normalize_punctuation("\u{201C}Quoted\u{201D}"), "\"Quoted\"");
+        assert_eq!(normalize_punctuation("Rock & Roll"), "Rock and Roll");
+    }
+
+    #[test]
+    fn test_mojibake_cleanup() {
+        assert_eq!(normalize_title("Song Title\u{FFFD}"), "song title");
+        assert_eq!(normalize_title("Song Title\u{FFFD}\u{FFFD}"), "song title");
+    }
+
+    #[test]
+    fn test_combined_normalization() {
+        // Track number + diacritics + remaster suffix
+        assert_eq!(
+            normalize_title("03 - Beyoncé - Single Ladies (Remastered 2020)"),
+            "beyonce - single ladies"
+        );
+    }
 }
