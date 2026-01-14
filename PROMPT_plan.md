@@ -1,81 +1,57 @@
-# Admin Catalog Redesign - Plan Mode
+# Planning Mode Prompt
 
-You are in PLANNING mode. Research and update the implementation plan.
+You are implementing features based on specs in the `specs/` directory.
 
-## Phase 0: Orient
+## Your Task
 
-### 0a. Study context
-Read `CLAUDE.md` for project rules:
-- Use bun exclusively (not npm/node)
-- Effect.ts for async operations
-- No `any` types, no `@ts-ignore`
-- Path alias: `@/*` → `src/*`
+1. Read `IMPLEMENTATION_PLAN.md` to understand the overall plan
+2. Find the next incomplete spec (Status: "Not Started" or "In Progress")
+3. Read that spec file from `specs/`
+4. Create a detailed implementation plan for JUST that spec
+5. Update the spec status in `IMPLEMENTATION_PLAN.md` to "In Progress"
+6. Write your plan to `CURRENT_PLAN.md`
 
-### 0b. Study the plan
-Read `IMPLEMENTATION_PLAN.md` to understand current state.
+## Planning Guidelines
 
-### 0c. Study specs
-Read specs in `specs/` for detailed requirements:
-- `admin-catalog-api.md`
-- `admin-track-search.md`
-- `admin-add-to-catalog.md`
-- `admin-catalog-hook.md`
-- `admin-songs-page-redesign.md`
+- Break the spec into small, atomic tasks
+- Each task should be independently testable
+- Include file paths and line numbers where changes are needed
+- Reference existing code patterns in the codebase
+- Include validation steps after each task
 
-## Phase 1: Research
+## Directories to Explore
 
-### 1a. Understand existing code
-Study these directories and files:
-- `src/app/api/admin/` - Existing admin API patterns
-- `src/app/admin/songs/` - Current page implementation
-- `src/lib/db/schema.ts` - Database schema (songs, song_lrclib_ids, user_song_items)
-- `src/services/turso.ts` - Turso service patterns
-- `src/hooks/` - Existing hook patterns
+- `scripts/lrclib-extract/src/` - Rust source code
+- `scripts/lrclib-extract/Cargo.toml` - Rust dependencies
+- `docs/lrclib-enrichment-v2-spec.md` - Full specification
 
-### 1b. Identify dependencies
-For each task, identify:
-- What tables/columns are needed
-- What services are required
-- What existing code can be reused
+## Output Format
 
-### 1c. Flag blockers
-If you discover issues:
-- Missing database columns
-- Schema changes needed
-- Unclear requirements
+Write your plan to `CURRENT_PLAN.md` with this structure:
 
-Document blockers in the plan and ask user for clarification.
+```markdown
+# Current Plan: [Spec Name]
 
-## Phase 2: Update Plan
+## Spec Reference
+[Link to spec file]
 
-### 2a. Refine tasks
-For each task in `IMPLEMENTATION_PLAN.md`:
-- Add specific file paths
-- Add code snippets where helpful
-- Add acceptance criteria details
-- Note any dependencies between tasks
+## Tasks
 
-### 2b. Mark discoveries
-If you find:
-- Existing code that can be reused → note it
-- Schema changes needed → add as prerequisite task
-- Edge cases → add to acceptance criteria
+### Task 1: [Name]
+- File: [path]
+- Changes: [description]
+- Validation: [how to test]
 
-### 2c. Save changes
-Update `IMPLEMENTATION_PLAN.md` with your findings.
+### Task 2: [Name]
+...
 
-## Exit Conditions
+## Validation Command
+[Command to validate all changes]
+```
 
-**Success**: Plan is refined, blockers documented → Exit
+## Important
 
-**Blocked**: Need user input → Document question and exit
-
-## Context Files
-
-- @CLAUDE.md
-- @IMPLEMENTATION_PLAN.md
-- @specs/admin-catalog-api.md
-- @specs/admin-track-search.md
-- @specs/admin-add-to-catalog.md
-- @specs/admin-catalog-hook.md
-- @specs/admin-songs-page-redesign.md
+- Do NOT write code in planning mode
+- Do NOT modify source files
+- Only read files and create the plan
+- Focus on ONE spec at a time
