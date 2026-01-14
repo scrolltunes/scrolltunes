@@ -51,6 +51,10 @@ struct Args {
     /// Filter by artist names (comma-separated, case-insensitive)
     #[arg(long)]
     artists: Option<String>,
+
+    /// Disable progress bars, use log output only (for background runs)
+    #[arg(long)]
+    log_only: bool,
 }
 
 const WRITE_BATCH_SIZE: usize = 10_000;
@@ -473,7 +477,12 @@ fn normalize_artist(artist: &str) -> String {
     for pattern in ARTIST_PATTERNS.iter() {
         result = pattern.replace_all(&result, "").to_string();
     }
-    let normalized = fold_to_ascii(&result).trim().to_string();
+    let mut normalized = fold_to_ascii(&result).trim().to_lowercase();
+
+    // Strip "the " prefix (e.g., "The Beatles" → "beatles")
+    if normalized.starts_with("the ") {
+        normalized = normalized[4..].to_string();
+    }
 
     // Apply transliteration for known Cyrillic artists
     ARTIST_TRANSLITERATIONS
@@ -730,14 +739,21 @@ fn select_canonical(tracks: Vec<Track>) -> Option<ScoredTrack> {
         })
 }
 
+/// Global flag for log-only mode (set from args in main)
+static LOG_ONLY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn create_progress_bar(len: u64, msg: &str) -> ProgressBar {
     let pb = ProgressBar::new(len);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{msg} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({per_sec}, ETA: {eta})")
-            .unwrap()
-            .progress_chars("=> "),
-    );
+    if LOG_ONLY.load(std::sync::atomic::Ordering::Relaxed) {
+        pb.set_draw_target(indicatif::ProgressDrawTarget::hidden());
+    } else {
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{msg} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({per_sec}, ETA: {eta})")
+                .unwrap()
+                .progress_chars("=> "),
+        );
+    }
     pb.set_message(msg.to_string());
     pb
 }
@@ -752,13 +768,17 @@ fn log_progress(phase: &str, current: u64, total: u64, interval: u64) {
 
 fn create_spinner(msg: &str) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{msg} {spinner} [{elapsed_precise}]")
-            .unwrap(),
-    );
+    if LOG_ONLY.load(std::sync::atomic::Ordering::Relaxed) {
+        pb.set_draw_target(indicatif::ProgressDrawTarget::hidden());
+    } else {
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{msg} {spinner} [{elapsed_precise}]")
+                .unwrap(),
+        );
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+    }
     pb.set_message(msg.to_string());
-    pb.enable_steady_tick(std::time::Duration::from_millis(100));
     pb
 }
 
@@ -2113,7 +2133,23 @@ fn collect_match_failures(
     failures
 }
 
-/// Write match failure logs to the database.
+/// Prepared failure entry with pre-serialized JSON for batched insertion.
+struct PreparedFailureEntry {
+    lrclib_id: i64,
+    lrclib_title: String,
+    lrclib_artist: String,
+    lrclib_album: Option<String>,
+    lrclib_duration_sec: i64,
+    lrclib_title_norm: String,
+    lrclib_artist_norm: String,
+    lrclib_quality: i32,
+    group_variant_count: usize,
+    failure_reason: String,
+    best_score: Option<i32>,
+    candidates_json: String,
+}
+
+/// Write match failure logs to the database using batched INSERTs.
 fn write_match_failures(
     conn: &Connection,
     failures: &[MatchFailureEntry],
@@ -2123,14 +2159,17 @@ fn write_match_failures(
         return Ok(());
     }
 
-    println!("[FAILURES] Logging {} match failures...", failures.len());
+    const BATCH_SIZE: usize = 500;
+    let total_batches = (failures.len() + BATCH_SIZE - 1) / BATCH_SIZE;
+    println!("[FAILURES] Logging {} match failures in {} batches...", failures.len(), total_batches);
+
     let pb = create_progress_bar(failures.len() as u64, "Writing failure logs");
 
-    for entry in failures {
-        // Serialize candidates to JSON (keep top 5)
+    // Pre-process entries: serialize JSON and convert reason to string
+    let prepared: Vec<PreparedFailureEntry> = failures.iter().map(|entry| {
         let candidates_json = serde_json::to_string(
             &entry.spotify_candidates.iter().take(5).collect::<Vec<_>>()
-        )?;
+        ).unwrap_or_else(|_| "[]".to_string());
 
         let reason_str = match &entry.failure_reason {
             FailureReason::NoSpotifyCandidates => "no_candidates",
@@ -2138,32 +2177,87 @@ fn write_match_failures(
             FailureReason::LowConfidenceMatch { .. } => "low_confidence",
         };
 
-        conn.execute(
-            "INSERT INTO match_failures (
-                lrclib_id, lrclib_title, lrclib_artist, lrclib_album,
-                lrclib_duration_sec, lrclib_title_norm, lrclib_artist_norm,
-                lrclib_quality, group_variant_count,
-                failure_reason, best_score, spotify_candidates
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-            params![
-                entry.lrclib_id,
-                entry.lrclib_title,
-                entry.lrclib_artist,
-                entry.lrclib_album,
-                entry.lrclib_duration_sec,
-                entry.lrclib_title_norm,
-                entry.lrclib_artist_norm,
-                entry.lrclib_quality,
-                entry.group_variant_count,
-                reason_str,
-                entry.best_score,
-                candidates_json,
-            ],
-        )?;
-        pb.inc(1);
+        PreparedFailureEntry {
+            lrclib_id: entry.lrclib_id,
+            lrclib_title: entry.lrclib_title.clone(),
+            lrclib_artist: entry.lrclib_artist.clone(),
+            lrclib_album: entry.lrclib_album.clone(),
+            lrclib_duration_sec: entry.lrclib_duration_sec,
+            lrclib_title_norm: entry.lrclib_title_norm.clone(),
+            lrclib_artist_norm: entry.lrclib_artist_norm.clone(),
+            lrclib_quality: entry.lrclib_quality,
+            group_variant_count: entry.group_variant_count,
+            failure_reason: reason_str.to_string(),
+            best_score: entry.best_score,
+            candidates_json,
+        }
+    }).collect();
+
+    // Write in batches using multi-value INSERTs
+    let mut written = 0u64;
+    for chunk in prepared.chunks(BATCH_SIZE) {
+        execute_failure_batch_insert(conn, chunk)?;
+        written += chunk.len() as u64;
+        pb.set_position(written);
+
+        // Tail-friendly logging
+        if written % 100_000 == 0 {
+            eprintln!("[FAILURES] {}/{} ({:.1}%)", written, failures.len(), 100.0 * written as f64 / failures.len() as f64);
+        }
     }
 
     pb.finish_with_message(format!("[FAILURES] Logged {} match failures", failures.len()));
+    Ok(())
+}
+
+/// Execute a batched INSERT for failure entries.
+fn execute_failure_batch_insert(
+    conn: &Connection,
+    batch: &[PreparedFailureEntry],
+) -> Result<()> {
+    if batch.is_empty() {
+        return Ok(());
+    }
+
+    // Build multi-value INSERT with 12 columns per row
+    let placeholders: Vec<&str> = (0..batch.len())
+        .map(|_| "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .collect();
+
+    let sql = format!(
+        "INSERT INTO match_failures (
+            lrclib_id, lrclib_title, lrclib_artist, lrclib_album,
+            lrclib_duration_sec, lrclib_title_norm, lrclib_artist_norm,
+            lrclib_quality, group_variant_count,
+            failure_reason, best_score, spotify_candidates
+        ) VALUES {}",
+        placeholders.join(", ")
+    );
+
+    let mut stmt = conn.prepare_cached(&sql)?;
+
+    // Flatten batch into parameter list
+    let params: Vec<&dyn rusqlite::ToSql> = batch
+        .iter()
+        .flat_map(|e| {
+            vec![
+                &e.lrclib_id as &dyn rusqlite::ToSql,
+                &e.lrclib_title as &dyn rusqlite::ToSql,
+                &e.lrclib_artist as &dyn rusqlite::ToSql,
+                &e.lrclib_album as &dyn rusqlite::ToSql,
+                &e.lrclib_duration_sec as &dyn rusqlite::ToSql,
+                &e.lrclib_title_norm as &dyn rusqlite::ToSql,
+                &e.lrclib_artist_norm as &dyn rusqlite::ToSql,
+                &e.lrclib_quality as &dyn rusqlite::ToSql,
+                &e.group_variant_count as &dyn rusqlite::ToSql,
+                &e.failure_reason as &dyn rusqlite::ToSql,
+                &e.best_score as &dyn rusqlite::ToSql,
+                &e.candidates_json as &dyn rusqlite::ToSql,
+            ]
+        })
+        .collect();
+
+    stmt.execute(params.as_slice())?;
     Ok(())
 }
 
@@ -2237,6 +2331,9 @@ fn test_search_enriched(conn: &Connection, query: &str) -> Result<()> {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+
+    // Set global log-only mode
+    LOG_ONLY.store(args.log_only, std::sync::atomic::Ordering::Relaxed);
 
     if args.workers > 0 {
         rayon::ThreadPoolBuilder::new()
@@ -2475,6 +2572,16 @@ mod tests {
             normalize_title_with_artist("Metallica: Enter Sandman", "Metallica"),
             "enter sandman"
         );
+    }
+
+    #[test]
+    fn test_the_prefix_stripping() {
+        // "The" prefix should be stripped from artist names
+        assert_eq!(normalize_artist("The Beatles"), "beatles");
+        assert_eq!(normalize_artist("The Rolling Stones"), "rolling stones");
+        assert_eq!(normalize_artist("The Offspring"), "offspring");
+        assert_eq!(normalize_artist("Beatles"), "beatles"); // Already without "The"
+        assert_eq!(normalize_artist("Thea Gilmore"), "thea gilmore"); // "Thea" not "The "
     }
 
     #[test]

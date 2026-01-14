@@ -1526,6 +1526,164 @@ Storage: ~50-100 MB for the `match_failures` table.
 
 ---
 
+## Part 13: Implementation Results (January 2026)
+
+### 13.1 Achieved Performance
+
+| Metric | Target | Achieved |
+|--------|--------|----------|
+| Global match rate | 65-72% | **49.0%** (partial implementation) |
+| Extraction time | 25-30 min | **20 min** (with pre-normalized Spotify) |
+| Peak memory | ~2.5 GB | ~4 GB |
+| Output size | — | 1.16 GB |
+
+### 13.2 Pre-Normalized Spotify Database
+
+A key optimization: pre-compute normalized (title, artist) keys for the entire Spotify catalog once, then use indexed lookups during extraction.
+
+**Binary:** `normalize-spotify`
+
+```bash
+./target/release/normalize-spotify \
+  spotify_clean.sqlite3 \
+  spotify_normalized.sqlite3
+```
+
+**Schema:**
+```sql
+CREATE TABLE track_norm (
+    track_rowid INTEGER NOT NULL,  -- References spotify_clean.tracks.rowid
+    title_norm TEXT NOT NULL,
+    artist_norm TEXT NOT NULL
+);
+CREATE INDEX idx_norm_key ON track_norm(title_norm, artist_norm);
+```
+
+**Performance:**
+- Input: 64M track-artist rows
+- Output: 54M unique keys (16% dedup from multi-artist tracks)
+- Size: ~5 GB
+- Time: ~10 min (with batched INSERTs)
+
+**Extraction with pre-normalized DB:**
+```bash
+./target/release/lrclib-extract \
+  lrclib-dump.sqlite3 \
+  output.sqlite3 \
+  --spotify spotify_clean.sqlite3 \
+  --spotify-normalized spotify_normalized.sqlite3 \
+  --audio-features spotify_clean_audio_features.sqlite3
+```
+
+This changes the matching strategy from "stream all 64M Spotify rows" to "query indexed DB for each of 4M LRCLIB groups" — a 4x speedup.
+
+### 13.3 Batched INSERT Optimization
+
+**Problem:** Individual INSERT statements are slow for millions of rows.
+
+**Solution:** Multi-value INSERTs in batches of 500-1000:
+
+```sql
+-- Before: 54M individual statements
+INSERT INTO track_norm VALUES (?, ?, ?);
+INSERT INTO track_norm VALUES (?, ?, ?);
+...
+
+-- After: 54K batched statements
+INSERT INTO track_norm VALUES (?, ?, ?), (?, ?, ?), ... (1000 times)
+```
+
+**Applied to:**
+- `normalize-spotify`: Phase 2 write (54M rows in ~10 min vs hours)
+- `lrclib-extract`: Failure logging (1.4M rows in 2,898 batches)
+
+### 13.4 Tail-Friendly Logging (--log-only)
+
+For background runs, disable progress bars and use `eprintln!` logging:
+
+```bash
+./target/release/lrclib-extract ... --log-only > extraction.log 2>&1 &
+tail -f extraction.log
+```
+
+**Log format:**
+```
+[READ] 500000/12203742 (4.1%)
+[READ] 1000000/12203742 (8.2%)
+...
+[MATCH] 500000/3942311 (12.7%)
+...
+[FAILURES] 100000/1448948 (6.9%)
+```
+
+### 13.5 Additional Normalization: "The" Prefix Stripping
+
+**Rule:** Strip "The " prefix from artist names for better matching.
+
+```rust
+fn normalize_artist(artist: &str) -> String {
+    // ... existing normalization ...
+
+    // Strip "the " prefix (e.g., "The Beatles" → "beatles")
+    if normalized.starts_with("the ") {
+        normalized = normalized[4..].to_string();
+    }
+
+    normalized
+}
+```
+
+**Impact:**
+- Match rate: 48.6% → 49.0% (+0.4%)
+- Additional matches: +1,532
+- Groups reduced: 3,971,042 → 3,942,311 (29K merged due to "The" dedup)
+
+### 13.6 Auto-Cleanup of Output Files
+
+Both binaries now auto-delete existing output files before starting to prevent corruption from interrupted runs:
+
+```rust
+if std::path::Path::new(output_db).exists() {
+    println!("Removing existing output file: {:?}", output_db);
+    std::fs::remove_file(output_db)?;
+}
+```
+
+### 13.7 Current Extraction Flow
+
+```
+normalize-spotify (one-time, ~10 min)
+    │
+    ▼ Creates spotify_normalized.sqlite3 (54M indexed keys)
+
+lrclib-extract (per extraction, ~20 min)
+    │
+    ├─ Phase 1: Read LRCLIB (12.2M rows → 10M valid tracks)
+    │
+    ├─ Phase 2: Group by (title_norm, artist_norm) → 3.9M groups
+    │
+    ├─ Phase 3: Match via indexed lookup → 2.2M candidates
+    │
+    ├─ Phase 4: Score and select canonical → 1.9M Spotify matches (49%)
+    │
+    ├─ Phase 5: Load audio features + album images (batched)
+    │
+    ├─ Phase 6: Write tracks + FTS index + failure logs
+    │
+    └─ Output: 3.9M tracks, 1.9M with Spotify enrichment
+```
+
+### 13.8 Remaining Work for Higher Match Rate
+
+The current 49% match rate can likely be improved to 65%+ with:
+
+1. **2-phase Spotify streaming** (not yet implemented): Stream tracks without artist join, batch-fetch artists only for title matches
+2. **Fuzzy title matching**: Levenshtein distance for typos ("Deatth" → "Death")
+3. **ISRC-based matching**: Match by ISRC code for exact releases
+4. **Album-level matching**: If track doesn't match, try album-level lookup
+
+---
+
 ## Appendix A: File Locations
 
 | File | Path | Size |
