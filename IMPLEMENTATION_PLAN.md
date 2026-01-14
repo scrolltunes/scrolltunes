@@ -10,7 +10,7 @@ Improve Spotify match rate from 46% to 65-72% through enhanced normalization, de
 |------|-------------|--------|
 | [spec-01](specs/spec-01-normalization.md) | Normalization improvements | Complete |
 | [spec-02](specs/spec-02-query-optimization.md) | Query optimization | Not Started |
-| [spec-03](specs/spec-03-delayed-canonical.md) | Delayed canonical selection | Not Started |
+| [spec-03](specs/spec-03-delayed-canonical.md) | Delayed canonical selection | Phase 2 Data Structures Complete |
 | [spec-04](specs/spec-04-combined-scoring.md) | Combined scoring system | Not Started |
 | [spec-05](specs/spec-05-failure-logging.md) | Match failure logging | Not Started |
 

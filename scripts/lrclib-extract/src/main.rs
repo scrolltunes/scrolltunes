@@ -66,6 +66,21 @@ struct ScoredTrack {
     quality: i32,
 }
 
+/// Group of LRCLIB tracks sharing (title_norm, artist_norm).
+/// Used for delayed canonical selection - keeps all variants until Spotify matching.
+#[derive(Clone, Debug)]
+struct LrclibGroup {
+    key: (String, String),  // (title_norm, artist_norm) stored ONCE per group
+    tracks: Vec<ScoredTrack>,
+    best_match: Option<(usize, SpotifyTrack, i32)>,  // (track_idx, spotify_track, score)
+}
+
+/// Index mapping (title_norm, artist_norm) to group index in Vec<LrclibGroup>
+type LrclibIndex = FxHashMap<(String, String), usize>;
+
+/// Title-only index for initial filtering before artist lookup (2-phase matching)
+type TitleOnlyIndex = FxHashMap<String, Vec<usize>>;
+
 /// Spotify track info for matching
 #[derive(Clone, Debug)]
 struct SpotifyTrack {
