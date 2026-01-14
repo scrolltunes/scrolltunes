@@ -153,16 +153,27 @@ CREATE VIRTUAL TABLE tracks_fts USING fts5(
 
 **Artists:**
 - Strip "The " prefix: "The Beatles" → "beatles"
+- Strip ", The" suffix: "Scorpions, The" → "scorpions"
 - Strip feat./ft./featuring
-- Fold diacritics
-- Transliterate Cyrillic/Hebrew artists
+- Fold diacritics + `any_ascii` transliteration
+- Cyrillic → Latin: "Кино" → "kino"
 
 ## Performance
 
 | Metric | Value |
 |--------|-------|
 | LRCLIB tracks | ~10M |
-| Unique groups | ~4M |
-| Spotify match rate | ~49% |
+| Unique groups | ~3.8M |
+| Spotify match rate | **53.3%** |
 | Extraction time | ~20 min (with pre-normalized Spotify) |
-| Output size | ~1.2 GB |
+| Output size | ~1.1 GB |
+
+## Match Rate Improvements
+
+| Change | Impact |
+|--------|--------|
+| Pre-normalized Spotify index | 4x faster |
+| Track number stripping | +1-2% |
+| "The" prefix/suffix handling | +0.4% |
+| Primary-artist fallback | +2.9% |
+| `any_ascii` transliteration | +1.4% |

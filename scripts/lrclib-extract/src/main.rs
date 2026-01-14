@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use any_ascii::any_ascii;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
@@ -233,6 +234,12 @@ static TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(r"(?i)\s*[\(\[](?:v(?:ersion)?\s*)?\d[\)\]]").unwrap(),
         // Dash format for mono/stereo/version: "- Mono", "- Stereo / 2021 Remaster"
         Regex::new(r"(?i)\s*[-–—]\s*(?:mono|stereo)(?:\s*/\s*\d{4}\s*remaster(?:ed)?)?").unwrap(),
+        // Feat without brackets: "Song feat. Artist", "Song ft. Someone"
+        Regex::new(r"(?i)\s+(?:feat\.?|ft\.?|featuring)\s+.+$").unwrap(),
+        // URL suffixes: "Song - SongsLover.com", "Track_Artist.mp3.com"
+        Regex::new(r"(?i)\s*[-–—_]?\s*[a-z0-9]+\.(?:com|net|org|io|ru|de|fr|es|co\.uk)").unwrap(),
+        // Visualizer/commentary tags: "(Visualiser)", "(Lyric Video)", "(comentario)"
+        Regex::new(r"(?i)\s*[\(\[](?:visuali[sz]er|lyric\s*video|official\s*video|audio|comentario|commentary)[\)\]]").unwrap(),
     ]
 });
 
@@ -331,13 +338,15 @@ static SKIP_TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
 // Cyrillic/Hebrew to Latin artist name mappings for deduplication
 static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     let mut m = FxHashMap::default();
-    // Russian bands with both Cyrillic and Latin spellings
+
+    // === RUSSIAN ARTISTS ===
+    // Top rock bands
     m.insert("ддт", "ddt");
     m.insert("кино", "kino");
     m.insert("аквариум", "aquarium");
     m.insert("ария", "aria");
     m.insert("алиса", "alisa");
-    m.insert("сплин", "splin");
+    m.insert("сплин", "splean");
     m.insert("мумий тролль", "mumiy troll");
     m.insert("би-2", "bi-2");
     m.insert("би2", "bi-2");
@@ -345,7 +354,6 @@ static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("ленинград", "leningrad");
     m.insert("король и шут", "korol i shut");
     m.insert("киш", "korol i shut");
-    m.insert("aria", "aria"); // Latin spelling maps to itself for consistency
     m.insert("машина времени", "mashina vremeni");
     m.insert("наутилус помпилиус", "nautilus pompilius");
     m.insert("пикник", "piknik");
@@ -354,23 +362,134 @@ static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("агата кристи", "agata kristi");
     m.insert("любэ", "lyube");
     m.insert("сектор газа", "sektor gaza");
-    // Hebrew bands with both Hebrew and Latin spellings
+    m.insert("браво", "bravo");
+    m.insert("гражданская оборона", "grazhdanskaya oborona");
+    m.insert("ногу свело", "nogu svelo");
+    m.insert("ночные снайперы", "nochnye snaipery");
+    m.insert("крематорий", "krematorij");
+    m.insert("смысловые галлюцинации", "smyslovye gallyutsinatsii");
+    m.insert("чиж", "chizh");
+    m.insert("чиж и ко", "chizh");
+    m.insert("звери", "zveri");
+    m.insert("танцы минус", "tantsy minus");
+    m.insert("ундервуд", "undervud");
+    m.insert("пилот", "pilot");
+    m.insert("lumen", "lumen");
+    m.insert("люмен", "lumen");
+    m.insert("кипелов", "kipelov");
+    m.insert("серьга", "serga");
+    m.insert("город 312", "gorod 312");
+    m.insert("ума турман", "uma2rman");
+    // Solo artists
+    m.insert("виктор цой", "viktor tsoi");
+    m.insert("борис гребенщиков", "boris grebenshchikov");
+    m.insert("юрий шевчук", "yuri shevchuk");
+    m.insert("диана арбенина", "diana arbenina");
+    m.insert("валерий кипелов", "valery kipelov");
+    m.insert("константин кинчев", "konstantin kinchev");
+    m.insert("вячеслав бутусов", "vyacheslav butusov");
+    m.insert("андрей макаревич", "andrey makarevich");
+    // Pop artists
+    m.insert("филипп киркоров", "philipp kirkorov");
+    m.insert("алла пугачева", "alla pugacheva");
+    m.insert("валерия", "valeria");
+    m.insert("дима билан", "dima bilan");
+    m.insert("полина гагарина", "polina gagarina");
+    m.insert("сергей лазарев", "sergey lazarev");
+    m.insert("тимати", "timati");
+    m.insert("баста", "basta");
+    m.insert("егор крид", "egor kreed");
+    m.insert("макс корж", "max korzh");
+    m.insert("мот", "mot");
+    m.insert("jah khalib", "jah khalib");
+    m.insert("джах халиб", "jah khalib");
+    m.insert("монатик", "monatik");
+    m.insert("нюша", "nyusha");
+    m.insert("елка", "elka");
+    m.insert("ёлка", "elka");
+    m.insert("loboda", "loboda");
+    m.insert("лобода", "loboda");
+    m.insert("светлана лобода", "loboda");
+    m.insert("zivert", "zivert");
+    m.insert("зиверт", "zivert");
+    m.insert("клава кока", "klava koka");
+    m.insert("инстасамка", "instasamka");
+    m.insert("miyagi", "miyagi");
+    m.insert("мияги", "miyagi");
+    m.insert("хаски", "husky");
+    m.insert("oxxxymiron", "oxxxymiron");
+    m.insert("оксимирон", "oxxxymiron");
+    m.insert("face", "face");
+    m.insert("фейс", "face");
+    m.insert("morgenshtern", "morgenshtern");
+    m.insert("моргенштерн", "morgenshtern");
+    m.insert("little big", "little big");
+    m.insert("литл биг", "little big");
+    m.insert("ic3peak", "ic3peak");
+    m.insert("molchat doma", "molchat doma");
+    m.insert("молчат дома", "molchat doma");
+
+    // === ISRAELI/HEBREW ARTISTS ===
+    // Bands
     m.insert("היהודים", "hayehudim");
     m.insert("משינה", "mashina");
     m.insert("אתניקס", "ethnix");
     m.insert("כוורת", "kaveret");
     m.insert("טיפקס", "tipex");
+    m.insert("הדג נחש", "hadag nahash");
+    m.insert("הדורבנים", "hadorbanim");
+    m.insert("מוניקה סקס", "monica sex");
+    m.insert("בום פאם", "boom pam");
+    m.insert("ימן בלוז", "yemen blues");
+    m.insert("שבק ס", "shabak samech");
+    m.insert("תיסלם", "teapacks");
+    m.insert("בנות נחש", "bnot nechash");
+    m.insert("מרסדס בנד", "mercedes band");
+    // Solo artists - classic
     m.insert("שלום חנוך", "shalom hanoch");
     m.insert("אריק איינשטיין", "arik einstein");
     m.insert("עידן רייכל", "idan raichel");
+    m.insert("הפרויקט של עידן רייכל", "idan raichel project");
     m.insert("שלמה ארצי", "shlomo artzi");
     m.insert("יהודה פוליקר", "yehuda poliker");
     m.insert("רמי קלינשטיין", "rami kleinstein");
     m.insert("אביב גפן", "aviv geffen");
     m.insert("עברי לידר", "ivri lider");
-    m.insert("סטטיק ובן אל תבורי", "static and ben el");
-    m.insert("נועה קירל", "noa kirel");
+    m.insert("עפרה חזה", "ofra haza");
+    m.insert("אהוד בנאי", "ehud banai");
+    m.insert("ריטה", "rita");
+    m.insert("מאיר אריאל", "meir ariel");
+    m.insert("ברי סחרוף", "berry sakharof");
+    m.insert("רוני דלומי", "ronnie dalumi");
+    m.insert("מוש בן ארי", "mosh ben ari");
+    m.insert("שלומי שבת", "shlomi shabat");
+    // Solo artists - contemporary
     m.insert("עומר אדם", "omer adam");
+    m.insert("נועה קירל", "noa kirel");
+    m.insert("סטטיק ובן אל תבורי", "static and ben el");
+    m.insert("סטטיק ובן אל", "static and ben el");
+    m.insert("שרית חדד", "sarit hadad");
+    m.insert("שירי מימון", "shiri maimon");
+    m.insert("אייל גולן", "eyal golan");
+    m.insert("קובי פרץ", "kobi peretz");
+    m.insert("דודו אהרון", "dudu aharon");
+    m.insert("אברהם טל", "avraham tal");
+    m.insert("קרן פלס", "keren peles");
+    m.insert("עדן בן זקן", "eden ben zaken");
+    m.insert("נטע ברזילי", "netta barzilai");
+    m.insert("נטע", "netta");
+    m.insert("אגם בוחבוט", "agam buhbut");
+    m.insert("שחר טביב", "shachar taviv");
+    m.insert("עומרי 4", "omri 4");
+    m.insert("אושר כהן", "osher cohen");
+    m.insert("אנה זק", "anna zak");
+    m.insert("נסרין קדרי", "nasrin kadri");
+    m.insert("ליאור נרקיס", "lior narkis");
+    m.insert("יונתן קליב", "yonatan klieb");
+    m.insert("דנה אינטרנשיונל", "dana international");
+    m.insert("עדן חסון", "eden hason");
+    m.insert("static and ben el tavori", "static and ben el");
+
     m
 });
 
@@ -387,16 +506,21 @@ fn is_combining_mark(c: char) -> bool {
 /// Fold Unicode text to ASCII by applying NFKD decomposition and removing combining marks.
 /// e.g., "Beyoncé" → "beyonce", "naïve" → "naive"
 fn fold_to_ascii(s: &str) -> String {
-    s.nfkd()
+    // First strip diacritics via NFKD decomposition
+    let stripped: String = s.nfkd()
         .filter(|c| !is_combining_mark(*c))
-        .collect::<String>()
-        .to_lowercase()
+        .collect();
+    // Then transliterate any remaining non-ASCII (Cyrillic, Hebrew, CJK, etc.)
+    any_ascii(&stripped).to_lowercase()
 }
+
+/// Regex to collapse multiple whitespace into single space
+static MULTI_SPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s{2,}").unwrap());
 
 /// Normalize punctuation by converting curly quotes to straight quotes and & to and.
 /// Also fixes common encoding issues and apostrophe spacing problems.
 fn normalize_punctuation(s: &str) -> String {
-    s.replace(['\u{2018}', '\u{2019}'], "'")  // Left/right single curly quotes
+    let result = s.replace(['\u{2018}', '\u{2019}'], "'")  // Left/right single curly quotes
         .replace(['\u{201C}', '\u{201D}'], "\"")  // Left/right double curly quotes
         .replace(['\u{00B4}', '\u{0060}'], "'")  // Acute accent and grave accent
         .replace(" & ", " and ")
@@ -413,7 +537,9 @@ fn normalize_punctuation(s: &str) -> String {
         .replace(" m ", "'m ")  // I m → I'm
         .replace(" ve ", "'ve ")  // I ve → I've
         .replace(" re ", "'re ")  // You re → You're
-        .replace(" ll ", "'ll ")  // I ll → I'll
+        .replace(" ll ", "'ll ");  // I ll → I'll
+    // Collapse multiple spaces into single space (e.g., "Peter Cetera  Amy Grant" → "Peter Cetera Amy Grant")
+    MULTI_SPACE.replace_all(&result, " ").to_string()
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -500,7 +626,16 @@ fn normalize_artist(artist: &str) -> String {
         normalized = normalized[4..].to_string();
     }
 
-    // Apply transliteration for known Cyrillic artists
+    // Strip ", the" suffix (e.g., "Scorpions, The" → "scorpions")
+    if normalized.ends_with(", the") {
+        normalized = normalized[..normalized.len() - 5].to_string();
+    }
+    // Strip "(the)" suffix (e.g., "Dandy Warhols (the)" → "dandy warhols")
+    if normalized.ends_with(" (the)") {
+        normalized = normalized[..normalized.len() - 6].to_string();
+    }
+
+    // Apply known artist transliterations for Cyrillic/Hebrew artists
     ARTIST_TRANSLITERATIONS
         .get(normalized.as_str())
         .map(|&s| s.to_string())
@@ -2824,5 +2959,36 @@ mod tests {
         assert_eq!(normalize_title("Song [V2]"), "song");
         // Take in parens
         assert_eq!(normalize_title("Song (take 4)"), "song");
+        // Feat without brackets
+        assert_eq!(normalize_title("Se feliz feat. Gepe"), "se feliz");
+        assert_eq!(normalize_title("Song ft. Artist"), "song");
+        assert_eq!(normalize_title("Track featuring Someone"), "track");
+        // URL suffixes
+        assert_eq!(normalize_title("Mujeriego - SongsLover.com"), "mujeriego");
+        assert_eq!(normalize_title("Song - Download.net"), "song");
+        // Visualizer/commentary
+        assert_eq!(normalize_title("Say That You Will (Visualiser)"), "say that you will");
+        assert_eq!(normalize_title("Song (Lyric Video)"), "song");
+        assert_eq!(normalize_title("Requiem (comentario)"), "requiem");
+    }
+
+    #[test]
+    fn test_the_suffix_stripping() {
+        // ", the" suffix should be stripped
+        assert_eq!(normalize_artist("Scorpions, The"), "scorpions");
+        assert_eq!(normalize_artist("Band, the"), "band");
+        // "(the)" suffix should be stripped
+        assert_eq!(normalize_artist("Dandy Warhols (the)"), "dandy warhols");
+        // Prefix still works
+        assert_eq!(normalize_artist("The Beatles"), "beatles");
+    }
+
+    #[test]
+    fn test_double_space_normalization() {
+        // Double spaces should be collapsed
+        assert_eq!(normalize_artist("Peter Cetera  Amy Grant"), "peter cetera amy grant");
+        assert_eq!(normalize_title("Song   Title"), "song title");
+        // Multiple spaces
+        assert_eq!(normalize_artist("A    B     C"), "a b c");
     }
 }

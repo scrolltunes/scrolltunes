@@ -2,6 +2,7 @@
 //! Usage: cargo run --release --bin simulate -- <failures_db>
 
 use anyhow::Result;
+use any_ascii::any_ascii;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rusqlite::Connection;
@@ -51,9 +52,12 @@ fn is_combining_mark(c: char) -> bool {
 }
 
 fn fold_to_ascii(s: &str) -> String {
-    s.nfkd()
+    // First strip diacritics via NFKD decomposition
+    let stripped: String = s.nfkd()
         .filter(|c| !is_combining_mark(*c))
-        .collect()
+        .collect();
+    // Then transliterate any remaining non-ASCII (Cyrillic, Hebrew, CJK, etc.)
+    any_ascii(&stripped).to_lowercase()
 }
 
 fn normalize_punctuation(s: &str) -> String {
