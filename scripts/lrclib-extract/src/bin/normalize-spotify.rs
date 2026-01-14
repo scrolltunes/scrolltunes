@@ -5,42 +5,76 @@
 //!
 //! NOTE: Do not create output files in the project directory.
 //! Use a separate location like /Users/hmemcpy/git/music/
+//!
+//! ## Schema (spec-02)
+//!
+//! Stores multiple candidates per (title_norm, artist_norm) key to handle
+//! duration variants (radio edit vs album version, etc.). Uses duration bucketing
+//! to deduplicate while preserving diversity.
+//!
+//! ```sql
+//! CREATE TABLE track_norm (
+//!     title_norm   TEXT NOT NULL,
+//!     artist_norm  TEXT NOT NULL,
+//!     track_rowid  INTEGER NOT NULL,
+//!     popularity   INTEGER NOT NULL,
+//!     duration_ms  INTEGER NOT NULL,
+//!     PRIMARY KEY (title_norm, artist_norm, track_rowid)
+//! );
+//! ```
 
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use rusqlite::Connection;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::time::Instant;
 
 // Import normalization functions from shared module
-use lrclib_extract::normalize::{normalize_title, normalize_artist};
+use lrclib_extract::normalize::{normalize_artist, normalize_title};
 
-/// Execute a batched INSERT statement for better performance
-fn execute_batch_insert(
-    conn: &Connection,
-    batch: &[(String, String, i64)],
-) -> Result<()> {
+/// Candidate row for batch insert (spec-02 top-K schema)
+#[derive(Clone)]
+struct CandidateRow {
+    track_rowid: i64,
+    title_norm: String,
+    artist_norm: String,
+    popularity: i32,
+    duration_ms: i64,
+}
+
+/// Duration bucket size in milliseconds (5 seconds).
+/// Candidates within the same bucket are deduplicated to the highest popularity.
+const DURATION_BUCKET_MS: i64 = 5000;
+
+/// Maximum candidates to keep per (title_norm, artist_norm) key.
+/// This limits index size while preserving duration diversity.
+const MAX_CANDIDATES_PER_KEY: usize = 20;
+
+/// Execute a batched INSERT statement for better performance (spec-02 schema)
+fn execute_batch_insert(conn: &Connection, batch: &[CandidateRow]) -> Result<()> {
     if batch.is_empty() {
         return Ok(());
     }
 
-    // Build multi-value INSERT: INSERT INTO track_norm VALUES (?, ?, ?), (?, ?, ?), ...
-    let placeholders: Vec<&str> = (0..batch.len()).map(|_| "(?, ?, ?)").collect();
+    // Build multi-value INSERT with 5 columns per row
+    let placeholders: Vec<&str> = (0..batch.len()).map(|_| "(?, ?, ?, ?, ?)").collect();
     let sql = format!(
-        "INSERT INTO track_norm (track_rowid, title_norm, artist_norm) VALUES {}",
+        "INSERT INTO track_norm (title_norm, artist_norm, track_rowid, popularity, duration_ms) VALUES {}",
         placeholders.join(", ")
     );
 
     let mut stmt = conn.prepare_cached(&sql)?;
 
-    // Flatten batch into parameter list
+    // Flatten batch into parameter list (order matches column order in INSERT)
     let params: Vec<&dyn rusqlite::ToSql> = batch
         .iter()
-        .flat_map(|(title, artist, rowid)| {
+        .flat_map(|row| {
             vec![
-                rowid as &dyn rusqlite::ToSql,
-                title as &dyn rusqlite::ToSql,
-                artist as &dyn rusqlite::ToSql,
+                &row.title_norm as &dyn rusqlite::ToSql,
+                &row.artist_norm as &dyn rusqlite::ToSql,
+                &row.track_rowid as &dyn rusqlite::ToSql,
+                &row.popularity as &dyn rusqlite::ToSql,
+                &row.duration_ms as &dyn rusqlite::ToSql,
             ]
         })
         .collect();
@@ -65,6 +99,42 @@ fn create_progress_bar(len: u64, log_only: bool) -> ProgressBar {
     pb
 }
 
+/// Intermediate candidate for duration bucket deduplication (spec-02 R2.4)
+struct RawCandidate {
+    track_rowid: i64,
+    popularity: i32,
+    duration_ms: i64,
+}
+
+/// Deduplicate candidates by duration bucket, keeping highest popularity per bucket (spec-02 R2.4).
+/// Returns up to MAX_CANDIDATES_PER_KEY candidates sorted by popularity DESC.
+fn dedupe_by_duration_bucket(candidates: Vec<RawCandidate>) -> Vec<RawCandidate> {
+    if candidates.is_empty() {
+        return vec![];
+    }
+
+    // Group by duration bucket, keep highest popularity per bucket
+    let mut bucket_map: FxHashMap<i64, RawCandidate> = FxHashMap::default();
+
+    for cand in candidates {
+        let bucket = cand.duration_ms / DURATION_BUCKET_MS;
+
+        match bucket_map.get(&bucket) {
+            Some(existing) if existing.popularity >= cand.popularity => {}
+            _ => {
+                bucket_map.insert(bucket, cand);
+            }
+        }
+    }
+
+    // Sort by popularity DESC and limit to MAX_CANDIDATES_PER_KEY
+    let mut result: Vec<RawCandidate> = bucket_map.into_values().collect();
+    result.sort_by(|a, b| b.popularity.cmp(&a.popularity));
+    result.truncate(MAX_CANDIDATES_PER_KEY);
+
+    result
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
 
@@ -73,19 +143,26 @@ fn main() -> Result<()> {
     let args_filtered: Vec<&String> = args.iter().filter(|a| *a != "--log-only").collect();
 
     if args_filtered.len() < 2 {
-        eprintln!("Usage: normalize-spotify [--log-only] <spotify_clean.sqlite3> [spotify_normalized.sqlite3]");
+        eprintln!(
+            "Usage: normalize-spotify [--log-only] <spotify_clean.sqlite3> [spotify_normalized.sqlite3]"
+        );
         eprintln!();
         eprintln!("Options:");
-        eprintln!("  --log-only  Disable progress bars, use log output only (for background runs)");
+        eprintln!(
+            "  --log-only  Disable progress bars, use log output only (for background runs)"
+        );
         eprintln!();
-        eprintln!("Creates a normalized lookup table for faster extraction.");
-        eprintln!("The output file will contain track_rowid, title_norm, artist_norm");
-        eprintln!("with an index on (title_norm, artist_norm) for O(1) lookups.");
+        eprintln!("Creates a normalized lookup table with multiple candidates per key (spec-02).");
+        eprintln!("Schema: track_norm(title_norm, artist_norm, track_rowid, popularity, duration_ms)");
+        eprintln!("Uses duration bucketing to preserve variants while limiting index size.");
         std::process::exit(1);
     }
 
     let spotify_db = args_filtered[1];
-    let output_db = args_filtered.get(2).map(|s| s.as_str()).unwrap_or("spotify_normalized.sqlite3");
+    let output_db = args_filtered
+        .get(2)
+        .map(|s| s.as_str())
+        .unwrap_or("spotify_normalized.sqlite3");
 
     let start = Instant::now();
 
@@ -121,26 +198,33 @@ fn main() -> Result<()> {
          PRAGMA temp_store = MEMORY;",
     )?;
 
-    // Create table
+    // Create table with spec-02 schema (multiple candidates per key)
     out_conn.execute(
         "CREATE TABLE IF NOT EXISTS track_norm (
-            track_rowid INTEGER NOT NULL,
-            title_norm TEXT NOT NULL,
-            artist_norm TEXT NOT NULL
+            title_norm   TEXT NOT NULL,
+            artist_norm  TEXT NOT NULL,
+            track_rowid  INTEGER NOT NULL,
+            popularity   INTEGER NOT NULL,
+            duration_ms  INTEGER NOT NULL,
+            PRIMARY KEY (title_norm, artist_norm, track_rowid)
         )",
         [],
     )?;
 
-    // Stream and normalize, deduplicating by keeping highest popularity per key
-    println!("Phase 1: Normalizing and deduplicating (keeping highest popularity per key)...");
-    eprintln!("[PHASE1] Starting normalization of {} tracks...", total);
+    // Phase 1: Stream and collect all candidates per (title_norm, artist_norm) key
+    println!("Phase 1: Normalizing tracks and collecting candidates...");
+    eprintln!(
+        "[PHASE1] Starting normalization of {} tracks...",
+        total
+    );
     let pb = create_progress_bar(total, log_only);
 
-    // Map: (title_norm, artist_norm) -> (track_rowid, popularity)
-    let mut dedup_map: FxHashMap<(String, String), (i64, i32)> = FxHashMap::default();
+    // Map: (title_norm, artist_norm) -> Vec<RawCandidate>
+    // Collect ALL candidates first, then dedupe by duration bucket
+    let mut candidates_map: FxHashMap<(String, String), Vec<RawCandidate>> = FxHashMap::default();
 
     let mut stmt = src_conn.prepare(
-        "SELECT t.rowid, t.name, a.name, t.popularity
+        "SELECT t.rowid, t.name, a.name, t.popularity, t.duration_ms
          FROM tracks t
          JOIN track_artists ta ON ta.track_rowid = t.rowid
          JOIN artists a ON a.rowid = ta.artist_rowid
@@ -155,18 +239,20 @@ fn main() -> Result<()> {
         let title: String = row.get(1)?;
         let artist: String = row.get(2)?;
         let popularity: i32 = row.get(3)?;
+        let duration_ms: i64 = row.get(4)?;
 
         let title_norm = normalize_title(&title);
         let artist_norm = normalize_artist(&artist);
         let key = (title_norm, artist_norm);
 
-        // Keep track with highest popularity
-        match dedup_map.get(&key) {
-            Some((_, existing_pop)) if *existing_pop >= popularity => {}
-            _ => {
-                dedup_map.insert(key, (track_rowid, popularity));
-            }
-        }
+        candidates_map
+            .entry(key)
+            .or_default()
+            .push(RawCandidate {
+                track_rowid,
+                popularity,
+                duration_ms,
+            });
 
         count += 1;
         if count % 100_000 == 0 {
@@ -174,69 +260,119 @@ fn main() -> Result<()> {
         }
         // Tail-friendly logging
         if count % 500_000 == 0 {
-            eprintln!("[READ] {}/{} ({:.1}%)", count, total, 100.0 * count as f64 / total as f64);
+            eprintln!(
+                "[READ] {}/{} ({:.1}%)",
+                count,
+                total,
+                100.0 * count as f64 / total as f64
+            );
         }
     }
     pb.set_position(count);
     pb.finish_with_message("done");
     eprintln!("[READ] {}/{} (100.0%)", count, total);
 
-    let unique_keys = dedup_map.len();
-    println!("  {} unique keys from {} rows ({:.1}% dedup ratio)",
-             unique_keys, count, 100.0 * (1.0 - unique_keys as f64 / count as f64));
+    let unique_keys = candidates_map.len();
+    println!(
+        "  {} unique (title, artist) keys from {} rows",
+        unique_keys, count
+    );
 
-    // Write deduplicated entries using batched INSERTs
+    // Phase 2: Deduplicate by duration bucket and count total rows
+    println!("Phase 2: Deduplicating by duration bucket ({}ms buckets, max {} per key)...",
+             DURATION_BUCKET_MS, MAX_CANDIDATES_PER_KEY);
+    eprintln!("[PHASE2] Deduplicating {} keys...", unique_keys);
+
+    let pb_dedup = create_progress_bar(unique_keys as u64, log_only);
+
+    // Track rowids we've already written (to avoid duplicates from multi-artist tracks)
+    let mut written_rowids: FxHashSet<i64> = FxHashSet::default();
+    let mut total_candidates = 0usize;
+    let mut keys_processed = 0u64;
+
+    // Prepare batch for writing
     const BATCH_SIZE: usize = 1000;
-    let total_batches = (unique_keys + BATCH_SIZE - 1) / BATCH_SIZE;
-    println!("Phase 2: Writing {} entries in {} batches (batch size: {})...", unique_keys, total_batches, BATCH_SIZE);
-    eprintln!("[PHASE2] Starting write of {} entries...", unique_keys);
-
-    let pb2 = create_progress_bar(unique_keys as u64, log_only);
+    let mut batch: Vec<CandidateRow> = Vec::with_capacity(BATCH_SIZE);
+    let mut written = 0u64;
 
     let tx = out_conn.transaction()?;
-    {
-        let mut written = 0u64;
-        let mut batch: Vec<(String, String, i64)> = Vec::with_capacity(BATCH_SIZE);
 
-        for ((title_norm, artist_norm), (track_rowid, _)) in dedup_map {
-            batch.push((title_norm, artist_norm, track_rowid));
+    for ((title_norm, artist_norm), candidates) in candidates_map {
+        let deduped = dedupe_by_duration_bucket(candidates);
+        total_candidates += deduped.len();
+
+        for cand in deduped {
+            // Skip if we've already written this track_rowid (from another artist entry)
+            if written_rowids.contains(&cand.track_rowid) {
+                continue;
+            }
+            written_rowids.insert(cand.track_rowid);
+
+            batch.push(CandidateRow {
+                track_rowid: cand.track_rowid,
+                title_norm: title_norm.clone(),
+                artist_norm: artist_norm.clone(),
+                popularity: cand.popularity,
+                duration_ms: cand.duration_ms,
+            });
 
             if batch.len() >= BATCH_SIZE {
                 execute_batch_insert(&tx, &batch)?;
                 written += batch.len() as u64;
                 batch.clear();
-                pb2.set_position(written);
 
-                // Also log for tail-friendly output
                 if written % 500_000 == 0 {
-                    eprintln!("[WRITE] {}/{} ({:.1}%)", written, unique_keys, 100.0 * written as f64 / unique_keys as f64);
+                    eprintln!(
+                        "[WRITE] {}/{} ({:.1}%)",
+                        written,
+                        total_candidates,
+                        100.0 * written as f64 / total_candidates.max(1) as f64
+                    );
                 }
             }
         }
 
-        // Write remaining entries
-        if !batch.is_empty() {
-            execute_batch_insert(&tx, &batch)?;
-            written += batch.len() as u64;
-            pb2.set_position(written);
+        keys_processed += 1;
+        if keys_processed % 100_000 == 0 {
+            pb_dedup.set_position(keys_processed);
         }
-
-        eprintln!("[WRITE] {}/{} (100.0%)", written, unique_keys);
     }
-    tx.commit()?;
-    pb2.finish_with_message("done");
 
-    // Create indexes
+    // Write remaining batch
+    if !batch.is_empty() {
+        execute_batch_insert(&tx, &batch)?;
+        written += batch.len() as u64;
+    }
+
+    pb_dedup.finish_with_message("done");
+    eprintln!("[WRITE] {}/{} (100.0%)", written, total_candidates);
+
+    tx.commit()?;
+
+    println!(
+        "  {} total candidate rows (avg {:.2} per key)",
+        written,
+        written as f64 / unique_keys.max(1) as f64
+    );
+
+    // Create indexes (spec-02 R2.1)
     println!("Creating indexes...");
-    eprintln!("[INDEX] Creating primary index on (title_norm, artist_norm)...");
+    eprintln!("[INDEX] Creating index on (title_norm, artist_norm)...");
     let idx_start = Instant::now();
 
     out_conn.execute(
-        "CREATE INDEX idx_norm_key ON track_norm(title_norm, artist_norm)",
+        "CREATE INDEX IF NOT EXISTS idx_track_norm_key ON track_norm(title_norm, artist_norm)",
         [],
     )?;
+
+    eprintln!("[INDEX] Creating index on title_norm only...");
+    out_conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_norm_title ON track_norm(title_norm)",
+        [],
+    )?;
+
     let idx_elapsed = idx_start.elapsed().as_secs_f64();
-    println!("  Primary index created in {:.2}s", idx_elapsed);
+    println!("  Indexes created in {:.2}s", idx_elapsed);
     eprintln!("[INDEX] Complete in {:.2}s", idx_elapsed);
 
     // Optimize
@@ -252,12 +388,123 @@ fn main() -> Result<()> {
     let elapsed = start.elapsed();
     println!();
     println!("============================================================");
-    println!("Normalization complete!");
+    println!("Normalization complete! (spec-02 top-K schema)");
     println!("  Input rows: {}", total);
     println!("  Unique keys: {}", unique_keys);
+    println!("  Total candidate rows: {}", written);
+    println!("  Avg candidates per key: {:.2}", written as f64 / unique_keys.max(1) as f64);
+    println!("  Duration bucket size: {}ms", DURATION_BUCKET_MS);
+    println!("  Max candidates per key: {}", MAX_CANDIDATES_PER_KEY);
     println!("  Output size: {:.2} MB", size_mb);
     println!("  Elapsed: {:.2}s", elapsed.as_secs_f64());
     println!("============================================================");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dedupe_by_duration_bucket_empty() {
+        let result = dedupe_by_duration_bucket(vec![]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_dedupe_by_duration_bucket_single() {
+        let candidates = vec![RawCandidate {
+            track_rowid: 1,
+            popularity: 50,
+            duration_ms: 180000, // 3 minutes
+        }];
+        let result = dedupe_by_duration_bucket(candidates);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].track_rowid, 1);
+    }
+
+    #[test]
+    fn test_dedupe_by_duration_bucket_same_bucket_keeps_highest_popularity() {
+        // Two candidates in the same 5-second bucket - should keep the higher popularity one
+        let candidates = vec![
+            RawCandidate {
+                track_rowid: 1,
+                popularity: 30,
+                duration_ms: 180000, // bucket 36
+            },
+            RawCandidate {
+                track_rowid: 2,
+                popularity: 80, // Higher popularity
+                duration_ms: 181000, // same bucket 36
+            },
+        ];
+        let result = dedupe_by_duration_bucket(candidates);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].track_rowid, 2);
+        assert_eq!(result[0].popularity, 80);
+    }
+
+    #[test]
+    fn test_dedupe_by_duration_bucket_different_buckets() {
+        // Two candidates in different buckets - should keep both
+        let candidates = vec![
+            RawCandidate {
+                track_rowid: 1,
+                popularity: 50,
+                duration_ms: 180000, // bucket 36 (3:00)
+            },
+            RawCandidate {
+                track_rowid: 2,
+                popularity: 60,
+                duration_ms: 220000, // bucket 44 (3:40)
+            },
+        ];
+        let result = dedupe_by_duration_bucket(candidates);
+        assert_eq!(result.len(), 2);
+        // Sorted by popularity DESC
+        assert_eq!(result[0].track_rowid, 2); // Higher popularity first
+        assert_eq!(result[1].track_rowid, 1);
+    }
+
+    #[test]
+    fn test_dedupe_by_duration_bucket_max_limit() {
+        // Create more candidates than MAX_CANDIDATES_PER_KEY in different buckets
+        let candidates: Vec<RawCandidate> = (0..30)
+            .map(|i| RawCandidate {
+                track_rowid: i as i64,
+                popularity: (100 - i as i32), // Decreasing popularity
+                duration_ms: i as i64 * 10000, // Different buckets (10s apart)
+            })
+            .collect();
+
+        let result = dedupe_by_duration_bucket(candidates);
+        // Should be limited to MAX_CANDIDATES_PER_KEY (20)
+        assert_eq!(result.len(), MAX_CANDIDATES_PER_KEY);
+        // Should keep the highest popularity ones (first 20)
+        assert_eq!(result[0].popularity, 100);
+        assert_eq!(result[19].popularity, 81);
+    }
+
+    #[test]
+    fn test_dedupe_by_duration_bucket_radio_edit_vs_album() {
+        // Realistic scenario: radio edit (3:30) vs album version (4:00)
+        let candidates = vec![
+            RawCandidate {
+                track_rowid: 1,
+                popularity: 70,
+                duration_ms: 210000, // 3:30 - radio edit
+            },
+            RawCandidate {
+                track_rowid: 2,
+                popularity: 85,
+                duration_ms: 240000, // 4:00 - album version
+            },
+        ];
+        let result = dedupe_by_duration_bucket(candidates);
+        // Different buckets (42 vs 48), so both should be kept
+        assert_eq!(result.len(), 2);
+        // Higher popularity first
+        assert_eq!(result[0].duration_ms, 240000);
+    }
 }
