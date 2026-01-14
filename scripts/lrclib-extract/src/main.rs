@@ -101,6 +101,11 @@ pub struct MatchingStats {
     pub duration_matches_11_to_15: usize,
     pub duration_matches_16_to_30: usize,
 
+    // Adaptive duration relaxation (spec-05)
+    pub duration_relaxed_31_to_45: usize,
+    pub duration_relaxed_46_to_60: usize,
+    pub duration_relaxed_61_plus: usize,
+
     // Final totals
     pub total_groups: usize,
     pub total_matches: usize,
@@ -142,8 +147,15 @@ impl MatchingStats {
             6..=10 => self.duration_matches_6_to_10 += 1,
             11..=15 => self.duration_matches_11_to_15 += 1,
             16..=30 => self.duration_matches_16_to_30 += 1,
-            _ => {} // Beyond 30s should not happen for matches
+            31..=45 => self.duration_relaxed_31_to_45 += 1,
+            46..=60 => self.duration_relaxed_46_to_60 += 1,
+            _ => self.duration_relaxed_61_plus += 1,
         }
+    }
+
+    /// Returns total count of relaxed duration matches (>30s diff)
+    pub fn total_relaxed_matches(&self) -> usize {
+        self.duration_relaxed_31_to_45 + self.duration_relaxed_46_to_60 + self.duration_relaxed_61_plus
     }
 }
 
@@ -408,19 +420,22 @@ fn title_contains_artist(title: &str, artist: &str) -> bool {
     title_lower.contains(&artist_lower)
 }
 
-/// Graduated duration score (spec-04).
+/// Graduated duration score (spec-04, spec-05).
 /// Replaces hard ±10s cutoff with graduated scoring.
+/// Extended in spec-05 to handle relaxed matches (31-60s) with very low scores.
 /// Note: Exposed for unit tests and used internally by combined_score().
 #[cfg_attr(not(test), allow(dead_code))]
 fn duration_score(lrclib_sec: i64, spotify_ms: i64) -> i32 {
     let diff = (lrclib_sec - spotify_ms / 1000).abs();
     match diff {
-        0..=2 => 100,   // Near-perfect
-        3..=5 => 80,    // Excellent
-        6..=10 => 50,   // Good
-        11..=15 => 25,  // Acceptable (currently rejected with hard ±10s!)
-        16..=30 => 10,  // Poor but possible
-        _ => -1000,     // Hard reject
+        0..=2 => 100,    // Near-perfect
+        3..=5 => 80,     // Excellent
+        6..=10 => 50,    // Good
+        11..=15 => 25,   // Acceptable
+        16..=30 => 10,   // Poor but possible
+        31..=45 => 5,    // Relaxed - very low (spec-05)
+        46..=60 => 2,    // Relaxed - minimal (spec-05)
+        _ => -1000,      // Hard reject beyond 60s
     }
 }
 
@@ -445,8 +460,38 @@ fn compute_artist_similarity(a: &str, b: &str) -> f64 {
     intersection as f64 / union as f64
 }
 
-/// Combined scoring with guardrails against false positives (spec-04).
+/// Confidence level for matching (spec-05).
+/// Determines duration tolerance based on title and artist match quality.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MatchConfidence {
+    High,      // Exact title AND artist match
+    Medium,    // Exact title OR exact artist (not both)
+    Low,       // Partial matches only
+}
+
+/// Calculate maximum duration tolerance based on confidence level (spec-05).
+/// Higher confidence allows more relaxed duration matching.
+fn max_duration_tolerance(confidence: MatchConfidence, track_duration_sec: i64) -> i64 {
+    let base = match confidence {
+        MatchConfidence::High => 60,   // High confidence: allow 60s
+        MatchConfidence::Medium => 45, // Medium confidence: allow 45s
+        MatchConfidence::Low => 30,    // Low confidence: keep strict
+    };
+
+    // For tracks > 5 min, allow up to 10% variance (spec-05 R5.2)
+    let ratio_based = (track_duration_sec as f64 * 0.10) as i64;
+
+    // Use larger of base or ratio-based, but cap at 90s
+    base.max(ratio_based).min(90)
+}
+
+/// Combined scoring with guardrails against false positives (spec-04, spec-05).
 /// Returns score >= ACCEPT_THRESHOLD for acceptable matches, or negative for rejections.
+///
+/// Spec-05 changes:
+/// - Confidence-based duration tolerance (high confidence = 60s, medium = 45s, low = 30s)
+/// - Graduated scoring continues beyond 30s for high-confidence matches
+/// - Relaxed matches (>30s) require exact artist match
 fn combined_score(
     lrclib: &Track,
     lrclib_quality: i32,
@@ -457,41 +502,67 @@ fn combined_score(
     let duration_diff = (lrclib.duration_sec - spotify_duration_sec).abs();
 
     // ═══════════════════════════════════════════════════════════════════════
-    // GUARDRAIL 1: Hard duration rejection
-    // Reject if diff > 30s OR diff > 25% of song length (whichever is larger)
+    // STEP 1: Calculate artist match quality first (needed for confidence)
     // ═══════════════════════════════════════════════════════════════════════
-    let max_allowed_diff = 30_i64.max((spotify_duration_sec as f64 * 0.25) as i64);
+    let spotify_artist_norm = normalize_artist(&spotify.artist);
+    let artist_exact = spotify_artist_norm == group_artist_norm;
+    let artist_similarity = if artist_exact {
+        1.0
+    } else {
+        compute_artist_similarity(&spotify_artist_norm, group_artist_norm)
+    };
+
+    // Hard reject if artist similarity too low
+    if artist_similarity < 0.3 {
+        return -500;  // Artist mismatch - reject
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STEP 2: Determine confidence level (spec-05 R5.1)
+    // Title is assumed to match since we're querying by title_norm
+    // ═══════════════════════════════════════════════════════════════════════
+    let confidence = if artist_exact {
+        MatchConfidence::High  // Title + artist both exact
+    } else if artist_similarity >= 0.7 {
+        MatchConfidence::Medium  // Title exact, artist partial
+    } else {
+        MatchConfidence::Low  // Weak artist match
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STEP 3: Adaptive duration tolerance based on confidence (spec-05)
+    // ═══════════════════════════════════════════════════════════════════════
+    let max_allowed_diff = max_duration_tolerance(confidence, spotify_duration_sec);
     if duration_diff > max_allowed_diff {
         return -1000;
     }
 
-    // Duration score (graduated)
+    // ═══════════════════════════════════════════════════════════════════════
+    // STEP 4: Graduated duration scoring (spec-05 R5.3)
+    // Extended to handle relaxed matches (31-60s) with very low scores
+    // ═══════════════════════════════════════════════════════════════════════
     let dur_score = match duration_diff {
-        0..=2 => 100,
-        3..=5 => 80,
-        6..=10 => 50,
-        11..=15 => 25,
-        16..=30 => 10,
-        _ => 0,
+        0..=2 => 100,    // Near-perfect
+        3..=5 => 80,     // Excellent
+        6..=10 => 50,    // Good
+        11..=15 => 25,   // Acceptable
+        16..=30 => 10,   // Poor but possible
+        31..=45 => 5,    // Relaxed - very low (spec-05)
+        46..=60 => 2,    // Relaxed - minimal (spec-05)
+        _ => 1,          // Beyond 60s - near-zero (spec-05)
     };
 
     let mut score = dur_score;
 
     // ═══════════════════════════════════════════════════════════════════════
-    // GUARDRAIL 2: Artist verification
-    // Even though we matched on (title_norm, artist_norm), double-check
+    // STEP 5: Artist score
     // ═══════════════════════════════════════════════════════════════════════
-    let spotify_artist_norm = normalize_artist(&spotify.artist);
-    let artist_match = if spotify_artist_norm == group_artist_norm {
+    let artist_score = if artist_exact {
         50  // Exact match
     } else {
-        let sim = compute_artist_similarity(&spotify_artist_norm, group_artist_norm);
-        if sim < 0.3 {
-            return -500;  // Artist mismatch - reject
-        }
-        (sim * 30.0) as i32  // Partial credit
+        (artist_similarity * 30.0) as i32  // Partial credit
     };
-    score += artist_match;
+    score += artist_score;
 
     // LRCLIB quality score (existing logic, typically -50 to +80)
     score += lrclib_quality;
@@ -502,8 +573,21 @@ fn combined_score(
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // GUARDRAIL 3: Popularity as tiebreaker only (bounded)
-    // Keep influence bounded (0-10 points, not 0-20)
+    // STEP 6: Relaxed match penalty (spec-05 R5.4)
+    // For matches with >30s duration diff, require high confidence
+    // ═══════════════════════════════════════════════════════════════════════
+    if duration_diff > 30 {
+        // Relaxed matches require exact artist match
+        if !artist_exact {
+            return -1000;  // Reject relaxed match without exact artist
+        }
+        // Apply penalty to ensure relaxed matches need strong other signals
+        score -= 20;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STEP 7: Popularity as tiebreaker only (bounded)
+    // Keep influence bounded (0-10 points)
     // ═══════════════════════════════════════════════════════════════════════
     score += spotify.popularity / 10;
 
@@ -2703,12 +2787,50 @@ mod tests {
         assert_eq!(duration_score(432, 429_000), 80);
         // 7s off
         assert_eq!(duration_score(436, 429_000), 50);
-        // 15s off (currently rejected with hard ±10s, now acceptable)
+        // 15s off
         assert_eq!(duration_score(414, 429_000), 25);
         // 29s off
         assert_eq!(duration_score(400, 429_000), 10);
-        // 35s off - hard reject (diff > 30s)
-        assert_eq!(duration_score(394, 429_000), -1000);
+        // 35s off - relaxed, very low score (spec-05)
+        assert_eq!(duration_score(394, 429_000), 5);
+        // 50s off - relaxed, minimal score (spec-05)
+        assert_eq!(duration_score(379, 429_000), 2);
+        // 65s off - hard reject beyond 60s
+        assert_eq!(duration_score(364, 429_000), -1000);
+    }
+
+    // ========================================================================
+    // Spec-05: Adaptive Duration Tolerance Tests
+    // ========================================================================
+
+    #[test]
+    fn test_max_duration_tolerance_confidence_levels() {
+        // High confidence: base 60s
+        assert_eq!(max_duration_tolerance(MatchConfidence::High, 200), 60);
+        // Medium confidence: base 45s
+        assert_eq!(max_duration_tolerance(MatchConfidence::Medium, 200), 45);
+        // Low confidence: base 30s
+        assert_eq!(max_duration_tolerance(MatchConfidence::Low, 200), 30);
+    }
+
+    #[test]
+    fn test_max_duration_tolerance_ratio_based() {
+        // For long tracks (>5 min = 300s), ratio-based tolerance kicks in
+        // 600s track: 10% = 60s, matches High confidence base
+        assert_eq!(max_duration_tolerance(MatchConfidence::High, 600), 60);
+        // 700s track: 10% = 70s, exceeds High confidence base
+        assert_eq!(max_duration_tolerance(MatchConfidence::High, 700), 70);
+        // 900s track: 10% = 90s, at cap
+        assert_eq!(max_duration_tolerance(MatchConfidence::High, 900), 90);
+        // 1000s track: 10% = 100s, but capped at 90s
+        assert_eq!(max_duration_tolerance(MatchConfidence::High, 1000), 90);
+    }
+
+    #[test]
+    fn test_max_duration_tolerance_low_confidence_short_tracks() {
+        // Short tracks with low confidence stay at 30s base
+        assert_eq!(max_duration_tolerance(MatchConfidence::Low, 180), 30);
+        assert_eq!(max_duration_tolerance(MatchConfidence::Low, 240), 30);
     }
 
     #[test]
@@ -2801,6 +2923,122 @@ mod tests {
 
         let score = combined_score(&lrclib_track, 40, &spotify_track, "artist one");
         assert!(score < 0); // Should be rejected due to artist mismatch
+    }
+
+    #[test]
+    fn test_combined_score_relaxed_match_exact_artist() {
+        // Spec-05: Relaxed matches (>30s diff) are allowed with exact artist match
+        let lrclib_track = Track {
+            id: 1,
+            title: "Radio Edit".to_string(),
+            artist: "Artist".to_string(),
+            album: Some("Album".to_string()),
+            duration_sec: 250,  // 4:10
+        };
+        let spotify_track = SpotifyTrack {
+            id: "abc123".to_string(),
+            name: "Radio Edit".to_string(),
+            artist: "Artist".to_string(),
+            duration_ms: 295_000,  // 4:55 = 45s diff (relaxed)
+            popularity: 50,
+            isrc: None,
+            album_rowid: 1,
+        };
+
+        let score = combined_score(&lrclib_track, 40, &spotify_track, "artist");
+        // With exact artist match, relaxed match should be accepted
+        // Score breakdown:
+        // duration: 5 (31-45s range)
+        // artist: 50 (exact)
+        // quality: 40
+        // clean title: 30
+        // relaxed penalty: -20
+        // popularity: 5
+        // Total: 110
+        assert!(score >= ACCEPT_THRESHOLD, "Relaxed match with exact artist should be accepted, got {}", score);
+        assert_eq!(score, 110);
+    }
+
+    #[test]
+    fn test_combined_score_relaxed_match_partial_artist_rejected() {
+        // Spec-05: Relaxed matches (>30s diff) require exact artist match
+        let lrclib_track = Track {
+            id: 1,
+            title: "Song".to_string(),
+            artist: "Artist Foo".to_string(),
+            album: None,
+            duration_sec: 250,
+        };
+        let spotify_track = SpotifyTrack {
+            id: "abc123".to_string(),
+            name: "Song".to_string(),
+            artist: "Artist Bar".to_string(),  // Only partial match
+            duration_ms: 295_000,  // 45s diff (relaxed)
+            popularity: 50,
+            isrc: None,
+            album_rowid: 1,
+        };
+
+        let score = combined_score(&lrclib_track, 40, &spotify_track, "artist foo");
+        // Relaxed match without exact artist should be rejected
+        assert!(score < 0, "Relaxed match with partial artist should be rejected, got {}", score);
+    }
+
+    #[test]
+    fn test_combined_score_60s_diff_with_exact_artist() {
+        // Spec-05: Even 60s diff should work with high confidence
+        let lrclib_track = Track {
+            id: 1,
+            title: "Extended Mix".to_string(),
+            artist: "DJ Artist".to_string(),
+            album: Some("Singles".to_string()),
+            duration_sec: 300,  // 5:00
+        };
+        let spotify_track = SpotifyTrack {
+            id: "abc123".to_string(),
+            name: "Extended Mix".to_string(),
+            artist: "DJ Artist".to_string(),
+            duration_ms: 360_000,  // 6:00 = 60s diff
+            popularity: 70,
+            isrc: None,
+            album_rowid: 1,
+        };
+
+        let score = combined_score(&lrclib_track, 40, &spotify_track, "dj artist");
+        // 60s diff with exact artist should be accepted (barely)
+        // duration: 2 (46-60s range)
+        // artist: 50
+        // quality: 40
+        // clean title: 30
+        // relaxed penalty: -20
+        // popularity: 7
+        // Total: 109
+        assert!(score >= ACCEPT_THRESHOLD, "60s diff with exact artist should be accepted, got {}", score);
+    }
+
+    #[test]
+    fn test_combined_score_beyond_60s_rejected() {
+        // Spec-05: Beyond 60s should be rejected even with exact artist
+        let lrclib_track = Track {
+            id: 1,
+            title: "Song".to_string(),
+            artist: "Artist".to_string(),
+            album: None,
+            duration_sec: 180,  // 3:00
+        };
+        let spotify_track = SpotifyTrack {
+            id: "abc123".to_string(),
+            name: "Song".to_string(),
+            artist: "Artist".to_string(),
+            duration_ms: 250_000,  // 4:10 = 70s diff
+            popularity: 80,
+            isrc: None,
+            album_rowid: 1,
+        };
+
+        let score = combined_score(&lrclib_track, 40, &spotify_track, "artist");
+        // 70s diff is beyond max tolerance (60s for high confidence on 250s track)
+        assert!(score < 0, "70s diff should be rejected, got {}", score);
     }
 
     #[test]
@@ -2912,6 +3150,26 @@ mod tests {
         assert_eq!(stats.duration_matches_6_to_10, 1);
         assert_eq!(stats.duration_matches_11_to_15, 1);
         assert_eq!(stats.duration_matches_16_to_30, 1);
+    }
+
+    #[test]
+    fn test_matching_stats_duration_relaxed_buckets() {
+        // Spec-05: Test relaxed duration tracking
+        let mut stats = MatchingStats::default();
+
+        // Record relaxed duration differences (>30s)
+        stats.record_duration_bucket(35);   // 31-45
+        stats.record_duration_bucket(40);   // 31-45
+        stats.record_duration_bucket(45);   // 31-45
+        stats.record_duration_bucket(50);   // 46-60
+        stats.record_duration_bucket(60);   // 46-60
+        stats.record_duration_bucket(65);   // 61+
+        stats.record_duration_bucket(-55);  // abs -> 46-60
+
+        assert_eq!(stats.duration_relaxed_31_to_45, 3);
+        assert_eq!(stats.duration_relaxed_46_to_60, 3);
+        assert_eq!(stats.duration_relaxed_61_plus, 1);
+        assert_eq!(stats.total_relaxed_matches(), 7);
     }
 
     #[test]
