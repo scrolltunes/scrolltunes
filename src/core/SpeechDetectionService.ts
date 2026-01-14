@@ -1,9 +1,8 @@
 "use client"
 
 import { type SileroPreset, type SileroVADConfig, getPresetConfig } from "@/lib/silero-vad-config"
-import { ClientLayer, type ClientLayerContext } from "@/services/client-layer"
 import { loadPublicConfig } from "@/services/public-config"
-import { SoundSystemService } from "@/services/sound-system"
+import { SoundSystemLive, SoundSystemService } from "@/services/sound-system"
 import type { AudioError } from "@/sounds"
 import { Context, Data, Effect, Layer } from "effect"
 import { useSyncExternalStore } from "react"
@@ -104,10 +103,10 @@ class SpeechDetectionStore implements VoiceDetectionService<SpeechDetectionState
   private sileroEngine: SileroVADEngine | null = null
   private smoothedLevel = 0
 
-  private runSyncWithClientLayer<T, E, R extends ClientLayerContext>(
-    effect: Effect.Effect<T, E, R>,
+  private runSyncWithSoundSystem<T, E>(
+    effect: Effect.Effect<T, E, SoundSystemService>,
   ): T {
-    return Effect.runSync(effect.pipe(Effect.provide(ClientLayer)) as Effect.Effect<T, E, never>)
+    return Effect.runSync(effect.pipe(Effect.provide(SoundSystemLive)) as Effect.Effect<T, E, never>)
   }
 
   private readonly stopMicrophoneEffect: Effect.Effect<void, never, SoundSystemService> =
@@ -296,7 +295,7 @@ class SpeechDetectionStore implements VoiceDetectionService<SpeechDetectionState
       this.smoothedLevel = 0
     }
 
-    this.runSyncWithClientLayer(this.stopMicrophoneEffect)
+    this.runSyncWithSoundSystem(this.stopMicrophoneEffect)
 
     this.setState({
       isListening: false,
@@ -353,7 +352,7 @@ class SpeechDetectionStore implements VoiceDetectionService<SpeechDetectionState
       this.smoothedLevel = 0
     }
 
-    this.runSyncWithClientLayer(this.stopMicrophoneEffect)
+    this.runSyncWithSoundSystem(this.stopMicrophoneEffect)
     this.sileroConfig = getPresetConfig("normal")
     this.state = {
       isListening: false,
