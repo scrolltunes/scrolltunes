@@ -3,6 +3,18 @@ name = "lrclib-extract"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "lrclib_extract"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lrclib-extract"
+path = "src/main.rs"
+
+[[bin]]
+name = "normalize-spotify"
+path = "src/bin/normalize-spotify.rs"
+
 [dependencies]
 rusqlite = { version = "0.31", features = ["bundled"] }
 rayon = "1.10"

@@ -1,291 +1,242 @@
-# Current Plan: Spec 01 - Normalization Improvements
+# Current Plan: Spec 01 - Normalization Unification (Task 1.1)
 
 ## Spec Reference
 [specs/spec-01-normalization.md](specs/spec-01-normalization.md)
 
 ## Overview
-Enhance title and artist normalization to fix matching failures caused by track number prefixes, artist names in titles, diacritics, and encoding issues.
+Extract all normalization code from `main.rs` and `normalize-spotify.rs` into a shared `normalize.rs` module to prevent drift and ensure byte-identical normalization across both binaries.
+
+## Problem Statement
+The normalization code is currently duplicated between:
+- `scripts/lrclib-extract/src/main.rs` (lines 210-717)
+- `scripts/lrclib-extract/src/bin/normalize-spotify.rs` (lines 19-392)
+
+Key differences discovered:
+1. **TITLE_PATTERNS**: Different regex patterns (main.rs has more sophisticated patterns)
+2. **normalize_punctuation()**: main.rs has encoding fixes (`?t` → `'t`) and multi-space collapsing; normalize-spotify.rs is simpler
+3. **normalize_title()**: Different ordering of operations between files
+4. **is_combining_mark()**: Different syntax forms (equivalent but not byte-identical)
+5. **main.rs-only**: `MULTI_SPACE`, `normalize_title_with_artist()`, `extract_primary_artist()`, `ARTIST_SEPARATOR`
+6. **ARTIST_TRANSLITERATIONS**: Both have ~205 entries but ordering may differ
+
+Any divergence produces `no_candidates` failures in the exact-key pipeline.
+
+---
 
 ## Tasks
 
-### Task 1: Add unicode-normalization dependency
-- **File:** `scripts/lrclib-extract/Cargo.toml`
-- **Line:** 14 (after `rustc-hash`)
-- **Changes:** Add `unicode-normalization = "0.1"` dependency
-- **Validation:** `cargo check` compiles successfully
-
----
-
-### Task 2: Add unicode-normalization import
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** 1-10 (imports section)
-- **Changes:** Add `use unicode_normalization::UnicodeNormalization;`
-- **Validation:** `cargo check` compiles successfully
-
----
-
-### Task 3: Add TRACK_NUMBER_PREFIX regex constant
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** After line 130 (after `TITLE_PATTERNS`)
-- **Changes:** Add static regex pattern:
+### Task 1: Create `normalize.rs` module file
+- **File:** `scripts/lrclib-extract/src/normalize.rs` (NEW)
+- **Changes:** Create new file with module structure:
   ```rust
-  static TRACK_NUMBER_PREFIX: Lazy<Regex> = Lazy::new(||
-      Regex::new(r"(?i)^(?:track\s*)?\d{1,4}\s*[-–—._]\s*").unwrap()
-  );
+  //! Shared normalization functions for LRCLIB-Spotify matching.
+  //! Used by both lrclib-extract and normalize-spotify binaries.
+  //!
+  //! CRITICAL: Any changes here affect both binaries. Run tests after changes.
+
+  use any_ascii::any_ascii;
+  use once_cell::sync::Lazy;
+  use regex::Regex;
+  use rustc_hash::FxHashMap;
+  use unicode_normalization::UnicodeNormalization;
+
+  // Module contents will be added in subsequent tasks
   ```
-- **Validation:** `cargo check` compiles successfully
+- **Validation:** `cargo check` compiles (empty module is valid)
 
 ---
 
-### Task 4: Add MOJIBAKE_SUFFIX regex constant
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** After TRACK_NUMBER_PREFIX (or after line 130)
-- **Changes:** Add static regex pattern:
-  ```rust
-  static MOJIBAKE_SUFFIX: Lazy<Regex> = Lazy::new(||
-      Regex::new(r"[\uFFFD]+$").unwrap()
-  );
-  ```
-- **Validation:** `cargo check` compiles successfully
+### Task 2: Move regex constants to `normalize.rs`
+- **File:** `scripts/lrclib-extract/src/normalize.rs`
+- **Changes:** Add all regex patterns (using main.rs versions as canonical):
+  - `TRACK_NUMBER_PREFIX` (line 248 in main.rs)
+  - `TRACK_NUMBER_SPACE_PREFIX` (line 255 in main.rs)
+  - `MOJIBAKE_SUFFIX` (line 260 in main.rs)
+  - `BRACKET_SUFFIX` (line 265 in main.rs)
+  - `FILE_EXTENSION` (line 270 in main.rs)
+  - `YEAR_SUFFIX` (line 275 in main.rs)
+  - `TITLE_PATTERNS` (line 210 in main.rs)
+  - `ARTIST_PATTERNS` (line 279 in main.rs)
+  - `MULTI_SPACE` (line 585 in main.rs)
+  - `ARTIST_SEPARATOR` (line 721 in main.rs)
+- **Note:** Export all as `pub static`
+- **Validation:** `cargo check` compiles
 
 ---
 
-### Task 5: Implement is_combining_mark() helper function
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** After line 240 (after `should_skip_title` function at line 238, before `normalize_title` at line 242)
-- **Changes:** Add helper function:
+### Task 3: Move `ARTIST_TRANSLITERATIONS` to `normalize.rs`
+- **File:** `scripts/lrclib-extract/src/normalize.rs`
+- **Changes:** Move the full ARTIST_TRANSLITERATIONS map from main.rs (lines 340-561)
+- **Note:** This is ~205 entries. Export as `pub static`
+- **Validation:** `cargo check` compiles
+
+---
+
+### Task 4: Move helper functions to `normalize.rs`
+- **File:** `scripts/lrclib-extract/src/normalize.rs`
+- **Changes:** Add helper functions:
   ```rust
-  fn is_combining_mark(c: char) -> bool {
+  /// Check if a character is a Unicode combining mark (diacritical mark).
+  pub fn is_combining_mark(c: char) -> bool {
       matches!(c as u32, 0x0300..=0x036F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0xFE20..=0xFE2F)
   }
-  ```
-- **Validation:** `cargo check` compiles successfully
 
----
-
-### Task 6: Implement fold_to_ascii() function
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** After `is_combining_mark()` function
-- **Changes:** Add function:
-  ```rust
-  fn fold_to_ascii(s: &str) -> String {
-      s.nfkd()
+  /// Fold Unicode text to ASCII by applying NFKD decomposition and removing combining marks.
+  pub fn fold_to_ascii(s: &str) -> String {
+      let stripped: String = s.nfkd()
           .filter(|c| !is_combining_mark(*c))
-          .collect::<String>()
-          .to_lowercase()
+          .collect();
+      any_ascii(&stripped).to_lowercase()
+  }
+
+  /// Normalize punctuation by converting curly quotes and fixing encoding issues.
+  pub fn normalize_punctuation(s: &str) -> String {
+      // Use main.rs version with encoding fixes and multi-space collapsing
   }
   ```
-- **Validation:** `cargo check` compiles successfully
+- **Validation:** `cargo check` compiles
 
 ---
 
-### Task 7: Implement normalize_punctuation() function
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** After `fold_to_ascii()` function
-- **Changes:** Add function:
-  ```rust
-  fn normalize_punctuation(s: &str) -> String {
-      s.replace([''', '''], "'")
-       .replace(['"', '"'], "\"")
-       .replace(['´', '`'], "'")
-       .replace(" & ", " and ")
-  }
-  ```
-- **Validation:** `cargo check` compiles successfully
+### Task 5: Move `normalize_title()` to `normalize.rs`
+- **File:** `scripts/lrclib-extract/src/normalize.rs`
+- **Changes:** Add `normalize_title()` function using main.rs implementation (lines 613-641)
+- **Signature:** `pub fn normalize_title(title: &str) -> String`
+- **Validation:** `cargo check` compiles
 
 ---
 
-### Task 8: Update normalize_title() to use new helpers
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** 242-248 (current `normalize_title` function)
-- **Changes:** Update function to:
-  1. Apply `normalize_punctuation()` first
-  2. Strip track number prefix using `TRACK_NUMBER_PREFIX`
-  3. Strip mojibake suffix using `MOJIBAKE_SUFFIX`
-  4. Apply existing TITLE_PATTERNS
-  5. Apply `fold_to_ascii()` as final step
-  ```rust
-  fn normalize_title(title: &str) -> String {
-      let mut result = normalize_punctuation(title);
-
-      // Strip track number prefix
-      result = TRACK_NUMBER_PREFIX.replace(&result, "").to_string();
-
-      // Strip mojibake suffix
-      result = MOJIBAKE_SUFFIX.replace(&result, "").to_string();
-
-      // Apply existing patterns
-      for pattern in TITLE_PATTERNS.iter() {
-          result = pattern.replace_all(&result, "").to_string();
-      }
-
-      fold_to_ascii(&result).trim().to_string()
-  }
-  ```
-- **Validation:** `cargo check` compiles successfully
+### Task 6: Move `normalize_title_with_artist()` to `normalize.rs`
+- **File:** `scripts/lrclib-extract/src/normalize.rs`
+- **Changes:** Add function from main.rs (lines 645-682)
+- **Signature:** `pub fn normalize_title_with_artist(title: &str, artist: &str) -> String`
+- **Validation:** `cargo check` compiles
 
 ---
 
-### Task 9: Implement normalize_title_with_artist() 2-arg function
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** After updated `normalize_title()` function
-- **Changes:** Add function that additionally strips artist prefix from title:
-  ```rust
-  fn normalize_title_with_artist(title: &str, artist: &str) -> String {
-      let mut result = normalize_punctuation(title);
-
-      // Strip track number prefix
-      result = TRACK_NUMBER_PREFIX.replace(&result, "").to_string();
-
-      // Strip artist prefix if artist is long enough
-      let artist_norm = normalize_artist(artist);
-      if artist_norm.len() >= 3 {
-          let escaped = regex::escape(&artist_norm);
-          if let Ok(prefix_re) = Regex::new(&format!(r"(?i)^\s*{}\s*[-–—:]\s*", escaped)) {
-              result = prefix_re.replace(&result, "").to_string();
-          }
-      }
-
-      // Strip mojibake suffix
-      result = MOJIBAKE_SUFFIX.replace(&result, "").to_string();
-
-      // Apply existing patterns
-      for pattern in TITLE_PATTERNS.iter() {
-          result = pattern.replace_all(&result, "").to_string();
-      }
-
-      fold_to_ascii(&result).trim().to_string()
-  }
-  ```
-- **Validation:** `cargo check` compiles successfully
+### Task 7: Move `normalize_artist()` to `normalize.rs`
+- **File:** `scripts/lrclib-extract/src/normalize.rs`
+- **Changes:** Add function from main.rs (lines 684-717)
+- **Signature:** `pub fn normalize_artist(artist: &str) -> String`
+- **Note:** Includes transliteration lookup (pre-fold and post-fold)
+- **Validation:** `cargo check` compiles
 
 ---
 
-### Task 10: Update normalize_artist() to use fold_to_ascii()
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** 250-262 (current `normalize_artist` function)
-- **Changes:** Update to apply `normalize_punctuation()` and `fold_to_ascii()` for consistent diacritic handling:
-  ```rust
-  fn normalize_artist(artist: &str) -> String {
-      let mut result = normalize_punctuation(artist);
-      for pattern in ARTIST_PATTERNS.iter() {
-          result = pattern.replace_all(&result, "").to_string();
-      }
-      let normalized = fold_to_ascii(&result).trim().to_string();
-
-      // Apply transliteration for known Cyrillic artists
-      ARTIST_TRANSLITERATIONS
-          .get(normalized.as_str())
-          .map(|&s| s.to_string())
-          .unwrap_or(normalized)
-  }
-  ```
-- **Validation:** `cargo check` compiles successfully
+### Task 8: Move `extract_primary_artist()` to `normalize.rs`
+- **File:** `scripts/lrclib-extract/src/normalize.rs`
+- **Changes:** Add function from main.rs (lines 730-744)
+- **Signature:** `pub fn extract_primary_artist(artist_norm: &str) -> Option<String>`
+- **Validation:** `cargo check` compiles
 
 ---
 
-### Task 11: Update select_canonical() to use normalize_title_with_artist()
+### Task 9: Update `main.rs` to use shared module
 - **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** 386-387 (in `select_canonical` function at line 373)
-- **Changes:** Replace:
-  ```rust
-  let title_norm = normalize_title(&tracks[0].title);
-  ```
-  With:
-  ```rust
-  let title_norm = normalize_title_with_artist(&tracks[0].title, &tracks[0].artist);
-  ```
-- **Validation:** `cargo check` compiles successfully
+- **Changes:**
+  1. Add `mod normalize;` after other imports
+  2. Add `use normalize::*;` to import all public items
+  3. Remove all normalization code from main.rs:
+     - Delete lines 210-285 (TITLE_PATTERNS, regex constants)
+     - Delete lines 340-561 (ARTIST_TRANSLITERATIONS)
+     - Delete lines 563-744 (helper functions, normalize_* functions)
+     - Keep remaining scoring/matching logic
+- **Validation:** `cargo check` compiles
 
 ---
 
-### Task 12: Update group_tracks() to use normalize_title_with_artist()
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** 510 (in `group_tracks` function at line 506)
-- **Changes:** Replace:
-  ```rust
-  let key = (normalize_title(&track.title), normalize_artist(&track.artist));
-  ```
-  With:
-  ```rust
-  let key = (normalize_title_with_artist(&track.title, &track.artist), normalize_artist(&track.artist));
-  ```
-- **Validation:** `cargo check` compiles successfully
+### Task 10: Update `normalize-spotify.rs` to use shared module
+- **File:** `scripts/lrclib-extract/src/bin/normalize-spotify.rs`
+- **Changes:**
+  1. Replace `use any_ascii::any_ascii;` and other normalization imports with:
+     ```rust
+     use lrclib_extract::normalize::{normalize_title, normalize_artist};
+     ```
+  2. Delete all normalization code (lines 19-392):
+     - All `static` regex patterns
+     - `ARTIST_TRANSLITERATIONS`
+     - `is_combining_mark()`, `fold_to_ascii()`, `normalize_punctuation()`
+     - `normalize_title()`, `normalize_artist()`
+  3. Keep only the main logic for database operations
+- **Validation:** `cargo check` compiles
 
 ---
 
-### Task 13: Update stream_match_spotify() to use normalize_title_with_artist()
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** 629 (in `stream_match_spotify` function at line 575)
-- **Changes:** Replace:
+### Task 11: Add `lib.rs` for crate exports
+- **File:** `scripts/lrclib-extract/src/lib.rs` (NEW)
+- **Changes:** Create library entry point:
   ```rust
-  let title_norm = normalize_title(&spotify_track.name);
+  //! LRCLIB extraction library - shared modules for all binaries.
+
+  pub mod normalize;
   ```
-  With:
-  ```rust
-  let title_norm = normalize_title_with_artist(&spotify_track.name, &spotify_track.artist);
-  ```
-- **Validation:** `cargo check` compiles successfully
+- **Note:** Required for `normalize-spotify.rs` to import from the crate
+- **Validation:** `cargo check` compiles
 
 ---
 
-### Task 14: Add unit tests for normalization functions
-- **File:** `scripts/lrclib-extract/src/main.rs`
-- **Line:** End of file (before closing main, as new test module)
-- **Changes:** Add test module:
+### Task 12: Update `Cargo.toml` for library + binary structure
+- **File:** `scripts/lrclib-extract/Cargo.toml`
+- **Changes:** Add library definition (if not already present):
+  ```toml
+  [lib]
+  name = "lrclib_extract"
+  path = "src/lib.rs"
+
+  [[bin]]
+  name = "lrclib-extract"
+  path = "src/main.rs"
+
+  [[bin]]
+  name = "normalize-spotify"
+  path = "src/bin/normalize-spotify.rs"
+  ```
+- **Validation:** `cargo check` compiles both binaries
+
+---
+
+### Task 13: Verify both binaries compile
+- **File:** N/A
+- **Changes:** N/A
+- **Validation:** Run `cargo build --release` and verify both binaries compile:
+  - `target/release/lrclib-extract`
+  - `target/release/normalize-spotify`
+
+---
+
+### Task 14: Add basic unit tests to `normalize.rs`
+- **File:** `scripts/lrclib-extract/src/normalize.rs`
+- **Changes:** Add test module at the end:
   ```rust
   #[cfg(test)]
   mod tests {
       use super::*;
 
       #[test]
-      fn test_track_number_stripping() {
-          assert_eq!(normalize_title("03 - Love You To Death"), "love you to death");
-          assert_eq!(normalize_title("Track 5 - Song Name"), "song name");
-          assert_eq!(normalize_title("01. First Song"), "first song");
-          assert_eq!(normalize_title("0958 - Artist - Song"), "artist - song");
+      fn test_normalize_title_basic() {
+          assert_eq!(normalize_title("03 - Song Name"), "song name");
+          assert_eq!(normalize_title("Song [Mono]"), "song");
+          assert_eq!(normalize_title("Track (2021 Remaster)"), "track");
       }
 
       #[test]
-      fn test_diacritic_folding() {
-          assert_eq!(fold_to_ascii("Beyoncé"), "beyonce");
-          assert_eq!(fold_to_ascii("naïve"), "naive");
+      fn test_normalize_artist_basic() {
+          assert_eq!(normalize_artist("The Beatles"), "beatles");
+          assert_eq!(normalize_artist("Band, The"), "band");
+          assert_eq!(normalize_artist("Artist feat. Other"), "artist");
+      }
+
+      #[test]
+      fn test_fold_to_ascii() {
+          assert_eq!(fold_to_ascii("Björk"), "bjork");
           assert_eq!(fold_to_ascii("Motörhead"), "motorhead");
-          assert_eq!(fold_to_ascii("Sigur Rós"), "sigur ros");
+          assert_eq!(fold_to_ascii("Beyoncé"), "beyonce");
       }
 
       #[test]
-      fn test_artist_prefix_stripping() {
-          assert_eq!(
-              normalize_title_with_artist("Type O Negative - Love You To Death", "Type O Negative"),
-              "love you to death"
-          );
-          assert_eq!(
-              normalize_title_with_artist("Metallica: Enter Sandman", "Metallica"),
-              "enter sandman"
-          );
-      }
-
-      #[test]
-      fn test_punctuation_normalization() {
-          assert_eq!(normalize_punctuation("Rock 'n' Roll"), "Rock 'n' Roll");
-          assert_eq!(normalize_punctuation(""Quoted""), "\"Quoted\"");
-          assert_eq!(normalize_punctuation("Rock & Roll"), "Rock and Roll");
-      }
-
-      #[test]
-      fn test_mojibake_cleanup() {
-          assert_eq!(normalize_title("Song Title\u{FFFD}"), "song title");
-          assert_eq!(normalize_title("Song Title\u{FFFD}\u{FFFD}"), "song title");
-      }
-
-      #[test]
-      fn test_combined_normalization() {
-          // Track number + diacritics + remaster suffix
-          assert_eq!(
-              normalize_title("03 - Beyoncé - Single Ladies (Remastered 2020)"),
-              "beyonce - single ladies"
-          );
+      fn test_transliteration() {
+          assert_eq!(normalize_artist("кино"), "kino");
+          assert_eq!(normalize_artist("אייל גולן"), "eyal golan");
       }
   }
   ```
@@ -296,47 +247,62 @@ Enhance title and artist normalization to fix matching failures caused by track 
 ### Task 15: Run full test suite
 - **File:** N/A
 - **Changes:** N/A
-- **Validation:** Run `cargo test` in `scripts/lrclib-extract/` directory and verify all tests pass
+- **Validation:** `cargo test` passes all tests
 
 ---
 
-### Task 16: Build release and verify compilation
-- **File:** N/A
-- **Changes:** N/A
-- **Validation:** Run `cargo build --release` and verify successful compilation
-
----
-
-## Validation Command
+## Validation Commands
 
 ```bash
-cd scripts/lrclib-extract && cargo test && cargo build --release
+cd scripts/lrclib-extract
+
+# Check compilation
+cargo check
+
+# Run tests
+cargo test
+
+# Build release binaries
+cargo build --release
+
+# Verify both binaries exist
+ls -la target/release/lrclib-extract target/release/normalize-spotify
 ```
 
 ## Done When
 
-- [x] `unicode-normalization` dependency added to Cargo.toml
-- [x] Track numbers stripped from title_norm (e.g., "03 - Song" → "song")
-- [x] Artist prefixes stripped from title_norm (e.g., "Artist - Song" → "song" when artist="Artist")
-- [x] Diacritics folded (Beyoncé matches beyonce)
-- [x] Mojibake suffixes removed (\uFFFD characters)
-- [x] Punctuation normalized (curly quotes → straight quotes, & → and)
-- [x] All unit tests pass (`cargo test`)
-- [x] Release build succeeds (`cargo build --release`)
+- [x] `normalize.rs` module exists with all normalization code
+- [x] `lib.rs` exports the normalize module
+- [x] `main.rs` uses `mod normalize; use normalize::*;`
+- [x] `normalize-spotify.rs` uses `use lrclib_extract::normalize::*;`
+- [x] No normalization code duplicated in either binary
+- [x] `cargo test` passes (27 tests pass)
+- [x] `cargo build --release` produces both binaries
 
 ## Notes
 
-### Key Integration Points
-1. **group_tracks() at line 506**: Uses normalize functions to create grouping keys
-2. **select_canonical() at line 373**: Uses normalize functions for title_norm/artist_norm fields
-3. **stream_match_spotify() at line 575**: Uses normalize functions to match Spotify tracks
+### Migration Strategy
+1. Create new files first (normalize.rs, lib.rs)
+2. Copy code to normalize.rs (don't delete from main.rs yet)
+3. Update main.rs to use module
+4. Verify main.rs still works
+5. Update normalize-spotify.rs
+6. Verify normalize-spotify still works
+7. Delete duplicated code from original locations
 
-### Existing Patterns to Follow
-- Static regex patterns use `Lazy<Regex>` with `once_cell::sync::Lazy`
-- Functions follow snake_case naming
-- Error handling uses `Result<T>` with `anyhow`
-- Existing test patterns should be followed
+### Key Differences to Resolve (Using main.rs as canonical)
+| Item | main.rs | normalize-spotify.rs | Resolution |
+|------|---------|---------------------|------------|
+| `normalize_punctuation` | Has encoding fixes | Simpler | Use main.rs version |
+| `normalize_title` order | punct→ext→track→space→bracket→year→moji→patterns→fold | ext→year→bracket→track→space→moji→punct→fold→patterns | Use main.rs version |
+| `TITLE_PATTERNS` | 16 patterns | 4 patterns | Use main.rs version |
+| `is_combining_mark` | `c as u32` syntax | char literal syntax | Use main.rs version (equivalent) |
 
-### Potential Issues
-- The `normalize_title_with_artist()` function creates a new Regex for each call when stripping artist prefix. This could be optimized later if performance is a concern, but for correctness we can accept this initially.
-- The spec shows example test assertions that may need adjustment based on actual regex behavior (e.g., "03 - Beyoncé - Single Ladies" might retain "beyonce - single ladies" not just "single ladies" depending on whether artist stripping is applied).
+### Files to Create
+- `scripts/lrclib-extract/src/normalize.rs` (NEW)
+- `scripts/lrclib-extract/src/lib.rs` (NEW)
+
+### Files to Modify
+- `scripts/lrclib-extract/src/main.rs` (remove normalization code)
+- `scripts/lrclib-extract/src/bin/normalize-spotify.rs` (remove normalization code, add import)
+- `scripts/lrclib-extract/Cargo.toml` (add lib section)
