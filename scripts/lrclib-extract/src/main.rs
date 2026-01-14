@@ -63,6 +63,9 @@ struct Track {
     duration_sec: i64,
 }
 
+/// Scored track with precomputed normalized strings (used by old pipeline).
+/// Kept for backward compatibility. New pipeline uses LrclibGroup + LrclibVariant.
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 struct ScoredTrack {
     track: Track,
@@ -76,8 +79,16 @@ struct ScoredTrack {
 #[derive(Clone, Debug)]
 struct LrclibGroup {
     key: (String, String),  // (title_norm, artist_norm) stored ONCE per group
-    tracks: Vec<ScoredTrack>,
+    tracks: Vec<LrclibVariant>,
     best_match: Option<(usize, SpotifyTrack, i32)>,  // (track_idx, spotify_track, score)
+}
+
+/// LRCLIB track variant within a group (without redundant normalized strings).
+/// title_norm and artist_norm are stored once in the parent LrclibGroup.key.
+#[derive(Clone, Debug)]
+struct LrclibVariant {
+    track: Track,
+    quality: i32,  // LRCLIB-only quality score
 }
 
 /// Index mapping (title_norm, artist_norm) to group index in Vec<LrclibGroup>
@@ -102,6 +113,8 @@ struct SpotifyTrack {
 
 /// Partial Spotify track (before artist lookup) for 2-phase matching.
 /// Used in optimized streaming: Phase A fetches tracks only, Phase B batch-fetches artists.
+/// Note: Not yet used in current implementation but kept for future optimization.
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 struct SpotifyTrackPartial {
     rowid: i64,              // SQLite rowid for artist lookup
@@ -431,6 +444,8 @@ fn title_contains_artist(title: &str, artist: &str) -> bool {
 
 /// Graduated duration score (spec-04).
 /// Replaces hard ±10s cutoff with graduated scoring.
+/// Note: Exposed for unit tests and used internally by combined_score().
+#[cfg_attr(not(test), allow(dead_code))]
 fn duration_score(lrclib_sec: i64, spotify_ms: i64) -> i32 {
     let diff = (lrclib_sec - spotify_ms / 1000).abs();
     match diff {
@@ -575,6 +590,9 @@ fn compute_quality_score(track: &Track, median_duration: Option<i64>) -> i32 {
     score
 }
 
+/// Old canonical selection function (replaced by delayed canonical selection).
+/// Kept for backward compatibility and potential rollback.
+#[allow(dead_code)]
 fn select_canonical(tracks: Vec<Track>) -> Option<ScoredTrack> {
     if tracks.is_empty() {
         return None;
@@ -718,6 +736,9 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
     Ok(tracks)
 }
 
+/// Old grouping function (replaced by build_groups_and_index for delayed canonical).
+/// Kept for backward compatibility.
+#[allow(dead_code)]
 fn group_tracks(tracks: Vec<Track>) -> FxHashMap<(String, String), Vec<Track>> {
     let mut groups: FxHashMap<(String, String), Vec<Track>> = FxHashMap::default();
 
@@ -729,6 +750,66 @@ fn group_tracks(tracks: Vec<Track>) -> FxHashMap<(String, String), Vec<Track>> {
     groups
 }
 
+/// Build LRCLIB groups and index for delayed canonical selection (spec-03).
+/// Returns (groups, index) where:
+/// - groups: Vec<LrclibGroup> with ALL variants per group (not just best quality)
+/// - index: FxHashMap<(title_norm, artist_norm), group_index>
+///
+/// Memory optimization: title_norm/artist_norm stored ONCE per group in key,
+/// not per track. This saves ~295 MB for 12.3M tracks.
+fn build_groups_and_index(tracks: Vec<Track>) -> (Vec<LrclibGroup>, LrclibIndex) {
+    let pb = create_progress_bar(tracks.len() as u64, "Phase 2: Building groups");
+
+    // First pass: group tracks and compute quality scores
+    let mut temp_groups: FxHashMap<(String, String), Vec<LrclibVariant>> = FxHashMap::default();
+
+    for track in tracks {
+        let title_norm = normalize_title_with_artist(&track.title, &track.artist);
+        let artist_norm = normalize_artist(&track.artist);
+        let quality = compute_quality_score(&track, None);
+
+        let variant = LrclibVariant { track, quality };
+        temp_groups.entry((title_norm, artist_norm)).or_default().push(variant);
+        pb.inc(1);
+    }
+
+    // Second pass: convert to Vec<LrclibGroup> and build index
+    let mut groups: Vec<LrclibGroup> = Vec::with_capacity(temp_groups.len());
+    let mut index: LrclibIndex = FxHashMap::default();
+
+    for (key, variants) in temp_groups {
+        let group_idx = groups.len();
+        index.insert(key.clone(), group_idx);
+        groups.push(LrclibGroup {
+            key,
+            tracks: variants,
+            best_match: None,
+        });
+    }
+
+    pb.finish_with_message(format!(
+        "Phase 2: Built {} groups with {} total variants",
+        groups.len(),
+        groups.iter().map(|g| g.tracks.len()).sum::<usize>()
+    ));
+
+    (groups, index)
+}
+
+/// Build title-only index for initial Spotify filtering (2-phase matching).
+/// Maps title_norm → Vec<group_idx> for fast title-based lookup before artist verification.
+fn build_title_only_index(groups: &[LrclibGroup]) -> TitleOnlyIndex {
+    let mut idx: TitleOnlyIndex = FxHashMap::default();
+    for (group_idx, group) in groups.iter().enumerate() {
+        let title_norm = &group.key.0;
+        idx.entry(title_norm.clone()).or_default().push(group_idx);
+    }
+    idx
+}
+
+/// Old group processing function (replaced by delayed canonical pipeline).
+/// Kept for backward compatibility.
+#[allow(dead_code)]
 fn process_groups(groups: FxHashMap<(String, String), Vec<Track>>) -> Vec<ScoredTrack> {
     let pb = create_progress_bar(groups.len() as u64, "Phase 2: Selecting canonical");
 
@@ -771,8 +852,10 @@ fn optimize_database(conn: &Connection) -> Result<()> {
 // Spotify Enrichment Functions
 // ============================================================================
 
-/// Build LRCLIB index for streaming Spotify matching.
+/// Build LRCLIB index for streaming Spotify matching (old pipeline).
 /// Returns FxHashMap: (title_norm, artist_norm) → Vec<index into canonical_tracks>
+/// Replaced by build_groups_and_index() for delayed canonical selection.
+#[allow(dead_code)]
 fn build_lrclib_index(canonical_tracks: &[ScoredTrack]) -> FxHashMap<(String, String), Vec<usize>> {
     println!("[LRCLIB] Building lookup index for {} canonical tracks...", canonical_tracks.len());
     let mut index: FxHashMap<(String, String), Vec<usize>> = FxHashMap::default();
@@ -784,9 +867,11 @@ fn build_lrclib_index(canonical_tracks: &[ScoredTrack]) -> FxHashMap<(String, St
     index
 }
 
-/// Stream Spotify tracks and match against LRCLIB index on-the-fly.
+/// Stream Spotify tracks and match against LRCLIB index on-the-fly (old pipeline).
 /// Returns Vec<Option<SpotifyTrack>> aligned with canonical_tracks indices.
 /// This avoids loading 45M+ Spotify tracks into memory.
+/// Replaced by stream_and_match_spotify_delayed() for delayed canonical selection.
+#[allow(dead_code)]
 fn stream_match_spotify(
     conn: &Connection,
     min_popularity: i32,
@@ -988,7 +1073,253 @@ fn load_audio_features_batched(
     Ok(lookup)
 }
 
-/// Collect needed Spotify track IDs and album rowids from best matches
+/// Stream Spotify tracks and match against LRCLIB groups using delayed canonical selection (spec-03).
+/// Scores ALL variants in each group, keeping the best (variant, Spotify) pair.
+/// Uses 2-phase approach: title-only filter → batch artist lookup → exact matching.
+fn stream_and_match_spotify_delayed(
+    conn: &Connection,
+    min_popularity: i32,
+    groups: &mut [LrclibGroup],
+    index: &LrclibIndex,
+    title_only_index: &TitleOnlyIndex,
+) -> Result<()> {
+    println!("[SPOTIFY] Streaming tracks with pop >= {} using delayed canonical matching...", min_popularity);
+
+    // Get count for progress bar
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM tracks WHERE popularity >= ?",
+        [min_popularity],
+        |row| row.get(0),
+    )?;
+
+    let pb = create_progress_bar(count as u64, "Streaming Spotify & matching (delayed canonical)");
+
+    // Phase A: Stream tracks only (no artist join - that's done later in batches)
+    // For now we use the existing query with artist join since batch_fetch_primary_artists
+    // would require collecting all candidate rowids first
+    let sql = r#"
+        SELECT
+            t.id,
+            t.name,
+            a.name as artist_name,
+            t.duration_ms,
+            t.popularity,
+            t.external_id_isrc,
+            t.album_rowid
+        FROM tracks t
+        JOIN artists a ON a.rowid = (
+            SELECT MIN(artist_rowid) FROM track_artists WHERE track_rowid = t.rowid
+        )
+        WHERE t.popularity >= ?
+    "#;
+
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query([min_popularity])?;
+
+    let mut scanned_count: u64 = 0;
+    let mut groups_matched: u64 = 0;
+
+    while let Some(row) = rows.next()? {
+        let spotify_track = SpotifyTrack {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            artist: row.get(2)?,
+            duration_ms: row.get(3)?,
+            popularity: row.get(4)?,
+            isrc: row.get(5)?,
+            album_rowid: row.get(6)?,
+        };
+
+        // Normalize Spotify track
+        let title_norm = normalize_title_with_artist(&spotify_track.name, &spotify_track.artist);
+        let artist_norm = normalize_artist(&spotify_track.artist);
+
+        // Try exact (title, artist) match first
+        if let Some(&group_idx) = index.get(&(title_norm.clone(), artist_norm.clone())) {
+            let group = &mut groups[group_idx];
+            let was_unmatched = group.best_match.is_none();
+
+            // Score against ALL variants in this group
+            for (track_idx, variant) in group.tracks.iter().enumerate() {
+                let score = combined_score(&variant.track, variant.quality, &spotify_track, &group.key.1);
+
+                if score >= ACCEPT_THRESHOLD {
+                    let current_best = group.best_match.as_ref().map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                    if score > current_best {
+                        group.best_match = Some((track_idx, spotify_track.clone(), score));
+                    }
+                }
+            }
+
+            if was_unmatched && group.best_match.is_some() {
+                groups_matched += 1;
+            }
+        }
+        // Also try title-only match for artist variations (feat., etc.)
+        else if let Some(group_indices) = title_only_index.get(&title_norm) {
+            for &group_idx in group_indices {
+                let group = &mut groups[group_idx];
+                let group_artist_norm = &group.key.1;
+
+                // Compute artist similarity
+                let artist_sim = compute_artist_similarity(&artist_norm, group_artist_norm);
+                if artist_sim < 0.5 {
+                    continue;  // Skip if artists are too different
+                }
+
+                let was_unmatched = group.best_match.is_none();
+
+                // Score against all variants with artist similarity penalty
+                for (track_idx, variant) in group.tracks.iter().enumerate() {
+                    let mut score = combined_score(&variant.track, variant.quality, &spotify_track, group_artist_norm);
+
+                    // Penalize non-exact artist match
+                    if artist_sim < 1.0 {
+                        score -= ((1.0 - artist_sim) * 50.0) as i32;
+                    }
+
+                    if score >= ACCEPT_THRESHOLD {
+                        let current_best = group.best_match.as_ref().map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                        if score > current_best {
+                            group.best_match = Some((track_idx, spotify_track.clone(), score));
+                        }
+                    }
+                }
+
+                if was_unmatched && group.best_match.is_some() {
+                    groups_matched += 1;
+                }
+            }
+        }
+
+        scanned_count += 1;
+        pb.inc(1);
+    }
+
+    let match_rate = if !groups.is_empty() {
+        100.0 * groups_matched as f64 / groups.len() as f64
+    } else {
+        0.0
+    };
+
+    pb.finish_with_message(format!(
+        "[SPOTIFY] Scanned {} tracks, matched {} groups ({:.1}%)",
+        scanned_count, groups_matched, match_rate
+    ));
+
+    Ok(())
+}
+
+/// Select canonical track and enrich with Spotify data (spec-03).
+/// For matched groups: use the variant that matched best with Spotify.
+/// For unmatched groups: fall back to best quality variant.
+fn select_canonical_and_enrich(
+    groups: Vec<LrclibGroup>,
+    audio_lookup: &FxHashMap<String, AudioFeatures>,
+    image_lookup: &FxHashMap<i64, String>,
+) -> Vec<EnrichedTrack> {
+    let pb = create_progress_bar(groups.len() as u64, "Selecting canonical & enriching");
+
+    let enriched: Vec<EnrichedTrack> = groups
+        .into_iter()
+        .map(|group| {
+            let (title_norm, artist_norm) = group.key;
+
+            let enriched_track = match group.best_match {
+                Some((track_idx, spotify, _score)) => {
+                    // Use the variant that matched Spotify
+                    let variant = &group.tracks[track_idx];
+                    let features = audio_lookup.get(&spotify.id);
+                    let album_image = image_lookup.get(&spotify.album_rowid).cloned();
+
+                    EnrichedTrack {
+                        lrclib_id: variant.track.id,
+                        title: variant.track.title.clone(),
+                        artist: variant.track.artist.clone(),
+                        album: variant.track.album.clone(),
+                        duration_sec: variant.track.duration_sec,
+                        title_norm,
+                        artist_norm,
+                        quality: variant.quality,
+                        spotify_id: Some(spotify.id),
+                        popularity: Some(spotify.popularity),
+                        tempo: features.and_then(|f| f.tempo),
+                        musical_key: features.and_then(|f| f.key),
+                        mode: features.and_then(|f| f.mode),
+                        time_signature: features.and_then(|f| f.time_signature),
+                        isrc: spotify.isrc,
+                        album_image_url: album_image,
+                    }
+                }
+                None => {
+                    // Fallback: best quality variant (no Spotify match)
+                    let best_variant = group.tracks.iter()
+                        .max_by(|a, b| {
+                            a.quality.cmp(&b.quality)
+                                .then_with(|| b.track.id.cmp(&a.track.id))
+                        })
+                        .unwrap();  // Safe: groups always have at least one track
+
+                    EnrichedTrack {
+                        lrclib_id: best_variant.track.id,
+                        title: best_variant.track.title.clone(),
+                        artist: best_variant.track.artist.clone(),
+                        album: best_variant.track.album.clone(),
+                        duration_sec: best_variant.track.duration_sec,
+                        title_norm,
+                        artist_norm,
+                        quality: best_variant.quality,
+                        spotify_id: None,
+                        popularity: None,
+                        tempo: None,
+                        musical_key: None,
+                        mode: None,
+                        time_signature: None,
+                        isrc: None,
+                        album_image_url: None,
+                    }
+                }
+            };
+
+            pb.inc(1);
+            enriched_track
+        })
+        .collect();
+
+    let matched_count = enriched.iter().filter(|t| t.spotify_id.is_some()).count();
+    let match_rate = if !enriched.is_empty() {
+        100.0 * matched_count as f64 / enriched.len() as f64
+    } else {
+        0.0
+    };
+
+    pb.finish_with_message(format!(
+        "Selected {} canonical tracks ({} with Spotify, {:.1}%)",
+        enriched.len(), matched_count, match_rate
+    ));
+
+    enriched
+}
+
+/// Collect needed Spotify track IDs and album rowids from groups with best matches
+fn collect_needed_ids_from_groups(groups: &[LrclibGroup]) -> (FxHashSet<String>, FxHashSet<i64>) {
+    let mut track_ids: FxHashSet<String> = FxHashSet::default();
+    let mut album_rowids: FxHashSet<i64> = FxHashSet::default();
+
+    for group in groups {
+        if let Some((_, ref spotify, _)) = group.best_match {
+            track_ids.insert(spotify.id.clone());
+            album_rowids.insert(spotify.album_rowid);
+        }
+    }
+
+    println!("[COLLECT] Need {} track IDs and {} album rowids", track_ids.len(), album_rowids.len());
+    (track_ids, album_rowids)
+}
+
+/// Collect needed Spotify track IDs and album rowids from best matches (old pipeline).
+/// Replaced by collect_needed_ids_from_groups() for delayed canonical selection.
+#[allow(dead_code)]
 fn collect_needed_ids(best_matches: &[Option<SpotifyTrack>]) -> (FxHashSet<String>, FxHashSet<i64>) {
     let mut track_ids: FxHashSet<String> = FxHashSet::default();
     let mut album_rowids: FxHashSet<i64> = FxHashSet::default();
@@ -1007,6 +1338,8 @@ fn collect_needed_ids(best_matches: &[Option<SpotifyTrack>]) -> (FxHashSet<Strin
 /// Batch-fetch primary artist names for a list of track rowids (spec-02).
 /// Uses batched IN queries instead of correlated subqueries to eliminate
 /// the 50M+ subquery executions in the original approach.
+/// Note: Not yet used in current implementation but kept for future 2-phase optimization.
+#[allow(dead_code)]
 fn batch_fetch_primary_artists(
     conn: &Connection,
     rowids: &[i64],
@@ -1132,8 +1465,10 @@ fn load_album_images_batched(
     Ok(lookup)
 }
 
-/// Enrich canonical LRCLIB tracks with pre-matched Spotify data.
+/// Enrich canonical LRCLIB tracks with pre-matched Spotify data (old pipeline).
 /// LRCLIB is the source of truth — Spotify data is nullable enrichment.
+/// Replaced by select_canonical_and_enrich() for delayed canonical selection.
+#[allow(dead_code)]
 fn enrich_tracks_with_matches(
     canonical: Vec<ScoredTrack>,
     best_matches: Vec<Option<SpotifyTrack>>,
@@ -1207,7 +1542,9 @@ fn enrich_tracks_with_matches(
     enriched
 }
 
-/// Convert ScoredTrack to EnrichedTrack with NULL Spotify fields
+/// Convert ScoredTrack to EnrichedTrack with NULL Spotify fields (old pipeline).
+/// Replaced by select_canonical_and_enrich() with empty lookups.
+#[allow(dead_code)]
 fn convert_to_enriched_without_spotify(tracks: Vec<ScoredTrack>) -> Vec<EnrichedTrack> {
     tracks
         .into_iter()
@@ -1421,17 +1758,16 @@ fn main() -> Result<()> {
     let tracks = read_tracks(&source_conn, artist_filter.as_ref())?;
     drop(source_conn);
 
-    // Phase 2: Group & select canonical (before Spotify to build index)
-    let groups = group_tracks(tracks);
-    println!("\nFound {} unique (title, artist) groups", groups.len());
+    // Phase 2: Build groups and index (delayed canonical selection - spec-03)
+    // Keep ALL variants per group, don't select canonical yet
+    let (mut groups, index) = build_groups_and_index(tracks);
+    println!("\nBuilt {} unique (title, artist) groups", groups.len());
 
-    let canonical_tracks = process_groups(groups);
+    // Build title-only index for 2-phase Spotify matching
+    let title_only_index = build_title_only_index(&groups);
 
-    // Phase 3: Spotify enrichment (streaming approach)
+    // Phase 3: Spotify enrichment with delayed canonical selection
     let enriched_tracks = if let Some(ref spotify_path) = args.spotify {
-        // Build LRCLIB index for streaming match
-        let lrclib_index = build_lrclib_index(&canonical_tracks);
-
         // Open Spotify DB with read-only optimizations
         println!("\nOpening Spotify database: {:?}", spotify_path);
         let spotify_conn = Connection::open(spotify_path)
@@ -1446,16 +1782,17 @@ fn main() -> Result<()> {
              PRAGMA locking_mode = EXCLUSIVE;",
         )?;
 
-        // Stream Spotify and match on-the-fly (doesn't load all 45M into memory)
-        let best_matches = stream_match_spotify(
+        // Stream Spotify and match using delayed canonical (scores ALL variants)
+        stream_and_match_spotify_delayed(
             &spotify_conn,
             args.min_popularity,
-            &canonical_tracks,
-            &lrclib_index,
+            &mut groups,
+            &index,
+            &title_only_index,
         )?;
 
         // Collect IDs we actually need for audio features and images
-        let (needed_track_ids, needed_album_rowids) = collect_needed_ids(&best_matches);
+        let (needed_track_ids, needed_album_rowids) = collect_needed_ids_from_groups(&groups);
 
         // Load audio features using batched IN queries (spec-02 optimization)
         let audio_lookup = if let Some(ref af_path) = args.audio_features {
@@ -1479,12 +1816,13 @@ fn main() -> Result<()> {
         // Load album images using batched IN queries (spec-02 optimization)
         let image_lookup = load_album_images_batched(&spotify_conn, &needed_album_rowids)?;
 
-        // Enrich using pre-matched data
-        println!("\nEnriching with Spotify data...");
-        enrich_tracks_with_matches(canonical_tracks, best_matches, &audio_lookup, &image_lookup)
+        // Select canonical and enrich (delayed selection - spec-03)
+        println!("\nSelecting canonical tracks and enriching...");
+        select_canonical_and_enrich(groups, &audio_lookup, &image_lookup)
     } else {
-        // No Spotify data: convert to EnrichedTrack with NULL Spotify fields
-        convert_to_enriched_without_spotify(canonical_tracks)
+        // No Spotify data: select best quality variant from each group
+        println!("\nNo Spotify data - selecting canonical by quality...");
+        select_canonical_and_enrich(groups, &FxHashMap::default(), &FxHashMap::default())
     };
 
     // Phase 3: Write output
