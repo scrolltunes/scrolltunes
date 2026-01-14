@@ -29,6 +29,11 @@ struct Args {
     #[arg(long)]
     spotify: Option<PathBuf>,
 
+    /// Path to spotify_normalized.sqlite3 (pre-normalized Spotify data for faster matching)
+    /// If provided, uses inverted lookup: LRCLIB → Spotify instead of streaming Spotify
+    #[arg(long)]
+    spotify_normalized: Option<PathBuf>,
+
     /// Path to spotify_clean_audio_features.sqlite3 (optional, requires --spotify)
     #[arg(long)]
     audio_features: Option<PathBuf>,
@@ -216,9 +221,31 @@ static TRACK_NUMBER_PREFIX: Lazy<Regex> = Lazy::new(||
     Regex::new(r"(?i)^(?:track\s*)?\d{1,4}\s*[-–—._]\s*").unwrap()
 );
 
+/// Matches track number prefix without separator: "16 Eleanor Rigby" → "Eleanor Rigby"
+/// Only matches 1-2 digit numbers (1-99) to avoid false positives like "1970 Somethin'"
+/// Pattern: 01-09 or 1-99 followed by space and uppercase letter.
+static TRACK_NUMBER_SPACE_PREFIX: Lazy<Regex> = Lazy::new(||
+    Regex::new(r"^(?:0[1-9]|[1-9]\d?)\s+([A-Z])").unwrap()
+);
+
 /// Matches mojibake replacement characters at end of string
 static MOJIBAKE_SUFFIX: Lazy<Regex> = Lazy::new(||
     Regex::new(r"[\u{FFFD}]+$").unwrap()
+);
+
+/// Matches bracket suffixes like [Mono], [RM1], [take 2], [Live], etc.
+static BRACKET_SUFFIX: Lazy<Regex> = Lazy::new(||
+    Regex::new(r"\s*\[[^\]]+\]\s*$").unwrap()
+);
+
+/// Matches file extensions in titles
+static FILE_EXTENSION: Lazy<Regex> = Lazy::new(||
+    Regex::new(r"(?i)\.(flac|mp3|wav|m4a|ogg|aac)$").unwrap()
+);
+
+/// Matches year suffix like (1964), (2009), etc.
+static YEAR_SUFFIX: Lazy<Regex> = Lazy::new(||
+    Regex::new(r"\s*\(\d{4}\)\s*$").unwrap()
 );
 
 static ARTIST_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
@@ -347,19 +374,47 @@ fn fold_to_ascii(s: &str) -> String {
 }
 
 /// Normalize punctuation by converting curly quotes to straight quotes and & to and.
+/// Also fixes common encoding issues and apostrophe spacing problems.
 fn normalize_punctuation(s: &str) -> String {
     s.replace(['\u{2018}', '\u{2019}'], "'")  // Left/right single curly quotes
         .replace(['\u{201C}', '\u{201D}'], "\"")  // Left/right double curly quotes
         .replace(['\u{00B4}', '\u{0060}'], "'")  // Acute accent and grave accent
         .replace(" & ", " and ")
+        // Fix encoding issues: ? often appears where ' should be (e.g., "Can?t" → "Can't")
+        .replace("?t ", "'t ")  // Can?t → Can't, Don?t → Don't, Won?t → Won't
+        .replace("?s ", "'s ")  // It?s → It's
+        .replace("?m ", "'m ")  // I?m → I'm
+        .replace("?ve ", "'ve ")  // I?ve → I've
+        .replace("?re ", "'re ")  // You?re → You're
+        .replace("?ll ", "'ll ")  // I?ll → I'll
+        // Fix apostrophe spacing: "She s " → "She's "
+        .replace(" s ", "'s ")  // Common OCR/encoding error
+        .replace(" t ", "'t ")  // Won t → Won't
+        .replace(" m ", "'m ")  // I m → I'm
+        .replace(" ve ", "'ve ")  // I ve → I've
+        .replace(" re ", "'re ")  // You re → You're
+        .replace(" ll ", "'ll ")  // I ll → I'll
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
 fn normalize_title(title: &str) -> String {
     let mut result = normalize_punctuation(title);
 
-    // Strip track number prefix
+    // Strip file extension first (before other processing)
+    result = FILE_EXTENSION.replace(&result, "").to_string();
+
+    // Strip track number prefix (with separator)
     result = TRACK_NUMBER_PREFIX.replace(&result, "").to_string();
+
+    // Strip track number prefix (space only, e.g., "16 Eleanor Rigby")
+    // Keep the captured capital letter: replace "16 E" with "E"
+    result = TRACK_NUMBER_SPACE_PREFIX.replace(&result, "$1").to_string();
+
+    // Strip bracket suffix like [Mono], [RM1], [take 2]
+    result = BRACKET_SUFFIX.replace(&result, "").to_string();
+
+    // Strip year suffix like (1964)
+    result = YEAR_SUFFIX.replace(&result, "").to_string();
 
     // Strip mojibake suffix
     result = MOJIBAKE_SUFFIX.replace(&result, "").to_string();
@@ -377,8 +432,15 @@ fn normalize_title(title: &str) -> String {
 fn normalize_title_with_artist(title: &str, artist: &str) -> String {
     let mut result = normalize_punctuation(title);
 
-    // Strip track number prefix
+    // Strip file extension first (before other processing)
+    result = FILE_EXTENSION.replace(&result, "").to_string();
+
+    // Strip track number prefix (with separator)
     result = TRACK_NUMBER_PREFIX.replace(&result, "").to_string();
+
+    // Strip track number prefix (space only, e.g., "16 Eleanor Rigby")
+    // Keep the captured capital letter: replace "16 E" with "E"
+    result = TRACK_NUMBER_SPACE_PREFIX.replace(&result, "$1").to_string();
 
     // Strip artist prefix if artist is long enough (avoid false positives for short names)
     let artist_norm = normalize_artist(artist);
@@ -388,6 +450,12 @@ fn normalize_title_with_artist(title: &str, artist: &str) -> String {
             result = prefix_re.replace(&result, "").to_string();
         }
     }
+
+    // Strip bracket suffix like [Mono], [RM1], [take 2]
+    result = BRACKET_SUFFIX.replace(&result, "").to_string();
+
+    // Strip year suffix like (1964)
+    result = YEAR_SUFFIX.replace(&result, "").to_string();
 
     // Strip mojibake suffix
     result = MOJIBAKE_SUFFIX.replace(&result, "").to_string();
@@ -674,6 +742,14 @@ fn create_progress_bar(len: u64, msg: &str) -> ProgressBar {
     pb
 }
 
+/// Log progress periodically for tail-friendly output
+fn log_progress(phase: &str, current: u64, total: u64, interval: u64) {
+    if current % interval == 0 || current == total {
+        let pct = 100.0 * current as f64 / total as f64;
+        eprintln!("[{}] {}/{} ({:.1}%)", phase, current, total, pct);
+    }
+}
+
 fn create_spinner(msg: &str) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
     pb.set_style(
@@ -749,6 +825,7 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
         stmt.query([])?
     };
 
+    let mut read_count = 0u64;
     while let Some(row) = rows.next()? {
         let album: Option<String> = row.get(3)?;
         let duration_float: f64 = row.get(4)?;
@@ -764,10 +841,13 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
         if !is_garbage_album(&track.album) && !should_skip_title(&track.title) {
             tracks.push(track);
         }
+        read_count += 1;
+        log_progress("READ", read_count, count as u64, 500_000);
         pb.inc(1);
     }
 
     pb.finish_with_message(format!("Phase 1: Read {} valid tracks", tracks.len()));
+    eprintln!("[READ] Complete: {} tracks", tracks.len());
     Ok(tracks)
 }
 
@@ -1249,6 +1329,164 @@ fn stream_and_match_spotify_delayed(
     ));
 
     Ok(())
+}
+
+/// Match LRCLIB groups to Spotify using pre-normalized indexed DB (inverted lookup).
+/// Uses batched queries against the indexed spotify_normalized.sqlite3.
+fn match_lrclib_to_spotify_normalized(
+    spotify_conn: &Connection,
+    spotify_norm_path: &std::path::Path,
+    groups: &mut [LrclibGroup],
+    groups_seen: &mut FxHashSet<usize>,
+) -> Result<()> {
+    println!("[MATCH] Matching LRCLIB groups to Spotify (indexed lookup)...");
+
+    // Open normalized DB with read optimizations
+    let norm_conn = Connection::open(spotify_norm_path)?;
+    norm_conn.execute_batch(
+        "PRAGMA query_only = 1;
+         PRAGMA journal_mode = OFF;
+         PRAGMA synchronous = OFF;
+         PRAGMA temp_store = MEMORY;
+         PRAGMA cache_size = -500000;
+         PRAGMA mmap_size = 8589934592;",
+    )?;
+
+    let pb = create_progress_bar(groups.len() as u64, "Matching LRCLIB → Spotify");
+
+    // Phase 1: Lookup track_rowids using prepared statement (uses index efficiently)
+    let mut matches_to_fetch: Vec<(usize, i64)> = Vec::new();
+
+    let mut lookup_stmt = norm_conn.prepare_cached(
+        "SELECT track_rowid FROM track_norm WHERE title_norm = ? AND artist_norm = ? LIMIT 1"
+    )?;
+
+    let total_groups = groups.len() as u64;
+    for (group_idx, group) in groups.iter().enumerate() {
+        if let Ok(track_rowid) = lookup_stmt.query_row(
+            rusqlite::params![&group.key.0, &group.key.1],
+            |row| row.get::<_, i64>(0)
+        ) {
+            matches_to_fetch.push((group_idx, track_rowid));
+            groups_seen.insert(group_idx);
+        }
+
+        let idx = group_idx as u64;
+        log_progress("MATCH", idx + 1, total_groups, 500_000);
+        if group_idx % 50_000 == 0 {
+            pb.set_position(idx);
+        }
+    }
+    pb.finish_with_message(format!("[MATCH] Found {} potential matches", matches_to_fetch.len()));
+    eprintln!("[MATCH] Complete: {} matches from {} groups", matches_to_fetch.len(), total_groups);
+
+    // Phase 2: Batch fetch track details for matches
+    eprintln!("[FETCH] Fetching track details for {} matches...", matches_to_fetch.len());
+    let rowids: Vec<i64> = matches_to_fetch.iter().map(|(_, r)| *r).collect();
+    let track_details = batch_fetch_track_details(spotify_conn, &rowids)?;
+    eprintln!("[FETCH] Complete: {} track details loaded", track_details.len());
+
+    // Phase 3: Score and assign matches
+    let pb2 = create_progress_bar(matches_to_fetch.len() as u64, "Scoring matches");
+    let mut groups_matched = 0u64;
+
+    for (i, (group_idx, track_rowid)) in matches_to_fetch.iter().enumerate() {
+        if let Some(spotify_track) = track_details.get(track_rowid) {
+            let group = &mut groups[*group_idx];
+            let was_unmatched = group.best_match.is_none();
+
+            // Score against ALL variants in this group
+            for (track_idx, variant) in group.tracks.iter().enumerate() {
+                let score = combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
+
+                if score >= ACCEPT_THRESHOLD {
+                    let current_best = group.best_match.as_ref().map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                    if score > current_best {
+                        group.best_match = Some((track_idx, spotify_track.clone(), score));
+                    }
+                }
+            }
+
+            if was_unmatched && group.best_match.is_some() {
+                groups_matched += 1;
+            }
+        }
+
+        if i % 10_000 == 0 {
+            pb2.set_position(i as u64);
+        }
+    }
+    pb2.finish_with_message(format!("[MATCH] Matched {} groups", groups_matched));
+
+    let match_rate = if !groups.is_empty() {
+        100.0 * groups_matched as f64 / groups.len() as f64
+    } else {
+        0.0
+    };
+    println!("[MATCH] Match rate: {:.1}%", match_rate);
+
+    Ok(())
+}
+
+/// Batch fetch track details by rowids.
+fn batch_fetch_track_details(
+    conn: &Connection,
+    rowids: &[i64],
+) -> Result<FxHashMap<i64, SpotifyTrack>> {
+    if rowids.is_empty() {
+        return Ok(FxHashMap::default());
+    }
+
+    let mut result: FxHashMap<i64, SpotifyTrack> = FxHashMap::default();
+    result.reserve(rowids.len());
+
+    // Process in batches to avoid query size limits
+    const BATCH_SIZE: usize = 10_000;
+    let pb = create_progress_bar(rowids.len() as u64, "Fetching track details");
+
+    for chunk in rowids.chunks(BATCH_SIZE) {
+        let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            r#"SELECT
+                t.rowid,
+                t.id,
+                t.name,
+                a.name as artist_name,
+                t.duration_ms,
+                t.popularity,
+                t.external_id_isrc,
+                t.album_rowid
+            FROM tracks t
+            JOIN artists a ON a.rowid = (
+                SELECT MIN(artist_rowid) FROM track_artists WHERE track_rowid = t.rowid
+            )
+            WHERE t.rowid IN ({})"#,
+            placeholders
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|r| r as &dyn rusqlite::ToSql).collect();
+        let mut rows = stmt.query(params.as_slice())?;
+
+        while let Some(row) = rows.next()? {
+            let rowid: i64 = row.get(0)?;
+            let track = SpotifyTrack {
+                id: row.get(1)?,
+                name: row.get(2)?,
+                artist: row.get(3)?,
+                duration_ms: row.get(4)?,
+                popularity: row.get(5)?,
+                isrc: row.get(6)?,
+                album_rowid: row.get(7)?,
+            };
+            result.insert(rowid, track);
+        }
+
+        pb.inc(chunk.len() as u64);
+    }
+    pb.finish();
+
+    Ok(result)
 }
 
 /// Select canonical track and enrich with Spotify data (spec-03).
@@ -2058,15 +2296,26 @@ fn main() -> Result<()> {
              PRAGMA locking_mode = EXCLUSIVE;",
         )?;
 
-        // Stream Spotify and match using delayed canonical (scores ALL variants)
-        stream_and_match_spotify_delayed(
-            &spotify_conn,
-            args.min_popularity,
-            &mut groups,
-            &index,
-            &title_only_index,
-            &mut groups_seen,
-        )?;
+        // Use pre-normalized Spotify index if available (much faster)
+        if let Some(ref spotify_norm_path) = args.spotify_normalized {
+            // Match LRCLIB → Spotify using indexed lookup (no memory load)
+            match_lrclib_to_spotify_normalized(
+                &spotify_conn,
+                spotify_norm_path,
+                &mut groups,
+                &mut groups_seen,
+            )?;
+        } else {
+            // Fall back to streaming all Spotify tracks (slow)
+            stream_and_match_spotify_delayed(
+                &spotify_conn,
+                args.min_popularity,
+                &mut groups,
+                &index,
+                &title_only_index,
+                &mut groups_seen,
+            )?;
+        }
 
         // Collect match failures BEFORE consuming groups (spec-05)
         let failures = collect_match_failures(&groups, &groups_seen);
@@ -2168,6 +2417,44 @@ mod tests {
         assert_eq!(normalize_title("Track 5 - Song Name"), "song name");
         assert_eq!(normalize_title("01. First Song"), "first song");
         assert_eq!(normalize_title("0958 - Artist - Song"), "artist - song");
+        // Space-only track number (e.g., "16 Eleanor Rigby")
+        assert_eq!(normalize_title("16 Eleanor Rigby"), "eleanor rigby");
+        // Leading-zero track numbers (e.g., "02 Panic Room")
+        assert_eq!(normalize_title("02 Panic Room"), "panic room");
+        assert_eq!(normalize_title("09 Song Title"), "song title");
+        // Should NOT strip single digit followed by lowercase (e.g., "7 rings")
+        assert_eq!(normalize_title("7 rings"), "7 rings");
+    }
+
+    #[test]
+    fn test_bracket_suffix_stripping() {
+        assert_eq!(normalize_title("Song Name [Mono]"), "song name");
+        assert_eq!(normalize_title("Song Name [RM1]"), "song name");
+        assert_eq!(normalize_title("Song Name [take 2]"), "song name");
+        // Multiple brackets: [Live] is stripped by TITLE_PATTERNS (live pattern), [Bonus] by BRACKET_SUFFIX
+        assert_eq!(normalize_title("Song [Live] [Bonus]"), "song");
+    }
+
+    #[test]
+    fn test_file_extension_stripping() {
+        assert_eq!(normalize_title("Ask Me Why.flac"), "ask me why");
+        assert_eq!(normalize_title("Song.mp3"), "song");
+        assert_eq!(normalize_title("Track.wav"), "track");
+    }
+
+    #[test]
+    fn test_year_suffix_stripping() {
+        assert_eq!(normalize_title("I Call Your Name (1964)"), "i call your name");
+        assert_eq!(normalize_title("Something (2009)"), "something");
+    }
+
+    #[test]
+    fn test_encoding_fixes() {
+        // ? to apostrophe
+        assert_eq!(normalize_punctuation("Can?t Buy Me Love"), "Can't Buy Me Love");
+        assert_eq!(normalize_punctuation("Don?t Stop"), "Don't Stop");
+        // Apostrophe spacing
+        assert_eq!(normalize_punctuation("She s Leaving Home"), "She's Leaving Home");
     }
 
     #[test]
