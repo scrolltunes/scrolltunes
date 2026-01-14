@@ -1,29 +1,48 @@
 # Planning Mode Prompt
 
-You are implementing features based on specs in the `specs/` directory.
+You are implementing improvements to the LRCLIB-Spotify enrichment pipeline (v3). Your goal is to improve match rate from 57.5% toward 65-72%.
+
+## Context
+
+Read these files to understand the current state:
+- `docs/lrclib-extraction-technical-report.md` - Current methodology and limitations
+- `docs/lrclib-enrichment-v2-spec.md` - Current implementation details
+- `IMPLEMENTATION_PLAN_V3.md` - The implementation plan you're following
+
+## Available Specs (v3)
+
+The `specs/` directory contains detailed specifications:
+- `spec-01-normalization-unification.md` - Single-source normalization (Foundation)
+- `spec-02-topk-candidates.md` - Top-K candidates per key (+2-4%)
+- `spec-03-multi-artist-verification.md` - Multi-artist scoring (+1-2%)
+- `spec-04-pop0-fallback-fix.md` - Pop=0 fallback fix (+0.5-1%)
+- `spec-05-adaptive-duration.md` - Adaptive duration tolerance (+1-2%)
+- `spec-06-title-first-rescue.md` - Title-first rescue pass (+2-4%)
+- `spec-07-instrumentation.md` - Instrumentation & evaluation
 
 ## Your Task
 
-1. Read `IMPLEMENTATION_PLAN.md` to understand the overall plan
-2. Find the next incomplete spec (Status: "Not Started" or "In Progress")
-3. Read that spec file from `specs/`
+1. Read `IMPLEMENTATION_PLAN_V3.md` to see current progress
+2. Find the next uncompleted task (marked `[ ]`)
+3. Read the corresponding spec file from `specs/`
 4. Create a detailed implementation plan for JUST that spec
-5. Update the spec status in `IMPLEMENTATION_PLAN.md` to "In Progress"
+5. Update the task status in `IMPLEMENTATION_PLAN_V3.md` to in-progress
 6. Write your plan to `CURRENT_PLAN.md`
 
 ## Planning Guidelines
 
 - Break the spec into small, atomic tasks
 - Each task should be independently testable
-- Include file paths and line numbers where changes are needed
+- Include file paths and specific code locations
 - Reference existing code patterns in the codebase
 - Include validation steps after each task
 
 ## Directories to Explore
 
 - `scripts/lrclib-extract/src/` - Rust source code
+- `scripts/lrclib-extract/src/main.rs` - Main extraction logic
+- `scripts/lrclib-extract/src/bin/normalize-spotify.rs` - Normalization binary
 - `scripts/lrclib-extract/Cargo.toml` - Rust dependencies
-- `docs/lrclib-enrichment-v2-spec.md` - Full specification
 
 ## Output Format
 
@@ -33,7 +52,7 @@ Write your plan to `CURRENT_PLAN.md` with this structure:
 # Current Plan: [Spec Name]
 
 ## Spec Reference
-[Link to spec file]
+specs/spec-XX-name.md
 
 ## Tasks
 
