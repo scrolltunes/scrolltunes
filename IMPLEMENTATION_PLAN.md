@@ -41,7 +41,7 @@ This plan implements recommendations from the senior data scientist's analysis t
 |---|------|------|--------|
 | 1.1 | Extract normalization to shared module | spec-01 | [x] |
 | 1.2 | Add golden tests for normalization | spec-01 | [x] |
-| 1.3 | Add instrumentation framework | spec-07 | [ ] |
+| 1.3 | Add instrumentation framework | spec-07 | [x] |
 | 1.4 | Verify both binaries use shared module | spec-01 | [x] |
 
 **Checkpoint:** Rebuild normalized index, verify identical output to current.

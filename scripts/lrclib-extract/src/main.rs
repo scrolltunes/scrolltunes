@@ -61,6 +61,10 @@ struct Args {
     /// Disable progress bars, use log output only (for background runs)
     #[arg(long)]
     log_only: bool,
+
+    /// Export stats to JSON file (spec-07 instrumentation)
+    #[arg(long)]
+    export_stats: Option<PathBuf>,
 }
 
 const WRITE_BATCH_SIZE: usize = 10_000;
@@ -69,6 +73,77 @@ const WRITE_BATCH_SIZE: usize = 10_000;
 const ACCEPT_THRESHOLD: i32 = 80;       // Minimum score to accept a match
 #[allow(dead_code)]
 const LOW_CONFIDENCE_THRESHOLD: i32 = 120; // Below this, log as low-confidence
+
+// ============================================================================
+// Instrumentation Framework (spec-07)
+// ============================================================================
+
+/// Per-phase matching statistics for instrumentation (spec-07).
+/// Tracks counts and rates for each matching phase to measure improvements.
+#[derive(Default, Debug, Clone, Serialize)]
+pub struct MatchingStats {
+    // Phase 1: Main index lookup
+    pub main_exact_matches: usize,
+    pub main_primary_artist_fallback: usize,
+    pub main_no_candidates: usize,
+    pub main_all_rejected: usize,
+
+    // Phase 2: Pop=0 fallback
+    pub pop0_eligible: usize,
+    pub pop0_matches: usize,
+
+    // Duration statistics
+    pub duration_matches_0_to_2: usize,
+    pub duration_matches_3_to_5: usize,
+    pub duration_matches_6_to_10: usize,
+    pub duration_matches_11_to_15: usize,
+    pub duration_matches_16_to_30: usize,
+
+    // Final totals
+    pub total_groups: usize,
+    pub total_matches: usize,
+    pub total_failures: usize,
+
+    // Timing
+    pub elapsed_seconds: f64,
+}
+
+impl MatchingStats {
+    /// Calculate match rate as a percentage
+    pub fn match_rate(&self) -> f64 {
+        if self.total_groups == 0 {
+            0.0
+        } else {
+            100.0 * self.total_matches as f64 / self.total_groups as f64
+        }
+    }
+
+    /// Log stats to stderr in JSON format
+    pub fn log_phase(&self, phase: &str) {
+        if let Ok(json) = serde_json::to_string_pretty(self) {
+            eprintln!("[STATS:{}]\n{}", phase, json);
+        }
+    }
+
+    /// Write stats to a JSON file
+    pub fn write_to_file(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        let json = serde_json::to_string_pretty(self)?;
+        std::fs::write(path, json)?;
+        Ok(())
+    }
+
+    /// Record duration bucket for a match based on duration diff in seconds
+    pub fn record_duration_bucket(&mut self, diff_sec: i64) {
+        match diff_sec.abs() {
+            0..=2 => self.duration_matches_0_to_2 += 1,
+            3..=5 => self.duration_matches_3_to_5 += 1,
+            6..=10 => self.duration_matches_6_to_10 += 1,
+            11..=15 => self.duration_matches_11_to_15 += 1,
+            16..=30 => self.duration_matches_16_to_30 += 1,
+            _ => {} // Beyond 30s should not happen for matches
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 struct Track {
@@ -1130,11 +1205,13 @@ fn stream_and_match_spotify_delayed(
 
 /// Match LRCLIB groups to Spotify using pre-normalized indexed DB (inverted lookup).
 /// Uses batched queries against the indexed spotify_normalized.sqlite3.
+/// Populates stats with match counts (spec-07 instrumentation).
 fn match_lrclib_to_spotify_normalized(
     spotify_conn: &Connection,
     spotify_norm_path: &std::path::Path,
     groups: &mut [LrclibGroup],
     groups_seen: &mut FxHashSet<usize>,
+    stats: &mut MatchingStats,
 ) -> Result<()> {
     println!("[MATCH] Matching LRCLIB groups to Spotify (indexed lookup)...");
 
@@ -1153,8 +1230,8 @@ fn match_lrclib_to_spotify_normalized(
 
     // Phase 1: Lookup track_rowids using prepared statement (uses index efficiently)
     // First try exact (title, artist) match, then fallback to primary artist only
-    let mut matches_to_fetch: Vec<(usize, i64)> = Vec::new();
-    let mut fallback_matches = 0u64;
+    let mut matches_to_fetch: Vec<(usize, i64, bool)> = Vec::new(); // (group_idx, rowid, is_fallback)
+    let mut fallback_matches_count = 0u64;
 
     let mut lookup_stmt = norm_conn.prepare_cached(
         "SELECT track_rowid FROM track_norm WHERE title_norm = ? AND artist_norm = ? LIMIT 1"
@@ -1170,7 +1247,7 @@ fn match_lrclib_to_spotify_normalized(
             rusqlite::params![title_norm, artist_norm],
             |row| row.get::<_, i64>(0)
         ) {
-            matches_to_fetch.push((group_idx, track_rowid));
+            matches_to_fetch.push((group_idx, track_rowid, false));
             groups_seen.insert(group_idx);
             true
         } else {
@@ -1184,9 +1261,9 @@ fn match_lrclib_to_spotify_normalized(
                     rusqlite::params![title_norm, &primary_artist],
                     |row| row.get::<_, i64>(0)
                 ) {
-                    matches_to_fetch.push((group_idx, track_rowid));
+                    matches_to_fetch.push((group_idx, track_rowid, true));
                     groups_seen.insert(group_idx);
-                    fallback_matches += 1;
+                    fallback_matches_count += 1;
                 }
             }
         }
@@ -1197,20 +1274,23 @@ fn match_lrclib_to_spotify_normalized(
             pb.set_position(idx);
         }
     }
-    pb.finish_with_message(format!("[MATCH] Found {} potential matches ({} via fallback)", matches_to_fetch.len(), fallback_matches));
-    eprintln!("[MATCH] Complete: {} matches from {} groups ({} via primary-artist fallback)", matches_to_fetch.len(), total_groups, fallback_matches);
+    pb.finish_with_message(format!("[MATCH] Found {} potential matches ({} via fallback)", matches_to_fetch.len(), fallback_matches_count));
+    eprintln!("[MATCH] Complete: {} matches from {} groups ({} via primary-artist fallback)", matches_to_fetch.len(), total_groups, fallback_matches_count);
 
     // Phase 2: Batch fetch track details for matches
     eprintln!("[FETCH] Fetching track details for {} matches...", matches_to_fetch.len());
-    let rowids: Vec<i64> = matches_to_fetch.iter().map(|(_, r)| *r).collect();
+    let rowids: Vec<i64> = matches_to_fetch.iter().map(|(_, r, _)| *r).collect();
     let track_details = batch_fetch_track_details(spotify_conn, &rowids)?;
     eprintln!("[FETCH] Complete: {} track details loaded", track_details.len());
 
     // Phase 3: Score and assign matches
     let pb2 = create_progress_bar(matches_to_fetch.len() as u64, "Scoring matches");
     let mut groups_matched = 0u64;
+    let mut exact_accepted = 0usize;
+    let mut fallback_accepted = 0usize;
+    let mut all_rejected = 0usize;
 
-    for (i, (group_idx, track_rowid)) in matches_to_fetch.iter().enumerate() {
+    for (i, (group_idx, track_rowid, is_fallback)) in matches_to_fetch.iter().enumerate() {
         if let Some(spotify_track) = track_details.get(track_rowid) {
             let group = &mut groups[*group_idx];
             let was_unmatched = group.best_match.is_none();
@@ -1229,6 +1309,21 @@ fn match_lrclib_to_spotify_normalized(
 
             if was_unmatched && group.best_match.is_some() {
                 groups_matched += 1;
+                // Track stats by match type (spec-07)
+                if *is_fallback {
+                    fallback_accepted += 1;
+                } else {
+                    exact_accepted += 1;
+                }
+                // Record duration bucket for stats
+                if let Some((track_idx, ref spotify, _)) = group.best_match {
+                    let lrclib_duration = group.tracks[track_idx].track.duration_sec;
+                    let diff_sec = lrclib_duration - spotify.duration_ms / 1000;
+                    stats.record_duration_bucket(diff_sec);
+                }
+            } else if was_unmatched && group.best_match.is_none() {
+                // Had candidates but all were rejected
+                all_rejected += 1;
             }
         }
 
@@ -1238,22 +1333,33 @@ fn match_lrclib_to_spotify_normalized(
     }
     pb2.finish_with_message(format!("[MATCH] Matched {} groups", groups_matched));
 
+    // Populate stats (spec-07)
+    stats.main_exact_matches = exact_accepted;
+    stats.main_primary_artist_fallback = fallback_accepted;
+    stats.main_all_rejected = all_rejected;
+    // Groups that had no candidates at all
+    stats.main_no_candidates = groups.len() - groups_seen.len();
+
     let match_rate = if !groups.is_empty() {
         100.0 * groups_matched as f64 / groups.len() as f64
     } else {
         0.0
     };
     println!("[MATCH] Match rate: {:.1}%", match_rate);
+    eprintln!("[STATS:MAIN] exact={}, fallback={}, rejected={}, no_candidates={}",
+        exact_accepted, fallback_accepted, all_rejected, stats.main_no_candidates);
 
     Ok(())
 }
 
 /// Fallback matching for pop=0 tracks (not in normalized index).
 /// Streams pop=0 tracks from raw Spotify DB and matches against unmatched LRCLIB groups.
+/// Populates stats.pop0_* fields (spec-07 instrumentation).
 fn match_pop0_fallback(
     spotify_conn: &Connection,
     groups: &mut [LrclibGroup],
     groups_seen: &mut FxHashSet<usize>,
+    stats: &mut MatchingStats,
 ) -> Result<u64> {
     // Build index of unmatched groups for fast lookup
     let mut unmatched_index: FxHashMap<(String, String), Vec<usize>> = FxHashMap::default();
@@ -1263,6 +1369,9 @@ fn match_pop0_fallback(
             unmatched_index.entry(key).or_default().push(idx);
         }
     }
+
+    // Record how many groups were eligible for pop=0 fallback (spec-07)
+    stats.pop0_eligible = unmatched_index.len();
 
     if unmatched_index.is_empty() {
         return Ok(0);
@@ -1335,6 +1444,12 @@ fn match_pop0_fallback(
                 if group.best_match.is_some() {
                     groups_seen.insert(group_idx);
                     matches_found += 1;
+                    // Record duration bucket for pop0 matches (spec-07)
+                    if let Some((track_idx, ref spotify, _)) = group.best_match {
+                        let lrclib_duration = group.tracks[track_idx].track.duration_sec;
+                        let diff_sec = lrclib_duration - spotify.duration_ms / 1000;
+                        stats.record_duration_bucket(diff_sec);
+                    }
                 }
             }
         }
@@ -1347,6 +1462,9 @@ fn match_pop0_fallback(
                 matches_found);
         }
     }
+
+    // Record pop0 match count (spec-07)
+    stats.pop0_matches = matches_found as usize;
 
     eprintln!("[POP0] Complete: {} additional matches from pop=0 tracks", matches_found);
     Ok(matches_found)
@@ -2282,6 +2400,12 @@ fn main() -> Result<()> {
     // Track which groups had Spotify candidates for failure logging
     let mut groups_seen: FxHashSet<usize> = FxHashSet::default();
 
+    // Initialize stats for instrumentation (spec-07)
+    let mut stats = MatchingStats {
+        total_groups: groups.len(),
+        ..Default::default()
+    };
+
     let (enriched_tracks, failure_data) = if let Some(ref spotify_path) = args.spotify {
         // Open Spotify DB with read-only optimizations
         println!("\nOpening Spotify database: {:?}", spotify_path);
@@ -2305,6 +2429,7 @@ fn main() -> Result<()> {
                 spotify_norm_path,
                 &mut groups,
                 &mut groups_seen,
+                &mut stats,
             )?;
 
             // Fallback: search pop=0 tracks for unmatched groups
@@ -2312,6 +2437,7 @@ fn main() -> Result<()> {
                 &spotify_conn,
                 &mut groups,
                 &mut groups_seen,
+                &mut stats,
             )?;
             if pop0_matches > 0 {
                 let total = groups.len();
@@ -2403,6 +2529,20 @@ fn main() -> Result<()> {
     } else {
         0.0
     };
+
+    // Finalize stats (spec-07)
+    stats.total_matches = matched_count;
+    stats.total_failures = enriched_tracks.len() - matched_count;
+    stats.elapsed_seconds = elapsed.as_secs_f64();
+
+    // Log final stats to stderr
+    stats.log_phase("FINAL");
+
+    // Export stats to JSON if requested (spec-07)
+    if let Some(ref stats_path) = args.export_stats {
+        stats.write_to_file(stats_path)?;
+        println!("[STATS] Exported to {:?}", stats_path);
+    }
 
     println!("\n{:=<60}", "");
     println!("Extraction complete!");
@@ -2707,5 +2847,61 @@ mod tests {
         assert_eq!(normalize_title("Song   Title"), "song title");
         // Multiple spaces
         assert_eq!(normalize_artist("A    B     C"), "a b c");
+    }
+
+    // ========================================================================
+    // Spec-07: Instrumentation Tests
+    // ========================================================================
+
+    #[test]
+    fn test_matching_stats_default() {
+        let stats = MatchingStats::default();
+        assert_eq!(stats.total_groups, 0);
+        assert_eq!(stats.total_matches, 0);
+        assert_eq!(stats.match_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_matching_stats_match_rate() {
+        let mut stats = MatchingStats::default();
+        stats.total_groups = 100;
+        stats.total_matches = 57;
+        assert!((stats.match_rate() - 57.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_matching_stats_duration_buckets() {
+        let mut stats = MatchingStats::default();
+
+        // Record various duration differences
+        stats.record_duration_bucket(0);   // 0-2
+        stats.record_duration_bucket(1);   // 0-2
+        stats.record_duration_bucket(4);   // 3-5
+        stats.record_duration_bucket(8);   // 6-10
+        stats.record_duration_bucket(12);  // 11-15
+        stats.record_duration_bucket(25);  // 16-30
+        stats.record_duration_bucket(-5);  // abs -> 3-5
+
+        assert_eq!(stats.duration_matches_0_to_2, 2);
+        assert_eq!(stats.duration_matches_3_to_5, 2);
+        assert_eq!(stats.duration_matches_6_to_10, 1);
+        assert_eq!(stats.duration_matches_11_to_15, 1);
+        assert_eq!(stats.duration_matches_16_to_30, 1);
+    }
+
+    #[test]
+    fn test_matching_stats_serialization() {
+        let mut stats = MatchingStats::default();
+        stats.total_groups = 1000;
+        stats.total_matches = 575;
+        stats.main_exact_matches = 500;
+        stats.main_primary_artist_fallback = 50;
+        stats.pop0_matches = 25;
+
+        // Should serialize without error
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("\"total_groups\":1000"));
+        assert!(json.contains("\"total_matches\":575"));
+        assert!(json.contains("\"main_exact_matches\":500"));
     }
 }
