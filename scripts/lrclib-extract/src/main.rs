@@ -11,6 +11,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Instant;
+use strsim::normalized_levenshtein;
 
 use normalize::{
     normalize_title, normalize_title_with_artist, normalize_artist, extract_primary_artist,
@@ -88,7 +89,14 @@ pub struct MatchingStats {
     pub main_no_candidates: usize,
     pub main_all_rejected: usize,
 
-    // Phase 2: Pop=0 fallback (spec-04: includes previously-rejected groups)
+    // Phase 2: Title-first rescue pass (spec-06)
+    pub rescue_attempted: usize,
+    pub rescue_skipped_common_title: usize,
+    pub rescue_matches: usize,
+    pub rescue_rejected_low_similarity: usize,
+    pub rescue_rejected_duration: usize,
+
+    // Phase 3: Pop=0 fallback (spec-04: includes previously-rejected groups)
     pub pop0_eligible: usize,
     pub pop0_from_no_candidates: usize,  // Groups that never had candidates
     pub pop0_from_rejected: usize,       // Groups that had candidates but all rejected
@@ -1669,6 +1677,238 @@ fn match_pop0_fallback(
     Ok(matches_found)
 }
 
+// ============================================================================
+// Title-First Rescue Pass (spec-06)
+// ============================================================================
+
+/// Common titles that appear in too many tracks to be useful for title-only lookup.
+/// These are skipped during rescue to avoid false positives.
+const COMMON_TITLES: &[&str] = &[
+    "home", "love", "intro", "outro", "interlude",
+    "untitled", "track 1", "bonus track", "live",
+    "remix", "acoustic", "instrumental", "interlude",
+    "prelude", "prologue", "epilogue", "finale",
+    "happy birthday", "hallelujah", "amen",
+];
+
+/// Check if a title is too common for title-only lookup (spec-06 R6.3).
+fn is_common_title(title_norm: &str) -> bool {
+    // Very short titles are common
+    if title_norm.len() < 3 {
+        return true;
+    }
+
+    // Check against known common titles
+    COMMON_TITLES.contains(&title_norm)
+}
+
+/// Title-first rescue pass for no_candidates groups (spec-06).
+/// Uses title-only lookup with fuzzy artist matching to recover matches where
+/// the artist normalization differs (typos, punctuation, partial names).
+fn title_first_rescue(
+    spotify_conn: &Connection,
+    spotify_norm_path: &std::path::Path,
+    groups: &mut [LrclibGroup],
+    groups_seen: &FxHashSet<usize>,
+    stats: &mut MatchingStats,
+) -> Result<u64> {
+    // Collect groups that are eligible for rescue:
+    // - No match yet (best_match is None)
+    // - Never had candidates (!groups_seen.contains(&idx))
+    // This excludes "all_rejected" groups which had candidates but failed duration/score
+    let rescue_candidates: Vec<(usize, &str, &str)> = groups.iter()
+        .enumerate()
+        .filter(|(idx, g)| g.best_match.is_none() && !groups_seen.contains(idx))
+        .filter(|(_, g)| !is_common_title(&g.key.0))
+        .map(|(idx, g)| (idx, g.key.0.as_str(), g.key.1.as_str()))
+        .collect();
+
+    if rescue_candidates.is_empty() {
+        eprintln!("[RESCUE] No eligible groups for title-first rescue");
+        return Ok(0);
+    }
+
+    // Count skipped common titles
+    let skipped_common: usize = groups.iter()
+        .enumerate()
+        .filter(|(idx, g)| g.best_match.is_none() && !groups_seen.contains(idx))
+        .filter(|(_, g)| is_common_title(&g.key.0))
+        .count();
+
+    stats.rescue_skipped_common_title = skipped_common;
+    stats.rescue_attempted = rescue_candidates.len();
+
+    eprintln!(
+        "[RESCUE] Running title-first rescue for {} groups ({} skipped as common titles)...",
+        rescue_candidates.len(),
+        skipped_common
+    );
+
+    // Open normalized DB for title-only lookups
+    let norm_conn = Connection::open(spotify_norm_path)?;
+    norm_conn.execute_batch(
+        "PRAGMA query_only = 1;
+         PRAGMA journal_mode = OFF;
+         PRAGMA synchronous = OFF;
+         PRAGMA temp_store = MEMORY;
+         PRAGMA cache_size = -500000;
+         PRAGMA mmap_size = 8589934592;",
+    )?;
+
+    let pb = create_progress_bar(rescue_candidates.len() as u64, "Title-first rescue");
+
+    // Maximum candidates to fetch per title
+    const MAX_CANDIDATES_PER_TITLE: i64 = 100;
+    const ARTIST_SIMILARITY_THRESHOLD: f64 = 0.70;
+
+    // Prepare title-only lookup statement (using idx_track_norm_title index)
+    let mut title_lookup_stmt = norm_conn.prepare_cached(
+        "SELECT track_rowid, artist_norm, popularity, duration_ms
+         FROM track_norm
+         WHERE title_norm = ?
+         ORDER BY popularity DESC
+         LIMIT ?"
+    )?;
+
+    let mut matches_found = 0u64;
+    let mut rejected_low_sim = 0usize;
+    let mut rejected_duration = 0usize;
+
+    // Collect all rowids that pass similarity filter for batch detail fetch
+    let mut rowids_to_fetch: Vec<(usize, i64, f64)> = Vec::new();  // (group_idx, rowid, similarity)
+
+    for (i, (group_idx, title_norm, artist_norm)) in rescue_candidates.iter().enumerate() {
+        // Phase 1: Title-only lookup in normalized index
+        let mut rows = title_lookup_stmt.query(rusqlite::params![title_norm, MAX_CANDIDATES_PER_TITLE])?;
+
+        while let Some(row) = rows.next()? {
+            let track_rowid: i64 = row.get(0)?;
+            let candidate_artist_norm: String = row.get(1)?;
+            let duration_ms: i64 = row.get(3)?;
+
+            // Phase 2: Artist similarity filter using normalized Levenshtein (spec-06 R6.2)
+            let similarity = normalized_levenshtein(artist_norm, &candidate_artist_norm);
+
+            if similarity < ARTIST_SIMILARITY_THRESHOLD {
+                rejected_low_sim += 1;
+                continue;
+            }
+
+            // Phase 3: Quick duration check (using normalized DB duration_ms)
+            // Get best quality variant's duration for comparison
+            let group = &groups[*group_idx];
+            let best_variant = group.tracks.iter().max_by_key(|t| t.quality).unwrap();
+            let lrclib_duration_sec = best_variant.track.duration_sec;
+            let diff = (lrclib_duration_sec - duration_ms / 1000).abs();
+
+            // Use strict 30s tolerance for rescue matches (spec-06 R6.4)
+            if diff > 30 {
+                rejected_duration += 1;
+                continue;
+            }
+
+            // Candidate passed filters - collect for batch detail fetch
+            rowids_to_fetch.push((*group_idx, track_rowid, similarity));
+        }
+
+        if i % 50_000 == 0 {
+            pb.set_position(i as u64);
+        }
+    }
+    pb.finish();
+
+    stats.rescue_rejected_low_similarity = rejected_low_sim;
+    stats.rescue_rejected_duration = rejected_duration;
+
+    if rowids_to_fetch.is_empty() {
+        eprintln!("[RESCUE] No candidates passed similarity/duration filters");
+        return Ok(0);
+    }
+
+    eprintln!(
+        "[RESCUE] {} candidates passed filters, fetching details...",
+        rowids_to_fetch.len()
+    );
+
+    // Phase 4: Batch fetch track details for all passing candidates
+    let unique_rowids: Vec<i64> = rowids_to_fetch.iter()
+        .map(|(_, rowid, _)| *rowid)
+        .collect::<FxHashSet<_>>()
+        .into_iter()
+        .collect();
+
+    let track_details = batch_fetch_track_details(spotify_conn, &unique_rowids)?;
+
+    // Phase 5: Score candidates and select best match per group
+    let pb2 = create_progress_bar(rowids_to_fetch.len() as u64, "Scoring rescue candidates");
+
+    // Group candidates by group_idx and find best
+    let mut best_per_group: FxHashMap<usize, (i64, f64, i32)> = FxHashMap::default();  // group_idx -> (rowid, similarity, score)
+
+    for (i, (group_idx, track_rowid, similarity)) in rowids_to_fetch.iter().enumerate() {
+        let group = &groups[*group_idx];
+
+        if let Some(spotify_track) = track_details.get(track_rowid) {
+            // Score against all variants
+            for (_track_idx, variant) in group.tracks.iter().enumerate() {
+                let base_score = combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
+
+                // Add similarity bonus (spec-06 R6.5)
+                let similarity_bonus = (*similarity * 50.0) as i32;
+                let score = base_score + similarity_bonus;
+
+                if score >= ACCEPT_THRESHOLD {
+                    let current_best = best_per_group.get(group_idx).map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                    if score > current_best {
+                        best_per_group.insert(*group_idx, (*track_rowid, *similarity, score));
+                    }
+                }
+            }
+        }
+
+        if i % 10_000 == 0 {
+            pb2.set_position(i as u64);
+        }
+    }
+    pb2.finish();
+
+    // Phase 6: Apply best matches to groups
+    for (group_idx, (track_rowid, _similarity, score)) in best_per_group.iter() {
+        if let Some(spotify_track) = track_details.get(track_rowid) {
+            let group = &mut groups[*group_idx];
+
+            // Find the variant that scored best with this Spotify track
+            let mut best_variant_idx = 0;
+            let mut best_variant_score = i32::MIN;
+
+            for (track_idx, variant) in group.tracks.iter().enumerate() {
+                let variant_score = combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
+                if variant_score > best_variant_score {
+                    best_variant_score = variant_score;
+                    best_variant_idx = track_idx;
+                }
+            }
+
+            group.best_match = Some((best_variant_idx, spotify_track.clone(), *score));
+            matches_found += 1;
+
+            // Record duration bucket for stats
+            let lrclib_duration = group.tracks[best_variant_idx].track.duration_sec;
+            let diff_sec = lrclib_duration - spotify_track.duration_ms / 1000;
+            stats.record_duration_bucket(diff_sec);
+        }
+    }
+
+    stats.rescue_matches = matches_found as usize;
+
+    eprintln!(
+        "[RESCUE] Complete: {} additional matches from title-first rescue",
+        matches_found
+    );
+
+    Ok(matches_found)
+}
+
 /// Batch fetch track details by rowids with all artists (spec-03 multi-artist).
 fn batch_fetch_track_details(
     conn: &Connection,
@@ -2663,6 +2903,21 @@ fn main() -> Result<()> {
                 &mut stats,
             )?;
 
+            // Title-first rescue pass for no_candidates groups (spec-06)
+            let rescue_matches = title_first_rescue(
+                &spotify_conn,
+                spotify_norm_path,
+                &mut groups,
+                &groups_seen,
+                &mut stats,
+            )?;
+            if rescue_matches > 0 {
+                let total = groups.len();
+                let matched = groups.iter().filter(|g| g.best_match.is_some()).count();
+                let rate = 100.0 * matched as f64 / total as f64;
+                println!("[MATCH] After rescue: {:.1}% ({} total, +{} from rescue)", rate, matched, rescue_matches);
+            }
+
             // Fallback: search pop=0 tracks for unmatched groups
             let pop0_matches = match_pop0_fallback(
                 &spotify_conn,
@@ -3467,5 +3722,71 @@ mod tests {
         // Search for "metallica" - should not match (no artist overlap)
         let score = combined_score(&lrclib_track, 40, &spotify_track, "metallica");
         assert!(score < 0, "Multi-artist match with no artist overlap should be rejected, got {}", score);
+    }
+
+    // ========================================================================
+    // Spec-06: Title-First Rescue Tests
+    // ========================================================================
+
+    #[test]
+    fn test_is_common_title() {
+        // Common titles should be identified
+        assert!(is_common_title("home"));
+        assert!(is_common_title("love"));
+        assert!(is_common_title("intro"));
+        assert!(is_common_title("instrumental"));
+
+        // Short titles are common
+        assert!(is_common_title("a"));
+        assert!(is_common_title("ab"));
+
+        // Specific song titles should not be common
+        assert!(!is_common_title("bohemian rhapsody"));
+        assert!(!is_common_title("stairway to heaven"));
+        assert!(!is_common_title("hotel california"));
+        assert!(!is_common_title("love you to death"));
+    }
+
+    #[test]
+    fn test_normalized_levenshtein_similarity() {
+        // Exact match
+        let sim = normalized_levenshtein("the beatles", "the beatles");
+        assert!((sim - 1.0).abs() < 0.001);
+
+        // Minor typo (should be high similarity)
+        let sim = normalized_levenshtein("everythig but the girl", "everything but the girl");
+        assert!(sim > 0.90, "Minor typo should have >90% similarity, got {}", sim);
+
+        // Punctuation difference (should be high similarity)
+        let sim = normalized_levenshtein("guns n roses", "guns and roses");
+        assert!(sim > 0.75, "Punctuation diff should have >75% similarity, got {}", sim);
+
+        // Completely different (should be low similarity)
+        let sim = normalized_levenshtein("metallica", "taylor swift");
+        assert!(sim < 0.30, "Completely different should have <30% similarity, got {}", sim);
+
+        // Partial match - "queen" vs "queen paul rodgers" has low similarity due to length difference
+        let sim = normalized_levenshtein("queen", "queen paul rodgers");
+        assert!(sim > 0.20 && sim < 0.50, "Partial match should be 20-50% similarity, got {}", sim);
+    }
+
+    #[test]
+    fn test_rescue_stats_fields_exist() {
+        // Verify all rescue-related stats fields exist and are serializable
+        let mut stats = MatchingStats::default();
+
+        stats.rescue_attempted = 1000;
+        stats.rescue_skipped_common_title = 50;
+        stats.rescue_matches = 100;
+        stats.rescue_rejected_low_similarity = 800;
+        stats.rescue_rejected_duration = 50;
+
+        // Should serialize without error
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("\"rescue_attempted\":1000"));
+        assert!(json.contains("\"rescue_matches\":100"));
+        assert!(json.contains("\"rescue_skipped_common_title\":50"));
+        assert!(json.contains("\"rescue_rejected_low_similarity\":800"));
+        assert!(json.contains("\"rescue_rejected_duration\":50"));
     }
 }

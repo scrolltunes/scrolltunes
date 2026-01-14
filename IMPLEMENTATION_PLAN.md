@@ -64,7 +64,7 @@ This plan implements recommendations from the senior data scientist's analysis t
 | 3.2 | Update normalize-spotify for new schema | spec-02 | [x] |
 | 3.3 | Update lrclib-extract for multi-candidate scoring | spec-02 | [x] |
 | 3.4 | Rebuild normalized index | spec-02 | [ ] |
-| 3.5 | Implement title-first rescue pass | spec-06 | [ ] |
+| 3.5 | Implement title-first rescue pass | spec-06 | [x] |
 
 **Checkpoint:** Full extraction run, validate against audit sample.
 

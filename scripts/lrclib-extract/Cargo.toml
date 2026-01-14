@@ -28,6 +28,7 @@ unicode-normalization = "0.1"  # Unicode NFKD decomposition for diacritic foldin
 serde = { version = "1.0", features = ["derive"] }  # Serialization for failure logging
 serde_json = "1.0"  # JSON serialization for Spotify candidates
 any_ascii = "0.3"  # Unicode to ASCII transliteration for Cyrillic/non-Latin scripts
+strsim = "0.11"    # String similarity for fuzzy artist matching (spec-06)
 
 [profile.release]
 lto = true
