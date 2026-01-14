@@ -50,7 +50,7 @@ This plan implements recommendations from the senior data scientist's analysis t
 
 | # | Task | Spec | Status |
 |---|------|------|--------|
-| 2.1 | Fix pop=0 fallback condition | spec-04 | [ ] |
+| 2.1 | Fix pop=0 fallback condition | spec-04 | [x] |
 | 2.2 | Implement adaptive duration tolerance | spec-05 | [ ] |
 | 2.3 | Add multi-artist verification | spec-03 | [ ] |
 

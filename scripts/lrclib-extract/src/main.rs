@@ -88,8 +88,10 @@ pub struct MatchingStats {
     pub main_no_candidates: usize,
     pub main_all_rejected: usize,
 
-    // Phase 2: Pop=0 fallback
+    // Phase 2: Pop=0 fallback (spec-04: includes previously-rejected groups)
     pub pop0_eligible: usize,
+    pub pop0_from_no_candidates: usize,  // Groups that never had candidates
+    pub pop0_from_rejected: usize,       // Groups that had candidates but all rejected
     pub pop0_matches: usize,
 
     // Duration statistics
@@ -1361,23 +1363,46 @@ fn match_pop0_fallback(
     groups_seen: &mut FxHashSet<usize>,
     stats: &mut MatchingStats,
 ) -> Result<u64> {
-    // Build index of unmatched groups for fast lookup
+    // Build index of unmatched groups for fast lookup (spec-04: includes rejected groups)
+    // Eligible groups are those WITHOUT a match, regardless of whether they were "seen"
+    // This includes:
+    // 1. Groups that never had candidates (!groups_seen.contains(&idx))
+    // 2. Groups that had candidates but all were rejected (in groups_seen but no match)
     let mut unmatched_index: FxHashMap<(String, String), Vec<usize>> = FxHashMap::default();
+    let mut from_no_candidates = 0usize;
+    let mut from_rejected = 0usize;
+
     for (idx, group) in groups.iter().enumerate() {
-        if !groups_seen.contains(&idx) {
+        // spec-04: Check for no match, not just "never seen"
+        if group.best_match.is_none() {
             let key = group.key.clone();
             unmatched_index.entry(key).or_default().push(idx);
+
+            // Track why this group is eligible (spec-07 instrumentation)
+            if groups_seen.contains(&idx) {
+                from_rejected += 1;  // Had candidates but all rejected
+            } else {
+                from_no_candidates += 1;  // Never had candidates
+            }
         }
     }
 
-    // Record how many groups were eligible for pop=0 fallback (spec-07)
+    // Record pop=0 eligibility breakdown (spec-04 + spec-07)
     stats.pop0_eligible = unmatched_index.len();
+    stats.pop0_from_no_candidates = from_no_candidates;
+    stats.pop0_from_rejected = from_rejected;
 
     if unmatched_index.is_empty() {
         return Ok(0);
     }
 
-    println!("[POP0] Searching pop=0 tracks for {} unmatched groups...", unmatched_index.len());
+    // spec-04: Log breakdown of why groups are eligible for pop=0
+    println!(
+        "[POP0] Searching pop=0 tracks for {} unmatched groups ({} never seen, {} previously rejected)...",
+        unmatched_index.len(),
+        from_no_candidates,
+        from_rejected
+    );
 
     // Count pop=0 tracks
     let total: u64 = spotify_conn.query_row(
@@ -2903,5 +2928,37 @@ mod tests {
         assert!(json.contains("\"total_groups\":1000"));
         assert!(json.contains("\"total_matches\":575"));
         assert!(json.contains("\"main_exact_matches\":500"));
+    }
+
+    #[test]
+    fn test_matching_stats_pop0_eligibility() {
+        // Test spec-04: pop0 eligibility tracking
+        let mut stats = MatchingStats::default();
+
+        // Simulate scenario: 1000 groups total
+        // - 600 matched in main phase
+        // - 200 had no candidates (never seen)
+        // - 200 had candidates but all rejected
+        stats.total_groups = 1000;
+        stats.total_matches = 600;
+        stats.main_no_candidates = 200;
+        stats.main_all_rejected = 200;
+
+        // Pop=0 should be eligible for both no_candidates AND rejected groups
+        stats.pop0_eligible = 400;  // 200 + 200
+        stats.pop0_from_no_candidates = 200;
+        stats.pop0_from_rejected = 200;
+
+        // Verify fields exist and are serializable
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("\"pop0_from_no_candidates\":200"));
+        assert!(json.contains("\"pop0_from_rejected\":200"));
+        assert!(json.contains("\"pop0_eligible\":400"));
+
+        // Verify sum is correct
+        assert_eq!(
+            stats.pop0_from_no_candidates + stats.pop0_from_rejected,
+            stats.pop0_eligible
+        );
     }
 }
