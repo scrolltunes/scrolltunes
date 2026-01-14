@@ -106,6 +106,9 @@ pub struct MatchingStats {
     pub duration_relaxed_46_to_60: usize,
     pub duration_relaxed_61_plus: usize,
 
+    // Multi-artist verification (spec-03)
+    pub multi_artist_rescues: usize,  // Matches where secondary artist matched
+
     // Final totals
     pub total_groups: usize,
     pub total_matches: usize,
@@ -210,6 +213,7 @@ struct SpotifyTrack {
     name: String,            // Original title (kept for debugging)
     #[allow(dead_code)]
     artist: String,          // Primary artist (kept for debugging)
+    artists: Vec<String>,    // All credited artists (spec-03 multi-artist verification)
     duration_ms: i64,
     popularity: i32,         // 0-100
     isrc: Option<String>,    // For Deezer album art lookup
@@ -460,6 +464,58 @@ fn compute_artist_similarity(a: &str, b: &str) -> f64 {
     intersection as f64 / union as f64
 }
 
+/// Multi-artist matching result (spec-03).
+/// Returns the best similarity score across all credited artists, plus whether it was an exact match
+/// and whether the best match was from a secondary (non-primary) artist.
+#[derive(Debug, Clone)]
+struct MultiArtistMatchResult {
+    best_similarity: f64,
+    is_exact: bool,
+    is_secondary_artist: bool,  // True if best match was not the primary artist
+}
+
+/// Score LRCLIB artist against all credited Spotify artists (spec-03 R3.2).
+/// Uses max-over-artists to find the best match.
+fn score_artist_multi(lrclib_artist_norm: &str, spotify_artists: &[String]) -> MultiArtistMatchResult {
+    if spotify_artists.is_empty() {
+        return MultiArtistMatchResult {
+            best_similarity: 0.0,
+            is_exact: false,
+            is_secondary_artist: false,
+        };
+    }
+
+    let mut best_similarity: f64 = 0.0;
+    let mut best_is_exact = false;
+    let mut best_artist_idx: usize = 0;
+
+    for (idx, artist) in spotify_artists.iter().enumerate() {
+        let artist_norm = normalize_artist(artist);
+
+        if artist_norm == lrclib_artist_norm {
+            // Exact match found - this is the best possible
+            return MultiArtistMatchResult {
+                best_similarity: 1.0,
+                is_exact: true,
+                is_secondary_artist: idx > 0,
+            };
+        }
+
+        let similarity = compute_artist_similarity(&artist_norm, lrclib_artist_norm);
+        if similarity > best_similarity {
+            best_similarity = similarity;
+            best_artist_idx = idx;
+            best_is_exact = false;
+        }
+    }
+
+    MultiArtistMatchResult {
+        best_similarity,
+        is_exact: best_is_exact,
+        is_secondary_artist: best_artist_idx > 0,
+    }
+}
+
 /// Confidence level for matching (spec-05).
 /// Determines duration tolerance based on title and artist match quality.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -485,8 +541,12 @@ fn max_duration_tolerance(confidence: MatchConfidence, track_duration_sec: i64) 
     base.max(ratio_based).min(90)
 }
 
-/// Combined scoring with guardrails against false positives (spec-04, spec-05).
+/// Combined scoring with guardrails against false positives (spec-04, spec-05, spec-03).
 /// Returns score >= ACCEPT_THRESHOLD for acceptable matches, or negative for rejections.
+///
+/// Spec-03 changes:
+/// - Multi-artist verification: score against ALL credited Spotify artists using max-over-artists
+/// - Track when match came from secondary artist for stats
 ///
 /// Spec-05 changes:
 /// - Confidence-based duration tolerance (high confidence = 60s, medium = 45s, low = 30s)
@@ -502,17 +562,14 @@ fn combined_score(
     let duration_diff = (lrclib.duration_sec - spotify_duration_sec).abs();
 
     // ═══════════════════════════════════════════════════════════════════════
-    // STEP 1: Calculate artist match quality first (needed for confidence)
+    // STEP 1: Calculate artist match quality using multi-artist verification (spec-03)
+    // Score LRCLIB artist against ALL credited Spotify artists
     // ═══════════════════════════════════════════════════════════════════════
-    let spotify_artist_norm = normalize_artist(&spotify.artist);
-    let artist_exact = spotify_artist_norm == group_artist_norm;
-    let artist_similarity = if artist_exact {
-        1.0
-    } else {
-        compute_artist_similarity(&spotify_artist_norm, group_artist_norm)
-    };
+    let artist_result = score_artist_multi(group_artist_norm, &spotify.artists);
+    let artist_exact = artist_result.is_exact;
+    let artist_similarity = artist_result.best_similarity;
 
-    // Hard reject if artist similarity too low
+    // Hard reject if artist similarity too low (no match against any credited artist)
     if artist_similarity < 0.3 {
         return -500;  // Artist mismatch - reject
     }
@@ -988,10 +1045,12 @@ fn stream_match_spotify(
     let mut match_count: u64 = 0;
 
     while let Some(row) = rows.next()? {
+        let primary_artist: String = row.get(2)?;
         let spotify_track = SpotifyTrack {
             id: row.get(0)?,
             name: row.get(1)?,
-            artist: row.get(2)?,
+            artist: primary_artist.clone(),
+            artists: vec![primary_artist.clone()], // Streaming gets only primary artist (spec-03: multi-artist via batch fetch)
             duration_ms: row.get(3)?,
             popularity: row.get(4)?,
             isrc: row.get(5)?,
@@ -1197,10 +1256,12 @@ fn stream_and_match_spotify_delayed(
     let mut groups_matched: u64 = 0;
 
     while let Some(row) = rows.next()? {
+        let primary_artist: String = row.get(2)?;
         let spotify_track = SpotifyTrack {
             id: row.get(0)?,
             name: row.get(1)?,
-            artist: row.get(2)?,
+            artist: primary_artist.clone(),
+            artists: vec![primary_artist.clone()], // Streaming gets only primary artist (spec-03: multi-artist via batch fetch)
             duration_ms: row.get(3)?,
             popularity: row.get(4)?,
             isrc: row.get(5)?,
@@ -1524,7 +1585,8 @@ fn match_pop0_fallback(
             let spotify_track = SpotifyTrack {
                 id: row.get(1)?,
                 name: title,
-                artist,
+                artist: artist.clone(),
+                artists: vec![artist], // Pop0 streaming gets single artist per row (spec-03: multi-artist via batch fetch)
                 duration_ms: row.get(4)?,
                 popularity: row.get(5)?,
                 isrc: row.get(6)?,
@@ -1579,7 +1641,7 @@ fn match_pop0_fallback(
     Ok(matches_found)
 }
 
-/// Batch fetch track details by rowids.
+/// Batch fetch track details by rowids with all artists (spec-03 multi-artist).
 fn batch_fetch_track_details(
     conn: &Connection,
     rowids: &[i64],
@@ -1597,6 +1659,8 @@ fn batch_fetch_track_details(
 
     for chunk in rowids.chunks(BATCH_SIZE) {
         let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+
+        // Phase 1: Fetch track data with primary artist
         let sql = format!(
             r#"SELECT
                 t.rowid,
@@ -1621,16 +1685,46 @@ fn batch_fetch_track_details(
 
         while let Some(row) = rows.next()? {
             let rowid: i64 = row.get(0)?;
+            let primary_artist: String = row.get(3)?;
             let track = SpotifyTrack {
                 id: row.get(1)?,
                 name: row.get(2)?,
-                artist: row.get(3)?,
+                artist: primary_artist.clone(),
+                artists: vec![primary_artist], // Will be extended with all artists
                 duration_ms: row.get(4)?,
                 popularity: row.get(5)?,
                 isrc: row.get(6)?,
                 album_rowid: row.get(7)?,
             };
             result.insert(rowid, track);
+        }
+
+        // Phase 2: Fetch ALL artists for these tracks (spec-03 R3.3)
+        let artists_sql = format!(
+            r#"SELECT ta.track_rowid, a.name
+            FROM track_artists ta
+            JOIN artists a ON a.rowid = ta.artist_rowid
+            WHERE ta.track_rowid IN ({})
+            ORDER BY ta.track_rowid, ta.artist_rowid"#,
+            placeholders
+        );
+
+        let mut artists_stmt = conn.prepare(&artists_sql)?;
+        let mut artist_rows = artists_stmt.query(params.as_slice())?;
+
+        // Collect all artists per track
+        let mut track_artists_map: FxHashMap<i64, Vec<String>> = FxHashMap::default();
+        while let Some(row) = artist_rows.next()? {
+            let track_rowid: i64 = row.get(0)?;
+            let artist_name: String = row.get(1)?;
+            track_artists_map.entry(track_rowid).or_default().push(artist_name);
+        }
+
+        // Update tracks with all artists
+        for (track_rowid, artists) in track_artists_map {
+            if let Some(track) = result.get_mut(&track_rowid) {
+                track.artists = artists;
+            }
         }
 
         pb.inc(chunk.len() as u64);
@@ -2860,6 +2954,7 @@ mod tests {
             id: "abc123".to_string(),
             name: "Love You to Death".to_string(),
             artist: "Type O Negative".to_string(),
+            artists: vec!["Type O Negative".to_string()],
             duration_ms: 429_000,
             popularity: 64,
             isrc: None,
@@ -2892,6 +2987,7 @@ mod tests {
             id: "abc123".to_string(),
             name: "Song".to_string(),
             artist: "Artist".to_string(),
+            artists: vec!["Artist".to_string()],
             duration_ms: 200_000, // 100s diff - way over 30s limit
             popularity: 80,
             isrc: None,
@@ -2915,6 +3011,7 @@ mod tests {
             id: "abc123".to_string(),
             name: "Song".to_string(),
             artist: "Completely Different".to_string(), // No token overlap
+            artists: vec!["Completely Different".to_string()],
             duration_ms: 200_000,
             popularity: 80,
             isrc: None,
@@ -2939,6 +3036,7 @@ mod tests {
             id: "abc123".to_string(),
             name: "Radio Edit".to_string(),
             artist: "Artist".to_string(),
+            artists: vec!["Artist".to_string()],
             duration_ms: 295_000,  // 4:55 = 45s diff (relaxed)
             popularity: 50,
             isrc: None,
@@ -2973,6 +3071,7 @@ mod tests {
             id: "abc123".to_string(),
             name: "Song".to_string(),
             artist: "Artist Bar".to_string(),  // Only partial match
+            artists: vec!["Artist Bar".to_string()],
             duration_ms: 295_000,  // 45s diff (relaxed)
             popularity: 50,
             isrc: None,
@@ -2998,6 +3097,7 @@ mod tests {
             id: "abc123".to_string(),
             name: "Extended Mix".to_string(),
             artist: "DJ Artist".to_string(),
+            artists: vec!["DJ Artist".to_string()],
             duration_ms: 360_000,  // 6:00 = 60s diff
             popularity: 70,
             isrc: None,
@@ -3030,6 +3130,7 @@ mod tests {
             id: "abc123".to_string(),
             name: "Song".to_string(),
             artist: "Artist".to_string(),
+            artists: vec!["Artist".to_string()],
             duration_ms: 250_000,  // 4:10 = 70s diff
             popularity: 80,
             isrc: None,
@@ -3218,5 +3319,125 @@ mod tests {
             stats.pop0_from_no_candidates + stats.pop0_from_rejected,
             stats.pop0_eligible
         );
+    }
+
+    // ========================================================================
+    // Spec-03: Multi-Artist Verification Tests
+    // ========================================================================
+
+    #[test]
+    fn test_score_artist_multi_exact_primary() {
+        // Primary artist matches exactly
+        let result = score_artist_multi("dua lipa", &vec![
+            "Dua Lipa".to_string(),
+            "Elton John".to_string(),
+        ]);
+        assert!(result.is_exact);
+        assert_eq!(result.best_similarity, 1.0);
+        assert!(!result.is_secondary_artist);
+    }
+
+    #[test]
+    fn test_score_artist_multi_exact_secondary() {
+        // Secondary artist matches exactly (spec-03: "Dua Lipa" searching for "Elton John, Dua Lipa")
+        let result = score_artist_multi("dua lipa", &vec![
+            "Elton John".to_string(),
+            "Dua Lipa".to_string(),
+        ]);
+        assert!(result.is_exact);
+        assert_eq!(result.best_similarity, 1.0);
+        assert!(result.is_secondary_artist);  // Match was from index 1
+    }
+
+    #[test]
+    fn test_score_artist_multi_partial_match() {
+        // Partial match against one of multiple artists
+        let result = score_artist_multi("elton", &vec![
+            "Elton John".to_string(),
+            "Dua Lipa".to_string(),
+        ]);
+        assert!(!result.is_exact);
+        assert!(result.best_similarity > 0.3);  // Should have some similarity
+        assert!(!result.is_secondary_artist);   // Best match was from primary
+    }
+
+    #[test]
+    fn test_score_artist_multi_no_match() {
+        // No artist matches
+        let result = score_artist_multi("metallica", &vec![
+            "Elton John".to_string(),
+            "Dua Lipa".to_string(),
+        ]);
+        assert!(!result.is_exact);
+        assert!(result.best_similarity < 0.3);  // Very low similarity
+    }
+
+    #[test]
+    fn test_score_artist_multi_empty() {
+        // Empty artist list
+        let result = score_artist_multi("metallica", &vec![]);
+        assert!(!result.is_exact);
+        assert_eq!(result.best_similarity, 0.0);
+        assert!(!result.is_secondary_artist);
+    }
+
+    #[test]
+    fn test_combined_score_multi_artist_secondary_match() {
+        // Spec-03: Match should succeed when LRCLIB artist matches secondary Spotify artist
+        let lrclib_track = Track {
+            id: 1,
+            title: "Cold Heart".to_string(),
+            artist: "Dua Lipa".to_string(),
+            album: None,
+            duration_sec: 210,
+        };
+        let spotify_track = SpotifyTrack {
+            id: "abc123".to_string(),
+            name: "Cold Heart".to_string(),
+            artist: "Elton John".to_string(),  // Primary is Elton John
+            artists: vec!["Elton John".to_string(), "Dua Lipa".to_string()],  // But Dua Lipa is credited
+            duration_ms: 210_000,
+            popularity: 85,
+            isrc: None,
+            album_rowid: 1,
+        };
+
+        // Search for "dua lipa" - should find match via secondary artist
+        let score = combined_score(&lrclib_track, 40, &spotify_track, "dua lipa");
+
+        // Should be a good match:
+        // duration: 100 (perfect)
+        // artist: 50 (exact match on secondary artist)
+        // quality: 40 (passed in)
+        // clean title bonus: 30 (no garbage pattern)
+        // popularity: 8 (85/10)
+        // Total: 228
+        assert!(score >= ACCEPT_THRESHOLD, "Multi-artist match via secondary artist should be accepted, got {}", score);
+    }
+
+    #[test]
+    fn test_combined_score_multi_artist_no_match() {
+        // Spec-03: Match should fail when LRCLIB artist doesn't match any Spotify artist
+        let lrclib_track = Track {
+            id: 1,
+            title: "Song".to_string(),
+            artist: "Metallica".to_string(),
+            album: None,
+            duration_sec: 210,
+        };
+        let spotify_track = SpotifyTrack {
+            id: "abc123".to_string(),
+            name: "Song".to_string(),
+            artist: "Elton John".to_string(),
+            artists: vec!["Elton John".to_string(), "Dua Lipa".to_string()],
+            duration_ms: 210_000,
+            popularity: 85,
+            isrc: None,
+            album_rowid: 1,
+        };
+
+        // Search for "metallica" - should not match (no artist overlap)
+        let score = combined_score(&lrclib_track, 40, &spotify_track, "metallica");
+        assert!(score < 0, "Multi-artist match with no artist overlap should be rejected, got {}", score);
     }
 }
