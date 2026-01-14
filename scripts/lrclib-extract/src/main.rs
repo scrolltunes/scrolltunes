@@ -6,6 +6,7 @@ use rayon::prelude::*;
 use regex::Regex;
 use rusqlite::{params, Connection};
 use rustc_hash::{FxHashMap, FxHashSet};
+use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Instant;
 use unicode_normalization::UnicodeNormalization;
@@ -133,6 +134,40 @@ struct AudioFeatures {
     key: Option<i32>,             // -1 to 11 (pitch class)
     mode: Option<i32>,            // 0=minor, 1=major
     time_signature: Option<i32>,  // 3-7
+}
+
+/// Spotify candidate for failure logging (spec-05).
+/// Serialized to JSON for storage in match_failures table.
+#[derive(Clone, Debug, Serialize)]
+struct SpotifyCandidate {
+    spotify_id: String,
+    spotify_name: String,
+    spotify_artist: String,
+    spotify_duration_ms: i64,
+    spotify_popularity: i32,
+    duration_diff_sec: i64,
+    score: i32,
+    reject_reason: Option<String>,
+}
+
+/// Failure reason for match_failures logging (spec-05).
+/// The fields in variants are metadata for debugging/analysis, not directly used in serialization.
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+enum FailureReason {
+    /// No Spotify tracks found for this (title_norm, artist_norm) key
+    NoSpotifyCandidates,
+    /// Spotify candidates found but all scored below threshold
+    AllCandidatesRejected {
+        candidate_count: usize,
+        best_score: i32,
+        primary_reject_reason: String,
+    },
+    /// Match accepted but score is marginal (between ACCEPT_THRESHOLD and LOW_CONFIDENCE_THRESHOLD)
+    LowConfidenceMatch {
+        accepted_score: i32,
+        threshold: i32,
+    },
 }
 
 /// Final enriched track for output.
@@ -1076,12 +1111,16 @@ fn load_audio_features_batched(
 /// Stream Spotify tracks and match against LRCLIB groups using delayed canonical selection (spec-03).
 /// Scores ALL variants in each group, keeping the best (variant, Spotify) pair.
 /// Uses 2-phase approach: title-only filter → batch artist lookup → exact matching.
+///
+/// Also tracks which groups were seen (had at least one Spotify candidate) vs unseen,
+/// for failure logging purposes.
 fn stream_and_match_spotify_delayed(
     conn: &Connection,
     min_popularity: i32,
     groups: &mut [LrclibGroup],
     index: &LrclibIndex,
     title_only_index: &TitleOnlyIndex,
+    groups_seen: &mut FxHashSet<usize>,  // Track which groups had candidates
 ) -> Result<()> {
     println!("[SPOTIFY] Streaming tracks with pop >= {} using delayed canonical matching...", min_popularity);
 
@@ -1138,6 +1177,7 @@ fn stream_and_match_spotify_delayed(
         if let Some(&group_idx) = index.get(&(title_norm.clone(), artist_norm.clone())) {
             let group = &mut groups[group_idx];
             let was_unmatched = group.best_match.is_none();
+            groups_seen.insert(group_idx);  // Track that this group had candidates
 
             // Score against ALL variants in this group
             for (track_idx, variant) in group.tracks.iter().enumerate() {
@@ -1167,6 +1207,7 @@ fn stream_and_match_spotify_delayed(
                     continue;  // Skip if artists are too different
                 }
 
+                groups_seen.insert(group_idx);  // Track that this group had candidates
                 let was_unmatched = group.best_match.is_none();
 
                 // Score against all variants with artist similarity penalty
@@ -1608,7 +1649,36 @@ fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Res
             content='tracks',
             content_rowid='id',
             tokenize='porter'
-        );",
+        );
+
+        -- Match failures table for post-hoc analysis (spec-05)
+        CREATE TABLE match_failures (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            -- LRCLIB entry (best quality variant from group)
+            lrclib_id INTEGER NOT NULL,
+            lrclib_title TEXT NOT NULL,
+            lrclib_artist TEXT NOT NULL,
+            lrclib_album TEXT,
+            lrclib_duration_sec INTEGER NOT NULL,
+            lrclib_title_norm TEXT NOT NULL,
+            lrclib_artist_norm TEXT NOT NULL,
+            lrclib_quality INTEGER NOT NULL,
+            group_variant_count INTEGER NOT NULL,
+
+            -- Failure info
+            failure_reason TEXT NOT NULL,
+            best_score INTEGER,
+
+            -- Spotify candidates (JSON array, top 5)
+            spotify_candidates TEXT,
+
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX idx_failures_reason ON match_failures(failure_reason);
+        CREATE INDEX idx_failures_quality ON match_failures(lrclib_quality DESC);
+        CREATE INDEX idx_failures_artist ON match_failures(lrclib_artist_norm);",
     )?;
 
     let pb = create_progress_bar(tracks.len() as u64, "Phase 3: Writing enriched tracks");
@@ -1653,6 +1723,209 @@ fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Res
     }
 
     pb.finish_with_message(format!("Phase 3: Wrote {} enriched tracks", tracks.len()));
+    Ok(())
+}
+
+// ============================================================================
+// Match Failure Logging (spec-05)
+// ============================================================================
+
+/// Determine if a failure should be logged.
+/// Only logs high-quality tracks with clean titles that failed to match.
+fn should_log_failure(group: &LrclibGroup, best_score: Option<i32>) -> bool {
+    // Get the best quality variant for evaluation
+    let best_variant = group.tracks.iter().max_by_key(|t| t.quality);
+    let best_variant = match best_variant {
+        Some(v) => v,
+        None => return false,
+    };
+
+    // Only log high-quality tracks (quality >= 30)
+    let is_high_quality = best_variant.quality >= 30;
+
+    // Only log clean titles (no garbage patterns)
+    let has_clean_title = !has_garbage_title_pattern(&best_variant.track.title);
+
+    // Either no match, or low-confidence match (score < ACCEPT_THRESHOLD)
+    let is_failure_or_marginal = match best_score {
+        None => true,                         // No match at all
+        Some(s) if s < ACCEPT_THRESHOLD => true,  // Below acceptance threshold
+        _ => false,                           // Good match, don't log
+    };
+
+    is_high_quality && has_clean_title && is_failure_or_marginal
+}
+
+/// Match failure entry ready for database insertion.
+/// Contains all data needed to write to match_failures table.
+#[derive(Clone, Debug)]
+struct MatchFailureEntry {
+    // LRCLIB entry info
+    lrclib_id: i64,
+    lrclib_title: String,
+    lrclib_artist: String,
+    lrclib_album: Option<String>,
+    lrclib_duration_sec: i64,
+    lrclib_title_norm: String,
+    lrclib_artist_norm: String,
+    lrclib_quality: i32,
+    group_variant_count: usize,
+    // Failure info
+    failure_reason: FailureReason,
+    best_score: Option<i32>,
+    spotify_candidates: Vec<SpotifyCandidate>,
+}
+
+/// Collect match failures from groups for logging.
+/// Returns fully populated failure entries ready for database insertion.
+fn collect_match_failures(
+    groups: &[LrclibGroup],
+    groups_seen: &FxHashSet<usize>,
+) -> Vec<MatchFailureEntry> {
+    let mut failures: Vec<MatchFailureEntry> = Vec::new();
+
+    for (idx, group) in groups.iter().enumerate() {
+        // Get best score (if any match exists)
+        let best_score = group.best_match.as_ref().map(|(_, _, s)| *s);
+
+        // Check if this failure should be logged
+        if !should_log_failure(group, best_score) {
+            continue;
+        }
+
+        let was_seen = groups_seen.contains(&idx);
+
+        let reason = match (group.best_match.as_ref(), was_seen) {
+            // No match and no candidates were seen
+            (None, false) => FailureReason::NoSpotifyCandidates,
+
+            // No match but candidates were seen (all rejected)
+            (None, true) => FailureReason::AllCandidatesRejected {
+                candidate_count: 0,  // We don't track exact count
+                best_score: 0,
+                primary_reject_reason: "score_below_threshold".to_string(),
+            },
+
+            // Match exists but below threshold (shouldn't happen if should_log_failure is correct)
+            (Some((_, _, score)), _) if *score < ACCEPT_THRESHOLD => {
+                FailureReason::AllCandidatesRejected {
+                    candidate_count: 1,
+                    best_score: *score,
+                    primary_reject_reason: "score_below_threshold".to_string(),
+                }
+            }
+
+            // Match exists but below low-confidence threshold
+            (Some((_, _, score)), _) if *score < LOW_CONFIDENCE_THRESHOLD => {
+                FailureReason::LowConfidenceMatch {
+                    accepted_score: *score,
+                    threshold: LOW_CONFIDENCE_THRESHOLD,
+                }
+            }
+
+            // Good match - shouldn't be here
+            _ => continue,
+        };
+
+        // Get best quality variant for logging
+        let best_variant = group.tracks.iter().max_by_key(|t| t.quality);
+        let best_variant = match best_variant {
+            Some(v) => v,
+            None => continue,
+        };
+
+        // Create candidate info from best match if available
+        let candidates: Vec<SpotifyCandidate> = match &group.best_match {
+            Some((track_idx, spotify, score)) => {
+                let variant = &group.tracks[*track_idx];
+                vec![SpotifyCandidate {
+                    spotify_id: spotify.id.clone(),
+                    spotify_name: spotify.name.clone(),
+                    spotify_artist: spotify.artist.clone(),
+                    spotify_duration_ms: spotify.duration_ms,
+                    spotify_popularity: spotify.popularity,
+                    duration_diff_sec: (variant.track.duration_sec - spotify.duration_ms / 1000).abs(),
+                    score: *score,
+                    reject_reason: if *score < ACCEPT_THRESHOLD {
+                        Some("score_below_threshold".to_string())
+                    } else {
+                        None
+                    },
+                }]
+            }
+            None => vec![],
+        };
+
+        failures.push(MatchFailureEntry {
+            lrclib_id: best_variant.track.id,
+            lrclib_title: best_variant.track.title.clone(),
+            lrclib_artist: best_variant.track.artist.clone(),
+            lrclib_album: best_variant.track.album.clone(),
+            lrclib_duration_sec: best_variant.track.duration_sec,
+            lrclib_title_norm: group.key.0.clone(),
+            lrclib_artist_norm: group.key.1.clone(),
+            lrclib_quality: best_variant.quality,
+            group_variant_count: group.tracks.len(),
+            failure_reason: reason,
+            best_score,
+            spotify_candidates: candidates,
+        });
+    }
+
+    failures
+}
+
+/// Write match failure logs to the database.
+fn write_match_failures(
+    conn: &Connection,
+    failures: &[MatchFailureEntry],
+) -> Result<()> {
+    if failures.is_empty() {
+        println!("[FAILURES] No match failures to log");
+        return Ok(());
+    }
+
+    println!("[FAILURES] Logging {} match failures...", failures.len());
+    let pb = create_progress_bar(failures.len() as u64, "Writing failure logs");
+
+    for entry in failures {
+        // Serialize candidates to JSON (keep top 5)
+        let candidates_json = serde_json::to_string(
+            &entry.spotify_candidates.iter().take(5).collect::<Vec<_>>()
+        )?;
+
+        let reason_str = match &entry.failure_reason {
+            FailureReason::NoSpotifyCandidates => "no_candidates",
+            FailureReason::AllCandidatesRejected { .. } => "all_rejected",
+            FailureReason::LowConfidenceMatch { .. } => "low_confidence",
+        };
+
+        conn.execute(
+            "INSERT INTO match_failures (
+                lrclib_id, lrclib_title, lrclib_artist, lrclib_album,
+                lrclib_duration_sec, lrclib_title_norm, lrclib_artist_norm,
+                lrclib_quality, group_variant_count,
+                failure_reason, best_score, spotify_candidates
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                entry.lrclib_id,
+                entry.lrclib_title,
+                entry.lrclib_artist,
+                entry.lrclib_album,
+                entry.lrclib_duration_sec,
+                entry.lrclib_title_norm,
+                entry.lrclib_artist_norm,
+                entry.lrclib_quality,
+                entry.group_variant_count,
+                reason_str,
+                entry.best_score,
+                candidates_json,
+            ],
+        )?;
+        pb.inc(1);
+    }
+
+    pb.finish_with_message(format!("[FAILURES] Logged {} match failures", failures.len()));
     Ok(())
 }
 
@@ -1767,7 +2040,10 @@ fn main() -> Result<()> {
     let title_only_index = build_title_only_index(&groups);
 
     // Phase 3: Spotify enrichment with delayed canonical selection
-    let enriched_tracks = if let Some(ref spotify_path) = args.spotify {
+    // Track which groups had Spotify candidates for failure logging
+    let mut groups_seen: FxHashSet<usize> = FxHashSet::default();
+
+    let (enriched_tracks, failure_data) = if let Some(ref spotify_path) = args.spotify {
         // Open Spotify DB with read-only optimizations
         println!("\nOpening Spotify database: {:?}", spotify_path);
         let spotify_conn = Connection::open(spotify_path)
@@ -1789,7 +2065,12 @@ fn main() -> Result<()> {
             &mut groups,
             &index,
             &title_only_index,
+            &mut groups_seen,
         )?;
+
+        // Collect match failures BEFORE consuming groups (spec-05)
+        let failures = collect_match_failures(&groups, &groups_seen);
+        println!("[FAILURES] Found {} potential failures to log", failures.len());
 
         // Collect IDs we actually need for audio features and images
         let (needed_track_ids, needed_album_rowids) = collect_needed_ids_from_groups(&groups);
@@ -1818,11 +2099,14 @@ fn main() -> Result<()> {
 
         // Select canonical and enrich (delayed selection - spec-03)
         println!("\nSelecting canonical tracks and enriching...");
-        select_canonical_and_enrich(groups, &audio_lookup, &image_lookup)
+        let enriched = select_canonical_and_enrich(groups, &audio_lookup, &image_lookup);
+
+        (enriched, Some(failures))
     } else {
         // No Spotify data: select best quality variant from each group
         println!("\nNo Spotify data - selecting canonical by quality...");
-        select_canonical_and_enrich(groups, &FxHashMap::default(), &FxHashMap::default())
+        let enriched = select_canonical_and_enrich(groups, &FxHashMap::default(), &FxHashMap::default());
+        (enriched, None)
     };
 
     // Phase 3: Write output
@@ -1836,6 +2120,11 @@ fn main() -> Result<()> {
         .context("Failed to create output database")?;
 
     write_enriched_output(&mut output_conn, &enriched_tracks)?;
+
+    // Write match failure logs (spec-05)
+    if let Some(ref failures) = failure_data {
+        write_match_failures(&output_conn, failures)?;
+    }
 
     // Phase 4-5: FTS & optimize
     build_fts_index(&output_conn)?;
