@@ -95,6 +95,19 @@ struct SpotifyTrack {
     album_rowid: i64,        // For album_images lookup
 }
 
+/// Partial Spotify track (before artist lookup) for 2-phase matching.
+/// Used in optimized streaming: Phase A fetches tracks only, Phase B batch-fetches artists.
+#[derive(Clone, Debug)]
+struct SpotifyTrackPartial {
+    rowid: i64,              // SQLite rowid for artist lookup
+    id: String,              // Spotify track ID
+    name: String,            // Original title
+    duration_ms: i64,
+    popularity: i32,         // 0-100
+    isrc: Option<String>,    // For Deezer album art lookup
+    album_rowid: i64,        // For album_images lookup
+}
+
 /// Audio features from Spotify
 #[derive(Clone, Debug)]
 struct AudioFeatures {
@@ -516,32 +529,42 @@ fn create_spinner(msg: &str) -> ProgressBar {
 }
 
 fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result<Vec<Track>> {
+    // Use optimized JOIN query instead of subquery (spec-02)
+    // This changes: WHERE t.last_lyrics_id IN (SELECT id FROM lyrics WHERE has_synced_lyrics = 1)
+    // To: FROM lyrics l JOIN tracks t ON t.last_lyrics_id = l.id WHERE l.has_synced_lyrics = 1
+    // EXPLAIN shows: SEARCH l USING COVERING INDEX + SEARCH t USING INDEX (instead of LIST SUBQUERY)
     let (count_sql, select_sql) = if let Some(artists) = artist_filter {
         let placeholders: Vec<String> = artists.iter().map(|_| "LOWER(t.artist_name) LIKE ?".to_string()).collect();
         let where_clause = placeholders.join(" OR ");
         (
             format!(
-                "SELECT COUNT(*) FROM tracks t
-                 WHERE t.last_lyrics_id IN (SELECT id FROM lyrics WHERE has_synced_lyrics = 1)
+                "SELECT COUNT(*)
+                 FROM lyrics l
+                 JOIN tracks t ON t.last_lyrics_id = l.id
+                 WHERE l.has_synced_lyrics = 1
                    AND t.duration > 45 AND t.duration < 600
                    AND ({})", where_clause
             ),
             format!(
                 "SELECT t.id, t.name, t.artist_name, t.album_name, t.duration
-                 FROM tracks t
-                 WHERE t.last_lyrics_id IN (SELECT id FROM lyrics WHERE has_synced_lyrics = 1)
+                 FROM lyrics l
+                 JOIN tracks t ON t.last_lyrics_id = l.id
+                 WHERE l.has_synced_lyrics = 1
                    AND t.duration > 45 AND t.duration < 600
                    AND ({})", where_clause
             ),
         )
     } else {
         (
-            "SELECT COUNT(*) FROM tracks t
-             WHERE t.last_lyrics_id IN (SELECT id FROM lyrics WHERE has_synced_lyrics = 1)
+            "SELECT COUNT(*)
+             FROM lyrics l
+             JOIN tracks t ON t.last_lyrics_id = l.id
+             WHERE l.has_synced_lyrics = 1
                AND t.duration > 45 AND t.duration < 600".to_string(),
             "SELECT t.id, t.name, t.artist_name, t.album_name, t.duration
-             FROM tracks t
-             WHERE t.last_lyrics_id IN (SELECT id FROM lyrics WHERE has_synced_lyrics = 1)
+             FROM lyrics l
+             JOIN tracks t ON t.last_lyrics_id = l.id
+             WHERE l.has_synced_lyrics = 1
                AND t.duration > 45 AND t.duration < 600".to_string(),
         )
     };
@@ -761,6 +784,7 @@ fn stream_match_spotify(
 
 /// Load audio features into FxHashMap, filtered to only needed track IDs.
 /// This avoids loading 40M+ rows - only keeps features for matched tracks.
+#[allow(dead_code)]
 fn load_audio_features_filtered(
     conn: &Connection,
     needed_ids: &FxHashSet<String>,
@@ -780,7 +804,7 @@ fn load_audio_features_filtered(
 
     while let Some(row) = rows.next()? {
         let track_id: String = row.get(0)?;
-        
+
         // Only keep if in our needed set
         if !needed_ids.contains(&track_id) {
             pb.inc(1);
@@ -806,24 +830,124 @@ fn load_audio_features_filtered(
     Ok(lookup)
 }
 
+/// Load audio features using batched IN queries (spec-02).
+/// Much faster than streaming all 40M+ rows and filtering in Rust.
+/// Uses the track_audio_features_track_id_unique index.
+fn load_audio_features_batched(
+    conn: &Connection,
+    spotify_ids: &FxHashSet<String>,
+) -> Result<FxHashMap<String, AudioFeatures>> {
+    println!("[AUDIO] Loading audio features (batched for {} IDs)...", spotify_ids.len());
+
+    let ids_vec: Vec<&String> = spotify_ids.iter().collect();
+    let mut lookup: FxHashMap<String, AudioFeatures> = FxHashMap::default();
+
+    if ids_vec.is_empty() {
+        return Ok(lookup);
+    }
+
+    let pb = create_progress_bar(ids_vec.len() as u64, "Loading audio features");
+
+    // Batch by 999 (SQLite parameter limit)
+    for chunk in ids_vec.chunks(999) {
+        let placeholders = vec!["?"; chunk.len()].join(",");
+        let sql = format!(
+            "SELECT track_id, tempo, key, mode, time_signature
+             FROM track_audio_features
+             WHERE track_id IN ({})",
+            placeholders
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params: Vec<&dyn rusqlite::ToSql> =
+            chunk.iter().map(|s| *s as &dyn rusqlite::ToSql).collect();
+
+        let mut rows = stmt.query(params.as_slice())?;
+        while let Some(row) = rows.next()? {
+            let track_id: String = row.get(0)?;
+            let features = AudioFeatures {
+                tempo: row.get(1)?,
+                key: row.get(2)?,
+                mode: row.get(3)?,
+                time_signature: row.get(4)?,
+            };
+            lookup.insert(track_id, features);
+            pb.inc(1);
+        }
+    }
+
+    pb.finish_with_message(format!(
+        "[AUDIO] Loaded {} audio features (batched)",
+        lookup.len()
+    ));
+    Ok(lookup)
+}
+
 /// Collect needed Spotify track IDs and album rowids from best matches
 fn collect_needed_ids(best_matches: &[Option<SpotifyTrack>]) -> (FxHashSet<String>, FxHashSet<i64>) {
     let mut track_ids: FxHashSet<String> = FxHashSet::default();
     let mut album_rowids: FxHashSet<i64> = FxHashSet::default();
-    
+
     for m in best_matches {
         if let Some(s) = m {
             track_ids.insert(s.id.clone());
             album_rowids.insert(s.album_rowid);
         }
     }
-    
+
     println!("[COLLECT] Need {} track IDs and {} album rowids", track_ids.len(), album_rowids.len());
     (track_ids, album_rowids)
 }
 
+/// Batch-fetch primary artist names for a list of track rowids (spec-02).
+/// Uses batched IN queries instead of correlated subqueries to eliminate
+/// the 50M+ subquery executions in the original approach.
+fn batch_fetch_primary_artists(
+    conn: &Connection,
+    rowids: &[i64],
+) -> Result<FxHashMap<i64, String>> {
+    let mut lookup: FxHashMap<i64, String> = FxHashMap::default();
+
+    if rowids.is_empty() {
+        return Ok(lookup);
+    }
+
+    // SQLite parameter limit is typically 999-32766 depending on version
+    // Use 999 for maximum compatibility
+    for chunk in rowids.chunks(999) {
+        let placeholders = vec!["?"; chunk.len()].join(",");
+
+        // Get primary artist (MIN artist_rowid) for each track
+        let sql = format!(r#"
+            SELECT ta.track_rowid, a.name
+            FROM track_artists ta
+            JOIN artists a ON a.rowid = ta.artist_rowid
+            WHERE ta.track_rowid IN ({})
+              AND ta.artist_rowid = (
+                  SELECT MIN(artist_rowid)
+                  FROM track_artists
+                  WHERE track_rowid = ta.track_rowid
+              )
+        "#, placeholders);
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params: Vec<&dyn rusqlite::ToSql> =
+            chunk.iter().map(|r| r as &dyn rusqlite::ToSql).collect();
+
+        let mut rows = stmt.query(params.as_slice())?;
+        while let Some(row) = rows.next()? {
+            let track_rowid: i64 = row.get(0)?;
+            let artist_name: String = row.get(1)?;
+            lookup.insert(track_rowid, artist_name);
+        }
+    }
+
+    Ok(lookup)
+}
+
 /// Load album image URLs filtered to only needed album rowids.
 /// We select medium size (~300px) for optimal mobile display.
+#[allow(dead_code)]
 fn load_album_images_filtered(
     conn: &Connection,
     needed_album_rowids: &FxHashSet<i64>,
@@ -844,18 +968,62 @@ fn load_album_images_filtered(
 
     while let Some(row) = rows.next()? {
         let album_rowid: i64 = row.get(0)?;
-        
+
         // Only keep if in our needed set
         if !needed_album_rowids.contains(&album_rowid) {
             continue;
         }
-        
+
         let url: String = row.get(1)?;
         // Only keep first (closest to 300px) per album
         lookup.entry(album_rowid).or_insert(url);
     }
 
     println!("[IMAGES] Loaded {} album image URLs", lookup.len());
+    Ok(lookup)
+}
+
+/// Load album image URLs using batched IN queries (spec-02).
+/// Much faster than scanning entire album_images table.
+/// Uses the album_images_album_id index.
+fn load_album_images_batched(
+    conn: &Connection,
+    album_rowids: &FxHashSet<i64>,
+) -> Result<FxHashMap<i64, String>> {
+    println!("[IMAGES] Loading album images (batched for {} albums)...", album_rowids.len());
+
+    let rowids_vec: Vec<i64> = album_rowids.iter().copied().collect();
+    let mut lookup: FxHashMap<i64, String> = FxHashMap::default();
+
+    if rowids_vec.is_empty() {
+        return Ok(lookup);
+    }
+
+    // Batch by 999 (SQLite parameter limit)
+    for chunk in rowids_vec.chunks(999) {
+        let placeholders = vec!["?"; chunk.len()].join(",");
+        let sql = format!(r#"
+            SELECT album_rowid, url, height
+            FROM album_images
+            WHERE album_rowid IN ({})
+              AND height BETWEEN 250 AND 350
+            ORDER BY ABS(height - 300)
+        "#, placeholders);
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params: Vec<&dyn rusqlite::ToSql> =
+            chunk.iter().map(|r| r as &dyn rusqlite::ToSql).collect();
+
+        let mut rows = stmt.query(params.as_slice())?;
+        while let Some(row) = rows.next()? {
+            let album_rowid: i64 = row.get(0)?;
+            let url: String = row.get(1)?;
+            // Only keep first (closest to 300px) per album
+            lookup.entry(album_rowid).or_insert(url);
+        }
+    }
+
+    println!("[IMAGES] Loaded {} album image URLs (batched)", lookup.len());
     Ok(lookup)
 }
 
@@ -1184,7 +1352,7 @@ fn main() -> Result<()> {
         // Collect IDs we actually need for audio features and images
         let (needed_track_ids, needed_album_rowids) = collect_needed_ids(&best_matches);
 
-        // Load audio features filtered to matched tracks only
+        // Load audio features using batched IN queries (spec-02 optimization)
         let audio_lookup = if let Some(ref af_path) = args.audio_features {
             println!("\nOpening audio features database: {:?}", af_path);
             let af_conn = Connection::open(af_path)
@@ -1198,13 +1366,13 @@ fn main() -> Result<()> {
                  PRAGMA mmap_size = 8589934592;
                  PRAGMA locking_mode = EXCLUSIVE;",
             )?;
-            load_audio_features_filtered(&af_conn, &needed_track_ids)?
+            load_audio_features_batched(&af_conn, &needed_track_ids)?
         } else {
             FxHashMap::default()
         };
 
-        // Load album images filtered to matched albums only
-        let image_lookup = load_album_images_filtered(&spotify_conn, &needed_album_rowids)?;
+        // Load album images using batched IN queries (spec-02 optimization)
+        let image_lookup = load_album_images_batched(&spotify_conn, &needed_album_rowids)?;
 
         // Enrich using pre-matched data
         println!("\nEnriching with Spotify data...");
