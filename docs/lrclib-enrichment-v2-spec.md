@@ -3,7 +3,7 @@
 > Improving Spotify match rate through normalization, transliteration, and language-aware matching
 
 **Last Updated:** January 2026
-**Status:** Partially Implemented (53.3% match rate achieved)
+**Status:** Implemented (57.5% match rate achieved)
 
 ---
 
@@ -11,9 +11,9 @@
 
 | Metric | Baseline | Current | Target |
 |--------|----------|---------|--------|
-| Match rate | 46.4% | **53.3%** | 65-72% |
+| Match rate | 46.4% | **57.5%** | 65-72% |
 | Unique groups | 4.1M | 3.84M | — |
-| Extraction time | 45 min | **20 min** | 25-30 min |
+| Extraction time | 45 min | **48 min** | 25-30 min |
 | Output size | — | 1.1 GB | — |
 
 ### Improvements Implemented
@@ -25,6 +25,8 @@
 | "The" prefix/suffix handling | +0.4% |
 | Primary-artist fallback | +2.9% |
 | `any_ascii` transliteration | +1.4% |
+| Pop=0 fallback | +4.1% (~157K matches) |
+| Hebrew/Russian artist aliases | ~205 hand-crafted mappings |
 | Batched INSERTs | 10x faster writes |
 
 ---
@@ -37,11 +39,12 @@
 normalize-spotify (one-time, ~11 min)
     └─ Creates spotify_normalized.sqlite3 (54M keys)
 
-lrclib-extract (~20 min)
+lrclib-extract (~48 min)
     ├─ Read LRCLIB (12.2M → 10M valid tracks)
     ├─ Group by (title_norm, artist_norm) → 3.8M groups
-    ├─ Match via indexed lookup + primary-artist fallback
-    ├─ Score and select canonical → 2M Spotify matches
+    ├─ Match via indexed lookup + primary-artist fallback → 2.4M matches (53%)
+    ├─ Pop=0 fallback for unmatched (283M tracks) → +157K matches
+    ├─ Score and select canonical → 2.2M Spotify matches (57.5%)
     ├─ Batch-load audio features + album images
     └─ Write tracks + FTS index + failure logs
 ```
