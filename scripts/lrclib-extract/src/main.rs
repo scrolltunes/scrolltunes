@@ -1375,13 +1375,20 @@ fn match_lrclib_to_spotify_normalized(
 
     let pb = create_progress_bar(groups.len() as u64, "Matching LRCLIB → Spotify");
 
-    // Phase 1: Lookup track_rowids using prepared statement (uses index efficiently)
-    // First try exact (title, artist) match, then fallback to primary artist only
-    let mut matches_to_fetch: Vec<(usize, i64, bool)> = Vec::new(); // (group_idx, rowid, is_fallback)
-    let mut fallback_matches_count = 0u64;
+    // Maximum candidates to fetch per key (spec-02 R2.2)
+    const MAX_CANDIDATES_PER_KEY: i64 = 20;
 
+    // Phase 1: Lookup ALL candidate track_rowids per (title_norm, artist_norm) key (spec-02)
+    // The new schema stores multiple candidates per key with different durations.
+    // We fetch all candidates and score them to find the best duration match.
+    // Structure: (group_idx, Vec<rowid>, is_fallback)
+    let mut matches_to_fetch: Vec<(usize, Vec<i64>, bool)> = Vec::new();
+    let mut fallback_matches_count = 0u64;
+    let mut total_candidates = 0u64;
+
+    // Prepare statement to fetch multiple candidates ordered by popularity (spec-02 R2.2)
     let mut lookup_stmt = norm_conn.prepare_cached(
-        "SELECT track_rowid FROM track_norm WHERE title_norm = ? AND artist_norm = ? LIMIT 1"
+        "SELECT track_rowid FROM track_norm WHERE title_norm = ? AND artist_norm = ? ORDER BY popularity DESC LIMIT ?"
     )?;
 
     let total_groups = groups.len() as u64;
@@ -1389,26 +1396,32 @@ fn match_lrclib_to_spotify_normalized(
         let title_norm = &group.key.0;
         let artist_norm = &group.key.1;
 
-        // Try exact match first
-        let found = if let Ok(track_rowid) = lookup_stmt.query_row(
-            rusqlite::params![title_norm, artist_norm],
-            |row| row.get::<_, i64>(0)
-        ) {
-            matches_to_fetch.push((group_idx, track_rowid, false));
-            groups_seen.insert(group_idx);
-            true
-        } else {
-            false
-        };
+        // Try exact match first - fetch ALL candidates for this key
+        let mut candidates: Vec<i64> = Vec::new();
+        {
+            let mut rows = lookup_stmt.query(rusqlite::params![title_norm, artist_norm, MAX_CANDIDATES_PER_KEY])?;
+            while let Some(row) = rows.next()? {
+                candidates.push(row.get(0)?);
+            }
+        }
 
-        // Fallback: try primary artist only (e.g., "mustard, migos" → "mustard")
-        if !found {
+        if !candidates.is_empty() {
+            total_candidates += candidates.len() as u64;
+            matches_to_fetch.push((group_idx, candidates, false));
+            groups_seen.insert(group_idx);
+        } else {
+            // Fallback: try primary artist only (e.g., "mustard, migos" → "mustard")
             if let Some(primary_artist) = extract_primary_artist(artist_norm) {
-                if let Ok(track_rowid) = lookup_stmt.query_row(
-                    rusqlite::params![title_norm, &primary_artist],
-                    |row| row.get::<_, i64>(0)
-                ) {
-                    matches_to_fetch.push((group_idx, track_rowid, true));
+                let mut fallback_candidates: Vec<i64> = Vec::new();
+                {
+                    let mut rows = lookup_stmt.query(rusqlite::params![title_norm, &primary_artist, MAX_CANDIDATES_PER_KEY])?;
+                    while let Some(row) = rows.next()? {
+                        fallback_candidates.push(row.get(0)?);
+                    }
+                }
+                if !fallback_candidates.is_empty() {
+                    total_candidates += fallback_candidates.len() as u64;
+                    matches_to_fetch.push((group_idx, fallback_candidates, true));
                     groups_seen.insert(group_idx);
                     fallback_matches_count += 1;
                 }
@@ -1421,57 +1434,72 @@ fn match_lrclib_to_spotify_normalized(
             pb.set_position(idx);
         }
     }
-    pb.finish_with_message(format!("[MATCH] Found {} potential matches ({} via fallback)", matches_to_fetch.len(), fallback_matches_count));
-    eprintln!("[MATCH] Complete: {} matches from {} groups ({} via primary-artist fallback)", matches_to_fetch.len(), total_groups, fallback_matches_count);
+    pb.finish_with_message(format!(
+        "[MATCH] Found {} groups with candidates ({} total candidates, {} via fallback)",
+        matches_to_fetch.len(), total_candidates, fallback_matches_count
+    ));
+    eprintln!(
+        "[MATCH] Complete: {} groups with candidates from {} groups ({} total candidates, avg {:.2} per group, {} via primary-artist fallback)",
+        matches_to_fetch.len(), total_groups, total_candidates,
+        if matches_to_fetch.is_empty() { 0.0 } else { total_candidates as f64 / matches_to_fetch.len() as f64 },
+        fallback_matches_count
+    );
 
-    // Phase 2: Batch fetch track details for matches
-    eprintln!("[FETCH] Fetching track details for {} matches...", matches_to_fetch.len());
-    let rowids: Vec<i64> = matches_to_fetch.iter().map(|(_, r, _)| *r).collect();
-    let track_details = batch_fetch_track_details(spotify_conn, &rowids)?;
+    // Phase 2: Batch fetch track details for ALL candidates
+    // Collect all unique rowids across all groups
+    let all_rowids: Vec<i64> = matches_to_fetch.iter()
+        .flat_map(|(_, rowids, _)| rowids.iter().copied())
+        .collect::<FxHashSet<_>>()
+        .into_iter()
+        .collect();
+    eprintln!("[FETCH] Fetching track details for {} unique candidates...", all_rowids.len());
+    let track_details = batch_fetch_track_details(spotify_conn, &all_rowids)?;
     eprintln!("[FETCH] Complete: {} track details loaded", track_details.len());
 
-    // Phase 3: Score and assign matches
-    let pb2 = create_progress_bar(matches_to_fetch.len() as u64, "Scoring matches");
+    // Phase 3: Score ALL candidates against ALL LRCLIB variants and select best (spec-02 R2.3)
+    let pb2 = create_progress_bar(matches_to_fetch.len() as u64, "Scoring candidates");
     let mut groups_matched = 0u64;
     let mut exact_accepted = 0usize;
     let mut fallback_accepted = 0usize;
     let mut all_rejected = 0usize;
 
-    for (i, (group_idx, track_rowid, is_fallback)) in matches_to_fetch.iter().enumerate() {
-        if let Some(spotify_track) = track_details.get(track_rowid) {
-            let group = &mut groups[*group_idx];
-            let was_unmatched = group.best_match.is_none();
+    for (i, (group_idx, candidate_rowids, is_fallback)) in matches_to_fetch.iter().enumerate() {
+        let group = &mut groups[*group_idx];
+        let was_unmatched = group.best_match.is_none();
 
-            // Score against ALL variants in this group
-            for (track_idx, variant) in group.tracks.iter().enumerate() {
-                let score = combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
+        // Score ALL candidates against ALL variants in this group (spec-02 R2.3)
+        for &track_rowid in candidate_rowids {
+            if let Some(spotify_track) = track_details.get(&track_rowid) {
+                for (track_idx, variant) in group.tracks.iter().enumerate() {
+                    let score = combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
 
-                if score >= ACCEPT_THRESHOLD {
-                    let current_best = group.best_match.as_ref().map(|(_, _, s)| *s).unwrap_or(i32::MIN);
-                    if score > current_best {
-                        group.best_match = Some((track_idx, spotify_track.clone(), score));
+                    if score >= ACCEPT_THRESHOLD {
+                        let current_best = group.best_match.as_ref().map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                        if score > current_best {
+                            group.best_match = Some((track_idx, spotify_track.clone(), score));
+                        }
                     }
                 }
             }
+        }
 
-            if was_unmatched && group.best_match.is_some() {
-                groups_matched += 1;
-                // Track stats by match type (spec-07)
-                if *is_fallback {
-                    fallback_accepted += 1;
-                } else {
-                    exact_accepted += 1;
-                }
-                // Record duration bucket for stats
-                if let Some((track_idx, ref spotify, _)) = group.best_match {
-                    let lrclib_duration = group.tracks[track_idx].track.duration_sec;
-                    let diff_sec = lrclib_duration - spotify.duration_ms / 1000;
-                    stats.record_duration_bucket(diff_sec);
-                }
-            } else if was_unmatched && group.best_match.is_none() {
-                // Had candidates but all were rejected
-                all_rejected += 1;
+        if was_unmatched && group.best_match.is_some() {
+            groups_matched += 1;
+            // Track stats by match type (spec-07)
+            if *is_fallback {
+                fallback_accepted += 1;
+            } else {
+                exact_accepted += 1;
             }
+            // Record duration bucket for stats
+            if let Some((track_idx, ref spotify, _)) = group.best_match {
+                let lrclib_duration = group.tracks[track_idx].track.duration_sec;
+                let diff_sec = lrclib_duration - spotify.duration_ms / 1000;
+                stats.record_duration_bucket(diff_sec);
+            }
+        } else if was_unmatched && group.best_match.is_none() {
+            // Had candidates but all were rejected
+            all_rejected += 1;
         }
 
         if i % 10_000 == 0 {
