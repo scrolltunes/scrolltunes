@@ -207,16 +207,32 @@ struct EnrichedTrack {
 
 static TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
-        Regex::new(r"(?i)\s*[-–—]\s*(?:remaster(?:ed)?(?:\s+\d{4})?|(?:\d{4}\s+)?remaster(?:ed)?)").unwrap(),
+        // Remaster variants: "- Remastered 2021", "(2021 Remaster)", "/ 1997 Remastered"
+        Regex::new(r"(?i)\s*[-–—/]\s*(?:remaster(?:ed)?(?:\s+\d{4})?|(?:\d{4}\s+)?remaster(?:ed)?)").unwrap(),
         Regex::new(r"(?i)\s*[\(\[](?:remaster(?:ed)?(?:\s+\d{4})?|(?:\d{4}\s+)?remaster(?:ed)?)[\)\]]").unwrap(),
+        // Live/acoustic: "(Live at Wembley)", "- Acoustic Version"
         Regex::new(r"(?i)\s*[\(\[](?:live(?:\s+(?:at|from|in)\s+[^)\]]+)?|acoustic(?:\s+version)?|unplugged)[\)\]]").unwrap(),
         Regex::new(r"(?i)\s*[-–—]\s*(?:live(?:\s+(?:at|from|in)\s+.+)?|acoustic(?:\s+version)?)").unwrap(),
+        // Edition variants: "(Deluxe Edition)", "[Super Deluxe]"
         Regex::new(r"(?i)\s*[\(\[](?:deluxe|super\s+deluxe|expanded|anniversary|bonus\s+track(?:s)?|special|collector'?s?)(?:\s+edition)?[\)\]]").unwrap(),
+        // Mix/version variants: "(Radio Edit)", "[Album Version]", "(Mono)", "(Stereo)"
         Regex::new(r"(?i)\s*[\(\[](?:radio\s+edit|single\s+version|album\s+version|extended(?:\s+(?:mix|version))?|original\s+mix|mono|stereo)[\)\]]").unwrap(),
+        // Content variants: "(Explicit)", "[Clean]", "(Instrumental)"
         Regex::new(r"(?i)\s*[\(\[](?:explicit|clean|censored|instrumental|karaoke)[\)\]]").unwrap(),
-        Regex::new(r"(?i)\s*[\(\[](?:demo(?:\s+version)?|alternate(?:\s+(?:take|version))?|outtake)[\)\]]").unwrap(),
+        // Recording variants: "(Demo)", "[Alternate Take]", "(Outtake)"
+        Regex::new(r"(?i)\s*[\(\[](?:demo(?:\s+version)?|alternate(?:\s+(?:take|version))?|outtake|take\s*\d+)[\)\]]").unwrap(),
+        // Year suffix: "- 2021", "- 1997 Version"
         Regex::new(r"(?i)\s*[-–—]\s*\d{4}(?:\s+(?:version|mix|edit))?$").unwrap(),
+        // Featured artists: "(feat. Artist)", "[ft. Someone]"
         Regex::new(r"(?i)\s*[\(\[](?:feat\.?|ft\.?|featuring)\s+[^)\]]+[\)\]]").unwrap(),
+        // Speed variants: "(Sped Up)", "(Slowed)", "(Slowed + Reverb)"
+        Regex::new(r"(?i)\s*[\(\[](?:sped\s+up|slowed(?:\s*\+\s*reverb)?|nightcore|daycore)[\)\]]").unwrap(),
+        // Rework variants: "(Reworked)", "(Redux)", "(Re-recorded)"
+        Regex::new(r"(?i)\s*[\(\[](?:reworked?|redux|re-?recorded|reimagined)[\)\]]").unwrap(),
+        // Version numbers: "(2)", "(Version 2)", "[V2]"
+        Regex::new(r"(?i)\s*[\(\[](?:v(?:ersion)?\s*)?\d[\)\]]").unwrap(),
+        // Dash format for mono/stereo/version: "- Mono", "- Stereo / 2021 Remaster"
+        Regex::new(r"(?i)\s*[-–—]\s*(?:mono|stereo)(?:\s*/\s*\d{4}\s*remaster(?:ed)?)?").unwrap(),
     ]
 });
 
@@ -489,6 +505,33 @@ fn normalize_artist(artist: &str) -> String {
         .get(normalized.as_str())
         .map(|&s| s.to_string())
         .unwrap_or(normalized)
+}
+
+/// Multi-artist separator pattern for extracting primary artist.
+/// Matches: &, /, ,, •, +, x, vs, and, with, feat, ft
+static ARTIST_SEPARATOR: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)\s*(?:[&/,•+×]|(?:\s+(?:x|vs\.?|and|with|feat\.?|ft\.?)\s+))\s*").unwrap()
+});
+
+/// Extract the primary (first) artist from a multi-artist string.
+/// Returns None if no separator found or result would be empty.
+/// e.g., "Mustard, Migos" → Some("mustard")
+///       "Duck Sauce, A-Trak & Armand Van Helden" → Some("duck sauce")
+///       "Beatles" → None (no separator)
+fn extract_primary_artist(artist_norm: &str) -> Option<String> {
+    // Find first separator
+    if let Some(m) = ARTIST_SEPARATOR.find(artist_norm) {
+        let primary = artist_norm[..m.start()].trim();
+        if !primary.is_empty() && primary.len() >= 2 {
+            // Re-normalize to handle "the " prefix on primary artist
+            let mut result = primary.to_string();
+            if result.starts_with("the ") {
+                result = result[4..].to_string();
+            }
+            return Some(result);
+        }
+    }
+    None
 }
 
 fn is_garbage_album(album: &Option<String>) -> bool {
@@ -1375,7 +1418,9 @@ fn match_lrclib_to_spotify_normalized(
     let pb = create_progress_bar(groups.len() as u64, "Matching LRCLIB → Spotify");
 
     // Phase 1: Lookup track_rowids using prepared statement (uses index efficiently)
+    // First try exact (title, artist) match, then fallback to primary artist only
     let mut matches_to_fetch: Vec<(usize, i64)> = Vec::new();
+    let mut fallback_matches = 0u64;
 
     let mut lookup_stmt = norm_conn.prepare_cached(
         "SELECT track_rowid FROM track_norm WHERE title_norm = ? AND artist_norm = ? LIMIT 1"
@@ -1383,12 +1428,33 @@ fn match_lrclib_to_spotify_normalized(
 
     let total_groups = groups.len() as u64;
     for (group_idx, group) in groups.iter().enumerate() {
-        if let Ok(track_rowid) = lookup_stmt.query_row(
-            rusqlite::params![&group.key.0, &group.key.1],
+        let title_norm = &group.key.0;
+        let artist_norm = &group.key.1;
+
+        // Try exact match first
+        let found = if let Ok(track_rowid) = lookup_stmt.query_row(
+            rusqlite::params![title_norm, artist_norm],
             |row| row.get::<_, i64>(0)
         ) {
             matches_to_fetch.push((group_idx, track_rowid));
             groups_seen.insert(group_idx);
+            true
+        } else {
+            false
+        };
+
+        // Fallback: try primary artist only (e.g., "mustard, migos" → "mustard")
+        if !found {
+            if let Some(primary_artist) = extract_primary_artist(artist_norm) {
+                if let Ok(track_rowid) = lookup_stmt.query_row(
+                    rusqlite::params![title_norm, &primary_artist],
+                    |row| row.get::<_, i64>(0)
+                ) {
+                    matches_to_fetch.push((group_idx, track_rowid));
+                    groups_seen.insert(group_idx);
+                    fallback_matches += 1;
+                }
+            }
         }
 
         let idx = group_idx as u64;
@@ -1397,8 +1463,8 @@ fn match_lrclib_to_spotify_normalized(
             pb.set_position(idx);
         }
     }
-    pb.finish_with_message(format!("[MATCH] Found {} potential matches", matches_to_fetch.len()));
-    eprintln!("[MATCH] Complete: {} matches from {} groups", matches_to_fetch.len(), total_groups);
+    pb.finish_with_message(format!("[MATCH] Found {} potential matches ({} via fallback)", matches_to_fetch.len(), fallback_matches));
+    eprintln!("[MATCH] Complete: {} matches from {} groups ({} via primary-artist fallback)", matches_to_fetch.len(), total_groups, fallback_matches);
 
     // Phase 2: Batch fetch track details for matches
     eprintln!("[FETCH] Fetching track details for {} matches...", matches_to_fetch.len());
@@ -2718,5 +2784,45 @@ mod tests {
 
         let score = combined_score(&lrclib_track, 40, &spotify_track, "artist one");
         assert!(score < 0); // Should be rejected due to artist mismatch
+    }
+
+    #[test]
+    fn test_extract_primary_artist() {
+        // Comma-separated artists
+        assert_eq!(extract_primary_artist("mustard, migos"), Some("mustard".to_string()));
+        assert_eq!(extract_primary_artist("duck sauce, a-trak and armand van helden"), Some("duck sauce".to_string()));
+        // & separator
+        assert_eq!(extract_primary_artist("nick cave and the bad seeds"), Some("nick cave".to_string()));
+        assert_eq!(extract_primary_artist("farid bang and julian williams"), Some("farid bang".to_string()));
+        // Slash separator
+        assert_eq!(extract_primary_artist("brent faiyaz/dahi/tyler, the creator"), Some("brent faiyaz".to_string()));
+        // Featuring
+        assert_eq!(extract_primary_artist("jay park feat loco"), Some("jay park".to_string()));
+        // No separator - single artist
+        assert_eq!(extract_primary_artist("beatles"), None);
+        assert_eq!(extract_primary_artist("rolling stones"), None);
+        // "The " stripping on primary artist
+        assert_eq!(extract_primary_artist("the deslondes and dan cutler"), Some("deslondes".to_string()));
+        // Too short primary artist rejected
+        assert_eq!(extract_primary_artist("a, b"), None);
+    }
+
+    #[test]
+    fn test_new_title_patterns() {
+        // Sped up/slowed variants
+        assert_eq!(normalize_title("Song (Sped Up)"), "song");
+        assert_eq!(normalize_title("Song (Slowed)"), "song");
+        assert_eq!(normalize_title("Song (Slowed + Reverb)"), "song");
+        // Slash remaster format
+        assert_eq!(normalize_title("Song - Mono / 1997 Remastered"), "song");
+        assert_eq!(normalize_title("God Only Knows / 2021 Remaster"), "god only knows");
+        // Reworked variants
+        assert_eq!(normalize_title("Song (Reworked)"), "song");
+        assert_eq!(normalize_title("Song (Redux)"), "song");
+        // Version numbers
+        assert_eq!(normalize_title("Song (2)"), "song");
+        assert_eq!(normalize_title("Song [V2]"), "song");
+        // Take in parens
+        assert_eq!(normalize_title("Song (take 4)"), "song");
     }
 }
