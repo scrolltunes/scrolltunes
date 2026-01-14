@@ -63,6 +63,226 @@ static ARTIST_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     ]
 });
 
+/// Artist transliteration map for Hebrew/Cyrillic → Latin.
+/// Must match main.rs ARTIST_TRANSLITERATIONS exactly.
+static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
+    let mut m = FxHashMap::default();
+    // === RUSSIAN ARTISTS ===
+    // Top rock bands
+    m.insert("ддт", "ddt");
+    m.insert("кино", "kino");
+    m.insert("аквариум", "aquarium");
+    m.insert("ария", "aria");
+    m.insert("алиса", "alisa");
+    m.insert("сплин", "splean");
+    m.insert("мумий тролль", "mumiy troll");
+    m.insert("би-2", "bi-2");
+    m.insert("би2", "bi-2");
+    m.insert("земфира", "zemfira");
+    m.insert("ленинград", "leningrad");
+    m.insert("король и шут", "korol i shut");
+    m.insert("киш", "korol i shut");
+    m.insert("машина времени", "mashina vremeni");
+    m.insert("наутилус помпилиус", "nautilus pompilius");
+    m.insert("пикник", "piknik");
+    m.insert("секрет", "sekret");
+    m.insert("чайф", "chaif");
+    m.insert("агата кристи", "agata kristi");
+    m.insert("любэ", "lyube");
+    m.insert("сектор газа", "sektor gaza");
+    m.insert("браво", "bravo");
+    m.insert("гражданская оборона", "grazhdanskaya oborona");
+    m.insert("ногу свело", "nogu svelo");
+    m.insert("ночные снайперы", "nochnye snaipery");
+    m.insert("крематорий", "krematorij");
+    m.insert("смысловые галлюцинации", "smyslovye gallyutsinatsii");
+    m.insert("чиж", "chizh");
+    m.insert("чиж и ко", "chizh");
+    m.insert("звери", "zveri");
+    m.insert("танцы минус", "tantsy minus");
+    m.insert("ундервуд", "undervud");
+    m.insert("пилот", "pilot");
+    m.insert("lumen", "lumen");
+    m.insert("люмен", "lumen");
+    m.insert("кипелов", "kipelov");
+    m.insert("серьга", "serga");
+    m.insert("город 312", "gorod 312");
+    m.insert("ума турман", "uma2rman");
+    // Solo artists
+    m.insert("виктор цой", "viktor tsoi");
+    m.insert("борис гребенщиков", "boris grebenshchikov");
+    m.insert("юрий шевчук", "yuri shevchuk");
+    m.insert("диана арбенина", "diana arbenina");
+    m.insert("валерий кипелов", "valery kipelov");
+    m.insert("константин кинчев", "konstantin kinchev");
+    m.insert("вячеслав бутусов", "vyacheslav butusov");
+    m.insert("андрей макаревич", "andrey makarevich");
+    // Pop artists
+    m.insert("филипп киркоров", "philipp kirkorov");
+    m.insert("алла пугачева", "alla pugacheva");
+    m.insert("валерия", "valeria");
+    m.insert("дима билан", "dima bilan");
+    m.insert("полина гагарина", "polina gagarina");
+    m.insert("сергей лазарев", "sergey lazarev");
+    m.insert("тимати", "timati");
+    m.insert("баста", "basta");
+    m.insert("егор крид", "egor kreed");
+    m.insert("макс корж", "max korzh");
+    m.insert("мот", "mot");
+    m.insert("jah khalib", "jah khalib");
+    m.insert("джах халиб", "jah khalib");
+    m.insert("монатик", "monatik");
+    m.insert("нюша", "nyusha");
+    m.insert("елка", "elka");
+    m.insert("ёлка", "elka");
+    m.insert("loboda", "loboda");
+    m.insert("лобода", "loboda");
+    m.insert("светлана лобода", "loboda");
+    m.insert("zivert", "zivert");
+    m.insert("зиверт", "zivert");
+    m.insert("клава кока", "klava koka");
+    m.insert("инстасамка", "instasamka");
+    m.insert("miyagi", "miyagi");
+    m.insert("мияги", "miyagi");
+    m.insert("хаски", "husky");
+    m.insert("oxxxymiron", "oxxxymiron");
+    m.insert("оксимирон", "oxxxymiron");
+    m.insert("face", "face");
+    m.insert("фейс", "face");
+    m.insert("morgenshtern", "morgenshtern");
+    m.insert("моргенштерн", "morgenshtern");
+    m.insert("little big", "little big");
+    m.insert("литл биг", "little big");
+    m.insert("ic3peak", "ic3peak");
+    m.insert("molchat doma", "molchat doma");
+    m.insert("молчат дома", "molchat doma");
+    // Hebrew artists (top from LRCLIB)
+    m.insert("אייל גולן", "eyal golan");
+    m.insert("אריק איינשטיין", "arik einstein");
+    m.insert("חיים משה", "haim moshe");
+    m.insert("עפרה חזה", "ofra haza");
+    m.insert("דקלון", "daklon");
+    m.insert("ישי ריבו", "ishay ribo");
+    m.insert("משינה", "mashina");
+    m.insert("מתי כספי", "matti caspi");
+    m.insert("מאיר אריאל", "meir ariel");
+    m.insert("חוה אלברשטיין", "chava alberstein");
+    m.insert("חווה אלברשטיין", "chava alberstein");
+    m.insert("ישי לוי", "yishai levy");
+    m.insert("רמי פורטיס", "rami fortis");
+    m.insert("עדן חסון", "eden hason");
+    m.insert("ברי סחרוף", "berry sakharof");
+    m.insert("קורין אלאל", "korin allal");
+    m.insert("הדג נחש", "hadag nahash");
+    m.insert("כנסיית השכל", "knesiyat hasechel");
+    m.insert("אהוד בנאי", "ehud banai");
+    m.insert("שלום חנוך", "shalom hanoch");
+    m.insert("ליאור פרחי", "lior farhi");
+    m.insert("דני סנדרסון", "danny sanderson");
+    m.insert("עידן עמדי", "idan amedi");
+    m.insert("ג'ירפות", "girafot");
+    m.insert("גלי עטרי", "gali atari");
+    m.insert("דודו אהרון", "dudu aharon");
+    m.insert("אתניקס", "ethnix");
+    m.insert("רוקפור", "rockfour");
+    m.insert("שלמה ארצי", "shlomo artzi");
+    m.insert("התקווה 6", "hatikva 6");
+    m.insert("מוניקה סקס", "monica sex");
+    m.insert("טיפקס", "tipex");
+    m.insert("הדורבנים", "hadorbanim");
+    m.insert("יהורם גאון", "yehoram gaon");
+    m.insert("גידי גוב", "gidi gov");
+    m.insert("שוטי הנבואה", "shotei hanevuah");
+    m.insert("פאר טסי", "peer tasi");
+    m.insert("ירדנה ארזי", "yardena arazi");
+    m.insert("אסף אמדורסקי", "assaf amdursky");
+    m.insert("שלומי שבת", "shlomi shabat");
+    m.insert("יהודה פוליקר", "yehuda poliker");
+    m.insert("חיים ישראל", "haim israel");
+    m.insert("איתי לוי", "itay levy");
+    m.insert("תמוז", "tamuz");
+    m.insert("נינט טייב", "ninet tayeb");
+    m.insert("בעז שרעבי", "boaz sharabi");
+    m.insert("עקיבא", "akiva");
+    m.insert("נעמי שמר", "naomi shemer");
+    m.insert("יואב יצחק", "yoav yitzhak");
+    m.insert("דודו טסה", "dudu tasa");
+    m.insert("מוש בן ארי", "mosh ben ari");
+    m.insert("משה פרץ", "moshe peretz");
+    m.insert("יוסי בנאי", "yossi banai");
+    m.insert("אריאל זילבר", "ariel zilber");
+    m.insert("הפיל הכחול", "hapil hakahol");
+    m.insert("אילנית", "ilanit");
+    m.insert("זוהר ארגוב", "zohar argov");
+    m.insert("אביב גפן", "aviv geffen");
+    m.insert("קרן פלס", "keren peles");
+    m.insert("אמיר דדון", "amir dadon");
+    m.insert("שולי רנד", "shuli rand");
+    m.insert("אברהם טל", "avraham tal");
+    m.insert("אביתר בנאי", "evyatar banai");
+    m.insert("עומר אדם", "omer adam");
+    m.insert("שרית חדד", "sarit hadad");
+    m.insert("עידן רייכל", "idan raichel");
+    m.insert("נועה קירל", "noa kirel");
+    m.insert("קאברט", "kaveret");
+    m.insert("כוורת", "kaveret");
+    m.insert("עברי לידר", "ivri lider");
+    m.insert("הראל סקעת", "harel skaat");
+    m.insert("היהודים", "hayehudim");
+    m.insert("סינרגיה", "synergia");
+    m.insert("ריקי גל", "riki gal");
+    // More Hebrew artists (from main.rs original list)
+    m.insert("בום פאם", "boom pam");
+    m.insert("ימן בלוז", "yemen blues");
+    m.insert("שבק ס", "shabak samech");
+    m.insert("תיסלם", "teapacks");
+    m.insert("בנות נחש", "bnot nechash");
+    m.insert("מרסדס בנד", "mercedes band");
+    m.insert("הפרויקט של עידן רייכל", "idan raichel project");
+    m.insert("רמי קלינשטיין", "rami kleinstein");
+    m.insert("ריטה", "rita");
+    m.insert("רוני דלומי", "ronnie dalumi");
+    m.insert("סטטיק ובן אל תבורי", "static and ben el");
+    m.insert("סטטיק ובן אל", "static and ben el");
+    m.insert("שירי מימון", "shiri maimon");
+    m.insert("קובי פרץ", "kobi peretz");
+    m.insert("עדן בן זקן", "eden ben zaken");
+    m.insert("נטע ברזילי", "netta barzilai");
+    m.insert("נטע", "netta");
+    m.insert("אגם בוחבוט", "agam buhbut");
+    m.insert("שחר טביב", "shachar taviv");
+    m.insert("עומרי 4", "omri 4");
+    m.insert("אושר כהן", "osher cohen");
+    m.insert("אנה זק", "anna zak");
+    m.insert("נסרין קדרי", "nasrin kadri");
+    m.insert("ליאור נרקיס", "lior narkis");
+    m.insert("יונתן קליב", "yonatan klieb");
+    m.insert("דנה אינטרנשיונל", "dana international");
+    m.insert("static and ben el tavori", "static and ben el");
+    // Additional from LRCLIB analysis
+    m.insert("גבריאל בלחסן", "gabriel belhasen");
+    m.insert("הפרברים", "haprevarim");
+    m.insert("הלם תרבות", "halem tarbut");
+    m.insert("סגיב כהן", "sagiv cohen");
+    m.insert("הגר יפת", "hagar yefet");
+    m.insert("טונה", "tuna");
+    m.insert("ביני לנדאו", "bini landau");
+    m.insert("נורית גלרון", "nurit galron");
+    m.insert("נצ'י נצ'", "nechi nech");
+    m.insert("מאיר בנאי", "meir banai");
+    m.insert("אריק לביא", "arik lavie");
+    m.insert("ליעד מאיר", "liad meir");
+    m.insert("שחר סאול", "shachar saul");
+    m.insert("עלמה גוב", "alma gov");
+    m.insert("ששון איפרם שאולוב", "sasson ifram shaulov");
+    m.insert("המכשפות", "hamechashefot");
+    m.insert("פוצים", "potzim");
+    m.insert("פוציםפוצים", "potzim");
+    m.insert("למה אני חי?", "lama ani hai");
+    m.insert("דודא", "duda");
+    m
+});
+
 fn is_combining_mark(c: char) -> bool {
     matches!(c, '\u{0300}'..='\u{036F}' | '\u{1AB0}'..='\u{1AFF}' |
              '\u{1DC0}'..='\u{1DFF}' | '\u{20D0}'..='\u{20FF}' |
@@ -140,12 +360,18 @@ fn normalize_title(title: &str) -> String {
 
 fn normalize_artist(artist: &str) -> String {
     let mut s = normalize_punctuation(artist);
-    s = fold_to_ascii(&s);
 
     for pattern in ARTIST_PATTERNS.iter() {
         s = pattern.replace_all(&s, "").to_string();
     }
 
+    // Check for known transliterations BEFORE ASCII folding (Hebrew/Cyrillic keys)
+    let pre_fold_key = s.trim().to_lowercase();
+    if let Some(&transliterated) = ARTIST_TRANSLITERATIONS.get(pre_fold_key.as_str()) {
+        return transliterated.to_string();
+    }
+
+    s = fold_to_ascii(&s);
     let mut normalized = s.to_lowercase().trim().to_string();
 
     // Strip "the " prefix (e.g., "The Beatles" → "beatles")
@@ -153,7 +379,16 @@ fn normalize_artist(artist: &str) -> String {
         normalized = normalized[4..].to_string();
     }
 
-    normalized
+    // Strip ", the" suffix (e.g., "Scorpions, The" → "scorpions")
+    if normalized.ends_with(", the") {
+        normalized = normalized[..normalized.len() - 5].to_string();
+    }
+
+    // Also check transliterations AFTER ASCII folding (for Cyrillic that folds to known keys)
+    ARTIST_TRANSLITERATIONS
+        .get(normalized.as_str())
+        .map(|&s| s.to_string())
+        .unwrap_or(normalized)
 }
 
 /// Execute a batched INSERT statement for better performance
@@ -240,7 +475,7 @@ fn main() -> Result<()> {
     println!("Opening Spotify database: {:?}", spotify_db);
     let src_conn = Connection::open(spotify_db)?;
 
-    // Count tracks for progress bar
+    // Count tracks for progress bar (pop>=1 for fast index, pop=0 handled via fallback)
     let total: u64 = src_conn.query_row(
         "SELECT COUNT(*) FROM tracks t
          JOIN track_artists ta ON ta.track_rowid = t.rowid

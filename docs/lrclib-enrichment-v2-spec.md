@@ -129,14 +129,32 @@ fn fold_to_ascii(s: &str) -> String {
 
 ### Hand-Crafted Artist Mappings
 
-~150 popular Russian/Israeli artists with known transliterations:
+~205 popular Russian/Hebrew artists with known transliterations:
 
+| Language | Count | Coverage |
+|----------|-------|----------|
+| Russian | ~90 | Top rock bands, solo artists, pop artists |
+| Hebrew | ~115 | Top LRCLIB artists by track count |
+
+**Key artists:**
 ```rust
+// Russian
 ARTIST_TRANSLITERATIONS.insert("ддт", "ddt");
 ARTIST_TRANSLITERATIONS.insert("кино", "kino");
+ARTIST_TRANSLITERATIONS.insert("молчат дома", "molchat doma");
+
+// Hebrew
+ARTIST_TRANSLITERATIONS.insert("אייל גולן", "eyal golan");
+ARTIST_TRANSLITERATIONS.insert("הדג נחש", "hadag nahash");
 ARTIST_TRANSLITERATIONS.insert("עומר אדם", "omer adam");
-// ... etc
 ```
+
+**Why needed:** Hebrew lacks vowels in writing, so `any_ascii` produces consonant-only output (e.g., "אברהם" → "'vrhm") that won't match Latin transliterations ("Avraham"). The dictionary maps Hebrew artist names directly to their Spotify Latin equivalents.
+
+**Lookup order:**
+1. Check original (pre-fold) against dictionary (catches Hebrew/Cyrillic keys)
+2. Apply `fold_to_ascii()`
+3. Check folded result against dictionary (catches Cyrillic that folds to known keys)
 
 ---
 

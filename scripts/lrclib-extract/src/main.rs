@@ -39,8 +39,9 @@ struct Args {
     #[arg(long)]
     audio_features: Option<PathBuf>,
 
-    /// Minimum Spotify popularity to include in lookup index (0-100)
-    #[arg(long, default_value = "1")]
+    /// Minimum Spotify popularity (0-100). Default 0 = include all.
+    /// Popularity used for ranking, not filtering - all LRCLIB entries should be enriched.
+    #[arg(long, default_value = "0")]
     min_popularity: i32,
 
     #[arg(long, default_value = "0")]
@@ -489,6 +490,72 @@ static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("דנה אינטרנשיונל", "dana international");
     m.insert("עדן חסון", "eden hason");
     m.insert("static and ben el tavori", "static and ben el");
+    // Additional Hebrew artists from LRCLIB analysis (Jan 2026)
+    // Classic artists
+    m.insert("חיים משה", "haim moshe");
+    m.insert("דקלון", "daklon");
+    m.insert("ישי ריבו", "ishay ribo");
+    m.insert("מתי כספי", "matti caspi");
+    m.insert("חוה אלברשטיין", "chava alberstein");
+    m.insert("חווה אלברשטיין", "chava alberstein");  // alternate spelling
+    m.insert("ישי לוי", "yishai levy");
+    m.insert("רמי פורטיס", "rami fortis");
+    m.insert("קורין אלאל", "korin allal");
+    m.insert("כנסיית השכל", "knesiyat hasechel");
+    m.insert("ליאור פרחי", "lior farhi");
+    m.insert("דני סנדרסון", "danny sanderson");
+    m.insert("עידן עמדי", "idan amedi");
+    m.insert("ג'ירפות", "girafot");
+    m.insert("גלי עטרי", "gali atari");
+    m.insert("גבריאל בלחסן", "gabriel belhasen");
+    m.insert("רוקפור", "rockfour");
+    m.insert("התקווה 6", "hatikva 6");
+    m.insert("יהורם גאון", "yehoram gaon");
+    m.insert("גידי גוב", "gidi gov");
+    m.insert("הפרברים", "haprevarim");
+    m.insert("הלם תרבות", "halem tarbut");
+    m.insert("סגיב כהן", "sagiv cohen");
+    m.insert("שוטי הנבואה", "shotei hanevuah");
+    m.insert("פאר טסי", "peer tasi");
+    m.insert("ירדנה ארזי", "yardena arazi");
+    m.insert("אסף אמדורסקי", "assaf amdursky");
+    m.insert("הגר יפת", "hagar yefet");
+    m.insert("חיים ישראל", "haim israel");
+    m.insert("איתי לוי", "itay levy");
+    m.insert("תמוז", "tamuz");
+    m.insert("נינט טייב", "ninet tayeb");
+    m.insert("בעז שרעבי", "boaz sharabi");
+    m.insert("טונה", "tuna");
+    m.insert("עקיבא", "akiva");
+    m.insert("נעמי שמר", "naomi shemer");
+    m.insert("יואב יצחק", "yoav yitzhak");
+    m.insert("דודו טסה", "dudu tasa");
+    m.insert("ביני לנדאו", "bini landau");
+    m.insert("משה פרץ", "moshe peretz");
+    m.insert("יוסי בנאי", "yossi banai");
+    m.insert("אריאל זילבר", "ariel zilber");
+    m.insert("הפיל הכחול", "hapil hakahol");
+    m.insert("אילנית", "ilanit");
+    m.insert("זוהר ארגוב", "zohar argov");
+    m.insert("נורית גלרון", "nurit galron");
+    m.insert("אמיר דדון", "amir dadon");
+    m.insert("נצ'י נצ'", "nechi nech");
+    m.insert("מאיר בנאי", "meir banai");
+    m.insert("שולי רנד", "shuli rand");
+    m.insert("אריק לביא", "arik lavie");
+    m.insert("אביתר בנאי", "evyatar banai");
+    m.insert("סינרגיה", "synergia");
+    m.insert("ריקי גל", "riki gal");
+    m.insert("ליעד מאיר", "liad meir");
+    m.insert("שחר סאול", "shachar saul");
+    m.insert("עלמה גוב", "alma gov");
+    m.insert("הראל סקעת", "harel skaat");
+    m.insert("ששון איפרם שאולוב", "sasson ifram shaulov");
+    m.insert("המכשפות", "hamechashefot");
+    m.insert("פוצים", "potzim");
+    m.insert("פוציםפוצים", "potzim");
+    m.insert("למה אני חי?", "lama ani hai");
+    m.insert("דודא", "duda");
 
     m
 });
@@ -619,6 +686,13 @@ fn normalize_artist(artist: &str) -> String {
     for pattern in ARTIST_PATTERNS.iter() {
         result = pattern.replace_all(&result, "").to_string();
     }
+
+    // Check for known transliterations BEFORE ASCII folding (Hebrew/Cyrillic keys)
+    let pre_fold_key = result.trim().to_lowercase();
+    if let Some(&transliterated) = ARTIST_TRANSLITERATIONS.get(pre_fold_key.as_str()) {
+        return transliterated.to_string();
+    }
+
     let mut normalized = fold_to_ascii(&result).trim().to_lowercase();
 
     // Strip "the " prefix (e.g., "The Beatles" → "beatles")
@@ -635,7 +709,7 @@ fn normalize_artist(artist: &str) -> String {
         normalized = normalized[..normalized.len() - 6].to_string();
     }
 
-    // Apply known artist transliterations for Cyrillic/Hebrew artists
+    // Also check transliterations AFTER ASCII folding (for Cyrillic that folds to known keys)
     ARTIST_TRANSLITERATIONS
         .get(normalized.as_str())
         .map(|&s| s.to_string())
@@ -1649,6 +1723,110 @@ fn match_lrclib_to_spotify_normalized(
     Ok(())
 }
 
+/// Fallback matching for pop=0 tracks (not in normalized index).
+/// Streams pop=0 tracks from raw Spotify DB and matches against unmatched LRCLIB groups.
+fn match_pop0_fallback(
+    spotify_conn: &Connection,
+    groups: &mut [LrclibGroup],
+    groups_seen: &mut FxHashSet<usize>,
+) -> Result<u64> {
+    // Build index of unmatched groups for fast lookup
+    let mut unmatched_index: FxHashMap<(String, String), Vec<usize>> = FxHashMap::default();
+    for (idx, group) in groups.iter().enumerate() {
+        if !groups_seen.contains(&idx) {
+            let key = group.key.clone();
+            unmatched_index.entry(key).or_default().push(idx);
+        }
+    }
+
+    if unmatched_index.is_empty() {
+        return Ok(0);
+    }
+
+    println!("[POP0] Searching pop=0 tracks for {} unmatched groups...", unmatched_index.len());
+
+    // Count pop=0 tracks
+    let total: u64 = spotify_conn.query_row(
+        "SELECT COUNT(*) FROM tracks t
+         JOIN track_artists ta ON ta.track_rowid = t.rowid
+         WHERE t.popularity = 0",
+        [],
+        |row| row.get(0),
+    )?;
+    eprintln!("[POP0] Streaming {} pop=0 track-artist rows...", total);
+
+    // Stream pop=0 tracks and match on-the-fly
+    let mut stmt = spotify_conn.prepare(
+        "SELECT t.rowid, t.id, t.name, a.name, t.duration_ms, t.popularity, t.external_id_isrc, t.album_rowid
+         FROM tracks t
+         JOIN track_artists ta ON ta.track_rowid = t.rowid
+         JOIN artists a ON a.rowid = ta.artist_rowid
+         WHERE t.popularity = 0"
+    )?;
+
+    let mut rows = stmt.query([])?;
+    let mut matches_found = 0u64;
+    let mut rows_processed = 0u64;
+
+    while let Some(row) = rows.next()? {
+        let title: String = row.get(2)?;
+        let artist: String = row.get(3)?;
+
+        let title_norm = normalize_title(&title);
+        let artist_norm = normalize_artist(&artist);
+        let key = (title_norm.clone(), artist_norm.clone());
+
+        // Check if this matches any unmatched group
+        if let Some(group_indices) = unmatched_index.get(&key) {
+            let spotify_track = SpotifyTrack {
+                id: row.get(1)?,
+                name: title,
+                artist,
+                duration_ms: row.get(4)?,
+                popularity: row.get(5)?,
+                isrc: row.get(6)?,
+                album_rowid: row.get(7)?,
+            };
+
+            for &group_idx in group_indices {
+                if groups_seen.contains(&group_idx) {
+                    continue; // Already matched
+                }
+
+                let group = &mut groups[group_idx];
+
+                // Score against all variants
+                for (track_idx, variant) in group.tracks.iter().enumerate() {
+                    let score = combined_score(&variant.track, variant.quality, &spotify_track, &artist_norm);
+
+                    if score >= ACCEPT_THRESHOLD {
+                        let current_best = group.best_match.as_ref().map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                        if score > current_best {
+                            group.best_match = Some((track_idx, spotify_track.clone(), score));
+                        }
+                    }
+                }
+
+                if group.best_match.is_some() {
+                    groups_seen.insert(group_idx);
+                    matches_found += 1;
+                }
+            }
+        }
+
+        rows_processed += 1;
+        if rows_processed % 5_000_000 == 0 {
+            eprintln!("[POP0] {}/{} ({:.1}%) - {} matches so far",
+                rows_processed, total,
+                100.0 * rows_processed as f64 / total as f64,
+                matches_found);
+        }
+    }
+
+    eprintln!("[POP0] Complete: {} additional matches from pop=0 tracks", matches_found);
+    Ok(matches_found)
+}
+
 /// Batch fetch track details by rowids.
 fn batch_fetch_track_details(
     conn: &Connection,
@@ -2603,6 +2781,19 @@ fn main() -> Result<()> {
                 &mut groups,
                 &mut groups_seen,
             )?;
+
+            // Fallback: search pop=0 tracks for unmatched groups
+            let pop0_matches = match_pop0_fallback(
+                &spotify_conn,
+                &mut groups,
+                &mut groups_seen,
+            )?;
+            if pop0_matches > 0 {
+                let total = groups.len();
+                let matched = groups_seen.len();
+                let rate = 100.0 * matched as f64 / total as f64;
+                println!("[MATCH] Updated match rate: {:.1}% ({} total, +{} from pop=0)", rate, matched, pop0_matches);
+            }
         } else {
             // Fall back to streaming all Spotify tracks (slow)
             stream_and_match_spotify_delayed(
