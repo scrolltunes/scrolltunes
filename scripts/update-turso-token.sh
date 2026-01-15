@@ -73,6 +73,11 @@ else
   exit 1
 fi
 
+# Update Vercel (preview/staging)
+echo "Updating Vercel preview environment..."
+vercel env rm TURSO_AUTH_TOKEN preview -y 2>/dev/null || true
+printf '%s' "$NEW_TOKEN" | vercel env add TURSO_AUTH_TOKEN preview
+
 # Update Vercel (production)
 echo "Updating Vercel production environment..."
 vercel env rm TURSO_AUTH_TOKEN production -y 2>/dev/null || true
@@ -82,6 +87,7 @@ echo ""
 echo "=== Done! ==="
 echo "  - Database uploaded to Turso"
 echo "  - Token updated in .env.local"
+echo "  - Token updated in Vercel (preview)"
 echo "  - Token updated in Vercel (production)"
 echo ""
 echo "To deploy: vercel --prod"

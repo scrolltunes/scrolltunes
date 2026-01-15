@@ -803,6 +803,384 @@ Remaining unmatched tracks are mostly:
 
 ---
 
+## Testing Strategies
+
+This section provides SQL queries for validating the enriched database. Run these after each extraction to verify correctness.
+
+### 1. Basic Integrity Checks
+
+```sql
+-- Total counts and match rate
+SELECT
+    COUNT(*) as total,
+    SUM(CASE WHEN spotify_id IS NOT NULL THEN 1 ELSE 0 END) as matched,
+    ROUND(100.0 * SUM(CASE WHEN spotify_id IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) as match_rate
+FROM tracks;
+
+-- Database integrity
+PRAGMA integrity_check;
+
+-- FTS index sync (should return 0)
+SELECT COUNT(*) FROM tracks_fts WHERE rowid NOT IN (SELECT id FROM tracks);
+```
+
+### 2. Hebrew Artist Matching
+
+Validates the hand-crafted Hebrew→Latin artist dictionary.
+
+```sql
+-- Top Hebrew artists should have Spotify matches
+SELECT t.artist, t.title, t.spotify_id, t.popularity
+FROM tracks t
+WHERE t.artist IN (
+    'עומר אדם',      -- Omer Adam
+    'אייל גולן',     -- Eyal Golan
+    'הדג נחש',       -- Hadag Nahash
+    'שלמה ארצי',     -- Shlomo Artzi
+    'משינה',         -- Mashina
+    'אריק איינשטיין' -- Arik Einstein
+)
+AND t.spotify_id IS NOT NULL
+LIMIT 20;
+
+-- Count Hebrew matches vs unmatched
+SELECT
+    SUM(CASE WHEN spotify_id IS NOT NULL THEN 1 ELSE 0 END) as matched,
+    SUM(CASE WHEN spotify_id IS NULL THEN 1 ELSE 0 END) as unmatched
+FROM tracks
+WHERE artist GLOB '*[א-ת]*';
+
+-- Sample unmatched Hebrew (identify dictionary gaps)
+SELECT artist, title, artist_norm
+FROM tracks
+WHERE artist GLOB '*[א-ת]*' AND spotify_id IS NULL
+GROUP BY artist_norm
+ORDER BY COUNT(*) DESC
+LIMIT 20;
+```
+
+### 3. Cyrillic/Russian Artist Matching
+
+Validates `any_ascii` transliteration and Russian artist dictionary.
+
+```sql
+-- Top Russian artists should have Spotify matches
+SELECT t.artist, t.title, t.spotify_id, t.popularity
+FROM tracks t
+WHERE t.artist IN (
+    'Кино',           -- Kino
+    'ДДТ',            -- DDT
+    'Ария',           -- Aria
+    'Молчат Дома',    -- Molchat Doma
+    'Земфира',        -- Zemfira
+    'Би-2'            -- Bi-2
+)
+AND t.spotify_id IS NOT NULL
+LIMIT 20;
+
+-- Count Cyrillic matches vs unmatched
+SELECT
+    SUM(CASE WHEN spotify_id IS NOT NULL THEN 1 ELSE 0 END) as matched,
+    SUM(CASE WHEN spotify_id IS NULL THEN 1 ELSE 0 END) as unmatched
+FROM tracks
+WHERE artist GLOB '*[а-яА-Я]*';
+
+-- Verify transliteration worked (should see Latin spotify matches)
+SELECT artist, artist_norm, spotify_id
+FROM tracks
+WHERE artist GLOB '*[а-яА-Я]*' AND spotify_id IS NOT NULL
+LIMIT 10;
+```
+
+### 4. High-Popularity Track Matching
+
+Popular tracks should have high match rates - low rates indicate problems.
+
+```sql
+-- Top artists by Spotify popularity (sanity check)
+SELECT artist, title, popularity, spotify_id
+FROM tracks
+WHERE popularity >= 80
+ORDER BY popularity DESC
+LIMIT 20;
+
+-- Artists with most high-popularity matches
+SELECT artist, COUNT(*) as tracks, MAX(popularity) as max_pop
+FROM tracks
+WHERE popularity >= 70
+GROUP BY artist
+ORDER BY tracks DESC
+LIMIT 20;
+
+-- Verify specific popular songs exist
+SELECT title, artist, popularity, tempo
+FROM tracks
+WHERE title_norm IN (
+    'bohemian rhapsody',
+    'stairway to heaven',
+    'smells like teen spirit',
+    'hotel california',
+    'imagine'
+)
+ORDER BY popularity DESC;
+```
+
+### 5. Deduplication Validation
+
+Ensures (title_norm, artist_norm) groups are properly deduplicated.
+
+```sql
+-- Should return 0 (no duplicate normalized keys with different spotify_ids)
+SELECT title_norm, artist_norm, COUNT(DISTINCT spotify_id) as spotify_ids
+FROM tracks
+WHERE spotify_id IS NOT NULL
+GROUP BY title_norm, artist_norm
+HAVING COUNT(DISTINCT spotify_id) > 1
+LIMIT 10;
+
+-- Track count should roughly equal unique (title_norm, artist_norm) pairs
+SELECT
+    COUNT(*) as total_tracks,
+    COUNT(DISTINCT title_norm || '|' || artist_norm) as unique_groups
+FROM tracks;
+
+-- Check for variant consolidation (multiple LRCLIB entries → 1 best match)
+SELECT title_norm, artist_norm, COUNT(*) as variants
+FROM tracks
+GROUP BY title_norm, artist_norm
+HAVING COUNT(*) > 1
+LIMIT 10;
+```
+
+### 6. Fuzzy Matching Validation
+
+Verify FUZZY phase caught spelling variants.
+
+```sql
+-- Known fuzzy matches (typos that should be corrected)
+SELECT title, artist, title_norm, spotify_id
+FROM tracks
+WHERE title_norm LIKE '%sandman%' AND artist_norm LIKE '%metallica%';
+
+-- Check near-miss titles were matched
+SELECT title, title_norm, spotify_id IS NOT NULL as matched
+FROM tracks
+WHERE title LIKE '%Remaster%' OR title LIKE '%Live%' OR title LIKE '%Edit%'
+LIMIT 20;
+```
+
+### 7. Audio Features Enrichment
+
+Validates tempo/BPM and musical key data loaded correctly.
+
+```sql
+-- Audio feature coverage
+SELECT
+    COUNT(*) as total_matched,
+    SUM(CASE WHEN tempo IS NOT NULL THEN 1 ELSE 0 END) as with_tempo,
+    SUM(CASE WHEN musical_key IS NOT NULL THEN 1 ELSE 0 END) as with_key,
+    ROUND(100.0 * SUM(CASE WHEN tempo IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) as tempo_pct
+FROM tracks
+WHERE spotify_id IS NOT NULL;
+
+-- Tempo distribution (sanity check - should be 60-200 BPM mostly)
+SELECT
+    CASE
+        WHEN tempo < 60 THEN 'Very slow (<60)'
+        WHEN tempo < 90 THEN 'Slow (60-89)'
+        WHEN tempo < 120 THEN 'Medium (90-119)'
+        WHEN tempo < 150 THEN 'Fast (120-149)'
+        ELSE 'Very fast (150+)'
+    END as tempo_range,
+    COUNT(*) as count
+FROM tracks
+WHERE tempo IS NOT NULL
+GROUP BY 1
+ORDER BY 2 DESC;
+
+-- Verify specific songs have expected tempos
+SELECT title, artist, tempo, musical_key
+FROM tracks
+WHERE title_norm IN ('billie jean', 'take on me', 'enter sandman')
+AND spotify_id IS NOT NULL;
+```
+
+### 8. Album Art Coverage
+
+```sql
+-- Album art coverage (should be 99%+ of matched)
+SELECT
+    SUM(CASE WHEN album_image_url IS NOT NULL THEN 1 ELSE 0 END) as with_art,
+    COUNT(*) as matched,
+    ROUND(100.0 * SUM(CASE WHEN album_image_url IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) as art_pct
+FROM tracks
+WHERE spotify_id IS NOT NULL;
+
+-- Sample album art URLs (verify format)
+SELECT title, artist, album_image_url
+FROM tracks
+WHERE album_image_url IS NOT NULL
+LIMIT 5;
+```
+
+### 9. FTS Search Quality
+
+Test full-text search returns relevant results.
+
+```sql
+-- Basic FTS search
+SELECT title, artist, popularity
+FROM tracks_fts
+JOIN tracks ON tracks_fts.rowid = tracks.id
+WHERE tracks_fts MATCH 'bohemian rhapsody'
+ORDER BY popularity DESC
+LIMIT 5;
+
+-- Multi-word search
+SELECT title, artist, popularity
+FROM tracks_fts
+JOIN tracks ON tracks_fts.rowid = tracks.id
+WHERE tracks_fts MATCH 'nothing else matters'
+ORDER BY popularity DESC
+LIMIT 5;
+
+-- Artist search
+SELECT title, artist, popularity
+FROM tracks_fts
+JOIN tracks ON tracks_fts.rowid = tracks.id
+WHERE tracks_fts MATCH 'metallica'
+ORDER BY popularity DESC
+LIMIT 10;
+
+-- Verify BM25 ranking works
+SELECT title, artist, bm25(tracks_fts) as score
+FROM tracks_fts
+JOIN tracks ON tracks_fts.rowid = tracks.id
+WHERE tracks_fts MATCH 'love'
+ORDER BY bm25(tracks_fts)
+LIMIT 10;
+```
+
+### 10. Edge Cases and Regressions
+
+```sql
+-- "The" prefix handling (Beatles vs The Beatles)
+SELECT artist, artist_norm, COUNT(*) as tracks
+FROM tracks
+WHERE artist LIKE '%Beatles%'
+GROUP BY artist_norm;
+
+-- Multi-artist tracks (feat., &, with)
+SELECT artist, artist_norm, spotify_id IS NOT NULL as matched
+FROM tracks
+WHERE artist LIKE '%feat.%' OR artist LIKE '%&%'
+LIMIT 20;
+
+-- Track number stripping (should not have leading numbers in norm)
+SELECT title, title_norm
+FROM tracks
+WHERE title GLOB '[0-9]*[-–.]*'
+LIMIT 10;
+
+-- Year suffix stripping
+SELECT title, title_norm
+FROM tracks
+WHERE title GLOB '*([0-9][0-9][0-9][0-9])*'
+LIMIT 10;
+
+-- Remaster suffix stripping
+SELECT title, title_norm
+FROM tracks
+WHERE title LIKE '%remaster%' OR title LIKE '%Remaster%'
+LIMIT 10;
+```
+
+### 11. Match Failures Analysis (if --log-failures used)
+
+```sql
+-- Only available if extraction run with --log-failures flag
+
+-- Failure distribution
+SELECT failure_reason, COUNT(*) as count,
+    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
+FROM match_failures
+GROUP BY failure_reason;
+
+-- High-quality unmatched (prioritize for dictionary additions)
+SELECT lrclib_artist, COUNT(*) as tracks, MAX(lrclib_quality) as max_quality
+FROM match_failures
+WHERE failure_reason = 'no_candidates'
+GROUP BY lrclib_artist_norm
+ORDER BY tracks DESC
+LIMIT 20;
+
+-- Unmatched Hebrew artists (dictionary candidates)
+SELECT lrclib_artist, lrclib_artist_norm, COUNT(*) as tracks
+FROM match_failures
+WHERE lrclib_artist GLOB '*[א-ת]*'
+GROUP BY lrclib_artist_norm
+ORDER BY tracks DESC
+LIMIT 20;
+
+-- Unmatched Cyrillic artists (dictionary candidates)
+SELECT lrclib_artist, lrclib_artist_norm, COUNT(*) as tracks
+FROM match_failures
+WHERE lrclib_artist GLOB '*[а-яА-Я]*'
+GROUP BY lrclib_artist_norm
+ORDER BY tracks DESC
+LIMIT 20;
+
+-- Near-misses (had candidates but all rejected)
+SELECT lrclib_title, lrclib_artist, spotify_candidates
+FROM match_failures
+WHERE failure_reason = 'all_rejected'
+    AND spotify_candidates IS NOT NULL
+LIMIT 10;
+```
+
+### Quick Validation Script
+
+Run all critical checks in one go:
+
+```bash
+sqlite3 output.sqlite3 <<'EOF'
+.mode column
+.headers on
+
+-- 1. Match rate
+SELECT COUNT(*) as total,
+    SUM(CASE WHEN spotify_id IS NOT NULL THEN 1 ELSE 0 END) as matched,
+    ROUND(100.0 * SUM(CASE WHEN spotify_id IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) || '%' as rate
+FROM tracks;
+
+-- 2. Hebrew coverage
+SELECT 'Hebrew' as script,
+    SUM(CASE WHEN spotify_id IS NOT NULL THEN 1 ELSE 0 END) as matched,
+    COUNT(*) as total
+FROM tracks WHERE artist GLOB '*[א-ת]*';
+
+-- 3. Cyrillic coverage
+SELECT 'Cyrillic' as script,
+    SUM(CASE WHEN spotify_id IS NOT NULL THEN 1 ELSE 0 END) as matched,
+    COUNT(*) as total
+FROM tracks WHERE artist GLOB '*[а-яА-Я]*';
+
+-- 4. Top popularity check
+SELECT title, artist, popularity FROM tracks
+WHERE popularity >= 85 ORDER BY popularity DESC LIMIT 5;
+
+-- 5. FTS sanity
+SELECT title, artist FROM tracks_fts
+JOIN tracks ON tracks_fts.rowid = tracks.id
+WHERE tracks_fts MATCH 'queen' LIMIT 3;
+
+-- 6. Integrity
+PRAGMA integrity_check;
+EOF
+```
+
+---
+
 ## Appendix: Output Schema
 
 ```sql
