@@ -373,7 +373,7 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("רביד פלוטניק", "ravid plotnik");
     m.insert("מוקי", "muki");
     m.insert("יזהר אשדות", "izhar ashdot");
-    m.insert("הדס קליינמן ואביב בכר", "hadas kleinman veaviv bachar");
+    m.insert("הדס קליינמן ואביב בכר", "hadas kleinman and aviv bachar");
     m.insert("הבנות נחמה", "habanot nechama");
     m.insert("דמיס רוסוס", "demis roussos");
     m.insert("אביחי הולנדר", "avichai hollander");
@@ -393,7 +393,7 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("גיא ויהל", "guy veyahel");
     m.insert("ארקדי דוכין", "arkadi duchin");
     m.insert("שלישיית גשר הירקון", "shlishiyat gesher hayarkon");
-    m.insert("רמי קלינשטיין וקרן פלס", "rami kleinstein vekeren peles");
+    m.insert("רמי קלינשטיין וקרן פלס", "rami kleinstein and keren peles");
     m.insert("רותם כהן", "rotem cohen");
     m.insert("רון נשר", "ron nesher");
     m.insert("קובי אפללו", "kobi aflalo");
@@ -484,7 +484,7 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("צביקה פיק", "tzvika pick");
     m.insert("צליל מכוון", "tzlil mechuan");
     m.insert("צמד ילד", "tzmad yeled");
-    m.insert("קטריקס ודורון ביטון", "katriks vedoron biton");
+    m.insert("קטריקס ודורון ביטון", "katriks and doron biton");
     m.insert("רביב כנר", "raviv kaner");
     m.insert("רגב הוד", "regev hod");
     m.insert("רון חיון", "ron chiyon");
@@ -493,7 +493,7 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("רותי נבון", "ruti navon");
     m.insert("ריטה ורמי", "rita verami");
     m.insert("ריף כהן", "riff cohen");
-    m.insert("רן דנקר ועילי בוטנר", "ran danker veilay botner");
+    m.insert("רן דנקר ועילי בוטנר", "ran danker and ilay botner");
     m.insert("שאזאמאט", "shazamat");
     m.insert("שגב", "segev");
     m.insert("שובל שלו", "shuval shalu");
@@ -543,7 +543,7 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("בנאל בן ציון", "banal ben tzion");
     m.insert("בנזין", "benzin");
     m.insert("בניה ברבי", "benaya barbi");
-    m.insert("ברי סחרוף ורע מוכיח", "berry sakharof vera mochiach");
+    m.insert("ברי סחרוף ורע מוכיח", "berry sakharof and ra mochiach");
     m.insert("ג'קו אייזנברג", "jacko eisenberg");
     m.insert("ג'קי מקייטן", "jackie makayten");
     m.insert("גלעד שגב", "gilad segev");
@@ -554,20 +554,20 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("דני בסן", "danny basan");
     m.insert("דני ליטני", "danny litani");
     m.insert("דפנה ארמוני", "dafna armoni");
-    m.insert("הדג נחש ואינפקטד מאשרום", "hadag nahash veinfected mushroom");
-    m.insert("הדג נחש וארקדי יעקובסון", "hadag nahash vearkadi yakobson");
-    m.insert("הדג נחש ויוסי מזרחי", "hadag nahash veyossi mizrachi");
-    m.insert("הדג נחש ומארינה מקסימיליאן", "hadag nahash vemarina maximilian");
-    m.insert("הדג נחש ושי צברי", "hadag nahash veshai tzabari");
-    m.insert("כרמלה גרוס ואגנר", "carmela gross veagner");
-    m.insert("ארקדי דוכין ומאיר בנאי", "arkadi duchin umeir banai");
-    m.insert("אריק איינשטיין ויוני רכטר", "arik einstein veyoni rechter");
-    m.insert("אריק איינשטיין ומיקי גבריאלוב", "arik einstein umiki gabrielov");
-    m.insert("אריק איינשטיין ושם טוב לוי", "arik einstein veshem tov levy");
-    m.insert("אריק איינשטיין ושם-טוב לוי", "arik einstein veshem tov levy");
+    m.insert("הדג נחש ואינפקטד מאשרום", "hadag nahash and infected mushroom");
+    m.insert("הדג נחש וארקדי יעקובסון", "hadag nahash and arkadi yakobson");
+    m.insert("הדג נחש ויוסי מזרחי", "hadag nahash and yossi mizrachi");
+    m.insert("הדג נחש ומארינה מקסימיליאן", "hadag nahash and marina maximilian");
+    m.insert("הדג נחש ושי צברי", "hadag nahash and shai tzabari");
+    m.insert("כרמלה גרוס ואגנר", "carmela gross and agner");
+    m.insert("ארקדי דוכין ומאיר בנאי", "arkadi duchin and meir banai");
+    m.insert("אריק איינשטיין ויוני רכטר", "arik einstein and yoni rechter");
+    m.insert("אריק איינשטיין ומיקי גבריאלוב", "arik einstein and miki gabrielov");
+    m.insert("אריק איינשטיין ושם טוב לוי", "arik einstein and shem tov levy");
+    m.insert("אריק איינשטיין ושם-טוב לוי", "arik einstein and shem tov levy");
     m.insert("אריק סיני", "arik sinai");
     m.insert("ארץעיר", "eretz ir");
-    m.insert("אהוד בנאי והפליטים", "ehud banai vehaплитim");
+    m.insert("אהוד בנאי והפליטים", "ehud banai vehaplitim");
     m.insert("אודיה", "odiya");
     m.insert("אודימן", "odiman");
     m.insert("אוחנה וברקת", "ohana vebareket");
@@ -585,38 +585,38 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("חמי רודנר", "hami rodner");
     m.insert("חיים בצחוק", "chaim betzchok");
     m.insert("דודו טסה מארח את ברי סחרוף", "dudu tassa mearach et berry sakharof");
-    m.insert("טונה & אורטגה", "tuna veortega");
-    m.insert("טונה & בר צברי", "tuna vebar tzabari");
-    m.insert("שלומי שבת וירון כהן", "shlomi shabat veyaron cohen");
-    m.insert("שלומי שבת וליאור נרקיס", "shlomi shabat velior narkis");
-    m.insert("שירי מימון ושמעון בוסקילה", "shiri maimon veshimon buskila");
-    m.insert("משה פרץ ועומר אדם", "moshe peretz veomer adam");
-    m.insert("שרית חדד וטיפקס", "sarit hadad vetipex");
-    m.insert("אייל גולן ואלין גולן", "eyal golan vealin golan");
-    m.insert("אייל גולן וחיים ישראל", "eyal golan vechaim israel");
-    m.insert("אייל גולן ומשה פרץ", "eyal golan umoshe peretz");
-    m.insert("אייל גולן ושלישיית מה קשור", "eyal golan veshlishiyat ma kashur");
-    m.insert("לירן טל וישי לוי", "liran tal veyishai levy");
+    m.insert("טונה & אורטגה", "tuna and ortega");
+    m.insert("טונה & בר צברי", "tuna and bar tzabari");
+    m.insert("שלומי שבת וירון כהן", "shlomi shabat and yaron cohen");
+    m.insert("שלומי שבת וליאור נרקיס", "shlomi shabat and lior narkis");
+    m.insert("שירי מימון ושמעון בוסקילה", "shiri maimon and shimon buskila");
+    m.insert("משה פרץ ועומר אדם", "moshe peretz and omer adam");
+    m.insert("שרית חדד וטיפקס", "sarit hadad and tipex");
+    m.insert("אייל גולן ואלין גולן", "eyal golan and alin golan");
+    m.insert("אייל גולן וחיים ישראל", "eyal golan and chaim israel");
+    m.insert("אייל גולן ומשה פרץ", "eyal golan and moshe peretz");
+    m.insert("אייל גולן ושלישיית מה קשור", "eyal golan and shlishiyat ma kashur");
+    m.insert("לירן טל וישי לוי", "liran tal and yishai levy");
     // Final batch of missing pure Hebrew artists
-    m.insert("'מלכים א' & מלכים ב", "melachim a vemelachim b");
+    m.insert("'מלכים א' & מלכים ב", "melachim a umelachim b");
     m.insert("אדם", "adam");
-    m.insert("אריק איינשטיין ושלום חנוך", "arik einstein veshalom hanoch");
+    m.insert("אריק איינשטיין ושלום חנוך", "arik einstein and shalom hanoch");
     m.insert("אריק איינשטיין, יוני רכטר", "arik einstein yoni rechter");
     m.insert("אריק איינשטיין, יצחק קלפטר", "arik einstein yitzhak klepter");
     m.insert("אריק אינשטיין", "arik einstein");  // alternate spelling
     m.insert("גזוז", "gazoz");
     m.insert("התזמורת האנדלוסית הישראלית אשדוד", "hatizmoret haandalusit ashdod");
     m.insert("יובל רפאל", "yuval rafael");
-    m.insert("ישראל גוריון & אסף אמדורסקי", "israel gurion vasaf amdursky");
+    m.insert("ישראל גוריון & אסף אמדורסקי", "israel gurion and asaf amdursky");
     m.insert("סטילה, חובי", "stella hovi");
     m.insert("סטילה, נס", "stella ness");
-    m.insert("עומר אדם & משה פרץ", "omer adam umoshe peretz");
+    m.insert("עומר אדם & משה פרץ", "omer adam and moshe peretz");
     m.insert("עומר אדם (בשיתוף לירן דנינו)", "omer adam liran danino");
     m.insert("עידן רז", "idan raz");
-    m.insert("פאר טסי וניב מנצור", "peer tasi veniv mantzur");
-    m.insert("פאר טסי ופבלו רוזנברג", "peer tasi vepablo rosenberg");
+    m.insert("פאר טסי וניב מנצור", "peer tasi and niv mantzur");
+    m.insert("פאר טסי ופבלו רוזנברג", "peer tasi and pablo rosenberg");
     m.insert("קיי. ג'י. סי", "kjc");
-    m.insert("שם טוב האבי & תמיר בר", "shem tov havi vetamir bar");
+    m.insert("שם טוב האבי & תמיר בר", "shem tov havi and tamir bar");
     m.insert("שמואל", "shmuel");
     m.insert("ששון איפרם שאולוב, אודיה", "sasson ifram shaulov odiya");
 
@@ -967,5 +967,29 @@ mod tests {
             normalize_title_with_artist("Artist Name - Actual Song", "Artist Name"),
             "actual song"
         );
+    }
+
+    #[test]
+    fn test_hebrew_collaboration_and_handling() {
+        // Hebrew collaborations use "and" which should:
+        // 1. Stay intact after normalize_artist (for matching Spotify "Artist1 and Artist2")
+        // 2. Be splittable via extract_primary_artist (for fallback matching)
+
+        // Hebrew ו prefix transliterated as "and"
+        assert_eq!(normalize_artist("אייל גולן ומשה פרץ"), "eyal golan and moshe peretz");
+        assert_eq!(normalize_artist("הדס קליינמן ואביב בכר"), "hadas kleinman and aviv bachar");
+
+        // extract_primary_artist handles "and" for fallback matching
+        assert_eq!(
+            extract_primary_artist("eyal golan and moshe peretz"),
+            Some("eyal golan".to_string())
+        );
+        assert_eq!(
+            extract_primary_artist("hadas kleinman and aviv bachar"),
+            Some("hadas kleinman".to_string())
+        );
+
+        // Spotify "&" becomes "and" via normalize_punctuation, enabling match
+        assert_eq!(normalize_punctuation("Eyal Golan & Moshe Peretz"), "Eyal Golan and Moshe Peretz");
     }
 }
