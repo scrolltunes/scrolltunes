@@ -2,8 +2,8 @@
 
 > Improving Spotify match rate through normalization, transliteration, fuzzy matching, and multi-pass rescue strategies
 
-**Last Updated:** January 15, 2026
-**Status:** Complete (71.6% match rate achieved, exceeds target)
+**Last Updated:** January 16, 2026
+**Status:** Complete (68.7% match rate with deduplication, exceeds target)
 
 ---
 
@@ -13,10 +13,11 @@
 |--------|----------|----------|-------------|--------|
 | Match rate (pre-dedup) | 46.4% | 57.5% | 71.6% | 65-72% ✓ |
 | **Match rate (post-dedup)** | — | — | **68.7%** | — |
-| Output tracks | 4.1M | 3.84M | **3.43M** | — |
-| Unique Spotify matches | — | — | **2.36M** | — |
-| Extraction time | 45 min | 48 min | **~44 min** | — |
-| Output size | — | 1.1 GB | **~850 MB** | — |
+| Output tracks | 4.1M | 3.84M | **3,434,899** | — |
+| Unique Spotify matches | — | — | **2,360,784** | — |
+| Duplicates removed | — | — | **350,606** | — |
+| Extraction time | 45 min | 48 min | **~47 min** | — |
+| Output size | — | 1.1 GB | **834 MB** | — |
 
 ### Match Rate by Phase
 
@@ -45,9 +46,10 @@
 | FUZZY | 2.7m | Streaming (1.6m) + Levenshtein (46s) → 68.5% (+151K) |
 | POP0 | 27.6m | Streaming scan 284M pop=0 tracks → +119K matches |
 | AUDIO/IMAGES | ~1m | Load BPM, key, album art |
-| WRITE | ~1m | Write 3.79M tracks |
+| DEDUP | <1s | Remove 350K duplicate spotify_id entries |
+| WRITE | ~1m | Write 3.43M tracks |
 | FTS + OPTIMIZE | ~13s | Build full-text search index |
-| **Total** | **~44 min** | |
+| **Total** | **~47 min** | |
 
 ### Improvements Implemented
 
@@ -818,34 +820,38 @@ WHERE lrclib_artist_norm GLOB '*[а-я]*' LIMIT 50;
 
 ---
 
-## Database Verification (January 15, 2026)
+## Database Verification (January 16, 2026)
 
-### Summary
+### Summary (Post-Deduplication)
 
 | Check | Result |
 |-------|--------|
-| Total tracks | 3,785,510 |
-| Spotify matches | 2,711,382 (71.6%) |
-| Unmatched | 1,074,128 (28.4%) |
-| With album art | 2,707,401 (99.8% of matched) |
-| With tempo/BPM | 2,700,246 |
+| Total tracks | 3,434,899 |
+| Spotify matches | 2,360,784 (68.7%) |
+| Unique spotify_ids | 2,360,784 (100% unique) |
+| Duplicates removed | 350,606 |
+| Unmatched | 1,074,115 (31.3%) |
+| Hebrew coverage | 1,747/2,088 (83.7%) |
+| Cyrillic coverage | 29,518/37,779 (78.1%) |
 | Database integrity | OK |
-| File size | 1.08 GB |
+| File size | 834 MB |
 
-### Failure Breakdown
+### Deduplication Impact
 
-| Reason | Count |
-|--------|-------|
-| `no_candidates` | 645,487 |
-| `all_rejected` | 58,462 |
+| Metric | Before | After |
+|--------|--------|-------|
+| Total tracks | 3,785,505 | 3,434,899 |
+| Matched rows | 2,711,390 | 2,360,784 |
+| Duplicate spotify_ids | 350,606 | 0 |
+| File size | ~980 MB | 834 MB |
 
 ### Popularity Distribution (Matched Tracks)
 
 | Range | Count |
 |-------|-------|
-| High (≥80) | 4,489 |
-| Medium (50-79) | 220,526 |
-| Low (<50) | 2,486,367 |
+| High (≥80) | ~4,000 |
+| Medium (50-79) | ~190,000 |
+| Low (<50) | ~2,160,000 |
 
 ### FTS Search Verification
 
