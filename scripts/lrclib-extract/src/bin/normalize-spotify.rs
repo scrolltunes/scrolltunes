@@ -106,11 +106,7 @@ fn build_batch_sql(num_rows: usize) -> String {
 
 /// Execute a batched INSERT statement using pre-built SQL.
 /// Uses a flat parameter array to avoid per-row allocations.
-fn execute_batch_insert(
-    conn: &Connection,
-    batch: &[CandidateRow],
-    batch_sql: &str,
-) -> Result<()> {
+fn execute_batch_insert(conn: &Connection, batch: &[CandidateRow], batch_sql: &str) -> Result<()> {
     if batch.is_empty() {
         return Ok(());
     }
@@ -218,7 +214,9 @@ fn parse_args() -> Result<Args> {
         );
         eprintln!();
         eprintln!("Creates a normalized lookup table with multiple candidates per key (spec-02).");
-        eprintln!("Schema: track_norm(title_norm, artist_norm, track_rowid, popularity, duration_ms)");
+        eprintln!(
+            "Schema: track_norm(title_norm, artist_norm, track_rowid, popularity, duration_ms)"
+        );
         eprintln!("Uses duration bucketing to preserve variants while limiting index size.");
         std::process::exit(1);
     }
@@ -297,10 +295,7 @@ fn main() -> Result<()> {
 
     // Phase 1: Stream and collect all candidates per (title_norm, artist_norm) key
     println!("Phase 1: Normalizing tracks and collecting candidates...");
-    eprintln!(
-        "[PHASE1] Starting normalization of {} tracks...",
-        total
-    );
+    eprintln!("[PHASE1] Starting normalization of {} tracks...", total);
     let pb = create_progress_bar(total, log_only);
 
     // String interner for deduplicating normalized strings
@@ -309,7 +304,8 @@ fn main() -> Result<()> {
 
     // Map: (title_norm, artist_norm) -> Vec<RawCandidate>
     // Using Arc<str> keys for efficient memory sharing
-    let mut candidates_map: FxHashMap<(Arc<str>, Arc<str>), Vec<RawCandidate>> = FxHashMap::default();
+    let mut candidates_map: FxHashMap<(Arc<str>, Arc<str>), Vec<RawCandidate>> =
+        FxHashMap::default();
 
     let mut stmt = src_conn.prepare(
         "SELECT t.rowid, t.name, a.name, t.popularity, t.duration_ms
@@ -334,14 +330,11 @@ fn main() -> Result<()> {
         let artist_norm = interner.intern(normalize_artist(&artist));
         let key = (Arc::clone(&title_norm), Arc::clone(&artist_norm));
 
-        candidates_map
-            .entry(key)
-            .or_default()
-            .push(RawCandidate {
-                track_rowid,
-                popularity,
-                duration_ms,
-            });
+        candidates_map.entry(key).or_default().push(RawCandidate {
+            track_rowid,
+            popularity,
+            duration_ms,
+        });
 
         count += 1;
         if count % 100_000 == 0 {
@@ -376,7 +369,10 @@ fn main() -> Result<()> {
 
     // Phase 2: Sort keys, deduplicate by duration bucket, and write
     // Sorting keys improves B-tree insertion locality for ~2x speedup
-    println!("Phase 2: Sorting {} keys for optimal write order...", unique_keys);
+    println!(
+        "Phase 2: Sorting {} keys for optimal write order...",
+        unique_keys
+    );
     eprintln!("[PHASE2] Sorting {} keys...", unique_keys);
 
     let sort_start = Instant::now();
@@ -384,10 +380,15 @@ fn main() -> Result<()> {
     sorted_keys.sort_unstable();
     let sort_elapsed = sort_start.elapsed();
     println!("  Sorted in {:.2}s", sort_elapsed.as_secs_f64());
-    eprintln!("[PHASE2] Sort complete in {:.2}s", sort_elapsed.as_secs_f64());
+    eprintln!(
+        "[PHASE2] Sort complete in {:.2}s",
+        sort_elapsed.as_secs_f64()
+    );
 
-    println!("Phase 2b: Deduplicating and writing ({}ms buckets, max {} per key, batch {})...",
-             DURATION_BUCKET_MS, MAX_CANDIDATES_PER_KEY, BATCH_SIZE);
+    println!(
+        "Phase 2b: Deduplicating and writing ({}ms buckets, max {} per key, batch {})...",
+        DURATION_BUCKET_MS, MAX_CANDIDATES_PER_KEY, BATCH_SIZE
+    );
     eprintln!("[PHASE2] Writing with batch size {}...", BATCH_SIZE);
 
     let pb_dedup = create_progress_bar(unique_keys as u64, log_only);
@@ -492,7 +493,10 @@ fn main() -> Result<()> {
     println!("  Input rows: {}", total);
     println!("  Unique keys: {}", unique_keys);
     println!("  Total candidate rows: {}", written);
-    println!("  Avg candidates per key: {:.2}", written as f64 / unique_keys.max(1) as f64);
+    println!(
+        "  Avg candidates per key: {:.2}",
+        written as f64 / unique_keys.max(1) as f64
+    );
     println!("  Duration bucket size: {}ms", DURATION_BUCKET_MS);
     println!("  Max candidates per key: {}", MAX_CANDIDATES_PER_KEY);
     println!("  Output size: {:.2} MB", size_mb);
@@ -535,7 +539,7 @@ mod tests {
             },
             RawCandidate {
                 track_rowid: 2,
-                popularity: 80, // Higher popularity
+                popularity: 80,      // Higher popularity
                 duration_ms: 181000, // same bucket 36
             },
         ];
@@ -573,7 +577,7 @@ mod tests {
         let candidates: Vec<RawCandidate> = (0..30)
             .map(|i| RawCandidate {
                 track_rowid: i as i64,
-                popularity: (100 - i as i32), // Decreasing popularity
+                popularity: (100 - i),         // Decreasing popularity
                 duration_ms: i as i64 * 10000, // Different buckets (10s apart)
             })
             .collect();

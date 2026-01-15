@@ -16,7 +16,7 @@ use std::time::Instant;
 use strsim::normalized_levenshtein;
 
 use normalize::{
-    normalize_title, normalize_title_with_artist, normalize_artist, extract_primary_artist,
+    extract_primary_artist, normalize_artist, normalize_title, normalize_title_with_artist,
 };
 
 // ============================================================================
@@ -125,10 +125,10 @@ struct Args {
 }
 
 #[allow(dead_code)]
-const WRITE_BATCH_SIZE: usize = 10_000;  // Legacy, replaced by ENRICHED_BATCH_SIZE
+const WRITE_BATCH_SIZE: usize = 10_000; // Legacy, replaced by ENRICHED_BATCH_SIZE
 
 // Score thresholds for combined scoring (spec-04)
-const ACCEPT_THRESHOLD: i32 = 80;       // Minimum score to accept a match
+const ACCEPT_THRESHOLD: i32 = 80; // Minimum score to accept a match
 #[allow(dead_code)]
 const LOW_CONFIDENCE_THRESHOLD: i32 = 120; // Below this, log as low-confidence
 
@@ -156,13 +156,13 @@ pub struct MatchingStats {
     // Phase 2b: Fuzzy title matching (new)
     pub fuzzy_title_attempted: usize,
     pub fuzzy_title_matches: usize,
-    pub fuzzy_title_no_artist: usize,      // Artist not found in Spotify
+    pub fuzzy_title_no_artist: usize, // Artist not found in Spotify
     pub fuzzy_title_no_close_match: usize, // No title with >=90% similarity
 
     // Phase 3: Pop=0 fallback (spec-04: includes previously-rejected groups)
     pub pop0_eligible: usize,
-    pub pop0_from_no_candidates: usize,  // Groups that never had candidates
-    pub pop0_from_rejected: usize,       // Groups that had candidates but all rejected
+    pub pop0_from_no_candidates: usize, // Groups that never had candidates
+    pub pop0_from_rejected: usize,      // Groups that had candidates but all rejected
     pub pop0_matches: usize,
 
     // Duration statistics
@@ -178,7 +178,7 @@ pub struct MatchingStats {
     pub duration_relaxed_61_plus: usize,
 
     // Multi-artist verification (spec-03)
-    pub multi_artist_rescues: usize,  // Matches where secondary artist matched
+    pub multi_artist_rescues: usize, // Matches where secondary artist matched
 
     // Final totals
     pub total_groups: usize,
@@ -229,7 +229,9 @@ impl MatchingStats {
 
     /// Returns total count of relaxed duration matches (>30s diff)
     pub fn total_relaxed_matches(&self) -> usize {
-        self.duration_relaxed_31_to_45 + self.duration_relaxed_46_to_60 + self.duration_relaxed_61_plus
+        self.duration_relaxed_31_to_45
+            + self.duration_relaxed_46_to_60
+            + self.duration_relaxed_61_plus
     }
 }
 
@@ -257,9 +259,9 @@ struct ScoredTrack {
 /// Used for delayed canonical selection - keeps all variants until Spotify matching.
 #[derive(Clone, Debug)]
 struct LrclibGroup {
-    key: (String, String),  // (title_norm, artist_norm) stored ONCE per group
+    key: (String, String), // (title_norm, artist_norm) stored ONCE per group
     tracks: Vec<LrclibVariant>,
-    best_match: Option<(usize, SpotifyTrack, i32)>,  // (track_idx, spotify_track, score)
+    best_match: Option<(usize, SpotifyTrack, i32)>, // (track_idx, spotify_track, score)
 }
 
 /// LRCLIB track variant within a group (without redundant normalized strings).
@@ -267,7 +269,7 @@ struct LrclibGroup {
 #[derive(Clone, Debug)]
 struct LrclibVariant {
     track: Track,
-    quality: i32,  // LRCLIB-only quality score
+    quality: i32, // LRCLIB-only quality score
 }
 
 /// Index mapping (title_norm, artist_norm) to group index in Vec<LrclibGroup>
@@ -279,16 +281,16 @@ type TitleOnlyIndex = FxHashMap<String, Vec<usize>>;
 /// Spotify track info for matching
 #[derive(Clone, Debug)]
 struct SpotifyTrack {
-    id: String,              // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
+    id: String, // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
     #[allow(dead_code)]
-    name: String,            // Original title (kept for debugging)
+    name: String, // Original title (kept for debugging)
     #[allow(dead_code)]
-    artist: String,          // Primary artist (kept for debugging)
-    artists: Vec<String>,    // All credited artists (spec-03 multi-artist verification)
+    artist: String, // Primary artist (kept for debugging)
+    artists: Vec<String>, // All credited artists (spec-03 multi-artist verification)
     duration_ms: i64,
-    popularity: i32,         // 0-100
-    isrc: Option<String>,    // For Deezer album art lookup
-    album_rowid: i64,        // For album_images lookup
+    popularity: i32,      // 0-100
+    isrc: Option<String>, // For Deezer album art lookup
+    album_rowid: i64,     // For album_images lookup
 }
 
 /// Partial Spotify track (before artist lookup) for 2-phase matching.
@@ -297,22 +299,22 @@ struct SpotifyTrack {
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 struct SpotifyTrackPartial {
-    rowid: i64,              // SQLite rowid for artist lookup
-    id: String,              // Spotify track ID
-    name: String,            // Original title
+    rowid: i64,   // SQLite rowid for artist lookup
+    id: String,   // Spotify track ID
+    name: String, // Original title
     duration_ms: i64,
-    popularity: i32,         // 0-100
-    isrc: Option<String>,    // For Deezer album art lookup
-    album_rowid: i64,        // For album_images lookup
+    popularity: i32,      // 0-100
+    isrc: Option<String>, // For Deezer album art lookup
+    album_rowid: i64,     // For album_images lookup
 }
 
 /// Audio features from Spotify
 #[derive(Clone, Debug)]
 struct AudioFeatures {
-    tempo: Option<f64>,           // BPM
-    key: Option<i32>,             // -1 to 11 (pitch class)
-    mode: Option<i32>,            // 0=minor, 1=major
-    time_signature: Option<i32>,  // 3-7
+    tempo: Option<f64>,          // BPM
+    key: Option<i32>,            // -1 to 11 (pitch class)
+    mode: Option<i32>,           // 0=minor, 1=major
+    time_signature: Option<i32>, // 3-7
 }
 
 /// Spotify candidate for failure logging (spec-05).
@@ -343,10 +345,7 @@ enum FailureReason {
         primary_reject_reason: String,
     },
     /// Match accepted but score is marginal (between ACCEPT_THRESHOLD and LOW_CONFIDENCE_THRESHOLD)
-    LowConfidenceMatch {
-        accepted_score: i32,
-        threshold: i32,
-    },
+    LowConfidenceMatch { accepted_score: i32, threshold: i32 },
 }
 
 /// Final enriched track for output.
@@ -366,7 +365,7 @@ struct EnrichedTrack {
 
     // From Spotify (enrichment, all nullable)
     spotify_id: Option<String>,
-    popularity: Option<i32>,         // NULL if no match (not 0)
+    popularity: Option<i32>, // NULL if no match (not 0)
     tempo: Option<f64>,
     musical_key: Option<i32>,
     mode: Option<i32>,
@@ -414,9 +413,19 @@ static GARBAGE_TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
 
 static LOW_QUALITY_ALBUMS: Lazy<Vec<&str>> = Lazy::new(|| {
     vec![
-        "-", ".", "null", "unknown", "drumless", "karaoke", "tribute",
-        "instrumental", "cover", "made famous", "in the style of",
-        "backing track", "minus one",
+        "-",
+        ".",
+        "null",
+        "unknown",
+        "drumless",
+        "karaoke",
+        "tribute",
+        "instrumental",
+        "cover",
+        "made famous",
+        "in the style of",
+        "backing track",
+        "minus one",
     ]
 });
 
@@ -457,15 +466,32 @@ fn classify_album(album: &Option<String>) -> AlbumType {
         None => AlbumType::Studio,
         Some(a) => {
             let lower = a.to_lowercase();
-            if lower.contains("live") || lower.contains("concert") || lower.contains("tour") || lower.contains("unplugged") {
+            if lower.contains("live")
+                || lower.contains("concert")
+                || lower.contains("tour")
+                || lower.contains("unplugged")
+            {
                 AlbumType::Live
-            } else if lower.contains("greatest hits") || lower.contains("best of") || lower.contains("collection") || lower.contains("anthology") || lower.contains("essential") {
+            } else if lower.contains("greatest hits")
+                || lower.contains("best of")
+                || lower.contains("collection")
+                || lower.contains("anthology")
+                || lower.contains("essential")
+            {
                 AlbumType::Compilation
-            } else if lower.contains("soundtrack") || lower.contains("ost") || lower.contains("motion picture") {
+            } else if lower.contains("soundtrack")
+                || lower.contains("ost")
+                || lower.contains("motion picture")
+            {
                 AlbumType::Soundtrack
             } else if lower.contains("remaster") || lower.contains("reissue") {
                 AlbumType::Remaster
-            } else if lower.contains("deluxe") || lower.contains("expanded") || lower.contains("anniversary") || lower.contains("special") || lower.contains("collector") {
+            } else if lower.contains("deluxe")
+                || lower.contains("expanded")
+                || lower.contains("anniversary")
+                || lower.contains("special")
+                || lower.contains("collector")
+            {
                 AlbumType::Deluxe
             } else {
                 AlbumType::Studio
@@ -503,14 +529,14 @@ fn title_contains_artist(title: &str, artist: &str) -> bool {
 fn duration_score(lrclib_sec: i64, spotify_ms: i64) -> i32 {
     let diff = (lrclib_sec - spotify_ms / 1000).abs();
     match diff {
-        0..=2 => 100,    // Near-perfect
-        3..=5 => 80,     // Excellent
-        6..=10 => 50,    // Good
-        11..=15 => 25,   // Acceptable
-        16..=30 => 10,   // Poor but possible
-        31..=45 => 5,    // Relaxed - very low (spec-05)
-        46..=60 => 2,    // Relaxed - minimal (spec-05)
-        _ => -1000,      // Hard reject beyond 60s
+        0..=2 => 100,  // Near-perfect
+        3..=5 => 80,   // Excellent
+        6..=10 => 50,  // Good
+        11..=15 => 25, // Acceptable
+        16..=30 => 10, // Poor but possible
+        31..=45 => 5,  // Relaxed - very low (spec-05)
+        46..=60 => 2,  // Relaxed - minimal (spec-05)
+        _ => -1000,    // Hard reject beyond 60s
     }
 }
 
@@ -546,7 +572,10 @@ struct MultiArtistMatchResult {
 
 /// Score LRCLIB artist against all credited Spotify artists (spec-03 R3.2).
 /// Uses max-over-artists to find the best match.
-fn score_artist_multi(lrclib_artist_norm: &str, spotify_artists: &[String]) -> MultiArtistMatchResult {
+fn score_artist_multi(
+    lrclib_artist_norm: &str,
+    spotify_artists: &[String],
+) -> MultiArtistMatchResult {
     if spotify_artists.is_empty() {
         return MultiArtistMatchResult {
             best_similarity: 0.0,
@@ -585,9 +614,9 @@ fn score_artist_multi(lrclib_artist_norm: &str, spotify_artists: &[String]) -> M
 /// Determines duration tolerance based on title and artist match quality.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MatchConfidence {
-    High,      // Exact title AND artist match
-    Medium,    // Exact title OR exact artist (not both)
-    Low,       // Partial matches only
+    High,   // Exact title AND artist match
+    Medium, // Exact title OR exact artist (not both)
+    Low,    // Partial matches only
 }
 
 /// Calculate maximum duration tolerance based on confidence level (spec-05).
@@ -636,7 +665,7 @@ fn combined_score(
 
     // Hard reject if artist similarity too low (no match against any credited artist)
     if artist_similarity < 0.3 {
-        return -500;  // Artist mismatch - reject
+        return -500; // Artist mismatch - reject
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -644,11 +673,11 @@ fn combined_score(
     // Title is assumed to match since we're querying by title_norm
     // ═══════════════════════════════════════════════════════════════════════
     let confidence = if artist_exact {
-        MatchConfidence::High  // Title + artist both exact
+        MatchConfidence::High // Title + artist both exact
     } else if artist_similarity >= 0.7 {
-        MatchConfidence::Medium  // Title exact, artist partial
+        MatchConfidence::Medium // Title exact, artist partial
     } else {
-        MatchConfidence::Low  // Weak artist match
+        MatchConfidence::Low // Weak artist match
     };
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -664,14 +693,14 @@ fn combined_score(
     // Extended to handle relaxed matches (31-60s) with very low scores
     // ═══════════════════════════════════════════════════════════════════════
     let dur_score = match duration_diff {
-        0..=2 => 100,    // Near-perfect
-        3..=5 => 80,     // Excellent
-        6..=10 => 50,    // Good
-        11..=15 => 25,   // Acceptable
-        16..=30 => 10,   // Poor but possible
-        31..=45 => 5,    // Relaxed - very low (spec-05)
-        46..=60 => 2,    // Relaxed - minimal (spec-05)
-        _ => 1,          // Beyond 60s - near-zero (spec-05)
+        0..=2 => 100,  // Near-perfect
+        3..=5 => 80,   // Excellent
+        6..=10 => 50,  // Good
+        11..=15 => 25, // Acceptable
+        16..=30 => 10, // Poor but possible
+        31..=45 => 5,  // Relaxed - very low (spec-05)
+        46..=60 => 2,  // Relaxed - minimal (spec-05)
+        _ => 1,        // Beyond 60s - near-zero (spec-05)
     };
 
     let mut score = dur_score;
@@ -680,9 +709,9 @@ fn combined_score(
     // STEP 5: Artist score
     // ═══════════════════════════════════════════════════════════════════════
     let artist_score = if artist_exact {
-        50  // Exact match
+        50 // Exact match
     } else {
-        (artist_similarity * 30.0) as i32  // Partial credit
+        (artist_similarity * 30.0) as i32 // Partial credit
     };
     score += artist_score;
 
@@ -701,7 +730,7 @@ fn combined_score(
     if duration_diff > 30 {
         // Relaxed matches require exact artist match
         if !artist_exact {
-            return -1000;  // Reject relaxed match without exact artist
+            return -1000; // Reject relaxed match without exact artist
         }
         // Apply penalty to ensure relaxed matches need strong other signals
         score -= 20;
@@ -713,7 +742,7 @@ fn combined_score(
     // ═══════════════════════════════════════════════════════════════════════
     score += spotify.popularity / 10;
 
-    score  // Typical range: 80-250 for good matches
+    score // Typical range: 80-250 for good matches
 }
 
 fn compute_quality_score(track: &Track, median_duration: Option<i64>) -> i32 {
@@ -729,7 +758,10 @@ fn compute_quality_score(track: &Track, median_duration: Option<i64>) -> i32 {
     }
 
     let title_has_pattern = has_live_remix_pattern(&track.title);
-    let album_has_pattern = track.album.as_ref().map_or(false, |a| has_live_remix_pattern(a));
+    let album_has_pattern = track
+        .album
+        .as_ref()
+        .is_some_and(|a| has_live_remix_pattern(a));
     if title_has_pattern || album_has_pattern {
         score -= 30;
     }
@@ -738,7 +770,7 @@ fn compute_quality_score(track: &Track, median_duration: Option<i64>) -> i32 {
     if has_garbage_title_pattern(&track.title) {
         score -= 50;
     }
-    
+
     // Penalize titles that contain the artist name (e.g., "Foo Fighters - Everlong")
     if title_contains_artist(&track.title, &track.artist) {
         score -= 40;
@@ -795,7 +827,9 @@ fn select_canonical(tracks: Vec<Track>) -> Option<ScoredTrack> {
         .max_by(|a, b| {
             // Primary: quality score (higher is better)
             // Tiebreaker: lower ID (older = more likely canonical)
-            a.quality.cmp(&b.quality).then_with(|| b.track.id.cmp(&a.track.id))
+            a.quality
+                .cmp(&b.quality)
+                .then_with(|| b.track.id.cmp(&a.track.id))
         })
 }
 
@@ -849,7 +883,10 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
     // To: FROM lyrics l JOIN tracks t ON t.last_lyrics_id = l.id WHERE l.has_synced_lyrics = 1
     // EXPLAIN shows: SEARCH l USING COVERING INDEX + SEARCH t USING INDEX (instead of LIST SUBQUERY)
     let (count_sql, select_sql) = if let Some(artists) = artist_filter {
-        let placeholders: Vec<String> = artists.iter().map(|_| "LOWER(t.artist_name) LIKE ?".to_string()).collect();
+        let placeholders: Vec<String> = artists
+            .iter()
+            .map(|_| "LOWER(t.artist_name) LIKE ?".to_string())
+            .collect();
         let where_clause = placeholders.join(" OR ");
         (
             format!(
@@ -858,7 +895,8 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
                  JOIN tracks t ON t.last_lyrics_id = l.id
                  WHERE l.has_synced_lyrics = 1
                    AND t.duration > 45 AND t.duration < 600
-                   AND ({})", where_clause
+                   AND ({})",
+                where_clause
             ),
             format!(
                 "SELECT t.id, t.name, t.artist_name, t.album_name, t.duration
@@ -866,7 +904,8 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
                  JOIN tracks t ON t.last_lyrics_id = l.id
                  WHERE l.has_synced_lyrics = 1
                    AND t.duration > 45 AND t.duration < 600
-                   AND ({})", where_clause
+                   AND ({})",
+                where_clause
             ),
         )
     } else {
@@ -875,19 +914,25 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
              FROM lyrics l
              JOIN tracks t ON t.last_lyrics_id = l.id
              WHERE l.has_synced_lyrics = 1
-               AND t.duration > 45 AND t.duration < 600".to_string(),
+               AND t.duration > 45 AND t.duration < 600"
+                .to_string(),
             "SELECT t.id, t.name, t.artist_name, t.album_name, t.duration
              FROM lyrics l
              JOIN tracks t ON t.last_lyrics_id = l.id
              WHERE l.has_synced_lyrics = 1
-               AND t.duration > 45 AND t.duration < 600".to_string(),
+               AND t.duration > 45 AND t.duration < 600"
+                .to_string(),
         )
     };
 
     let count: i64 = if let Some(artists) = artist_filter {
-        let patterns: Vec<String> = artists.iter().map(|a| format!("%{}%", a.to_lowercase())).collect();
+        let patterns: Vec<String> = artists
+            .iter()
+            .map(|a| format!("%{}%", a.to_lowercase()))
+            .collect();
         let mut stmt = conn.prepare(&count_sql)?;
-        let params: Vec<&dyn rusqlite::ToSql> = patterns.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
+        let params: Vec<&dyn rusqlite::ToSql> =
+            patterns.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
         stmt.query_row(params.as_slice(), |row| row.get(0))?
     } else {
         conn.query_row(&count_sql, [], |row| row.get(0))?
@@ -899,8 +944,12 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
 
     let mut tracks = Vec::with_capacity(count as usize);
     let mut rows = if let Some(artists) = artist_filter {
-        let patterns: Vec<String> = artists.iter().map(|a| format!("%{}%", a.to_lowercase())).collect();
-        let params: Vec<&dyn rusqlite::ToSql> = patterns.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
+        let patterns: Vec<String> = artists
+            .iter()
+            .map(|a| format!("%{}%", a.to_lowercase()))
+            .collect();
+        let params: Vec<&dyn rusqlite::ToSql> =
+            patterns.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
         stmt.query(params.as_slice())?
     } else {
         stmt.query([])?
@@ -928,7 +977,11 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
     }
 
     pb.finish_with_message(format!("Phase 1: Read {} valid tracks", tracks.len()));
-    eprintln!("[READ] Complete: {} tracks ({})", tracks.len(), format_duration(phase_start.elapsed()));
+    eprintln!(
+        "[READ] Complete: {} tracks ({})",
+        tracks.len(),
+        format_duration(phase_start.elapsed())
+    );
     Ok(tracks)
 }
 
@@ -939,7 +992,10 @@ fn group_tracks(tracks: Vec<Track>) -> FxHashMap<(String, String), Vec<Track>> {
     let mut groups: FxHashMap<(String, String), Vec<Track>> = FxHashMap::default();
 
     for track in tracks {
-        let key = (normalize_title_with_artist(&track.title, &track.artist), normalize_artist(&track.artist));
+        let key = (
+            normalize_title_with_artist(&track.title, &track.artist),
+            normalize_artist(&track.artist),
+        );
         groups.entry(key).or_default().push(track);
     }
 
@@ -1011,7 +1067,8 @@ fn build_groups_and_index(tracks: Vec<Track>) -> (Vec<LrclibGroup>, LrclibIndex)
     // Phase 3: Convert to Vec<LrclibGroup> and build index
     // Convert Arc<str> to String for the final output (keeps existing API)
     let mut groups: Vec<LrclibGroup> = Vec::with_capacity(temp_groups.len());
-    let mut index: LrclibIndex = FxHashMap::with_capacity_and_hasher(temp_groups.len(), Default::default());
+    let mut index: LrclibIndex =
+        FxHashMap::with_capacity_and_hasher(temp_groups.len(), Default::default());
 
     for ((title_arc, artist_arc), variants) in temp_groups {
         let group_idx = groups.len();
@@ -1061,7 +1118,10 @@ fn process_groups(groups: FxHashMap<(String, String), Vec<Track>>) -> Vec<Scored
         })
         .collect();
 
-    pb.finish_with_message(format!("Phase 2: Selected {} canonical tracks", results.len()));
+    pb.finish_with_message(format!(
+        "Phase 2: Selected {} canonical tracks",
+        results.len()
+    ));
     results
 }
 
@@ -1069,13 +1129,13 @@ fn build_fts_index(conn: &Connection) -> Result<()> {
     let phase_start = Instant::now();
     let spinner = create_spinner("Phase 4: Building FTS index");
 
-    conn.execute(
-        "INSERT INTO tracks_fts(tracks_fts) VALUES('rebuild')",
-        [],
-    )?;
+    conn.execute("INSERT INTO tracks_fts(tracks_fts) VALUES('rebuild')", [])?;
 
     spinner.finish_with_message("Phase 4: FTS index built");
-    eprintln!("[FTS] Complete ({})", format_duration(phase_start.elapsed()));
+    eprintln!(
+        "[FTS] Complete ({})",
+        format_duration(phase_start.elapsed())
+    );
     Ok(())
 }
 
@@ -1086,7 +1146,10 @@ fn optimize_database(conn: &Connection) -> Result<()> {
     conn.execute_batch("VACUUM; ANALYZE;")?;
 
     spinner.finish_with_message("Phase 5: Database optimized");
-    eprintln!("[OPTIMIZE] Complete ({})", format_duration(phase_start.elapsed()));
+    eprintln!(
+        "[OPTIMIZE] Complete ({})",
+        format_duration(phase_start.elapsed())
+    );
     Ok(())
 }
 
@@ -1099,13 +1162,19 @@ fn optimize_database(conn: &Connection) -> Result<()> {
 /// Replaced by build_groups_and_index() for delayed canonical selection.
 #[allow(dead_code)]
 fn build_lrclib_index(canonical_tracks: &[ScoredTrack]) -> FxHashMap<(String, String), Vec<usize>> {
-    println!("[LRCLIB] Building lookup index for {} canonical tracks...", canonical_tracks.len());
+    println!(
+        "[LRCLIB] Building lookup index for {} canonical tracks...",
+        canonical_tracks.len()
+    );
     let mut index: FxHashMap<(String, String), Vec<usize>> = FxHashMap::default();
     for (idx, t) in canonical_tracks.iter().enumerate() {
         let key = (t.title_norm.clone(), t.artist_norm.clone());
         index.entry(key).or_default().push(idx);
     }
-    println!("[LRCLIB] Index built with {} unique (title, artist) keys", index.len());
+    println!(
+        "[LRCLIB] Index built with {} unique (title, artist) keys",
+        index.len()
+    );
     index
 }
 
@@ -1120,7 +1189,10 @@ fn stream_match_spotify(
     canonical_tracks: &[ScoredTrack],
     lrclib_index: &FxHashMap<(String, String), Vec<usize>>,
 ) -> Result<Vec<Option<SpotifyTrack>>> {
-    println!("[SPOTIFY] Streaming tracks with popularity >= {} and matching on-the-fly...", min_popularity);
+    println!(
+        "[SPOTIFY] Streaming tracks with popularity >= {} and matching on-the-fly...",
+        min_popularity
+    );
 
     // Get count for progress bar
     let count: i64 = conn.query_row(
@@ -1223,10 +1295,14 @@ fn load_audio_features_filtered(
     conn: &Connection,
     needed_ids: &FxHashSet<String>,
 ) -> Result<FxHashMap<String, AudioFeatures>> {
-    println!("[AUDIO] Loading audio features (filtered to {} needed IDs)...", needed_ids.len());
+    println!(
+        "[AUDIO] Loading audio features (filtered to {} needed IDs)...",
+        needed_ids.len()
+    );
 
-    let count: i64 =
-        conn.query_row("SELECT COUNT(*) FROM track_audio_features", [], |row| row.get(0))?;
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM track_audio_features", [], |row| {
+        row.get(0)
+    })?;
     let pb = create_progress_bar(count as u64, "Streaming audio features");
 
     // Actual schema: track_audio_features with track_id (Spotify ID string), tempo is INTEGER
@@ -1271,7 +1347,10 @@ fn load_audio_features_batched(
     conn: &Connection,
     spotify_ids: &FxHashSet<String>,
 ) -> Result<FxHashMap<String, AudioFeatures>> {
-    println!("[AUDIO] Loading audio features (batched for {} IDs)...", spotify_ids.len());
+    println!(
+        "[AUDIO] Loading audio features (batched for {} IDs)...",
+        spotify_ids.len()
+    );
 
     let ids_vec: Vec<&String> = spotify_ids.iter().collect();
     let mut lookup: FxHashMap<String, AudioFeatures> = FxHashMap::default();
@@ -1329,9 +1408,12 @@ fn stream_and_match_spotify_delayed(
     groups: &mut [LrclibGroup],
     index: &LrclibIndex,
     title_only_index: &TitleOnlyIndex,
-    groups_seen: &mut FxHashSet<usize>,  // Track which groups had candidates
+    groups_seen: &mut FxHashSet<usize>, // Track which groups had candidates
 ) -> Result<()> {
-    println!("[SPOTIFY] Streaming tracks with pop >= {} using delayed canonical matching...", min_popularity);
+    println!(
+        "[SPOTIFY] Streaming tracks with pop >= {} using delayed canonical matching...",
+        min_popularity
+    );
 
     // Get count for progress bar
     let count: i64 = conn.query_row(
@@ -1340,7 +1422,10 @@ fn stream_and_match_spotify_delayed(
         |row| row.get(0),
     )?;
 
-    let pb = create_progress_bar(count as u64, "Streaming Spotify & matching (delayed canonical)");
+    let pb = create_progress_bar(
+        count as u64,
+        "Streaming Spotify & matching (delayed canonical)",
+    );
 
     // Phase A: Stream tracks only (no artist join - that's done later in batches)
     // For now we use the existing query with artist join since batch_fetch_primary_artists
@@ -1388,14 +1473,23 @@ fn stream_and_match_spotify_delayed(
         if let Some(&group_idx) = index.get(&(title_norm.clone(), artist_norm.clone())) {
             let group = &mut groups[group_idx];
             let was_unmatched = group.best_match.is_none();
-            groups_seen.insert(group_idx);  // Track that this group had candidates
+            groups_seen.insert(group_idx); // Track that this group had candidates
 
             // Score against ALL variants in this group
             for (track_idx, variant) in group.tracks.iter().enumerate() {
-                let score = combined_score(&variant.track, variant.quality, &spotify_track, &group.key.1);
+                let score = combined_score(
+                    &variant.track,
+                    variant.quality,
+                    &spotify_track,
+                    &group.key.1,
+                );
 
                 if score >= ACCEPT_THRESHOLD {
-                    let current_best = group.best_match.as_ref().map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                    let current_best = group
+                        .best_match
+                        .as_ref()
+                        .map(|(_, _, s)| *s)
+                        .unwrap_or(i32::MIN);
                     if score > current_best {
                         group.best_match = Some((track_idx, spotify_track.clone(), score));
                     }
@@ -1415,15 +1509,20 @@ fn stream_and_match_spotify_delayed(
                 // Compute artist similarity
                 let artist_sim = compute_artist_similarity(&artist_norm, group_artist_norm);
                 if artist_sim < 0.5 {
-                    continue;  // Skip if artists are too different
+                    continue; // Skip if artists are too different
                 }
 
-                groups_seen.insert(group_idx);  // Track that this group had candidates
+                groups_seen.insert(group_idx); // Track that this group had candidates
                 let was_unmatched = group.best_match.is_none();
 
                 // Score against all variants with artist similarity penalty
                 for (track_idx, variant) in group.tracks.iter().enumerate() {
-                    let mut score = combined_score(&variant.track, variant.quality, &spotify_track, group_artist_norm);
+                    let mut score = combined_score(
+                        &variant.track,
+                        variant.quality,
+                        &spotify_track,
+                        group_artist_norm,
+                    );
 
                     // Penalize non-exact artist match
                     if artist_sim < 1.0 {
@@ -1431,7 +1530,11 @@ fn stream_and_match_spotify_delayed(
                     }
 
                     if score >= ACCEPT_THRESHOLD {
-                        let current_best = group.best_match.as_ref().map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                        let current_best = group
+                            .best_match
+                            .as_ref()
+                            .map(|(_, _, s)| *s)
+                            .unwrap_or(i32::MIN);
                         if score > current_best {
                             group.best_match = Some((track_idx, spotify_track.clone(), score));
                         }
@@ -1512,7 +1615,11 @@ fn match_lrclib_to_spotify_normalized(
         // Try exact match first - fetch ALL candidates for this key
         let mut candidates: Vec<i64> = Vec::new();
         {
-            let mut rows = lookup_stmt.query(rusqlite::params![title_norm, artist_norm, MAX_CANDIDATES_PER_KEY])?;
+            let mut rows = lookup_stmt.query(rusqlite::params![
+                title_norm,
+                artist_norm,
+                MAX_CANDIDATES_PER_KEY
+            ])?;
             while let Some(row) = rows.next()? {
                 candidates.push(row.get(0)?);
             }
@@ -1527,7 +1634,11 @@ fn match_lrclib_to_spotify_normalized(
             if let Some(primary_artist) = extract_primary_artist(artist_norm) {
                 let mut fallback_candidates: Vec<i64> = Vec::new();
                 {
-                    let mut rows = lookup_stmt.query(rusqlite::params![title_norm, &primary_artist, MAX_CANDIDATES_PER_KEY])?;
+                    let mut rows = lookup_stmt.query(rusqlite::params![
+                        title_norm,
+                        &primary_artist,
+                        MAX_CANDIDATES_PER_KEY
+                    ])?;
                     while let Some(row) = rows.next()? {
                         fallback_candidates.push(row.get(0)?);
                     }
@@ -1549,7 +1660,9 @@ fn match_lrclib_to_spotify_normalized(
     }
     pb.finish_with_message(format!(
         "[MATCH] Found {} groups with candidates ({} total candidates, {} via fallback)",
-        matches_to_fetch.len(), total_candidates, fallback_matches_count
+        matches_to_fetch.len(),
+        total_candidates,
+        fallback_matches_count
     ));
     eprintln!(
         "[MATCH] Complete: {} groups with candidates from {} groups ({} total candidates, avg {:.2} per group, {} via primary-artist fallback)",
@@ -1560,15 +1673,23 @@ fn match_lrclib_to_spotify_normalized(
 
     // Phase 2: Batch fetch track details for ALL candidates
     // Collect all unique rowids across all groups
-    let all_rowids: Vec<i64> = matches_to_fetch.iter()
+    let all_rowids: Vec<i64> = matches_to_fetch
+        .iter()
         .flat_map(|(_, rowids, _)| rowids.iter().copied())
         .collect::<FxHashSet<_>>()
         .into_iter()
         .collect();
     let fetch_start = Instant::now();
-    eprintln!("[FETCH] Fetching track details for {} unique candidates...", all_rowids.len());
+    eprintln!(
+        "[FETCH] Fetching track details for {} unique candidates...",
+        all_rowids.len()
+    );
     let track_details = batch_fetch_track_details(spotify_conn, &all_rowids)?;
-    eprintln!("[FETCH] Complete: {} track details loaded ({})", track_details.len(), format_duration(fetch_start.elapsed()));
+    eprintln!(
+        "[FETCH] Complete: {} track details loaded ({})",
+        track_details.len(),
+        format_duration(fetch_start.elapsed())
+    );
 
     // Phase 3: Score ALL candidates against ALL LRCLIB variants and select best (spec-02 R2.3)
     let pb2 = create_progress_bar(matches_to_fetch.len() as u64, "Scoring candidates");
@@ -1585,10 +1706,19 @@ fn match_lrclib_to_spotify_normalized(
         for &track_rowid in candidate_rowids {
             if let Some(spotify_track) = track_details.get(&track_rowid) {
                 for (track_idx, variant) in group.tracks.iter().enumerate() {
-                    let score = combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
+                    let score = combined_score(
+                        &variant.track,
+                        variant.quality,
+                        spotify_track,
+                        &group.key.1,
+                    );
 
                     if score >= ACCEPT_THRESHOLD {
-                        let current_best = group.best_match.as_ref().map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                        let current_best = group
+                            .best_match
+                            .as_ref()
+                            .map(|(_, _, s)| *s)
+                            .unwrap_or(i32::MIN);
                         if score > current_best {
                             group.best_match = Some((track_idx, spotify_track.clone(), score));
                         }
@@ -1634,9 +1764,15 @@ fn match_lrclib_to_spotify_normalized(
     } else {
         0.0
     };
-    println!("[MATCH] Match rate: {:.1}% ({})", match_rate, format_duration(phase_start.elapsed()));
-    eprintln!("[STATS:MAIN] exact={}, fallback={}, rejected={}, no_candidates={}",
-        exact_accepted, fallback_accepted, all_rejected, stats.main_no_candidates);
+    println!(
+        "[MATCH] Match rate: {:.1}% ({})",
+        match_rate,
+        format_duration(phase_start.elapsed())
+    );
+    eprintln!(
+        "[STATS:MAIN] exact={}, fallback={}, rejected={}, no_candidates={}",
+        exact_accepted, fallback_accepted, all_rejected, stats.main_no_candidates
+    );
 
     Ok(())
 }
@@ -1668,9 +1804,9 @@ fn match_pop0_fallback(
 
             // Track why this group is eligible (spec-07 instrumentation)
             if groups_seen.contains(&idx) {
-                from_rejected += 1;  // Had candidates but all rejected
+                from_rejected += 1; // Had candidates but all rejected
             } else {
-                from_no_candidates += 1;  // Never had candidates
+                from_no_candidates += 1; // Never had candidates
             }
         }
     }
@@ -1698,7 +1834,10 @@ fn match_pop0_fallback(
     for (title_norm, _artist_norm) in unmatched_index.keys() {
         title_only_index.insert(title_norm.clone());
     }
-    eprintln!("[POP0] Built title-only index with {} unique titles", title_only_index.len());
+    eprintln!(
+        "[POP0] Built title-only index with {} unique titles",
+        title_only_index.len()
+    );
 
     // Count pop=0 tracks
     let total: u64 = spotify_conn.query_row(
@@ -1732,10 +1871,14 @@ fn match_pop0_fallback(
         if !title_only_index.contains(&title_norm) {
             rows_processed += 1;
             if rows_processed % 5_000_000 == 0 {
-                eprintln!("[POP0] {}/{} ({:.1}%) - {} title matches, {} full matches",
-                    rows_processed, total,
+                eprintln!(
+                    "[POP0] {}/{} ({:.1}%) - {} title matches, {} full matches",
+                    rows_processed,
+                    total,
                     100.0 * rows_processed as f64 / total as f64,
-                    title_matches, matches_found);
+                    title_matches,
+                    matches_found
+                );
             }
             continue;
         }
@@ -1768,10 +1911,19 @@ fn match_pop0_fallback(
 
                 // Score against all variants
                 for (track_idx, variant) in group.tracks.iter().enumerate() {
-                    let score = combined_score(&variant.track, variant.quality, &spotify_track, &artist_norm);
+                    let score = combined_score(
+                        &variant.track,
+                        variant.quality,
+                        &spotify_track,
+                        &artist_norm,
+                    );
 
                     if score >= ACCEPT_THRESHOLD {
-                        let current_best = group.best_match.as_ref().map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                        let current_best = group
+                            .best_match
+                            .as_ref()
+                            .map(|(_, _, s)| *s)
+                            .unwrap_or(i32::MIN);
                         if score > current_best {
                             group.best_match = Some((track_idx, spotify_track.clone(), score));
                         }
@@ -1793,17 +1945,25 @@ fn match_pop0_fallback(
 
         rows_processed += 1;
         if rows_processed % 5_000_000 == 0 {
-            eprintln!("[POP0] {}/{} ({:.1}%) - {} title matches, {} full matches",
-                rows_processed, total,
+            eprintln!(
+                "[POP0] {}/{} ({:.1}%) - {} title matches, {} full matches",
+                rows_processed,
+                total,
                 100.0 * rows_processed as f64 / total as f64,
-                title_matches, matches_found);
+                title_matches,
+                matches_found
+            );
         }
     }
 
     // Record pop0 match count (spec-07)
     stats.pop0_matches = matches_found as usize;
 
-    eprintln!("[POP0] Complete: {} additional matches from pop=0 tracks ({})", matches_found, format_duration(phase_start.elapsed()));
+    eprintln!(
+        "[POP0] Complete: {} additional matches from pop=0 tracks ({})",
+        matches_found,
+        format_duration(phase_start.elapsed())
+    );
     Ok(matches_found)
 }
 
@@ -1817,11 +1977,26 @@ fn match_pop0_fallback(
 /// Common titles that appear in too many tracks to be useful for title-only lookup.
 /// These are skipped during rescue to avoid false positives.
 const COMMON_TITLES: &[&str] = &[
-    "home", "love", "intro", "outro", "interlude",
-    "untitled", "track 1", "bonus track", "live",
-    "remix", "acoustic", "instrumental", "interlude",
-    "prelude", "prologue", "epilogue", "finale",
-    "happy birthday", "hallelujah", "amen",
+    "home",
+    "love",
+    "intro",
+    "outro",
+    "interlude",
+    "untitled",
+    "track 1",
+    "bonus track",
+    "live",
+    "remix",
+    "acoustic",
+    "instrumental",
+    "interlude",
+    "prelude",
+    "prologue",
+    "epilogue",
+    "finale",
+    "happy birthday",
+    "hallelujah",
+    "amen",
 ];
 
 /// Check if a title is too common for title-only lookup (spec-06 R6.3).
@@ -1850,7 +2025,8 @@ fn title_first_rescue(
     // - No match yet (best_match is None)
     // - Never had candidates (!groups_seen.contains(&idx))
     // This excludes "all_rejected" groups which had candidates but failed duration/score
-    let rescue_candidates: Vec<(usize, &str, &str)> = groups.iter()
+    let rescue_candidates: Vec<(usize, &str, &str)> = groups
+        .iter()
         .enumerate()
         .filter(|(idx, g)| g.best_match.is_none() && !groups_seen.contains(idx))
         .filter(|(_, g)| !is_common_title(&g.key.0))
@@ -1863,7 +2039,8 @@ fn title_first_rescue(
     }
 
     // Count skipped common titles
-    let skipped_common: usize = groups.iter()
+    let skipped_common: usize = groups
+        .iter()
         .enumerate()
         .filter(|(idx, g)| g.best_match.is_none() && !groups_seen.contains(idx))
         .filter(|(_, g)| is_common_title(&g.key.0))
@@ -1901,7 +2078,7 @@ fn title_first_rescue(
          FROM track_norm
          WHERE title_norm = ?
          ORDER BY popularity DESC
-         LIMIT ?"
+         LIMIT ?",
     )?;
 
     let mut matches_found = 0u64;
@@ -1909,11 +2086,12 @@ fn title_first_rescue(
     let mut rejected_duration = 0usize;
 
     // Collect all rowids that pass similarity filter for batch detail fetch
-    let mut rowids_to_fetch: Vec<(usize, i64, f64)> = Vec::new();  // (group_idx, rowid, similarity)
+    let mut rowids_to_fetch: Vec<(usize, i64, f64)> = Vec::new(); // (group_idx, rowid, similarity)
 
     for (i, (group_idx, title_norm, artist_norm)) in rescue_candidates.iter().enumerate() {
         // Phase 1: Title-only lookup in normalized index
-        let mut rows = title_lookup_stmt.query(rusqlite::params![title_norm, MAX_CANDIDATES_PER_TITLE])?;
+        let mut rows =
+            title_lookup_stmt.query(rusqlite::params![title_norm, MAX_CANDIDATES_PER_TITLE])?;
 
         while let Some(row) = rows.next()? {
             let track_rowid: i64 = row.get(0)?;
@@ -1965,7 +2143,8 @@ fn title_first_rescue(
     );
 
     // Phase 4: Batch fetch track details for all passing candidates
-    let unique_rowids: Vec<i64> = rowids_to_fetch.iter()
+    let unique_rowids: Vec<i64> = rowids_to_fetch
+        .iter()
         .map(|(_, rowid, _)| *rowid)
         .collect::<FxHashSet<_>>()
         .into_iter()
@@ -1977,22 +2156,26 @@ fn title_first_rescue(
     let pb2 = create_progress_bar(rowids_to_fetch.len() as u64, "Scoring rescue candidates");
 
     // Group candidates by group_idx and find best
-    let mut best_per_group: FxHashMap<usize, (i64, f64, i32)> = FxHashMap::default();  // group_idx -> (rowid, similarity, score)
+    let mut best_per_group: FxHashMap<usize, (i64, f64, i32)> = FxHashMap::default(); // group_idx -> (rowid, similarity, score)
 
     for (i, (group_idx, track_rowid, similarity)) in rowids_to_fetch.iter().enumerate() {
         let group = &groups[*group_idx];
 
         if let Some(spotify_track) = track_details.get(track_rowid) {
             // Score against all variants
-            for (_track_idx, variant) in group.tracks.iter().enumerate() {
-                let base_score = combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
+            for variant in group.tracks.iter() {
+                let base_score =
+                    combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
 
                 // Add similarity bonus (spec-06 R6.5)
                 let similarity_bonus = (*similarity * 50.0) as i32;
                 let score = base_score + similarity_bonus;
 
                 if score >= ACCEPT_THRESHOLD {
-                    let current_best = best_per_group.get(group_idx).map(|(_, _, s)| *s).unwrap_or(i32::MIN);
+                    let current_best = best_per_group
+                        .get(group_idx)
+                        .map(|(_, _, s)| *s)
+                        .unwrap_or(i32::MIN);
                     if score > current_best {
                         best_per_group.insert(*group_idx, (*track_rowid, *similarity, score));
                     }
@@ -2016,7 +2199,8 @@ fn title_first_rescue(
             let mut best_variant_score = i32::MIN;
 
             for (track_idx, variant) in group.tracks.iter().enumerate() {
-                let variant_score = combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
+                let variant_score =
+                    combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
                 if variant_score > best_variant_score {
                     best_variant_score = variant_score;
                     best_variant_idx = track_idx;
@@ -2106,22 +2290,25 @@ fn fuzzy_title_rescue(
         .map(|(_, _, artist)| *artist)
         .collect();
 
-    eprintln!("[FUZZY] Streaming normalized DB to find titles for {} unique artists...", unique_artists.len());
+    eprintln!(
+        "[FUZZY] Streaming normalized DB to find titles for {} unique artists...",
+        unique_artists.len()
+    );
 
     // Count rows for progress
-    let total_rows: u64 = norm_conn.query_row(
-        "SELECT COUNT(DISTINCT artist_norm || '|' || title_norm) FROM track_norm",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total_rows: u64 = norm_conn
+        .query_row(
+            "SELECT COUNT(DISTINCT artist_norm || '|' || title_norm) FROM track_norm",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     // Stream all unique (artist, title) pairs and filter to our artists
     let mut artist_titles_map: FxHashMap<String, Vec<String>> = FxHashMap::default();
     artist_titles_map.reserve(unique_artists.len());
 
-    let mut stmt = norm_conn.prepare(
-        "SELECT DISTINCT artist_norm, title_norm FROM track_norm"
-    )?;
+    let mut stmt = norm_conn.prepare("SELECT DISTINCT artist_norm, title_norm FROM track_norm")?;
     let mut rows = stmt.query([])?;
     let mut rows_processed = 0u64;
 
@@ -2131,14 +2318,15 @@ fn fuzzy_title_rescue(
         // Only keep if this artist is in our lookup set
         if unique_artists.contains(artist.as_str()) {
             let title: String = row.get(1)?;
-            artist_titles_map.entry(artist).or_insert_with(Vec::new).push(title);
+            artist_titles_map.entry(artist).or_default().push(title);
         }
 
         rows_processed += 1;
         if rows_processed % 5_000_000 == 0 {
             eprintln!(
                 "[FUZZY] Streamed {}/{} pairs ({:.1}%), found {} artists so far",
-                rows_processed, total_rows,
+                rows_processed,
+                total_rows,
                 100.0 * rows_processed as f64 / total_rows.max(1) as f64,
                 artist_titles_map.len()
             );
@@ -2232,7 +2420,8 @@ fn fuzzy_title_rescue(
         let lrclib_duration_sec = best_variant.track.duration_sec;
 
         let artist_norm = &group.key.1;
-        let mut cand_rows = candidate_stmt.query(rusqlite::params![matched_title, artist_norm.as_str()])?;
+        let mut cand_rows =
+            candidate_stmt.query(rusqlite::params![matched_title, artist_norm.as_str()])?;
 
         while let Some(row) = cand_rows.next()? {
             let track_rowid: i64 = row.get(0)?;
@@ -2279,7 +2468,9 @@ fn fuzzy_title_rescue(
     let mut matches_found = 0u64;
     let pb2 = create_progress_bar(rowids_to_fetch.len() as u64, "Scoring fuzzy matches");
 
-    for (i, (group_idx, track_rowid, _matched_title, similarity)) in rowids_to_fetch.iter().enumerate() {
+    for (i, (group_idx, track_rowid, _matched_title, similarity)) in
+        rowids_to_fetch.iter().enumerate()
+    {
         let group = &mut groups[*group_idx];
 
         // Skip if already matched by another candidate
@@ -2293,7 +2484,8 @@ fn fuzzy_title_rescue(
             let mut best_variant_idx = 0;
 
             for (variant_idx, variant) in group.tracks.iter().enumerate() {
-                let base_score = combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
+                let base_score =
+                    combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
                 // Add similarity bonus (fuzzy match gets some credit)
                 let similarity_bonus = (*similarity * 30.0) as i32;
                 let score = base_score + similarity_bonus;
@@ -2371,7 +2563,8 @@ fn batch_fetch_track_details(
         );
 
         let mut stmt = conn.prepare(&sql)?;
-        let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|r| r as &dyn rusqlite::ToSql).collect();
+        let params: Vec<&dyn rusqlite::ToSql> =
+            chunk.iter().map(|r| r as &dyn rusqlite::ToSql).collect();
         let mut rows = stmt.query(params.as_slice())?;
 
         while let Some(row) = rows.next()? {
@@ -2408,7 +2601,10 @@ fn batch_fetch_track_details(
         while let Some(row) = artist_rows.next()? {
             let track_rowid: i64 = row.get(0)?;
             let artist_name: String = row.get(1)?;
-            track_artists_map.entry(track_rowid).or_default().push(artist_name);
+            track_artists_map
+                .entry(track_rowid)
+                .or_default()
+                .push(artist_name);
         }
 
         // Update tracks with all artists
@@ -2468,12 +2664,15 @@ fn select_canonical_and_enrich(
                 }
                 None => {
                     // Fallback: best quality variant (no Spotify match)
-                    let best_variant = group.tracks.iter()
+                    let best_variant = group
+                        .tracks
+                        .iter()
                         .max_by(|a, b| {
-                            a.quality.cmp(&b.quality)
+                            a.quality
+                                .cmp(&b.quality)
                                 .then_with(|| b.track.id.cmp(&a.track.id))
                         })
-                        .unwrap();  // Safe: groups always have at least one track
+                        .unwrap(); // Safe: groups always have at least one track
 
                     EnrichedTrack {
                         lrclib_id: best_variant.track.id,
@@ -2510,10 +2709,58 @@ fn select_canonical_and_enrich(
 
     pb.finish_with_message(format!(
         "Selected {} canonical tracks ({} with Spotify, {:.1}%)",
-        enriched.len(), matched_count, match_rate
+        enriched.len(),
+        matched_count,
+        match_rate
     ));
 
     enriched
+}
+
+/// Deduplicate enriched tracks by spotify_id, keeping the highest quality LRCLIB entry.
+///
+/// This handles cases where multiple LRCLIB groups (with different title_norm values)
+/// matched the same Spotify track via fuzzy matching. For example:
+/// - "Nothing Else Matters" (metallica) → Spotify ID X
+/// - "Nothing Else Matte" (metallica) → Spotify ID X (fuzzy match)
+/// - "Nothing Else Matter" (metallica) → Spotify ID X (fuzzy match)
+///
+/// We keep only the highest quality entry to avoid showing typo variants in search results.
+fn deduplicate_by_spotify_id(tracks: Vec<EnrichedTrack>) -> Vec<EnrichedTrack> {
+    let before_count = tracks.len();
+    let mut spotify_best: FxHashMap<String, EnrichedTrack> = FxHashMap::default();
+    let mut unmatched: Vec<EnrichedTrack> = Vec::new();
+
+    for track in tracks {
+        match &track.spotify_id {
+            Some(sid) => {
+                spotify_best
+                    .entry(sid.clone())
+                    .and_modify(|existing| {
+                        // Keep the one with higher quality score
+                        if track.quality > existing.quality {
+                            *existing = track.clone();
+                        }
+                    })
+                    .or_insert(track);
+            }
+            None => unmatched.push(track),
+        }
+    }
+
+    let matched_count = spotify_best.len();
+    let mut result: Vec<EnrichedTrack> = spotify_best.into_values().collect();
+    result.extend(unmatched);
+
+    let removed = before_count - result.len();
+    if removed > 0 {
+        eprintln!(
+            "[DEDUP] Removed {} duplicate spotify_id entries ({} matched + {} unmatched = {} total)",
+            removed, matched_count, result.len() - matched_count, result.len()
+        );
+    }
+
+    result
 }
 
 /// Collect needed Spotify track IDs and album rowids from groups with best matches
@@ -2528,25 +2775,33 @@ fn collect_needed_ids_from_groups(groups: &[LrclibGroup]) -> (FxHashSet<String>,
         }
     }
 
-    println!("[COLLECT] Need {} track IDs and {} album rowids", track_ids.len(), album_rowids.len());
+    println!(
+        "[COLLECT] Need {} track IDs and {} album rowids",
+        track_ids.len(),
+        album_rowids.len()
+    );
     (track_ids, album_rowids)
 }
 
 /// Collect needed Spotify track IDs and album rowids from best matches (old pipeline).
 /// Replaced by collect_needed_ids_from_groups() for delayed canonical selection.
 #[allow(dead_code)]
-fn collect_needed_ids(best_matches: &[Option<SpotifyTrack>]) -> (FxHashSet<String>, FxHashSet<i64>) {
+fn collect_needed_ids(
+    best_matches: &[Option<SpotifyTrack>],
+) -> (FxHashSet<String>, FxHashSet<i64>) {
     let mut track_ids: FxHashSet<String> = FxHashSet::default();
     let mut album_rowids: FxHashSet<i64> = FxHashSet::default();
 
-    for m in best_matches {
-        if let Some(s) = m {
-            track_ids.insert(s.id.clone());
-            album_rowids.insert(s.album_rowid);
-        }
+    for s in best_matches.iter().flatten() {
+        track_ids.insert(s.id.clone());
+        album_rowids.insert(s.album_rowid);
     }
 
-    println!("[COLLECT] Need {} track IDs and {} album rowids", track_ids.len(), album_rowids.len());
+    println!(
+        "[COLLECT] Need {} track IDs and {} album rowids",
+        track_ids.len(),
+        album_rowids.len()
+    );
     (track_ids, album_rowids)
 }
 
@@ -2571,7 +2826,8 @@ fn batch_fetch_primary_artists(
         let placeholders = vec!["?"; chunk.len()].join(",");
 
         // Get primary artist (MIN artist_rowid) for each track
-        let sql = format!(r#"
+        let sql = format!(
+            r#"
             SELECT ta.track_rowid, a.name
             FROM track_artists ta
             JOIN artists a ON a.rowid = ta.artist_rowid
@@ -2581,7 +2837,9 @@ fn batch_fetch_primary_artists(
                   FROM track_artists
                   WHERE track_rowid = ta.track_rowid
               )
-        "#, placeholders);
+        "#,
+            placeholders
+        );
 
         let mut stmt = conn.prepare(&sql)?;
         let params: Vec<&dyn rusqlite::ToSql> =
@@ -2605,7 +2863,10 @@ fn load_album_images_filtered(
     conn: &Connection,
     needed_album_rowids: &FxHashSet<i64>,
 ) -> Result<FxHashMap<i64, String>> {
-    println!("[IMAGES] Loading album images (filtered to {} albums)...", needed_album_rowids.len());
+    println!(
+        "[IMAGES] Loading album images (filtered to {} albums)...",
+        needed_album_rowids.len()
+    );
 
     // Select images closest to 300px (medium size)
     let sql = r#"
@@ -2643,7 +2904,10 @@ fn load_album_images_batched(
     conn: &Connection,
     album_rowids: &FxHashSet<i64>,
 ) -> Result<FxHashMap<i64, String>> {
-    println!("[IMAGES] Loading album images (batched for {} albums)...", album_rowids.len());
+    println!(
+        "[IMAGES] Loading album images (batched for {} albums)...",
+        album_rowids.len()
+    );
 
     let rowids_vec: Vec<i64> = album_rowids.iter().copied().collect();
     let mut lookup: FxHashMap<i64, String> = FxHashMap::default();
@@ -2655,13 +2919,16 @@ fn load_album_images_batched(
     // Batch by 999 (SQLite parameter limit)
     for chunk in rowids_vec.chunks(999) {
         let placeholders = vec!["?"; chunk.len()].join(",");
-        let sql = format!(r#"
+        let sql = format!(
+            r#"
             SELECT album_rowid, url, height
             FROM album_images
             WHERE album_rowid IN ({})
               AND height BETWEEN 250 AND 350
             ORDER BY ABS(height - 300)
-        "#, placeholders);
+        "#,
+            placeholders
+        );
 
         let mut stmt = conn.prepare(&sql)?;
         let params: Vec<&dyn rusqlite::ToSql> =
@@ -2676,7 +2943,10 @@ fn load_album_images_batched(
         }
     }
 
-    println!("[IMAGES] Loaded {} album image URLs (batched)", lookup.len());
+    println!(
+        "[IMAGES] Loaded {} album image URLs (batched)",
+        lookup.len()
+    );
     Ok(lookup)
 }
 
@@ -2694,7 +2964,7 @@ fn enrich_tracks_with_matches(
 
     let enriched: Vec<EnrichedTrack> = canonical
         .into_iter()
-        .zip(best_matches.into_iter())
+        .zip(best_matches)
         .map(|(lrclib, spotify_match)| {
             let enrichment = match spotify_match {
                 Some(ref s) => {
@@ -2805,7 +3075,7 @@ fn build_enriched_batch_sql(num_rows: usize) -> String {
             title_norm, artist_norm, quality,
             spotify_id, popularity, tempo, musical_key, mode, time_signature,
             isrc, album_image_url
-        ) VALUES "
+        ) VALUES ",
     );
     for i in 0..num_rows {
         if i > 0 {
@@ -2948,7 +3218,11 @@ fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Res
     tx.commit()?;
 
     pb.finish_with_message(format!("Phase 3: Wrote {} enriched tracks", tracks.len()));
-    eprintln!("[WRITE] Complete: {} tracks written ({})", tracks.len(), format_duration(phase_start.elapsed()));
+    eprintln!(
+        "[WRITE] Complete: {} tracks written ({})",
+        tracks.len(),
+        format_duration(phase_start.elapsed())
+    );
     Ok(())
 }
 
@@ -2974,9 +3248,9 @@ fn should_log_failure(group: &LrclibGroup, best_score: Option<i32>) -> bool {
 
     // Either no match, or low-confidence match (score < ACCEPT_THRESHOLD)
     let is_failure_or_marginal = match best_score {
-        None => true,                         // No match at all
-        Some(s) if s < ACCEPT_THRESHOLD => true,  // Below acceptance threshold
-        _ => false,                           // Good match, don't log
+        None => true,                            // No match at all
+        Some(s) if s < ACCEPT_THRESHOLD => true, // Below acceptance threshold
+        _ => false,                              // Good match, don't log
     };
 
     is_high_quality && has_clean_title && is_failure_or_marginal
@@ -3027,7 +3301,7 @@ fn collect_match_failures(
 
             // No match but candidates were seen (all rejected)
             (None, true) => FailureReason::AllCandidatesRejected {
-                candidate_count: 0,  // We don't track exact count
+                candidate_count: 0, // We don't track exact count
                 best_score: 0,
                 primary_reject_reason: "score_below_threshold".to_string(),
             },
@@ -3070,7 +3344,8 @@ fn collect_match_failures(
                     spotify_artist: spotify.artist.clone(),
                     spotify_duration_ms: spotify.duration_ms,
                     spotify_popularity: spotify.popularity,
-                    duration_diff_sec: (variant.track.duration_sec - spotify.duration_ms / 1000).abs(),
+                    duration_diff_sec: (variant.track.duration_sec - spotify.duration_ms / 1000)
+                        .abs(),
                     score: *score,
                     reject_reason: if *score < ACCEPT_THRESHOLD {
                         Some("score_below_threshold".to_string())
@@ -3118,48 +3393,52 @@ struct PreparedFailureEntry {
 }
 
 /// Write match failure logs to the database using batched INSERTs.
-fn write_match_failures(
-    conn: &Connection,
-    failures: &[MatchFailureEntry],
-) -> Result<()> {
+fn write_match_failures(conn: &Connection, failures: &[MatchFailureEntry]) -> Result<()> {
     if failures.is_empty() {
         println!("[FAILURES] No match failures to log");
         return Ok(());
     }
 
     const BATCH_SIZE: usize = 500;
-    let total_batches = (failures.len() + BATCH_SIZE - 1) / BATCH_SIZE;
-    println!("[FAILURES] Logging {} match failures in {} batches...", failures.len(), total_batches);
+    let total_batches = failures.len().div_ceil(BATCH_SIZE);
+    println!(
+        "[FAILURES] Logging {} match failures in {} batches...",
+        failures.len(),
+        total_batches
+    );
 
     let pb = create_progress_bar(failures.len() as u64, "Writing failure logs");
 
     // Pre-process entries: serialize JSON and convert reason to string
-    let prepared: Vec<PreparedFailureEntry> = failures.iter().map(|entry| {
-        let candidates_json = serde_json::to_string(
-            &entry.spotify_candidates.iter().take(5).collect::<Vec<_>>()
-        ).unwrap_or_else(|_| "[]".to_string());
+    let prepared: Vec<PreparedFailureEntry> = failures
+        .iter()
+        .map(|entry| {
+            let candidates_json =
+                serde_json::to_string(&entry.spotify_candidates.iter().take(5).collect::<Vec<_>>())
+                    .unwrap_or_else(|_| "[]".to_string());
 
-        let reason_str = match &entry.failure_reason {
-            FailureReason::NoSpotifyCandidates => "no_candidates",
-            FailureReason::AllCandidatesRejected { .. } => "all_rejected",
-            FailureReason::LowConfidenceMatch { .. } => "low_confidence",
-        };
+            let reason_str = match &entry.failure_reason {
+                FailureReason::NoSpotifyCandidates => "no_candidates",
+                FailureReason::AllCandidatesRejected { .. } => "all_rejected",
+                FailureReason::LowConfidenceMatch { .. } => "low_confidence",
+            };
 
-        PreparedFailureEntry {
-            lrclib_id: entry.lrclib_id,
-            lrclib_title: entry.lrclib_title.clone(),
-            lrclib_artist: entry.lrclib_artist.clone(),
-            lrclib_album: entry.lrclib_album.clone(),
-            lrclib_duration_sec: entry.lrclib_duration_sec,
-            lrclib_title_norm: entry.lrclib_title_norm.clone(),
-            lrclib_artist_norm: entry.lrclib_artist_norm.clone(),
-            lrclib_quality: entry.lrclib_quality,
-            group_variant_count: entry.group_variant_count,
-            failure_reason: reason_str.to_string(),
-            best_score: entry.best_score,
-            candidates_json,
-        }
-    }).collect();
+            PreparedFailureEntry {
+                lrclib_id: entry.lrclib_id,
+                lrclib_title: entry.lrclib_title.clone(),
+                lrclib_artist: entry.lrclib_artist.clone(),
+                lrclib_album: entry.lrclib_album.clone(),
+                lrclib_duration_sec: entry.lrclib_duration_sec,
+                lrclib_title_norm: entry.lrclib_title_norm.clone(),
+                lrclib_artist_norm: entry.lrclib_artist_norm.clone(),
+                lrclib_quality: entry.lrclib_quality,
+                group_variant_count: entry.group_variant_count,
+                failure_reason: reason_str.to_string(),
+                best_score: entry.best_score,
+                candidates_json,
+            }
+        })
+        .collect();
 
     // Write in batches using multi-value INSERTs
     let mut written = 0u64;
@@ -3170,11 +3449,19 @@ fn write_match_failures(
 
         // Tail-friendly logging
         if written % 100_000 == 0 {
-            eprintln!("[FAILURES] {}/{} ({:.1}%)", written, failures.len(), 100.0 * written as f64 / failures.len() as f64);
+            eprintln!(
+                "[FAILURES] {}/{} ({:.1}%)",
+                written,
+                failures.len(),
+                100.0 * written as f64 / failures.len() as f64
+            );
         }
     }
 
-    pb.finish_with_message(format!("[FAILURES] Logged {} match failures", failures.len()));
+    pb.finish_with_message(format!(
+        "[FAILURES] Logged {} match failures",
+        failures.len()
+    ));
     Ok(())
 }
 
@@ -3192,7 +3479,7 @@ fn build_failure_batch_sql(num_rows: usize) -> String {
             lrclib_duration_sec, lrclib_title_norm, lrclib_artist_norm,
             lrclib_quality, group_variant_count,
             failure_reason, best_score, spotify_candidates
-        ) VALUES "
+        ) VALUES ",
     );
     for i in 0..num_rows {
         if i > 0 {
@@ -3205,10 +3492,7 @@ fn build_failure_batch_sql(num_rows: usize) -> String {
 
 /// Execute a batched INSERT for failure entries.
 /// Uses array literals instead of vec![] for flat_map to avoid heap allocations.
-fn execute_failure_batch_insert(
-    conn: &Connection,
-    batch: &[PreparedFailureEntry],
-) -> Result<()> {
+fn execute_failure_batch_insert(conn: &Connection, batch: &[PreparedFailureEntry]) -> Result<()> {
     if batch.is_empty() {
         return Ok(());
     }
@@ -3273,8 +3557,10 @@ fn test_search_enriched(conn: &Connection, query: &str) -> Result<()> {
 
         // Format key if available
         let key_str = match (musical_key, mode) {
-            (Some(k), Some(m)) if k >= 0 && k <= 11 => {
-                let pitch_classes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+            (Some(k), Some(m)) if (0..=11).contains(&k) => {
+                let pitch_classes = [
+                    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+                ];
                 let mode_str = if m == 1 { "major" } else { "minor" };
                 format!("key={} {}", pitch_classes[k as usize], mode_str)
             }
@@ -3326,8 +3612,7 @@ fn main() -> Result<()> {
 
     // Phase 1: Read LRCLIB tracks (source of truth)
     println!("Opening source database: {:?}", args.source);
-    let source_conn = Connection::open(&args.source)
-        .context("Failed to open source database")?;
+    let source_conn = Connection::open(&args.source).context("Failed to open source database")?;
 
     source_conn.execute_batch(
         "PRAGMA mmap_size = 8589934592;
@@ -3335,9 +3620,10 @@ fn main() -> Result<()> {
          PRAGMA temp_store = MEMORY;",
     )?;
 
-    let artist_filter: Option<Vec<String>> = args.artists.clone().map(|s| {
-        s.split(',').map(|a| a.trim().to_string()).collect()
-    });
+    let artist_filter: Option<Vec<String>> = args
+        .artists
+        .clone()
+        .map(|s| s.split(',').map(|a| a.trim().to_string()).collect());
 
     if let Some(ref artists) = artist_filter {
         println!("Filtering by artists: {:?}", artists);
@@ -3366,8 +3652,8 @@ fn main() -> Result<()> {
     let (enriched_tracks, failure_data) = if let Some(ref spotify_path) = args.spotify {
         // Open Spotify DB with read-only optimizations
         println!("\nOpening Spotify database: {:?}", spotify_path);
-        let spotify_conn = Connection::open(spotify_path)
-            .context("Failed to open Spotify database")?;
+        let spotify_conn =
+            Connection::open(spotify_path).context("Failed to open Spotify database")?;
         spotify_conn.execute_batch(
             "PRAGMA query_only = 1;
              PRAGMA journal_mode = OFF;
@@ -3401,7 +3687,10 @@ fn main() -> Result<()> {
                 let total = groups.len();
                 let matched = groups.iter().filter(|g| g.best_match.is_some()).count();
                 let rate = 100.0 * matched as f64 / total as f64;
-                println!("[MATCH] After rescue: {:.1}% ({} total, +{} from rescue)", rate, matched, rescue_matches);
+                println!(
+                    "[MATCH] After rescue: {:.1}% ({} total, +{} from rescue)",
+                    rate, matched, rescue_matches
+                );
             }
 
             // Phase 2b: Fuzzy title matching for remaining unmatched groups
@@ -3416,22 +3705,24 @@ fn main() -> Result<()> {
                 let total = groups.len();
                 let matched = groups.iter().filter(|g| g.best_match.is_some()).count();
                 let rate = 100.0 * matched as f64 / total as f64;
-                println!("[MATCH] After fuzzy: {:.1}% ({} total, +{} from fuzzy)", rate, matched, fuzzy_matches);
+                println!(
+                    "[MATCH] After fuzzy: {:.1}% ({} total, +{} from fuzzy)",
+                    rate, matched, fuzzy_matches
+                );
             }
 
             // Fallback: search pop=0 tracks for unmatched groups
-            let pop0_matches = match_pop0_fallback(
-                &spotify_conn,
-                &mut groups,
-                &mut groups_seen,
-                &mut stats,
-            )?;
+            let pop0_matches =
+                match_pop0_fallback(&spotify_conn, &mut groups, &mut groups_seen, &mut stats)?;
 
             if pop0_matches > 0 {
                 let total = groups.len();
                 let matched = groups_seen.len();
                 let rate = 100.0 * matched as f64 / total as f64;
-                println!("[MATCH] Updated match rate: {:.1}% ({} total, +{} from pop=0)", rate, matched, pop0_matches);
+                println!(
+                    "[MATCH] Updated match rate: {:.1}% ({} total, +{} from pop=0)",
+                    rate, matched, pop0_matches
+                );
             }
         } else {
             // Fall back to streaming all Spotify tracks (slow)
@@ -3460,8 +3751,8 @@ fn main() -> Result<()> {
         // Load audio features using batched IN queries (spec-02 optimization)
         let audio_lookup = if let Some(ref af_path) = args.audio_features {
             println!("\nOpening audio features database: {:?}", af_path);
-            let af_conn = Connection::open(af_path)
-                .context("Failed to open audio features database")?;
+            let af_conn =
+                Connection::open(af_path).context("Failed to open audio features database")?;
             af_conn.execute_batch(
                 "PRAGMA query_only = 1;
                  PRAGMA journal_mode = OFF;
@@ -3483,11 +3774,16 @@ fn main() -> Result<()> {
         println!("\nSelecting canonical tracks and enriching...");
         let enriched = select_canonical_and_enrich(groups, &audio_lookup, &image_lookup);
 
+        // Deduplicate by spotify_id - multiple LRCLIB groups may match same Spotify track
+        let enriched = deduplicate_by_spotify_id(enriched);
+
         (enriched, failures)
     } else {
         // No Spotify data: select best quality variant from each group
         println!("\nNo Spotify data - selecting canonical by quality...");
-        let enriched = select_canonical_and_enrich(groups, &FxHashMap::default(), &FxHashMap::default());
+        let enriched =
+            select_canonical_and_enrich(groups, &FxHashMap::default(), &FxHashMap::default());
+        // No dedup needed when there's no Spotify matching
         (enriched, None)
     };
 
@@ -3506,13 +3802,12 @@ fn main() -> Result<()> {
     validate_output_path(&args.output, "enriched", &source_paths)?;
 
     if args.output.exists() {
-        std::fs::remove_file(&args.output)
-            .context("Failed to remove existing output file")?;
+        std::fs::remove_file(&args.output).context("Failed to remove existing output file")?;
     }
 
     println!("\nCreating output database: {:?}", args.output);
-    let mut output_conn = Connection::open(&args.output)
-        .context("Failed to create output database")?;
+    let mut output_conn =
+        Connection::open(&args.output).context("Failed to create output database")?;
 
     write_enriched_output(&mut output_conn, &enriched_tracks)?;
 
@@ -3529,7 +3824,10 @@ fn main() -> Result<()> {
     let file_size = std::fs::metadata(&args.output)?.len();
 
     // Calculate match statistics
-    let matched_count = enriched_tracks.iter().filter(|t| t.spotify_id.is_some()).count();
+    let matched_count = enriched_tracks
+        .iter()
+        .filter(|t| t.spotify_id.is_some())
+        .count();
     let match_rate = if !enriched_tracks.is_empty() {
         100.0 * matched_count as f64 / enriched_tracks.len() as f64
     } else {
@@ -3568,13 +3866,17 @@ fn main() -> Result<()> {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
-    use crate::normalize::{normalize_punctuation, fold_to_ascii};
+    use crate::normalize::{fold_to_ascii, normalize_punctuation};
 
     #[test]
     fn test_track_number_stripping() {
-        assert_eq!(normalize_title("03 - Love You To Death"), "love you to death");
+        assert_eq!(
+            normalize_title("03 - Love You To Death"),
+            "love you to death"
+        );
         assert_eq!(normalize_title("Track 5 - Song Name"), "song name");
         assert_eq!(normalize_title("01. First Song"), "first song");
         assert_eq!(normalize_title("0958 - Artist - Song"), "artist - song");
@@ -3605,17 +3907,26 @@ mod tests {
 
     #[test]
     fn test_year_suffix_stripping() {
-        assert_eq!(normalize_title("I Call Your Name (1964)"), "i call your name");
+        assert_eq!(
+            normalize_title("I Call Your Name (1964)"),
+            "i call your name"
+        );
         assert_eq!(normalize_title("Something (2009)"), "something");
     }
 
     #[test]
     fn test_encoding_fixes() {
         // ? to apostrophe
-        assert_eq!(normalize_punctuation("Can?t Buy Me Love"), "Can't Buy Me Love");
+        assert_eq!(
+            normalize_punctuation("Can?t Buy Me Love"),
+            "Can't Buy Me Love"
+        );
         assert_eq!(normalize_punctuation("Don?t Stop"), "Don't Stop");
         // Apostrophe spacing
-        assert_eq!(normalize_punctuation("She s Leaving Home"), "She's Leaving Home");
+        assert_eq!(
+            normalize_punctuation("She s Leaving Home"),
+            "She's Leaving Home"
+        );
     }
 
     #[test]
@@ -3650,8 +3961,14 @@ mod tests {
 
     #[test]
     fn test_punctuation_normalization() {
-        assert_eq!(normalize_punctuation("Rock \u{2018}n\u{2019} Roll"), "Rock 'n' Roll");
-        assert_eq!(normalize_punctuation("\u{201C}Quoted\u{201D}"), "\"Quoted\"");
+        assert_eq!(
+            normalize_punctuation("Rock \u{2018}n\u{2019} Roll"),
+            "Rock 'n' Roll"
+        );
+        assert_eq!(
+            normalize_punctuation("\u{201C}Quoted\u{201D}"),
+            "\"Quoted\""
+        );
         assert_eq!(normalize_punctuation("Rock & Roll"), "Rock and Roll");
     }
 
@@ -3733,7 +4050,9 @@ mod tests {
     #[test]
     fn test_artist_similarity() {
         // Exact match
-        assert!((compute_artist_similarity("type o negative", "type o negative") - 1.0).abs() < 0.001);
+        assert!(
+            (compute_artist_similarity("type o negative", "type o negative") - 1.0).abs() < 0.001
+        );
         // Partial match (3 of 4 tokens)
         let sim = compute_artist_similarity("type o negative", "type o");
         assert!(sim > 0.5 && sim < 1.0);
@@ -3833,14 +4152,14 @@ mod tests {
             title: "Radio Edit".to_string(),
             artist: "Artist".to_string(),
             album: Some("Album".to_string()),
-            duration_sec: 250,  // 4:10
+            duration_sec: 250, // 4:10
         };
         let spotify_track = SpotifyTrack {
             id: "abc123".to_string(),
             name: "Radio Edit".to_string(),
             artist: "Artist".to_string(),
             artists: vec!["Artist".to_string()],
-            duration_ms: 295_000,  // 4:55 = 45s diff (relaxed)
+            duration_ms: 295_000, // 4:55 = 45s diff (relaxed)
             popularity: 50,
             isrc: None,
             album_rowid: 1,
@@ -3856,7 +4175,11 @@ mod tests {
         // relaxed penalty: -20
         // popularity: 5
         // Total: 110
-        assert!(score >= ACCEPT_THRESHOLD, "Relaxed match with exact artist should be accepted, got {}", score);
+        assert!(
+            score >= ACCEPT_THRESHOLD,
+            "Relaxed match with exact artist should be accepted, got {}",
+            score
+        );
         assert_eq!(score, 110);
     }
 
@@ -3873,9 +4196,9 @@ mod tests {
         let spotify_track = SpotifyTrack {
             id: "abc123".to_string(),
             name: "Song".to_string(),
-            artist: "Artist Bar".to_string(),  // Only partial match
+            artist: "Artist Bar".to_string(), // Only partial match
             artists: vec!["Artist Bar".to_string()],
-            duration_ms: 295_000,  // 45s diff (relaxed)
+            duration_ms: 295_000, // 45s diff (relaxed)
             popularity: 50,
             isrc: None,
             album_rowid: 1,
@@ -3883,7 +4206,11 @@ mod tests {
 
         let score = combined_score(&lrclib_track, 40, &spotify_track, "artist foo");
         // Relaxed match without exact artist should be rejected
-        assert!(score < 0, "Relaxed match with partial artist should be rejected, got {}", score);
+        assert!(
+            score < 0,
+            "Relaxed match with partial artist should be rejected, got {}",
+            score
+        );
     }
 
     #[test]
@@ -3894,14 +4221,14 @@ mod tests {
             title: "Extended Mix".to_string(),
             artist: "DJ Artist".to_string(),
             album: Some("Singles".to_string()),
-            duration_sec: 300,  // 5:00
+            duration_sec: 300, // 5:00
         };
         let spotify_track = SpotifyTrack {
             id: "abc123".to_string(),
             name: "Extended Mix".to_string(),
             artist: "DJ Artist".to_string(),
             artists: vec!["DJ Artist".to_string()],
-            duration_ms: 360_000,  // 6:00 = 60s diff
+            duration_ms: 360_000, // 6:00 = 60s diff
             popularity: 70,
             isrc: None,
             album_rowid: 1,
@@ -3916,7 +4243,11 @@ mod tests {
         // relaxed penalty: -20
         // popularity: 7
         // Total: 109
-        assert!(score >= ACCEPT_THRESHOLD, "60s diff with exact artist should be accepted, got {}", score);
+        assert!(
+            score >= ACCEPT_THRESHOLD,
+            "60s diff with exact artist should be accepted, got {}",
+            score
+        );
     }
 
     #[test]
@@ -3927,14 +4258,14 @@ mod tests {
             title: "Song".to_string(),
             artist: "Artist".to_string(),
             album: None,
-            duration_sec: 180,  // 3:00
+            duration_sec: 180, // 3:00
         };
         let spotify_track = SpotifyTrack {
             id: "abc123".to_string(),
             name: "Song".to_string(),
             artist: "Artist".to_string(),
             artists: vec!["Artist".to_string()],
-            duration_ms: 250_000,  // 4:10 = 70s diff
+            duration_ms: 250_000, // 4:10 = 70s diff
             popularity: 80,
             isrc: None,
             album_rowid: 1,
@@ -3948,20 +4279,41 @@ mod tests {
     #[test]
     fn test_extract_primary_artist() {
         // Comma-separated artists
-        assert_eq!(extract_primary_artist("mustard, migos"), Some("mustard".to_string()));
-        assert_eq!(extract_primary_artist("duck sauce, a-trak and armand van helden"), Some("duck sauce".to_string()));
+        assert_eq!(
+            extract_primary_artist("mustard, migos"),
+            Some("mustard".to_string())
+        );
+        assert_eq!(
+            extract_primary_artist("duck sauce, a-trak and armand van helden"),
+            Some("duck sauce".to_string())
+        );
         // & separator
-        assert_eq!(extract_primary_artist("nick cave and the bad seeds"), Some("nick cave".to_string()));
-        assert_eq!(extract_primary_artist("farid bang and julian williams"), Some("farid bang".to_string()));
+        assert_eq!(
+            extract_primary_artist("nick cave and the bad seeds"),
+            Some("nick cave".to_string())
+        );
+        assert_eq!(
+            extract_primary_artist("farid bang and julian williams"),
+            Some("farid bang".to_string())
+        );
         // Slash separator
-        assert_eq!(extract_primary_artist("brent faiyaz/dahi/tyler, the creator"), Some("brent faiyaz".to_string()));
+        assert_eq!(
+            extract_primary_artist("brent faiyaz/dahi/tyler, the creator"),
+            Some("brent faiyaz".to_string())
+        );
         // Featuring
-        assert_eq!(extract_primary_artist("jay park feat loco"), Some("jay park".to_string()));
+        assert_eq!(
+            extract_primary_artist("jay park feat loco"),
+            Some("jay park".to_string())
+        );
         // No separator - single artist
         assert_eq!(extract_primary_artist("beatles"), None);
         assert_eq!(extract_primary_artist("rolling stones"), None);
         // "The " stripping on primary artist
-        assert_eq!(extract_primary_artist("the deslondes and dan cutler"), Some("deslondes".to_string()));
+        assert_eq!(
+            extract_primary_artist("the deslondes and dan cutler"),
+            Some("deslondes".to_string())
+        );
         // Too short primary artist rejected
         assert_eq!(extract_primary_artist("a, b"), None);
     }
@@ -3974,7 +4326,10 @@ mod tests {
         assert_eq!(normalize_title("Song (Slowed + Reverb)"), "song");
         // Slash remaster format
         assert_eq!(normalize_title("Song - Mono / 1997 Remastered"), "song");
-        assert_eq!(normalize_title("God Only Knows / 2021 Remaster"), "god only knows");
+        assert_eq!(
+            normalize_title("God Only Knows / 2021 Remaster"),
+            "god only knows"
+        );
         // Reworked variants
         assert_eq!(normalize_title("Song (Reworked)"), "song");
         assert_eq!(normalize_title("Song (Redux)"), "song");
@@ -3991,7 +4346,10 @@ mod tests {
         assert_eq!(normalize_title("Mujeriego - SongsLover.com"), "mujeriego");
         assert_eq!(normalize_title("Song - Download.net"), "song");
         // Visualizer/commentary
-        assert_eq!(normalize_title("Say That You Will (Visualiser)"), "say that you will");
+        assert_eq!(
+            normalize_title("Say That You Will (Visualiser)"),
+            "say that you will"
+        );
         assert_eq!(normalize_title("Song (Lyric Video)"), "song");
         assert_eq!(normalize_title("Requiem (comentario)"), "requiem");
     }
@@ -4010,7 +4368,10 @@ mod tests {
     #[test]
     fn test_double_space_normalization() {
         // Double spaces should be collapsed
-        assert_eq!(normalize_artist("Peter Cetera  Amy Grant"), "peter cetera amy grant");
+        assert_eq!(
+            normalize_artist("Peter Cetera  Amy Grant"),
+            "peter cetera amy grant"
+        );
         assert_eq!(normalize_title("Song   Title"), "song title");
         // Multiple spaces
         assert_eq!(normalize_artist("A    B     C"), "a b c");
@@ -4041,13 +4402,13 @@ mod tests {
         let mut stats = MatchingStats::default();
 
         // Record various duration differences
-        stats.record_duration_bucket(0);   // 0-2
-        stats.record_duration_bucket(1);   // 0-2
-        stats.record_duration_bucket(4);   // 3-5
-        stats.record_duration_bucket(8);   // 6-10
-        stats.record_duration_bucket(12);  // 11-15
-        stats.record_duration_bucket(25);  // 16-30
-        stats.record_duration_bucket(-5);  // abs -> 3-5
+        stats.record_duration_bucket(0); // 0-2
+        stats.record_duration_bucket(1); // 0-2
+        stats.record_duration_bucket(4); // 3-5
+        stats.record_duration_bucket(8); // 6-10
+        stats.record_duration_bucket(12); // 11-15
+        stats.record_duration_bucket(25); // 16-30
+        stats.record_duration_bucket(-5); // abs -> 3-5
 
         assert_eq!(stats.duration_matches_0_to_2, 2);
         assert_eq!(stats.duration_matches_3_to_5, 2);
@@ -4062,13 +4423,13 @@ mod tests {
         let mut stats = MatchingStats::default();
 
         // Record relaxed duration differences (>30s)
-        stats.record_duration_bucket(35);   // 31-45
-        stats.record_duration_bucket(40);   // 31-45
-        stats.record_duration_bucket(45);   // 31-45
-        stats.record_duration_bucket(50);   // 46-60
-        stats.record_duration_bucket(60);   // 46-60
-        stats.record_duration_bucket(65);   // 61+
-        stats.record_duration_bucket(-55);  // abs -> 46-60
+        stats.record_duration_bucket(35); // 31-45
+        stats.record_duration_bucket(40); // 31-45
+        stats.record_duration_bucket(45); // 31-45
+        stats.record_duration_bucket(50); // 46-60
+        stats.record_duration_bucket(60); // 46-60
+        stats.record_duration_bucket(65); // 61+
+        stats.record_duration_bucket(-55); // abs -> 46-60
 
         assert_eq!(stats.duration_relaxed_31_to_45, 3);
         assert_eq!(stats.duration_relaxed_46_to_60, 3);
@@ -4107,7 +4468,7 @@ mod tests {
         stats.main_all_rejected = 200;
 
         // Pop=0 should be eligible for both no_candidates AND rejected groups
-        stats.pop0_eligible = 400;  // 200 + 200
+        stats.pop0_eligible = 400; // 200 + 200
         stats.pop0_from_no_candidates = 200;
         stats.pop0_from_rejected = 200;
 
@@ -4131,10 +4492,10 @@ mod tests {
     #[test]
     fn test_score_artist_multi_exact_primary() {
         // Primary artist matches exactly
-        let result = score_artist_multi("dua lipa", &vec![
-            "Dua Lipa".to_string(),
-            "Elton John".to_string(),
-        ]);
+        let result = score_artist_multi(
+            "dua lipa",
+            &["Dua Lipa".to_string(), "Elton John".to_string()],
+        );
         assert!(result.is_exact);
         assert_eq!(result.best_similarity, 1.0);
     }
@@ -4142,10 +4503,10 @@ mod tests {
     #[test]
     fn test_score_artist_multi_exact_secondary() {
         // Secondary artist matches exactly (spec-03: "Dua Lipa" searching for "Elton John, Dua Lipa")
-        let result = score_artist_multi("dua lipa", &vec![
-            "Elton John".to_string(),
-            "Dua Lipa".to_string(),
-        ]);
+        let result = score_artist_multi(
+            "dua lipa",
+            &["Elton John".to_string(), "Dua Lipa".to_string()],
+        );
         assert!(result.is_exact);
         assert_eq!(result.best_similarity, 1.0);
     }
@@ -4153,29 +4514,27 @@ mod tests {
     #[test]
     fn test_score_artist_multi_partial_match() {
         // Partial match against one of multiple artists
-        let result = score_artist_multi("elton", &vec![
-            "Elton John".to_string(),
-            "Dua Lipa".to_string(),
-        ]);
+        let result =
+            score_artist_multi("elton", &["Elton John".to_string(), "Dua Lipa".to_string()]);
         assert!(!result.is_exact);
-        assert!(result.best_similarity > 0.3);  // Should have some similarity
+        assert!(result.best_similarity > 0.3); // Should have some similarity
     }
 
     #[test]
     fn test_score_artist_multi_no_match() {
         // No artist matches
-        let result = score_artist_multi("metallica", &vec![
-            "Elton John".to_string(),
-            "Dua Lipa".to_string(),
-        ]);
+        let result = score_artist_multi(
+            "metallica",
+            &["Elton John".to_string(), "Dua Lipa".to_string()],
+        );
         assert!(!result.is_exact);
-        assert!(result.best_similarity < 0.3);  // Very low similarity
+        assert!(result.best_similarity < 0.3); // Very low similarity
     }
 
     #[test]
     fn test_score_artist_multi_empty() {
         // Empty artist list
-        let result = score_artist_multi("metallica", &vec![]);
+        let result = score_artist_multi("metallica", &[]);
         assert!(!result.is_exact);
         assert_eq!(result.best_similarity, 0.0);
     }
@@ -4193,8 +4552,8 @@ mod tests {
         let spotify_track = SpotifyTrack {
             id: "abc123".to_string(),
             name: "Cold Heart".to_string(),
-            artist: "Elton John".to_string(),  // Primary is Elton John
-            artists: vec!["Elton John".to_string(), "Dua Lipa".to_string()],  // But Dua Lipa is credited
+            artist: "Elton John".to_string(), // Primary is Elton John
+            artists: vec!["Elton John".to_string(), "Dua Lipa".to_string()], // But Dua Lipa is credited
             duration_ms: 210_000,
             popularity: 85,
             isrc: None,
@@ -4211,7 +4570,11 @@ mod tests {
         // clean title bonus: 30 (no garbage pattern)
         // popularity: 8 (85/10)
         // Total: 228
-        assert!(score >= ACCEPT_THRESHOLD, "Multi-artist match via secondary artist should be accepted, got {}", score);
+        assert!(
+            score >= ACCEPT_THRESHOLD,
+            "Multi-artist match via secondary artist should be accepted, got {}",
+            score
+        );
     }
 
     #[test]
@@ -4237,7 +4600,11 @@ mod tests {
 
         // Search for "metallica" - should not match (no artist overlap)
         let score = combined_score(&lrclib_track, 40, &spotify_track, "metallica");
-        assert!(score < 0, "Multi-artist match with no artist overlap should be rejected, got {}", score);
+        assert!(
+            score < 0,
+            "Multi-artist match with no artist overlap should be rejected, got {}",
+            score
+        );
     }
 
     // ========================================================================
@@ -4271,19 +4638,35 @@ mod tests {
 
         // Minor typo (should be high similarity)
         let sim = normalized_levenshtein("everythig but the girl", "everything but the girl");
-        assert!(sim > 0.90, "Minor typo should have >90% similarity, got {}", sim);
+        assert!(
+            sim > 0.90,
+            "Minor typo should have >90% similarity, got {}",
+            sim
+        );
 
         // Punctuation difference (should be high similarity)
         let sim = normalized_levenshtein("guns n roses", "guns and roses");
-        assert!(sim > 0.75, "Punctuation diff should have >75% similarity, got {}", sim);
+        assert!(
+            sim > 0.75,
+            "Punctuation diff should have >75% similarity, got {}",
+            sim
+        );
 
         // Completely different (should be low similarity)
         let sim = normalized_levenshtein("metallica", "taylor swift");
-        assert!(sim < 0.30, "Completely different should have <30% similarity, got {}", sim);
+        assert!(
+            sim < 0.30,
+            "Completely different should have <30% similarity, got {}",
+            sim
+        );
 
         // Partial match - "queen" vs "queen paul rodgers" has low similarity due to length difference
         let sim = normalized_levenshtein("queen", "queen paul rodgers");
-        assert!(sim > 0.20 && sim < 0.50, "Partial match should be 20-50% similarity, got {}", sim);
+        assert!(
+            sim > 0.20 && sim < 0.50,
+            "Partial match should be 20-50% similarity, got {}",
+            sim
+        );
     }
 
     #[test]

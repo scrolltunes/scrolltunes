@@ -77,47 +77,36 @@ pub static TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
 });
 
 /// Matches track number prefixes like "03 - ", "Track 5 - ", "01. ", etc.
-pub static TRACK_NUMBER_PREFIX: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)^(?:track\s*)?\d{1,4}\s*[-–—._]\s*").unwrap()
-);
+pub static TRACK_NUMBER_PREFIX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)^(?:track\s*)?\d{1,4}\s*[-–—._]\s*").unwrap());
 
 /// Matches track number prefix without separator: "16 Eleanor Rigby" → "Eleanor Rigby"
 /// Only matches 1-2 digit numbers (1-99) to avoid false positives like "1970 Somethin'"
 /// Pattern: 01-09 or 1-99 followed by space and uppercase letter.
-pub static TRACK_NUMBER_SPACE_PREFIX: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"^(?:0[1-9]|[1-9]\d?)\s+([A-Z])").unwrap()
-);
+pub static TRACK_NUMBER_SPACE_PREFIX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^(?:0[1-9]|[1-9]\d?)\s+([A-Z])").unwrap());
 
 /// Matches track number in brackets: "[01] Song", "[12] Title"
-pub static TRACK_NUMBER_BRACKET: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"^\[\d{1,2}\]\s*").unwrap()
-);
+pub static TRACK_NUMBER_BRACKET: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\[\d{1,2}\]\s*").unwrap());
 
 /// Matches "Artist - Title" format where track number precedes artist
 /// e.g., "117.任贤齐 - 小狼狗" → "小狼狗" (when processed with artist context)
-pub static TRACK_ARTIST_TITLE: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"^\d{1,3}\.\s*[^-–—]+\s*[-–—]\s*").unwrap()
-);
+pub static TRACK_ARTIST_TITLE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\d{1,3}\.\s*[^-–—]+\s*[-–—]\s*").unwrap());
 
 /// Matches mojibake replacement characters at end of string
-pub static MOJIBAKE_SUFFIX: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"[\u{FFFD}]+$").unwrap()
-);
+pub static MOJIBAKE_SUFFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[\u{FFFD}]+$").unwrap());
 
 /// Matches bracket suffixes like [Mono], [RM1], [take 2], [Live], etc.
-pub static BRACKET_SUFFIX: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"\s*\[[^\]]+\]\s*$").unwrap()
-);
+pub static BRACKET_SUFFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s*\[[^\]]+\]\s*$").unwrap());
 
 /// Matches file extensions in titles
-pub static FILE_EXTENSION: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)\.(flac|mp3|wav|m4a|ogg|aac)$").unwrap()
-);
+pub static FILE_EXTENSION: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\.(flac|mp3|wav|m4a|ogg|aac)$").unwrap());
 
 /// Matches year suffix like (1964), (2009), etc.
-pub static YEAR_SUFFIX: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"\s*\(\d{4}\)\s*$").unwrap()
-);
+pub static YEAR_SUFFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s*\(\d{4}\)\s*$").unwrap());
 
 /// Artist cleanup patterns
 pub static ARTIST_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
@@ -152,206 +141,227 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
 
     // Bands with stylized/anglicized names
     m.insert("аквариум", "aquarium");
-    m.insert("akvarium", "aquarium");  // alias
+    m.insert("akvarium", "aquarium"); // alias
     m.insert("ария", "aria");
-    m.insert("ariya", "aria");  // alias
+    m.insert("ariya", "aria"); // alias
     m.insert("сплин", "splean");
-    m.insert("splin", "splean");  // alias
+    m.insert("splin", "splean"); // alias
     m.insert("би2", "bi-2");
     m.insert("би-2", "bi-2");
     m.insert("киш", "korol i shut");
-    m.insert("kish", "korol i shut");  // alias
+    m.insert("kish", "korol i shut"); // alias
     m.insert("чайф", "chaif");
-    m.insert("chajf", "chaif");  // alias
+    m.insert("chajf", "chaif"); // alias
     m.insert("смысловые галлюцинации", "smyslovye gallyutsinatsii");
-    m.insert("smyslovye gallyucinacii", "smyslovye gallyutsinatsii");  // alias
+    m.insert("smyslovye gallyucinacii", "smyslovye gallyutsinatsii"); // alias
     m.insert("чиж и ко", "chizh");
-    m.insert("chizh i ko", "chizh");  // alias
+    m.insert("chizh i ko", "chizh"); // alias
     m.insert("танцы минус", "tantsy minus");
-    m.insert("tancy minus", "tantsy minus");  // alias
+    m.insert("tancy minus", "tantsy minus"); // alias
     m.insert("люмен", "lumen");
-    m.insert("lyumen", "lumen");  // alias
+    m.insert("lyumen", "lumen"); // alias
     m.insert("ума турман", "uma2rman");
-    m.insert("uma turman", "uma2rman");  // alias
+    m.insert("uma turman", "uma2rman"); // alias
 
     // Solo artists
     m.insert("виктор цой", "viktor tsoi");
-    m.insert("viktor coj", "viktor tsoi");  // alias
+    m.insert("viktor coj", "viktor tsoi"); // alias
     m.insert("валерий кипелов", "valery kipelov");
-    m.insert("valerij kipelov", "valery kipelov");  // alias
+    m.insert("valerij kipelov", "valery kipelov"); // alias
     m.insert("филипп киркоров", "philipp kirkorov");
-    m.insert("filipp kirkorov", "philipp kirkorov");  // alias
+    m.insert("filipp kirkorov", "philipp kirkorov"); // alias
     m.insert("валерия", "valeria");
-    m.insert("valeriya", "valeria");  // alias
+    m.insert("valeriya", "valeria"); // alias
     m.insert("егор крид", "egor kreed");
-    m.insert("egor krid", "egor kreed");  // alias
+    m.insert("egor krid", "egor kreed"); // alias
     m.insert("макс корж", "max korzh");
-    m.insert("maks korzh", "max korzh");  // alias
+    m.insert("maks korzh", "max korzh"); // alias
     m.insert("джах халиб", "jah khalib");
-    m.insert("dzhah halib", "jah khalib");  // alias
+    m.insert("dzhah halib", "jah khalib"); // alias
     m.insert("ёлка", "elka");
-    m.insert("yolka", "elka");  // alias
+    m.insert("yolka", "elka"); // alias
     m.insert("светлана лобода", "loboda");
-    m.insert("svetlana loboda", "loboda");  // alias
+    m.insert("svetlana loboda", "loboda"); // alias
     m.insert("хаски", "husky");
-    m.insert("haski", "husky");  // alias
+    m.insert("haski", "husky"); // alias
     m.insert("оксимирон", "oxxxymiron");
-    m.insert("oksimiron", "oxxxymiron");  // alias
+    m.insert("oksimiron", "oxxxymiron"); // alias
     m.insert("фейс", "face");
-    m.insert("fejs", "face");  // alias
+    m.insert("fejs", "face"); // alias
     m.insert("литл биг", "little big");
-    m.insert("litl big", "little big");  // alias
+    m.insert("litl big", "little big"); // alias
     m.insert("григорий лепс", "grigory leps");
-    m.insert("grigorij leps", "grigory leps");  // alias
+    m.insert("grigorij leps", "grigory leps"); // alias
 
     // More artists
     m.insert("воровайки", "vorovayki");
-    m.insert("vorovajki", "vorovayki");  // alias
+    m.insert("vorovajki", "vorovayki"); // alias
     m.insert("скриптонит", "scriptonite");
-    m.insert("skriptonit", "scriptonite");  // alias
+    m.insert("skriptonit", "scriptonite"); // alias
     m.insert("владимир высоцкий", "vladimir vysotsky");
-    m.insert("vladimir vysockij", "vladimir vysotsky");  // alias
+    m.insert("vladimir vysockij", "vladimir vysotsky"); // alias
     m.insert("психея", "psychea");
-    m.insert("psiheya", "psychea");  // alias
+    m.insert("psiheya", "psychea"); // alias
     m.insert("замай", "zamay");
-    m.insert("zamaj", "zamay");  // alias
+    m.insert("zamaj", "zamay"); // alias
     m.insert("бумбокс", "boombox");
-    m.insert("bumboks", "boombox");  // alias
+    m.insert("bumboks", "boombox"); // alias
     m.insert("александр розенбаум", "alexander rosenbaum");
-    m.insert("aleksandr rozenbaum", "alexander rosenbaum");  // alias
+    m.insert("aleksandr rozenbaum", "alexander rosenbaum"); // alias
     m.insert("эпидемия", "epidemia");
-    m.insert("epidemiya", "epidemia");  // alias
+    m.insert("epidemiya", "epidemia"); // alias
     m.insert("элджей", "eldzhey");
-    m.insert("eldzhej", "eldzhey");  // alias
+    m.insert("eldzhej", "eldzhey"); // alias
     m.insert("комбинация", "kombinatsiya");
-    m.insert("kombinaciya", "kombinatsiya");  // alias
+    m.insert("kombinaciya", "kombinatsiya"); // alias
     m.insert("элизиум", "elysium");
-    m.insert("elizium", "elysium");  // alias
+    m.insert("elizium", "elysium"); // alias
     m.insert("слот (slot)", "slot");
     m.insert("йорш", "yorsh");
-    m.insert("jorsh", "yorsh");  // alias
+    m.insert("jorsh", "yorsh"); // alias
     m.insert("каспийский груз", "kaspiyskiy gruz");
-    m.insert("kaspijskij gruz", "kaspiyskiy gruz");  // alias
+    m.insert("kaspijskij gruz", "kaspiyskiy gruz"); // alias
     m.insert("ольга арефьева и группа «ковчег»", "olga arefieva");
-    m.insert("olga arefeva i gruppa kovcheg", "olga arefieva");  // alias
+    m.insert("olga arefeva i gruppa kovcheg", "olga arefieva"); // alias
     m.insert("макс барских", "max barskih");
-    m.insert("maks barskih", "max barskih");  // alias
+    m.insert("maks barskih", "max barskih"); // alias
     m.insert("высоцкий, владимир", "vladimir vysotsky");
-    m.insert("vysockij, vladimir", "vladimir vysotsky");  // alias
+    m.insert("vysockij, vladimir", "vladimir vysotsky"); // alias
     m.insert("ганвест", "gunwest");
-    m.insert("ganvest", "gunwest");  // alias
+    m.insert("ganvest", "gunwest"); // alias
     m.insert("сюзанна", "suzanna");
-    m.insert("syuzanna", "suzanna");  // alias
+    m.insert("syuzanna", "suzanna"); // alias
     m.insert("хлеб", "khleb");
-    m.insert("hleb", "khleb");  // alias
+    m.insert("hleb", "khleb"); // alias
 
     // Ukrainian artists
     m.insert("брати гадюкіни", "braty hadiukiny");
-    m.insert("brati gadyukini", "braty hadiukiny");  // alias
+    m.insert("brati gadyukini", "braty hadiukiny"); // alias
     m.insert("пилот and илья «чёрт»", "pilot");
     m.insert("христина соловій", "khrystyna soloviy");
-    m.insert("hristina solovij", "khrystyna soloviy");  // alias
+    m.insert("hristina solovij", "khrystyna soloviy"); // alias
     m.insert("воплі відоплясова", "vopli vidopliassova");
-    m.insert("vopli vidoplyasova", "vopli vidopliassova");  // alias
+    m.insert("vopli vidoplyasova", "vopli vidopliassova"); // alias
     m.insert("антитіла", "antytila");
-    m.insert("antitila", "antytila");  // alias
+    m.insert("antitila", "antytila"); // alias
 
     // Bulgarian/Slavic
     m.insert("слави трифонов и ку-ку бенд", "slavi trifonov");
-    m.insert("slavi trifonov i ku-ku bend", "slavi trifonov");  // alias
+    m.insert("slavi trifonov i ku-ku bend", "slavi trifonov"); // alias
     m.insert("щурците", "shturcite");
-    m.insert("schurcite", "shturcite");  // alias
+    m.insert("schurcite", "shturcite"); // alias
     m.insert("анелия", "anelia");
-    m.insert("aneliya", "anelia");  // alias
+    m.insert("aneliya", "anelia"); // alias
 
     // More Russian artists
     m.insert("александр градский", "alexander gradsky");
-    m.insert("aleksandr gradskij", "alexander gradsky");  // alias
+    m.insert("aleksandr gradskij", "alexander gradsky"); // alias
     m.insert("кравц", "kravts");
-    m.insert("kravc", "kravts");  // alias
+    m.insert("kravc", "kravts"); // alias
     m.insert("алсу", "alsou");
-    m.insert("alsu", "alsou");  // alias
+    m.insert("alsu", "alsou"); // alias
     m.insert("яшникова, екатерина", "ekaterina yashnikova");
-    m.insert("yashnikova, ekaterina", "ekaterina yashnikova");  // alias
+    m.insert("yashnikova, ekaterina", "ekaterina yashnikova"); // alias
     m.insert("тайпан", "taipan");
-    m.insert("tajpan", "taipan");  // alias
+    m.insert("tajpan", "taipan"); // alias
     m.insert("хмыров", "khmyrov");
-    m.insert("hmyrov", "khmyrov");  // alias
+    m.insert("hmyrov", "khmyrov"); // alias
     m.insert("контакт х", "kontakt x");
-    m.insert("kontakt h", "kontakt x");  // alias
+    m.insert("kontakt h", "kontakt x"); // alias
     m.insert("ляпис трубецкой", "lyapis trubetskoy");
-    m.insert("lyapis trubeckoj", "lyapis trubetskoy");  // alias
+    m.insert("lyapis trubeckoj", "lyapis trubetskoy"); // alias
     m.insert("стас михайлов", "stas mikhailov");
-    m.insert("stas mihajlov", "stas mikhailov");  // alias
+    m.insert("stas mihajlov", "stas mikhailov"); // alias
     m.insert("высоцкий владимир", "vladimir vysotsky");
-    m.insert("vysockij vladimir", "vladimir vysotsky");  // alias
+    m.insert("vysockij vladimir", "vladimir vysotsky"); // alias
 
     // Ensembles and groups
-    m.insert("академический ансамбль песни и пляски российской армии", "alexandrov ensemble");
-    m.insert("akademicheskij ansambl pesni i plyaski rossijskoj armii", "alexandrov ensemble");  // alias
-    m.insert("академический ансамбль песни и пляски российской армии имени а. в. александрова", "alexandrov ensemble");
+    m.insert(
+        "академический ансамбль песни и пляски российской армии",
+        "alexandrov ensemble",
+    );
+    m.insert(
+        "akademicheskij ansambl pesni i plyaski rossijskoj armii",
+        "alexandrov ensemble",
+    ); // alias
+    m.insert(
+        "академический ансамбль песни и пляски российской армии имени а. в. александрова",
+        "alexandrov ensemble",
+    );
     m.insert("круг михаил", "mikhail krug");
-    m.insert("krug mihail", "mikhail krug");  // alias
+    m.insert("krug mihail", "mikhail krug"); // alias
     m.insert("алла пугачёва", "alla pugacheva");
-    m.insert("alla pugachyova", "alla pugacheva");  // alias
+    m.insert("alla pugachyova", "alla pugacheva"); // alias
     m.insert("шатунов юрий", "yuri shatunov");
-    m.insert("shatunov yurij", "yuri shatunov");  // alias
+    m.insert("shatunov yurij", "yuri shatunov"); // alias
     m.insert("аукцыон", "auktyon");
-    m.insert("aukcyon", "auktyon");  // alias
+    m.insert("aukcyon", "auktyon"); // alias
     m.insert("несчастный случай", "neschastny sluchay");
-    m.insert("neschastnyj sluchaj", "neschastny sluchay");  // alias
+    m.insert("neschastnyj sluchaj", "neschastny sluchay"); // alias
     m.insert("вектор а", "vector a");
-    m.insert("vektor a", "vector a");  // alias
+    m.insert("vektor a", "vector a"); // alias
     m.insert("андрей леницкий", "andrey lenitsky");
-    m.insert("andrej lenickij", "andrey lenitsky");  // alias
+    m.insert("andrej lenickij", "andrey lenitsky"); // alias
     m.insert("тараканы!", "tarakany");
-    m.insert("tarakany!", "tarakany");  // alias
+    m.insert("tarakany!", "tarakany"); // alias
     m.insert("клоукома", "cloukoma");
-    m.insert("kloukoma", "cloukoma");  // alias
+    m.insert("kloukoma", "cloukoma"); // alias
     m.insert("децл", "detsl");
-    m.insert("decl", "detsl");  // alias
+    m.insert("decl", "detsl"); // alias
     m.insert("винтаж", "vintage");
-    m.insert("vintazh", "vintage");  // alias
-    m.insert("калинов мост и дмитрий ревякин", "kalinov most and dmitry revyakin");
-    m.insert("kalinov most i dmitrij revyakin", "kalinov most and dmitry revyakin");  // alias
+    m.insert("vintazh", "vintage"); // alias
+    m.insert(
+        "калинов мост и дмитрий ревякин",
+        "kalinov most and dmitry revyakin",
+    );
+    m.insert(
+        "kalinov most i dmitrij revyakin",
+        "kalinov most and dmitry revyakin",
+    ); // alias
     m.insert("группа воровайки", "vorovayki");
-    m.insert("gruppa vorovajki", "vorovayki");  // alias
+    m.insert("gruppa vorovajki", "vorovayki"); // alias
     m.insert("грай", "grai");
-    m.insert("graj", "grai");  // alias
+    m.insert("graj", "grai"); // alias
     m.insert("смоки мо", "smoky mo");
-    m.insert("smoki mo", "smoky mo");  // alias
+    m.insert("smoki mo", "smoky mo"); // alias
     m.insert("дмитрий ревякин", "dmitry revyakin");
-    m.insert("dmitrij revyakin", "dmitry revyakin");  // alias
+    m.insert("dmitrij revyakin", "dmitry revyakin"); // alias
     m.insert("глюк'oza", "glukoza");
-    m.insert("glyuk'oza", "glukoza");  // alias
+    m.insert("glyuk'oza", "glukoza"); // alias
     m.insert("глюкоza", "glukoza");
-    m.insert("glyukoza", "glukoza");  // alias
+    m.insert("glyukoza", "glukoza"); // alias
     m.insert("фристайл", "freestyle");
-    m.insert("fristajl", "freestyle");  // alias
+    m.insert("fristajl", "freestyle"); // alias
     m.insert("фактор-2", "faktor 2");
-    m.insert("faktor-2", "faktor 2");  // alias
+    m.insert("faktor-2", "faktor 2"); // alias
     m.insert("нуки (nookie)", "nuki");
-    m.insert("nuki (nookie)", "nuki");  // alias
+    m.insert("nuki (nookie)", "nuki"); // alias
     m.insert("ночные снайперы+диана арбенина", "nochnye snaipery");
-    m.insert("nochnye snajpery+diana arbenina", "nochnye snaipery");  // alias
+    m.insert("nochnye snajpery+diana arbenina", "nochnye snaipery"); // alias
     m.insert("наговицын сергей", "sergey nagovitsyn");
-    m.insert("nagovicyn sergej", "sergey nagovitsyn");  // alias
-    m.insert("леонид фёдоров, игорь крутоголов", "leonid fyodorov and igor krutogolov");
-    m.insert("leonid fyodorov, igor krutogolov", "leonid fyodorov and igor krutogolov");  // alias
+    m.insert("nagovicyn sergej", "sergey nagovitsyn"); // alias
+    m.insert(
+        "леонид фёдоров, игорь крутоголов",
+        "leonid fyodorov and igor krutogolov",
+    );
+    m.insert(
+        "leonid fyodorov, igor krutogolov",
+        "leonid fyodorov and igor krutogolov",
+    ); // alias
     m.insert("исайя", "isaya");
-    m.insert("isajya", "isaya");  // alias
+    m.insert("isajya", "isaya"); // alias
     m.insert("группа бутырка", "butyrka");
-    m.insert("gruppa butyrka", "butyrka");  // alias
+    m.insert("gruppa butyrka", "butyrka"); // alias
     m.insert("гарик кричевский", "garik krichevsky");
-    m.insert("garik krichevskij", "garik krichevsky");  // alias
+    m.insert("garik krichevskij", "garik krichevsky"); // alias
     m.insert("алексей воробьёв", "alexey vorobyov");
-    m.insert("aleksej vorobyov", "alexey vorobyov");  // alias
+    m.insert("aleksej vorobyov", "alexey vorobyov"); // alias
     m.insert("шуфутинский михаил", "mikhail shufutinsky");
-    m.insert("shufutinskij mihail", "mikhail shufutinsky");  // alias
+    m.insert("shufutinskij mihail", "mikhail shufutinsky"); // alias
     m.insert("чёрный обелиск", "chorny obelisk");
-    m.insert("chyornyj obelisk", "chorny obelisk");  // alias
+    m.insert("chyornyj obelisk", "chorny obelisk"); // alias
     m.insert("фиксики", "fixiki");
-    m.insert("fiksiki", "fixiki");  // alias
+    m.insert("fiksiki", "fixiki"); // alias
     m.insert("тату", "tatu");
     m.insert("miyagi and эндшпиль", "miyagi and endshpil");
 
@@ -361,7 +371,7 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("משינה", "mashina");
     m.insert("אתניקס", "ethnix");
     m.insert("כוורת", "kaveret");
-    m.insert("טיפקס", "teapacks");  // Israeli band, not Spanish "Tipex"
+    m.insert("טיפקס", "teapacks"); // Israeli band, not Spanish "Tipex"
     m.insert("הדג נחש", "hadag nahash");
     m.insert("הדורבנים", "hadorbanim");
     m.insert("מוניקה סקס", "monica sex");
@@ -422,7 +432,7 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("ישי ריבו", "ishay ribo");
     m.insert("מתי כספי", "matti caspi");
     m.insert("חוה אלברשטיין", "chava alberstein");
-    m.insert("חווה אלברשטיין", "chava alberstein");  // alternate spelling
+    m.insert("חווה אלברשטיין", "chava alberstein"); // alternate spelling
     m.insert("ישי לוי", "yishai levy");
     m.insert("רמי פורטיס", "rami fortis");
     m.insert("קורין אלאל", "korin allal");
@@ -536,7 +546,10 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("בן אל", "ben el");
     m.insert("בועז שרעבי", "boaz sharabi");
     m.insert("אתי אנקרי", "etti ankri");
-    m.insert("אלישע בנאי וארבעים השודדים", "elisha banai vearbayim hashodedim");
+    m.insert(
+        "אלישע בנאי וארבעים השודדים",
+        "elisha banai vearbayim hashodedim",
+    );
     m.insert("איציק אשל", "itzik eshel");
     m.insert("אבי פרץ", "avi peretz");
     m.insert("אבי אבורומי", "avi aburomi");
@@ -674,17 +687,38 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("דני בסן", "danny basan");
     m.insert("דני ליטני", "danny litani");
     m.insert("דפנה ארמוני", "dafna armoni");
-    m.insert("הדג נחש ואינפקטד מאשרום", "hadag nahash and infected mushroom");
-    m.insert("הדג נחש וארקדי יעקובסון", "hadag nahash and arkadi yakobson");
+    m.insert(
+        "הדג נחש ואינפקטד מאשרום",
+        "hadag nahash and infected mushroom",
+    );
+    m.insert(
+        "הדג נחש וארקדי יעקובסון",
+        "hadag nahash and arkadi yakobson",
+    );
     m.insert("הדג נחש ויוסי מזרחי", "hadag nahash and yossi mizrachi");
-    m.insert("הדג נחש ומארינה מקסימיליאן", "hadag nahash and marina maximilian");
+    m.insert(
+        "הדג נחש ומארינה מקסימיליאן",
+        "hadag nahash and marina maximilian",
+    );
     m.insert("הדג נחש ושי צברי", "hadag nahash and shai tzabari");
     m.insert("כרמלה גרוס ואגנר", "carmela gross and agner");
     m.insert("ארקדי דוכין ומאיר בנאי", "arkadi duchin and meir banai");
-    m.insert("אריק איינשטיין ויוני רכטר", "arik einstein and yoni rechter");
-    m.insert("אריק איינשטיין ומיקי גבריאלוב", "arik einstein and miki gabrielov");
-    m.insert("אריק איינשטיין ושם טוב לוי", "arik einstein and shem tov levy");
-    m.insert("אריק איינשטיין ושם-טוב לוי", "arik einstein and shem tov levy");
+    m.insert(
+        "אריק איינשטיין ויוני רכטר",
+        "arik einstein and yoni rechter",
+    );
+    m.insert(
+        "אריק איינשטיין ומיקי גבריאלוב",
+        "arik einstein and miki gabrielov",
+    );
+    m.insert(
+        "אריק איינשטיין ושם טוב לוי",
+        "arik einstein and shem tov levy",
+    );
+    m.insert(
+        "אריק איינשטיין ושם-טוב לוי",
+        "arik einstein and shem tov levy",
+    );
     m.insert("אריק סיני", "arik sinai");
     m.insert("ארץעיר", "eretz ir");
     m.insert("אהוד בנאי והפליטים", "ehud banai vehaplitim");
@@ -704,30 +738,51 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("נערי רפול", "naarei raful");
     m.insert("חמי רודנר", "hami rodner");
     m.insert("חיים בצחוק", "chaim betzchok");
-    m.insert("דודו טסה מארח את ברי סחרוף", "dudu tassa mearach et berry sakharof");
+    m.insert(
+        "דודו טסה מארח את ברי סחרוף",
+        "dudu tassa mearach et berry sakharof",
+    );
     m.insert("טונה and אורטגה", "tuna and ortega");
     m.insert("טונה and בר צברי", "tuna and bar tzabari");
     m.insert("שלומי שבת וירון כהן", "shlomi shabat and yaron cohen");
     m.insert("שלומי שבת וליאור נרקיס", "shlomi shabat and lior narkis");
-    m.insert("שירי מימון ושמעון בוסקילה", "shiri maimon and shimon buskila");
+    m.insert(
+        "שירי מימון ושמעון בוסקילה",
+        "shiri maimon and shimon buskila",
+    );
     m.insert("משה פרץ ועומר אדם", "moshe peretz and omer adam");
     m.insert("שרית חדד וטיפקס", "sarit hadad and teapacks");
     m.insert("אייל גולן ואלין גולן", "eyal golan and alin golan");
     m.insert("אייל גולן וחיים ישראל", "eyal golan and chaim israel");
     m.insert("אייל גולן ומשה פרץ", "eyal golan and moshe peretz");
-    m.insert("אייל גולן ושלישיית מה קשור", "eyal golan and shlishiyat ma kashur");
+    m.insert(
+        "אייל גולן ושלישיית מה קשור",
+        "eyal golan and shlishiyat ma kashur",
+    );
     m.insert("לירן טל וישי לוי", "liran tal and yishai levy");
     // Final batch of missing pure Hebrew artists
     m.insert("'מלכים א' and מלכים ב", "melachim a umelachim b");
     m.insert("אדם", "adam");
-    m.insert("אריק איינשטיין ושלום חנוך", "arik einstein and shalom hanoch");
+    m.insert(
+        "אריק איינשטיין ושלום חנוך",
+        "arik einstein and shalom hanoch",
+    );
     m.insert("אריק איינשטיין, יוני רכטר", "arik einstein yoni rechter");
-    m.insert("אריק איינשטיין, יצחק קלפטר", "arik einstein yitzhak klepter");
-    m.insert("אריק אינשטיין", "arik einstein");  // alternate spelling
+    m.insert(
+        "אריק איינשטיין, יצחק קלפטר",
+        "arik einstein yitzhak klepter",
+    );
+    m.insert("אריק אינשטיין", "arik einstein"); // alternate spelling
     m.insert("גזוז", "gazoz");
-    m.insert("התזמורת האנדלוסית הישראלית אשדוד", "hatizmoret haandalusit ashdod");
+    m.insert(
+        "התזמורת האנדלוסית הישראלית אשדוד",
+        "hatizmoret haandalusit ashdod",
+    );
     m.insert("יובל רפאל", "yuval rafael");
-    m.insert("ישראל גוריון and אסף אמדורסקי", "israel gurion and asaf amdursky");
+    m.insert(
+        "ישראל גוריון and אסף אמדורסקי",
+        "israel gurion and asaf amdursky",
+    );
     m.insert("סטילה, חובי", "stella hovi");
     m.insert("סטילה, נס", "stella ness");
     m.insert("עומר אדם and משה פרץ", "omer adam and moshe peretz");
@@ -757,9 +812,7 @@ pub fn is_combining_mark(c: char) -> bool {
 /// e.g., "Beyoncé" → "beyonce", "naïve" → "naive"
 pub fn fold_to_ascii(s: &str) -> String {
     // First strip diacritics via NFKD decomposition
-    let stripped: String = s.nfkd()
-        .filter(|c| !is_combining_mark(*c))
-        .collect();
+    let stripped: String = s.nfkd().filter(|c| !is_combining_mark(*c)).collect();
     // Then transliterate any remaining non-ASCII (Cyrillic, Hebrew, CJK, etc.)
     any_ascii(&stripped).to_lowercase()
 }
@@ -767,25 +820,26 @@ pub fn fold_to_ascii(s: &str) -> String {
 /// Normalize punctuation by converting curly quotes to straight quotes and & to and.
 /// Also fixes common encoding issues and apostrophe spacing problems.
 pub fn normalize_punctuation(s: &str) -> String {
-    let result = s.replace(['\u{2018}', '\u{2019}'], "'")  // Left/right single curly quotes
-        .replace(['\u{201C}', '\u{201D}'], "\"")  // Left/right double curly quotes
-        .replace(['\u{00B4}', '\u{0060}'], "'")  // Acute accent and grave accent
+    let result = s
+        .replace(['\u{2018}', '\u{2019}'], "'") // Left/right single curly quotes
+        .replace(['\u{201C}', '\u{201D}'], "\"") // Left/right double curly quotes
+        .replace(['\u{00B4}', '\u{0060}'], "'") // Acute accent and grave accent
         .replace(" & ", " and ")
         // Fix encoding issues: ? often appears where ' should be (e.g., "Can?t" → "Can't")
-        .replace("?t ", "'t ")  // Can?t → Can't, Don?t → Don't, Won?t → Won't
-        .replace("?s ", "'s ")  // It?s → It's
-        .replace("?m ", "'m ")  // I?m → I'm
-        .replace("?ve ", "'ve ")  // I?ve → I've
-        .replace("?re ", "'re ")  // You?re → You're
-        .replace("?ll ", "'ll ")  // I?ll → I'll
+        .replace("?t ", "'t ") // Can?t → Can't, Don?t → Don't, Won?t → Won't
+        .replace("?s ", "'s ") // It?s → It's
+        .replace("?m ", "'m ") // I?m → I'm
+        .replace("?ve ", "'ve ") // I?ve → I've
+        .replace("?re ", "'re ") // You?re → You're
+        .replace("?ll ", "'ll ") // I?ll → I'll
         // Fix apostrophe spacing: "She s " → "She's "
-        .replace(" s ", "'s ")  // Common OCR/encoding error
-        .replace(" t ", "'t ")  // Won t → Won't
-        .replace(" m ", "'m ")  // I m → I'm
-        .replace(" ve ", "'ve ")  // I ve → I've
-        .replace(" re ", "'re ")  // You re → You're
-        .replace(" ll ", "'ll ");  // I ll → I'll
-    // Collapse multiple spaces into single space (e.g., "Peter Cetera  Amy Grant" → "Peter Cetera Amy Grant")
+        .replace(" s ", "'s ") // Common OCR/encoding error
+        .replace(" t ", "'t ") // Won t → Won't
+        .replace(" m ", "'m ") // I m → I'm
+        .replace(" ve ", "'ve ") // I ve → I've
+        .replace(" re ", "'re ") // You re → You're
+        .replace(" ll ", "'ll "); // I ll → I'll
+                                  // Collapse multiple spaces into single space (e.g., "Peter Cetera  Amy Grant" → "Peter Cetera Amy Grant")
     MULTI_SPACE.replace_all(&result, " ").to_string()
 }
 
@@ -1006,28 +1060,64 @@ mod tests {
     #[test]
     fn test_extract_primary_artist() {
         // Comma separator
-        assert_eq!(extract_primary_artist("mustard, migos"), Some("mustard".to_string()));
+        assert_eq!(
+            extract_primary_artist("mustard, migos"),
+            Some("mustard".to_string())
+        );
         // No separator - returns None
         assert_eq!(extract_primary_artist("beatles"), None);
         // Ampersand separator with "the" prefix stripped
-        assert_eq!(extract_primary_artist("the beatles & someone"), Some("beatles".to_string()));
+        assert_eq!(
+            extract_primary_artist("the beatles & someone"),
+            Some("beatles".to_string())
+        );
         // Slash separator
-        assert_eq!(extract_primary_artist("artist1/artist2"), Some("artist1".to_string()));
-        assert_eq!(extract_primary_artist("artist1 / artist2"), Some("artist1".to_string()));
+        assert_eq!(
+            extract_primary_artist("artist1/artist2"),
+            Some("artist1".to_string())
+        );
+        assert_eq!(
+            extract_primary_artist("artist1 / artist2"),
+            Some("artist1".to_string())
+        );
         // "x" separator (common in electronic music)
-        assert_eq!(extract_primary_artist("dj snake x lil jon"), Some("dj snake".to_string()));
+        assert_eq!(
+            extract_primary_artist("dj snake x lil jon"),
+            Some("dj snake".to_string())
+        );
         // "vs" separator
-        assert_eq!(extract_primary_artist("artist1 vs artist2"), Some("artist1".to_string()));
-        assert_eq!(extract_primary_artist("artist1 vs. artist2"), Some("artist1".to_string()));
+        assert_eq!(
+            extract_primary_artist("artist1 vs artist2"),
+            Some("artist1".to_string())
+        );
+        assert_eq!(
+            extract_primary_artist("artist1 vs. artist2"),
+            Some("artist1".to_string())
+        );
         // "and" separator
-        assert_eq!(extract_primary_artist("hall and oates"), Some("hall".to_string()));
+        assert_eq!(
+            extract_primary_artist("hall and oates"),
+            Some("hall".to_string())
+        );
         // "feat" / "ft" separator
-        assert_eq!(extract_primary_artist("drake feat rihanna"), Some("drake".to_string()));
-        assert_eq!(extract_primary_artist("drake ft. rihanna"), Some("drake".to_string()));
+        assert_eq!(
+            extract_primary_artist("drake feat rihanna"),
+            Some("drake".to_string())
+        );
+        assert_eq!(
+            extract_primary_artist("drake ft. rihanna"),
+            Some("drake".to_string())
+        );
         // Multiple separators - should take first
-        assert_eq!(extract_primary_artist("artist1, artist2 & artist3"), Some("artist1".to_string()));
+        assert_eq!(
+            extract_primary_artist("artist1, artist2 & artist3"),
+            Some("artist1".to_string())
+        );
         // Plus separator
-        assert_eq!(extract_primary_artist("artist1+artist2"), Some("artist1".to_string()));
+        assert_eq!(
+            extract_primary_artist("artist1+artist2"),
+            Some("artist1".to_string())
+        );
     }
 
     #[test]
@@ -1080,7 +1170,10 @@ mod tests {
     fn test_normalize_title_track_artist_format() {
         // Track number with dot is stripped, leaving "Artist - Song" which isn't further processed
         // This is expected - the "Artist - Title" embedded case needs normalize_title_with_artist
-        assert_eq!(normalize_title("117.Artist Name - Actual Song"), "artist name - actual song");
+        assert_eq!(
+            normalize_title("117.Artist Name - Actual Song"),
+            "artist name - actual song"
+        );
 
         // But with artist context, the artist prefix can be stripped
         assert_eq!(
@@ -1096,8 +1189,14 @@ mod tests {
         // 2. Be splittable via extract_primary_artist (for fallback matching)
 
         // Hebrew ו prefix transliterated as "and"
-        assert_eq!(normalize_artist("אייל גולן ומשה פרץ"), "eyal golan and moshe peretz");
-        assert_eq!(normalize_artist("הדס קליינמן ואביב בכר"), "hadas kleinman and aviv bachar");
+        assert_eq!(
+            normalize_artist("אייל גולן ומשה פרץ"),
+            "eyal golan and moshe peretz"
+        );
+        assert_eq!(
+            normalize_artist("הדס קליינמן ואביב בכר"),
+            "hadas kleinman and aviv bachar"
+        );
 
         // extract_primary_artist handles "and" for fallback matching
         assert_eq!(
@@ -1110,7 +1209,10 @@ mod tests {
         );
 
         // Spotify "&" becomes "and" via normalize_punctuation, enabling match
-        assert_eq!(normalize_punctuation("Eyal Golan & Moshe Peretz"), "Eyal Golan and Moshe Peretz");
+        assert_eq!(
+            normalize_punctuation("Eyal Golan & Moshe Peretz"),
+            "Eyal Golan and Moshe Peretz"
+        );
     }
 
     #[test]
@@ -1123,7 +1225,7 @@ mod tests {
 
         // Test artists that rely on any_ascii (no dictionary entry needed)
         // These were removed as redundant since they fuzzy-match anyway
-        assert_eq!(normalize_artist("Тату"), "tatu");  // any_ascii produces correct output
+        assert_eq!(normalize_artist("Тату"), "tatu"); // any_ascii produces correct output
         assert_eq!(normalize_artist("Витас"), "vitas"); // any_ascii produces correct output
 
         // Collaborations use "and" (converted from "&")

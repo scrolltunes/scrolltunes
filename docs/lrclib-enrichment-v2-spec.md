@@ -11,10 +11,12 @@
 
 | Metric | Baseline | Previous | **Current** | Target |
 |--------|----------|----------|-------------|--------|
-| Match rate | 46.4% | 57.5% | **71.6%** | 65-72% ✓ |
-| Unique groups | 4.1M | 3.84M | 3.79M | — |
+| Match rate (pre-dedup) | 46.4% | 57.5% | 71.6% | 65-72% ✓ |
+| **Match rate (post-dedup)** | — | — | **68.7%** | — |
+| Output tracks | 4.1M | 3.84M | **3.43M** | — |
+| Unique Spotify matches | — | — | **2.36M** | — |
 | Extraction time | 45 min | 48 min | **~44 min** | — |
-| Output size | — | 1.1 GB | **~980 MB** | — |
+| Output size | — | 1.1 GB | **~850 MB** | — |
 
 ### Match Rate by Phase
 
@@ -24,8 +26,12 @@
 | MAIN (primary-artist fallback) | 63.0% | +181,473 | +4.8% |
 | RESCUE (title-first) | 64.5% | +56,266 | +1.5% |
 | FUZZY (Levenshtein ≥0.85) | 68.5% | +151,027 | +4.0% |
-| POP0 (popularity=0 tracks) | 68.3% | +119,438 | +3.2% |
-| **Final (after scoring)** | **71.6%** | **2,711,390** | — |
+| POP0 (popularity=0 tracks) | 71.6% | +119,438 | +3.2% |
+| After scoring | 71.6% | 2,711,390 | — |
+| **DEDUP (unique spotify_id)** | **68.7%** | **2,360,784** | -350,606 |
+
+> Note: DEDUP removes duplicate spotify_id entries (fuzzy matches to same track).
+> Final output: 3.43M tracks (2.36M matched + 1.07M unmatched).
 
 ### Timing Breakdown
 
@@ -72,7 +78,7 @@
 normalize-spotify (one-time, ~15 min)
     └─ Creates spotify_normalized.sqlite3 (54M keys, pop≥1)
 
-lrclib-extract (~48 min)
+lrclib-extract (~44 min)
     ├─ READ: Load LRCLIB (12.2M → 10.0M filtered tracks)
     ├─ GROUP: Deduplicate by (title_norm, artist_norm) → 3.79M groups
     ├─ MATCH: Indexed lookup + primary-artist fallback → 63.0% (2.38M)
@@ -80,9 +86,10 @@ lrclib-extract (~48 min)
     ├─ RESCUE: Title-first rescue for no_candidates → 64.5% (+56K)
     ├─ FUZZY: Levenshtein similarity ≥0.85 → 68.5% (+151K)
     ├─ POP0: Streaming scan 284M pop=0 tracks → 71.6% (+119K)
-    ├─ SCORE: Select best candidate per group → 71.6% (2.71M)
+    ├─ SCORE: Select best candidate per group
     ├─ ENRICH: Batch-load audio features + album images
-    └─ WRITE: Output tracks + FTS index + failure logs
+    ├─ DEDUP: Remove duplicate spotify_id entries → 2.36M unique matches
+    └─ WRITE: Output tracks + FTS index
 ```
 
 ### New Matching Phases (v2)
@@ -105,6 +112,13 @@ lrclib-extract (~48 min)
 - Searches 284M tracks with popularity=0 (excluded from main index for size)
 - Streams all rows with title pre-filter index for efficiency
 - Impact: +119K matches (+3.2%), ~29 min runtime
+
+**DEDUP (Spotify ID Deduplication):**
+- Multiple LRCLIB groups can match the same Spotify track via fuzzy matching
+- Example: "Nothing Else Matters", "Nothing Else Matte", "Nothing Else Matter" → same Spotify ID
+- Keeps only the highest quality LRCLIB entry per spotify_id
+- Prevents duplicate/typo variants appearing in search results
+- Impact: Removes ~350K duplicate rows (2.71M → 2.36M unique matches)
 
 ### Database Files
 
@@ -702,6 +716,54 @@ if count % 500_000 == 0 {
 4. **Collecting all rows into memory** - Stream and process
 5. **Random key iteration for writes** - Sort for B-tree locality
 6. **String allocation in hot loops** - Intern or use references
+
+---
+
+## Code Structure
+
+The `lrclib-extract` crate is organized into modules:
+
+```
+scripts/lrclib-extract/src/
+├── lib.rs              # Library exports
+├── main.rs             # CLI and orchestration (~4300 lines)
+├── models.rs           # Core data structures
+│   ├── Track, ScoredTrack, LrclibGroup, LrclibVariant
+│   ├── SpotifyTrack, SpotifyCandidate, AudioFeatures
+│   ├── EnrichedTrack (final output)
+│   ├── MatchConfidence, FailureReason
+│   ├── MatchingStats (instrumentation)
+│   └── StringInterner (memory optimization)
+├── scoring.rs          # Scoring functions
+│   ├── combined_score() - Main scoring with multi-artist verification
+│   ├── duration_score() - Graduated duration scoring
+│   ├── compute_quality_score() - LRCLIB quality scoring
+│   ├── score_artist_multi() - Multi-artist matching (spec-03)
+│   ├── classify_album() - Album type classification
+│   └── Pattern matchers (live/remix, garbage titles)
+├── normalize.rs        # Normalization functions
+│   ├── normalize_title(), normalize_artist()
+│   ├── extract_primary_artist()
+│   └── Artist transliteration dictionaries (Hebrew, Russian)
+├── safety.rs           # Safety validations
+│   └── validate_output_path() - Prevent overwriting source DBs
+└── bin/
+    ├── normalize-spotify.rs  # Pre-normalized index builder
+    ├── analyze_failures.rs   # Failure analysis tool
+    └── simulate.rs           # Match simulation
+```
+
+### Key Functions in main.rs
+
+| Function | Purpose |
+|----------|---------|
+| `match_lrclib_to_spotify_normalized` | Main indexed matching phase |
+| `title_first_rescue` | Rescue pass for no_candidates groups |
+| `fuzzy_title_rescue` | Levenshtein fuzzy matching |
+| `match_pop0_fallback` | Pop=0 streaming fallback |
+| `select_canonical_and_enrich` | Select best variant + enrich |
+| `deduplicate_by_spotify_id` | Remove duplicate Spotify matches |
+| `write_enriched_output` | Batched output writing |
 
 ---
 

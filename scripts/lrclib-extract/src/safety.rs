@@ -3,8 +3,8 @@
 //! These checks help prevent catastrophic data loss by validating that
 //! output files are not source databases before deletion.
 
-use std::path::Path;
 use anyhow::{bail, Result};
+use std::path::Path;
 
 /// Validates that an output path is safe to overwrite.
 ///
@@ -25,10 +25,7 @@ pub fn validate_output_path(
     required_pattern: &str,
     source_paths: &[&Path],
 ) -> Result<()> {
-    let output_name = output
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+    let output_name = output.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
     // Check that output contains the required pattern
     if !output_name.contains(required_pattern) {
@@ -90,7 +87,10 @@ mod tests {
         let source = PathBuf::from("/data/source.sqlite3");
         let result = validate_output_path(&output, "enriched", &[&source]);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("must contain 'enriched'"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("must contain 'enriched'"));
     }
 
     #[test]
@@ -98,7 +98,10 @@ mod tests {
         let path = PathBuf::from("/data/lrclib-enriched.sqlite3");
         let result = validate_output_path(&path, "enriched", &[&path]);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("cannot be the same as source"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("cannot be the same as source"));
     }
 
     #[test]

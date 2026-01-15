@@ -25,16 +25,20 @@ fn levenshtein(a: &str, b: &str) -> usize {
 
     let mut matrix = vec![vec![0usize; b_len + 1]; a_len + 1];
 
-    for i in 0..=a_len {
-        matrix[i][0] = i;
+    for (i, row) in matrix.iter_mut().enumerate() {
+        row[0] = i;
     }
-    for j in 0..=b_len {
-        matrix[0][j] = j;
+    for (j, cell) in matrix[0].iter_mut().enumerate() {
+        *cell = j;
     }
 
     for i in 1..=a_len {
         for j in 1..=b_len {
-            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
             matrix[i][j] = (matrix[i - 1][j] + 1)
                 .min(matrix[i][j - 1] + 1)
                 .min(matrix[i - 1][j - 1] + cost);
@@ -120,14 +124,17 @@ fn main() -> Result<()> {
 
     // Regex patterns (compiled once)
     let suffix_re = regex::Regex::new(r"(?i)\s*[\(\[].*?(remix|version|edit|remaster|live|mix|stereo|mono|radio|explicit|clean|deluxe).*?[\)\]]?\s*$").unwrap();
-    let suffix_dash_re = regex::Regex::new(r"(?i)\s*-\s*(remix|version|remaster|live|edit).*$").unwrap();
+    let suffix_dash_re =
+        regex::Regex::new(r"(?i)\s*-\s*(remix|version|remaster|live|edit).*$").unwrap();
     let track_num_re = regex::Regex::new(r"^\d+[\.\-\s]+").unwrap();
 
     unmatched.par_iter().for_each(|(title_norm, artist_norm)| {
         // Strategy 1: Strip suffixes
         let stripped = suffix_re.replace(title_norm, "");
         let stripped = suffix_dash_re.replace(&stripped, "");
-        if stripped != *title_norm && exact_set.contains(&(stripped.to_string(), artist_norm.clone())) {
+        if stripped != *title_norm
+            && exact_set.contains(&(stripped.to_string(), artist_norm.clone()))
+        {
             suffix_strip.fetch_add(1, Ordering::Relaxed);
             return;
         }
@@ -144,7 +151,8 @@ fn main() -> Result<()> {
             .next()
             .unwrap_or(artist_norm)
             .trim();
-        if primary != artist_norm && exact_set.contains(&(title_norm.clone(), primary.to_string())) {
+        if primary != artist_norm && exact_set.contains(&(title_norm.clone(), primary.to_string()))
+        {
             artist_primary.fetch_add(1, Ordering::Relaxed);
             return;
         }
@@ -160,7 +168,9 @@ fn main() -> Result<()> {
 
         // Strategy 4: Track number stripping
         let no_track = track_num_re.replace(title_norm, "");
-        if no_track != *title_norm && exact_set.contains(&(no_track.to_string(), artist_norm.clone())) {
+        if no_track != *title_norm
+            && exact_set.contains(&(no_track.to_string(), artist_norm.clone()))
+        {
             track_num.fetch_add(1, Ordering::Relaxed);
             return;
         }
@@ -210,18 +220,62 @@ fn main() -> Result<()> {
 
     println!("Strategy              Count     %      Extrapolated");
     println!("─────────────────────────────────────────────────────");
-    println!("Suffix stripping      {:>6}  {:>5.1}%   ~{:>9}", ss, 100.0 * ss as f64 / total as f64, (1466013.0 * ss as f64 / total as f64) as i64);
-    println!("Primary artist        {:>6}  {:>5.1}%   ~{:>9}", ap, 100.0 * ap as f64 / total as f64, (1466013.0 * ap as f64 / total as f64) as i64);
-    println!("The prefix            {:>6}  {:>5.1}%   ~{:>9}", tp, 100.0 * tp as f64 / total as f64, (1466013.0 * tp as f64 / total as f64) as i64);
-    println!("Track number strip    {:>6}  {:>5.1}%   ~{:>9}", tn, 100.0 * tn as f64 / total as f64, (1466013.0 * tn as f64 / total as f64) as i64);
-    println!("Fuzzy ≥95%            {:>6}  {:>5.1}%   ~{:>9}", f95, 100.0 * f95 as f64 / total as f64, (1466013.0 * f95 as f64 / total as f64) as i64);
-    println!("Fuzzy 90-95%          {:>6}  {:>5.1}%   ~{:>9}", f90, 100.0 * f90 as f64 / total as f64, (1466013.0 * f90 as f64 / total as f64) as i64);
-    println!("Fuzzy 85-90%          {:>6}  {:>5.1}%   ~{:>9}", f85, 100.0 * f85 as f64 / total as f64, (1466013.0 * f85 as f64 / total as f64) as i64);
+    println!(
+        "Suffix stripping      {:>6}  {:>5.1}%   ~{:>9}",
+        ss,
+        100.0 * ss as f64 / total as f64,
+        (1466013.0 * ss as f64 / total as f64) as i64
+    );
+    println!(
+        "Primary artist        {:>6}  {:>5.1}%   ~{:>9}",
+        ap,
+        100.0 * ap as f64 / total as f64,
+        (1466013.0 * ap as f64 / total as f64) as i64
+    );
+    println!(
+        "The prefix            {:>6}  {:>5.1}%   ~{:>9}",
+        tp,
+        100.0 * tp as f64 / total as f64,
+        (1466013.0 * tp as f64 / total as f64) as i64
+    );
+    println!(
+        "Track number strip    {:>6}  {:>5.1}%   ~{:>9}",
+        tn,
+        100.0 * tn as f64 / total as f64,
+        (1466013.0 * tn as f64 / total as f64) as i64
+    );
+    println!(
+        "Fuzzy ≥95%            {:>6}  {:>5.1}%   ~{:>9}",
+        f95,
+        100.0 * f95 as f64 / total as f64,
+        (1466013.0 * f95 as f64 / total as f64) as i64
+    );
+    println!(
+        "Fuzzy 90-95%          {:>6}  {:>5.1}%   ~{:>9}",
+        f90,
+        100.0 * f90 as f64 / total as f64,
+        (1466013.0 * f90 as f64 / total as f64) as i64
+    );
+    println!(
+        "Fuzzy 85-90%          {:>6}  {:>5.1}%   ~{:>9}",
+        f85,
+        100.0 * f85 as f64 / total as f64,
+        (1466013.0 * f85 as f64 / total as f64) as i64
+    );
     println!("─────────────────────────────────────────────────────");
 
     let recoverable = ss + ap + tp + tn + f95 + f90 + f85;
-    println!("TOTAL RECOVERABLE     {:>6}  {:>5.1}%   ~{:>9}", recoverable, 100.0 * recoverable as f64 / total as f64, (1466013.0 * recoverable as f64 / total as f64) as i64);
-    println!("Not recoverable       {:>6}  {:>5.1}%", nf, 100.0 * nf as f64 / total as f64);
+    println!(
+        "TOTAL RECOVERABLE     {:>6}  {:>5.1}%   ~{:>9}",
+        recoverable,
+        100.0 * recoverable as f64 / total as f64,
+        (1466013.0 * recoverable as f64 / total as f64) as i64
+    );
+    println!(
+        "Not recoverable       {:>6}  {:>5.1}%",
+        nf,
+        100.0 * nf as f64 / total as f64
+    );
     println!();
     println!("Elapsed: {:.2}s", elapsed.as_secs_f64());
 
