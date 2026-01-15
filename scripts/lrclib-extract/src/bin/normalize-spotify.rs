@@ -192,8 +192,36 @@ fn main() -> Result<()> {
 
     let start = Instant::now();
 
+    // Safety check: prevent accidentally deleting source databases
+    // Output file MUST contain "normalized" and MUST NOT match source patterns
+    let output_path = std::path::Path::new(output_db);
+    let output_name = output_path.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+
+    if !output_name.contains("normalized") {
+        anyhow::bail!(
+            "Safety check failed: output file '{}' must contain 'normalized' in the name",
+            output_db
+        );
+    }
+
+    if output_name.contains("spotify_clean") && !output_name.contains("normalized") {
+        anyhow::bail!(
+            "Safety check failed: refusing to overwrite source database pattern '{}'",
+            output_db
+        );
+    }
+
+    if output_db == spotify_db {
+        anyhow::bail!(
+            "Safety check failed: output '{}' cannot be the same as input '{}'",
+            output_db, spotify_db
+        );
+    }
+
     // Remove existing output file to avoid corruption from previous runs
-    if std::path::Path::new(output_db).exists() {
+    if output_path.exists() {
         println!("Removing existing output file: {:?}", output_db);
         std::fs::remove_file(output_db)?;
     }
