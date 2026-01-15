@@ -1,20 +1,47 @@
 # LRCLIB-Spotify Enrichment v2 Specification
 
-> Improving Spotify match rate through normalization, transliteration, and language-aware matching
+> Improving Spotify match rate through normalization, transliteration, fuzzy matching, and multi-pass rescue strategies
 
-**Last Updated:** January 2026
-**Status:** Implemented (57.5% match rate achieved)
+**Last Updated:** January 15, 2026
+**Status:** Complete (71.6% match rate achieved, exceeds target)
 
 ---
 
 ## Current Results
 
-| Metric | Baseline | Current | Target |
-|--------|----------|---------|--------|
-| Match rate | 46.4% | **57.5%** | 65-72% |
-| Unique groups | 4.1M | 3.84M | — |
-| Extraction time | 45 min | **48 min** | 25-30 min |
-| Output size | — | 1.1 GB | — |
+| Metric | Baseline | Previous | **Current** | Target |
+|--------|----------|----------|-------------|--------|
+| Match rate | 46.4% | 57.5% | **71.6%** | 65-72% ✓ |
+| Unique groups | 4.1M | 3.84M | 3.79M | — |
+| Extraction time | 45 min | 48 min | **48 min** | — |
+| Output size | — | 1.1 GB | **1.08 GB** | — |
+
+### Match Rate by Phase
+
+| Phase | Rate | Matches | Added |
+|-------|------|---------|-------|
+| MAIN (exact match) | 58.2% | 2,203,178 | — |
+| MAIN (primary-artist fallback) | 63.0% | +181,473 | +4.8% |
+| RESCUE (title-first) | 64.5% | +56,266 | +1.5% |
+| FUZZY (Levenshtein ≥0.85) | 68.5% | +151,027 | +4.0% |
+| POP0 (popularity=0 tracks) | 68.3% | +119,438 | +3.2% |
+| **Final (after scoring)** | **71.6%** | **2,711,382** | — |
+
+### Timing Breakdown
+
+| Phase | Time | Details |
+|-------|------|---------|
+| READ | 1.9m | Load 12.2M → 10.0M filtered tracks |
+| GROUP | 1.6m | Parallel normalization (1.5m) + string interning (4.8s) |
+| MATCH | 5.1m | Indexed lookup → 63.0% (2.46M candidates) |
+| FETCH | 2.6m | Load 2.78M track details |
+| RESCUE | 1.8m | Title-first rescue → 64.5% (+56K) |
+| FUZZY | 3.1m | Streaming (1.9m) + Levenshtein (55s) → 68.5% (+151K) |
+| POP0 | 29.1m | Stream 284M pop=0 rows → +119K matches |
+| AUDIO/IMAGES | ~1m | Load BPM, key, album art |
+| WRITE | 1.0m | Write 3.79M tracks + failures |
+| FTS + OPTIMIZE | 12.6s | Build full-text search index |
+| **Total** | **~48 min** | |
 
 ### Improvements Implemented
 
@@ -23,12 +50,18 @@
 | Pre-normalized Spotify index | 4x faster extraction |
 | Track number stripping | +1-2% |
 | "The" prefix/suffix handling | +0.4% |
-| Primary-artist fallback | +2.9% |
+| Primary-artist fallback | +4.8% (~181K matches) |
 | `any_ascii` transliteration | +1.4% |
-| Pop=0 fallback | +4.1% (~157K matches) |
-| Hebrew/Russian artist aliases | ~150 hand-crafted mappings (cleaned) |
+| **Title-first rescue (NEW)** | +1.5% (~56K matches) |
+| **Fuzzy title matching (NEW)** | +4.0% (~151K matches) |
+| **Pop=0 fallback (NEW)** | +3.2% (~119K matches) |
+| Hebrew/Russian artist aliases | ~150 hand-crafted mappings |
 | Batched INSERTs | 10x faster writes |
 | normalize-spotify optimization | 6x faster (90 min → 15 min) |
+| Parallel GROUP normalization | Uses rayon for 10M tracks |
+| String interning | Saves ~8.6M allocations |
+| FUZZY streaming approach | Reads 54M pairs once vs batch queries |
+| POP0 title-only pre-filter | Skips 75% of artist normalizations |
 
 ---
 
@@ -41,14 +74,39 @@ normalize-spotify (one-time, ~15 min)
     └─ Creates spotify_normalized.sqlite3 (54M keys, 56M rows)
 
 lrclib-extract (~48 min)
-    ├─ Read LRCLIB (12.2M → 10M valid tracks)
-    ├─ Group by (title_norm, artist_norm) → 3.8M groups
-    ├─ Match via indexed lookup + primary-artist fallback → 2.4M matches (53%)
-    ├─ Pop=0 fallback for unmatched (283M tracks) → +157K matches
-    ├─ Score and select canonical → 2.2M Spotify matches (57.5%)
-    ├─ Batch-load audio features + album images
-    └─ Write tracks + FTS index + failure logs
+    ├─ READ: Load LRCLIB (12.2M → 10.0M filtered tracks)
+    ├─ GROUP: Deduplicate by (title_norm, artist_norm) → 3.79M groups
+    ├─ MATCH: Indexed lookup + primary-artist fallback → 63.0% (2.38M)
+    ├─ FETCH: Load track details for candidates (2.78M)
+    ├─ RESCUE: Title-first rescue for no_candidates → 64.5% (+56K)
+    ├─ FUZZY: Levenshtein similarity ≥0.85 → 68.5% (+151K)
+    ├─ POP0: Stream 284M popularity=0 tracks → 68.3% (+119K)
+    ├─ SCORE: Select best candidate per group → 71.6% (2.71M)
+    ├─ ENRICH: Batch-load audio features + album images
+    └─ WRITE: Output tracks + FTS index + failure logs
 ```
+
+### New Matching Phases (v2)
+
+**RESCUE (Title-First):**
+- For groups with `no_candidates`, search by title only
+- Verifies artist similarity ≥0.6 (normalized Jaccard)
+- Skips common titles ("Love", "Home") to avoid false positives
+- Impact: +56K matches (+1.5%)
+
+**FUZZY (Levenshtein):**
+- For remaining unmatched where artist exists in Spotify
+- Streams all 54M (artist, title) pairs, filters to matching artists
+- Computes Levenshtein similarity between LRCLIB and Spotify titles
+- Accepts matches with similarity ≥0.85
+- Parallel computation using rayon
+- Impact: +151K matches (+4.0%)
+
+**POP0 (Popularity Zero):**
+- Searches 284M tracks with popularity=0 (excluded from main index)
+- Uses title-only pre-filter HashSet (859K unique titles)
+- Only normalizes artist for rows where title matches
+- Impact: +119K matches (+3.2%)
 
 ### Database Files
 
@@ -164,12 +222,15 @@ ARTIST_TRANSLITERATIONS.insert("עומר אדם", "omer adam");
 
 ## Match Failure Analysis
 
-### Failure Distribution
+### Failure Distribution (After All Phases)
 
 | Reason | Count | % |
 |--------|-------|---|
-| `no_candidates` | ~1M | 74% |
-| `all_rejected` | ~270K | 26% |
+| `no_candidates` | 645,487 | 60% |
+| `all_rejected` | 58,462 | 5% |
+| **Total unmatched** | **1,074,128** | **28.4%** |
+
+**Improvement:** Failures reduced from ~1.6M (42.5%) to ~1.07M (28.4%)
 
 ### Common Failure Patterns
 
@@ -266,20 +327,18 @@ Expected match: "avraham" or "abraham"
 
 **Gap:** ~30K entries with reversed or reordered artist credits.
 
-### 5. Spelling Variants and Typos
+### 5. Spelling Variants and Typos ✓ ADDRESSED
 
-**Problem:** No fuzzy matching implemented.
+**Problem:** ~~No fuzzy matching implemented.~~ **Now implemented via FUZZY phase.**
 
-**Examples:**
+**Examples now matched:**
 ```
-LRCLIB: "Everythig But The Girl" (typo)
-Spotify: "Everything but the Girl"
-
-LRCLIB: "Guns 'n' Roses"
-Spotify: "Guns N' Roses"
+LRCLIB: "Enter Sand Man" → Spotify: "Enter Sandman" (Metallica)
+LRCLIB: "Nothing Else Matte" → Spotify: "Nothing Else Matters" (Metallica)
+LRCLIB: "BIRDS OF A FEATHE" → Spotify: "BIRDS OF A FEATHER" (Billie Eilish)
 ```
 
-**Gap:** ~50K entries with minor spelling differences.
+**Remaining gap:** ~20K entries with <85% similarity or artist mismatch.
 
 ### 6. Metadata in Titles
 
@@ -300,19 +359,25 @@ Ask Me Why.flac            | ask me why.flac (extension not stripped)
 
 ---
 
-## Impractical Improvements
+## Previously "Impractical" Improvements - Now Implemented
 
-These improvements were evaluated and deemed not worth pursuing given effort vs impact.
+### 1. Fuzzy String Matching ✓ IMPLEMENTED
 
-### 1. Fuzzy String Matching
+**Previous assessment:** "Impractical - quadratic complexity"
 
-**Why impractical:**
-- Levenshtein distance over 3.8M × 54M comparisons = quadratic complexity
-- Even with indexing (BK-trees, SimHash), false positive rate unacceptable
-- Would need human review for borderline cases
+**Actual implementation:**
+- Stream-based approach: Read 54M pairs once, filter in memory
+- Only compare titles for artists that exist in both databases
+- Parallel Levenshtein computation using rayon (55 seconds for 1.3M comparisons)
+- Threshold ≥0.85 similarity keeps false positive rate low
 
-**Estimated effort:** Months of engineering, ongoing curation
-**Estimated gain:** +2-3%
+**Actual effort:** 1 day of engineering
+**Actual gain:** +4.0% (+151K matches)
+
+**Key insight:** The quadratic complexity fear was unfounded because:
+1. Artist pre-filtering reduces comparisons from 3.8M × 54M to ~1.3M × ~500 avg
+2. Streaming approach avoids memory issues
+3. Parallel computation makes it tractable
 
 ### 2. ICU Transliteration for Hebrew
 
@@ -372,23 +437,27 @@ These improvements were evaluated and deemed not worth pursuing given effort vs 
 
 ## Recommendations
 
-### Short-Term (Achievable)
+### Completed ✓
+
+1. ~~**Implement fuzzy title matching**~~ → +4.0% (+151K matches)
+2. ~~**Title-first rescue pass**~~ → +1.5% (+56K matches)
+3. ~~**Pop=0 fallback search**~~ → +3.2% (+119K matches)
+4. ~~**Parallel GROUP normalization**~~ → 1.5m (was sequential)
+5. ~~**Streaming FUZZY approach**~~ → Avoids memory issues with 54M pairs
+
+### Potential Future Improvements (Diminishing Returns)
 
 1. **Expand artist alias dictionary** - Add more Hebrew/Russian/Arabic artists as encountered
-2. **Loosen duration threshold for exact matches** - Allow 45s for perfect title+artist
-3. **Add more title normalization patterns** - Handle emerging metadata formats
+2. **Loosen duration threshold** - Currently 30s max, could allow 45s for perfect matches
+3. **Phonetic indexing** - Soundex/Metaphone for English typo tolerance (~50K potential)
+4. **ISRC-based matching** - Where available in LRCLIB metadata
+5. **Language-specific romanization** - CJK scripts (~100K potential, high effort)
 
-### Medium-Term (Moderate Effort)
+### Not Recommended
 
-1. **Build language-specific indexes** - Pre-filter by detected script for faster matching
-2. **Implement phonetic indexing** - Soundex/Metaphone for English typo tolerance
-3. **Add ISRC-based matching** - Where available in LRCLIB metadata
-
-### Long-Term (Significant Investment)
-
-1. **Community contribution system** - Allow users to submit/validate matches
-2. **Incremental updates** - Process only new LRCLIB entries instead of full rebuilds
-3. **Alternative data sources** - MusicBrainz, Discogs for additional metadata
+1. **Lower fuzzy threshold below 0.85** - False positive rate increases significantly
+2. **Further POP0 optimization** - 29 min is acceptable, limited by I/O
+3. **Machine learning matching** - Effort/maintenance outweighs ~5% potential gain
 
 ---
 
@@ -621,7 +690,9 @@ if count % 500_000 == 0 {
 | `rusqlite` | SQLite bindings with `bundled` feature |
 | `any_ascii` | Fast Unicode → ASCII transliteration |
 | `unicode-normalization` | NFKD decomposition |
-| `rayon` | Parallel iterators (not used here due to SQLite single-writer) |
+| `rayon` | Parallel iterators (GROUP normalization, FUZZY Levenshtein) |
+| `strsim` | Levenshtein similarity for fuzzy title matching |
+| `rustc-hash` | FxHashMap/FxHashSet for faster hashing |
 | `indicatif` | Progress bars (alternative to manual logging) |
 
 ---
@@ -686,6 +757,53 @@ WHERE lrclib_artist_norm GLOB '*[а-я]*' LIMIT 50;
 
 ---
 
+## Database Verification (January 15, 2026)
+
+### Summary
+
+| Check | Result |
+|-------|--------|
+| Total tracks | 3,785,510 |
+| Spotify matches | 2,711,382 (71.6%) |
+| Unmatched | 1,074,128 (28.4%) |
+| With album art | 2,707,401 (99.8% of matched) |
+| With tempo/BPM | 2,700,246 |
+| Database integrity | OK |
+| File size | 1.08 GB |
+
+### Failure Breakdown
+
+| Reason | Count |
+|--------|-------|
+| `no_candidates` | 645,487 |
+| `all_rejected` | 58,462 |
+
+### Popularity Distribution (Matched Tracks)
+
+| Range | Count |
+|-------|-------|
+| High (≥80) | 4,489 |
+| Medium (50-79) | 220,526 |
+| Low (<50) | 2,486,367 |
+
+### FTS Search Verification
+
+```sql
+-- Bohemian Rhapsody: Queen (pop 81)
+-- Metallica: Enter Sandman (pop 81), Nothing Else Matters (pop 80)
+-- Taylor Swift: Cruel Summer (pop 89)
+-- Daft Punk: Starboy (pop 89, tempo 186)
+```
+
+### Sample Unmatched (High Quality)
+
+Remaining unmatched tracks are mostly:
+- Non-Latin characters (Chinese 馮曦妤, Japanese エリック・クラプトン, Thai คาราบาว)
+- Non-standard artist separators (`;`, `/`, `&` variations)
+- Obscure artists not in Spotify catalog
+
+---
+
 ## Appendix: Output Schema
 
 ```sql
@@ -710,15 +828,20 @@ CREATE TABLE tracks (
 );
 
 CREATE TABLE match_failures (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     lrclib_id INTEGER NOT NULL,
     lrclib_title TEXT NOT NULL,
     lrclib_artist TEXT NOT NULL,
+    lrclib_album TEXT,
+    lrclib_duration_sec INTEGER NOT NULL,
     lrclib_title_norm TEXT NOT NULL,
     lrclib_artist_norm TEXT NOT NULL,
     lrclib_quality INTEGER NOT NULL,
+    group_variant_count INTEGER NOT NULL,
     failure_reason TEXT NOT NULL,  -- 'no_candidates', 'all_rejected'
-    spotify_candidates TEXT        -- JSON array of top candidates
+    best_score INTEGER,
+    spotify_candidates TEXT,       -- JSON array of top 5 candidates
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE VIRTUAL TABLE tracks_fts USING fts5(

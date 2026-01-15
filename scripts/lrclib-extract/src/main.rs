@@ -7,16 +7,67 @@ use lrclib_extract::safety::validate_output_path;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Serialize;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 use strsim::normalized_levenshtein;
 
 use normalize::{
     normalize_title, normalize_title_with_artist, normalize_artist, extract_primary_artist,
 };
+
+// ============================================================================
+// String Interning for Memory Optimization
+// ============================================================================
+
+/// String interner for deduplicating normalized strings during grouping.
+/// Reduces memory usage when many tracks share the same artist/title.
+/// Similar to normalize-spotify optimization that saved 40M allocations.
+struct StringInterner {
+    strings: FxHashMap<Arc<str>, Arc<str>>,
+}
+
+impl StringInterner {
+    fn new() -> Self {
+        Self {
+            strings: FxHashMap::default(),
+        }
+    }
+
+    /// Intern a string, returning a shared reference to the deduplicated version.
+    fn intern(&mut self, s: String) -> Arc<str> {
+        if let Some(existing) = self.strings.get(s.as_str()) {
+            Arc::clone(existing)
+        } else {
+            let arc: Arc<str> = Arc::from(s);
+            self.strings.insert(Arc::clone(&arc), Arc::clone(&arc));
+            arc
+        }
+    }
+
+    /// Number of unique strings interned.
+    fn len(&self) -> usize {
+        self.strings.len()
+    }
+}
+
+// ============================================================================
+// Timing Helper
+// ============================================================================
+
+/// Format duration in human-readable format
+fn format_duration(d: std::time::Duration) -> String {
+    let secs = d.as_secs_f64();
+    if secs < 60.0 {
+        format!("{:.1}s", secs)
+    } else {
+        let mins = secs / 60.0;
+        format!("{:.1}m", mins)
+    }
+}
 
 /// Extract deduplicated LRCLIB search index with optional Spotify enrichment.
 ///
@@ -69,7 +120,8 @@ struct Args {
     export_stats: Option<PathBuf>,
 }
 
-const WRITE_BATCH_SIZE: usize = 10_000;
+#[allow(dead_code)]
+const WRITE_BATCH_SIZE: usize = 10_000;  // Legacy, replaced by ENRICHED_BATCH_SIZE
 
 // Score thresholds for combined scoring (spec-04)
 const ACCEPT_THRESHOLD: i32 = 80;       // Minimum score to accept a match
@@ -793,6 +845,7 @@ fn create_spinner(msg: &str) -> ProgressBar {
 }
 
 fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result<Vec<Track>> {
+    let phase_start = Instant::now();
     // Use optimized JOIN query instead of subquery (spec-02)
     // This changes: WHERE t.last_lyrics_id IN (SELECT id FROM lyrics WHERE has_synced_lyrics = 1)
     // To: FROM lyrics l JOIN tracks t ON t.last_lyrics_id = l.id WHERE l.has_synced_lyrics = 1
@@ -877,7 +930,7 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
     }
 
     pb.finish_with_message(format!("Phase 1: Read {} valid tracks", tracks.len()));
-    eprintln!("[READ] Complete: {} tracks", tracks.len());
+    eprintln!("[READ] Complete: {} tracks ({})", tracks.len(), format_duration(phase_start.elapsed()));
     Ok(tracks)
 }
 
@@ -901,29 +954,70 @@ fn group_tracks(tracks: Vec<Track>) -> FxHashMap<(String, String), Vec<Track>> {
 /// - index: FxHashMap<(title_norm, artist_norm), group_index>
 ///
 /// Memory optimization: title_norm/artist_norm stored ONCE per group in key,
-/// not per track. This saves ~295 MB for 12.3M tracks.
+/// not per track. Uses string interning to reduce allocations during grouping.
 fn build_groups_and_index(tracks: Vec<Track>) -> (Vec<LrclibGroup>, LrclibIndex) {
-    let pb = create_progress_bar(tracks.len() as u64, "Phase 2: Building groups");
+    let phase_start = Instant::now();
+    let total_tracks = tracks.len();
 
-    // First pass: group tracks and compute quality scores
-    let mut temp_groups: FxHashMap<(String, String), Vec<LrclibVariant>> = FxHashMap::default();
+    // Phase 1: Parallel normalization using rayon
+    // Each thread normalizes tracks and builds a local map, then we merge
+    eprintln!("[GROUP] Normalizing {} tracks (parallel)...", total_tracks);
+    let norm_start = Instant::now();
 
-    for track in tracks {
-        let title_norm = normalize_title_with_artist(&track.title, &track.artist);
-        let artist_norm = normalize_artist(&track.artist);
-        let quality = compute_quality_score(&track, None);
+    // Process in parallel: normalize and compute quality scores
+    let normalized: Vec<(String, String, Track, i32)> = tracks
+        .into_par_iter()
+        .map(|track| {
+            let title_norm = normalize_title_with_artist(&track.title, &track.artist);
+            let artist_norm = normalize_artist(&track.artist);
+            let quality = compute_quality_score(&track, None);
+            (title_norm, artist_norm, track, quality)
+        })
+        .collect();
 
+    eprintln!(
+        "[GROUP] Normalization complete ({})",
+        format_duration(norm_start.elapsed())
+    );
+
+    // Phase 2: Sequential grouping with string interning (interning requires &mut)
+    eprintln!("[GROUP] Grouping with string interning...");
+    let group_start = Instant::now();
+
+    let mut interner = StringInterner::new();
+    // Pre-allocate with estimate: ~38% of tracks become unique groups
+    let estimated_groups = total_tracks * 38 / 100;
+    let mut temp_groups: FxHashMap<(Arc<str>, Arc<str>), Vec<LrclibVariant>> =
+        FxHashMap::with_capacity_and_hasher(estimated_groups, Default::default());
+
+    for (title_norm, artist_norm, track, quality) in normalized {
+        let title_arc = interner.intern(title_norm);
+        let artist_arc = interner.intern(artist_norm);
         let variant = LrclibVariant { track, quality };
-        temp_groups.entry((title_norm, artist_norm)).or_default().push(variant);
-        pb.inc(1);
+        temp_groups
+            .entry((Arc::clone(&title_arc), Arc::clone(&artist_arc)))
+            .or_default()
+            .push(variant);
     }
 
-    // Second pass: convert to Vec<LrclibGroup> and build index
-    let mut groups: Vec<LrclibGroup> = Vec::with_capacity(temp_groups.len());
-    let mut index: LrclibIndex = FxHashMap::default();
+    // Report interning stats
+    let unique_strings = interner.len();
+    let saved_allocations = total_tracks.saturating_sub(unique_strings / 2);
+    eprintln!(
+        "[GROUP] Interned {} unique strings (saved ~{} allocations) ({})",
+        unique_strings,
+        saved_allocations,
+        format_duration(group_start.elapsed())
+    );
 
-    for (key, variants) in temp_groups {
+    // Phase 3: Convert to Vec<LrclibGroup> and build index
+    // Convert Arc<str> to String for the final output (keeps existing API)
+    let mut groups: Vec<LrclibGroup> = Vec::with_capacity(temp_groups.len());
+    let mut index: LrclibIndex = FxHashMap::with_capacity_and_hasher(temp_groups.len(), Default::default());
+
+    for ((title_arc, artist_arc), variants) in temp_groups {
         let group_idx = groups.len();
+        let key = (title_arc.to_string(), artist_arc.to_string());
         index.insert(key.clone(), group_idx);
         groups.push(LrclibGroup {
             key,
@@ -932,11 +1026,12 @@ fn build_groups_and_index(tracks: Vec<Track>) -> (Vec<LrclibGroup>, LrclibIndex)
         });
     }
 
-    pb.finish_with_message(format!(
-        "Phase 2: Built {} groups with {} total variants",
+    eprintln!(
+        "[GROUP] Complete: {} groups with {} variants ({})",
         groups.len(),
-        groups.iter().map(|g| g.tracks.len()).sum::<usize>()
-    ));
+        groups.iter().map(|g| g.tracks.len()).sum::<usize>(),
+        format_duration(phase_start.elapsed())
+    );
 
     (groups, index)
 }
@@ -973,6 +1068,7 @@ fn process_groups(groups: FxHashMap<(String, String), Vec<Track>>) -> Vec<Scored
 }
 
 fn build_fts_index(conn: &Connection) -> Result<()> {
+    let phase_start = Instant::now();
     let spinner = create_spinner("Phase 4: Building FTS index");
 
     conn.execute(
@@ -981,15 +1077,18 @@ fn build_fts_index(conn: &Connection) -> Result<()> {
     )?;
 
     spinner.finish_with_message("Phase 4: FTS index built");
+    eprintln!("[FTS] Complete ({})", format_duration(phase_start.elapsed()));
     Ok(())
 }
 
 fn optimize_database(conn: &Connection) -> Result<()> {
+    let phase_start = Instant::now();
     let spinner = create_spinner("Phase 5: Optimizing database");
 
     conn.execute_batch("VACUUM; ANALYZE;")?;
 
     spinner.finish_with_message("Phase 5: Database optimized");
+    eprintln!("[OPTIMIZE] Complete ({})", format_duration(phase_start.elapsed()));
     Ok(())
 }
 
@@ -1375,6 +1474,7 @@ fn match_lrclib_to_spotify_normalized(
     groups_seen: &mut FxHashSet<usize>,
     stats: &mut MatchingStats,
 ) -> Result<()> {
+    let phase_start = Instant::now();
     println!("[MATCH] Matching LRCLIB groups to Spotify (indexed lookup)...");
 
     // Open normalized DB with read optimizations
@@ -1467,9 +1567,10 @@ fn match_lrclib_to_spotify_normalized(
         .collect::<FxHashSet<_>>()
         .into_iter()
         .collect();
+    let fetch_start = Instant::now();
     eprintln!("[FETCH] Fetching track details for {} unique candidates...", all_rowids.len());
     let track_details = batch_fetch_track_details(spotify_conn, &all_rowids)?;
-    eprintln!("[FETCH] Complete: {} track details loaded", track_details.len());
+    eprintln!("[FETCH] Complete: {} track details loaded ({})", track_details.len(), format_duration(fetch_start.elapsed()));
 
     // Phase 3: Score ALL candidates against ALL LRCLIB variants and select best (spec-02 R2.3)
     let pb2 = create_progress_bar(matches_to_fetch.len() as u64, "Scoring candidates");
@@ -1535,7 +1636,7 @@ fn match_lrclib_to_spotify_normalized(
     } else {
         0.0
     };
-    println!("[MATCH] Match rate: {:.1}%", match_rate);
+    println!("[MATCH] Match rate: {:.1}% ({})", match_rate, format_duration(phase_start.elapsed()));
     eprintln!("[STATS:MAIN] exact={}, fallback={}, rejected={}, no_candidates={}",
         exact_accepted, fallback_accepted, all_rejected, stats.main_no_candidates);
 
@@ -1551,6 +1652,7 @@ fn match_pop0_fallback(
     groups_seen: &mut FxHashSet<usize>,
     stats: &mut MatchingStats,
 ) -> Result<u64> {
+    let phase_start = Instant::now();
     // Build index of unmatched groups for fast lookup (spec-04: includes rejected groups)
     // Eligible groups are those WITHOUT a match, regardless of whether they were "seen"
     // This includes:
@@ -1592,6 +1694,14 @@ fn match_pop0_fallback(
         from_rejected
     );
 
+    // Optimization: Build title-only index for fast pre-filtering
+    // This avoids normalize_artist() calls for ~90% of rows (most titles won't match)
+    let mut title_only_index: FxHashSet<String> = FxHashSet::default();
+    for (title_norm, _artist_norm) in unmatched_index.keys() {
+        title_only_index.insert(title_norm.clone());
+    }
+    eprintln!("[POP0] Built title-only index with {} unique titles", title_only_index.len());
+
     // Count pop=0 tracks
     let total: u64 = spotify_conn.query_row(
         "SELECT COUNT(*) FROM tracks t
@@ -1614,12 +1724,27 @@ fn match_pop0_fallback(
     let mut rows = stmt.query([])?;
     let mut matches_found = 0u64;
     let mut rows_processed = 0u64;
+    let mut title_matches = 0u64;
 
     while let Some(row) = rows.next()? {
         let title: String = row.get(2)?;
-        let artist: String = row.get(3)?;
-
         let title_norm = normalize_title(&title);
+
+        // Quick pre-filter: skip if no group has this title (avoids artist normalization)
+        if !title_only_index.contains(&title_norm) {
+            rows_processed += 1;
+            if rows_processed % 5_000_000 == 0 {
+                eprintln!("[POP0] {}/{} ({:.1}%) - {} title matches, {} full matches",
+                    rows_processed, total,
+                    100.0 * rows_processed as f64 / total as f64,
+                    title_matches, matches_found);
+            }
+            continue;
+        }
+        title_matches += 1;
+
+        // Title matched - now normalize artist
+        let artist: String = row.get(3)?;
         let artist_norm = normalize_artist(&artist);
         let key = (title_norm.clone(), artist_norm.clone());
 
@@ -1670,17 +1795,17 @@ fn match_pop0_fallback(
 
         rows_processed += 1;
         if rows_processed % 5_000_000 == 0 {
-            eprintln!("[POP0] {}/{} ({:.1}%) - {} matches so far",
+            eprintln!("[POP0] {}/{} ({:.1}%) - {} title matches, {} full matches",
                 rows_processed, total,
                 100.0 * rows_processed as f64 / total as f64,
-                matches_found);
+                title_matches, matches_found);
         }
     }
 
     // Record pop0 match count (spec-07)
     stats.pop0_matches = matches_found as usize;
 
-    eprintln!("[POP0] Complete: {} additional matches from pop=0 tracks", matches_found);
+    eprintln!("[POP0] Complete: {} additional matches from pop=0 tracks ({})", matches_found, format_duration(phase_start.elapsed()));
     Ok(matches_found)
 }
 
@@ -1719,6 +1844,7 @@ fn title_first_rescue(
     groups_seen: &FxHashSet<usize>,
     stats: &mut MatchingStats,
 ) -> Result<u64> {
+    let phase_start = Instant::now();
     // Collect groups that are eligible for rescue:
     // - No match yet (best_match is None)
     // - Never had candidates (!groups_seen.contains(&idx))
@@ -1909,8 +2035,9 @@ fn title_first_rescue(
     stats.rescue_matches = matches_found as usize;
 
     eprintln!(
-        "[RESCUE] Complete: {} additional matches from title-first rescue",
-        matches_found
+        "[RESCUE] Complete: {} additional matches from title-first rescue ({})",
+        matches_found,
+        format_duration(phase_start.elapsed())
     );
 
     Ok(matches_found)
@@ -1920,6 +2047,10 @@ fn title_first_rescue(
 /// For groups where the artist exists in Spotify but no exact title match was found,
 /// this pass tries to find similar titles using Levenshtein distance.
 /// Helps recover matches for typos, slight variations, and encoding differences.
+///
+/// Optimizations applied:
+/// - Batch prefetch: Collect all unique artists, fetch their titles in batches
+/// - Parallel processing: Use rayon for Levenshtein comparisons
 fn fuzzy_title_rescue(
     spotify_conn: &Connection,
     spotify_norm_path: &std::path::Path,
@@ -1927,6 +2058,8 @@ fn fuzzy_title_rescue(
     _groups_seen: &FxHashSet<usize>,
     stats: &mut MatchingStats,
 ) -> Result<u64> {
+    let phase_start = Instant::now();
+
     // Collect groups eligible for fuzzy title rescue:
     // - No match yet (best_match is None)
     // - Not a common title (those are too ambiguous)
@@ -1960,12 +2093,127 @@ fn fuzzy_title_rescue(
          PRAGMA mmap_size = 8589934592;",
     )?;
 
-    // Prepare statement to get all titles for a given artist
-    let mut artist_titles_stmt = norm_conn.prepare_cached(
-        "SELECT DISTINCT title_norm FROM track_norm WHERE artist_norm = ? LIMIT 500",
-    )?;
+    // =========================================================================
+    // Optimization: Stream normalized DB once to build artist→titles map
+    // This is O(N) where N = normalized DB size, much faster than batch IN queries
+    // =========================================================================
+    let prefetch_start = Instant::now();
 
-    // Prepare statement to get candidates for a (title, artist) pair
+    // Build set of artists we're looking for (for O(1) lookup during streaming)
+    let unique_artists: FxHashSet<&str> = rescue_candidates
+        .iter()
+        .map(|(_, _, artist)| *artist)
+        .collect();
+
+    eprintln!("[FUZZY] Streaming normalized DB to find titles for {} unique artists...", unique_artists.len());
+
+    // Count rows for progress
+    let total_rows: u64 = norm_conn.query_row(
+        "SELECT COUNT(DISTINCT artist_norm || '|' || title_norm) FROM track_norm",
+        [],
+        |row| row.get(0),
+    ).unwrap_or(0);
+
+    // Stream all unique (artist, title) pairs and filter to our artists
+    let mut artist_titles_map: FxHashMap<String, Vec<String>> = FxHashMap::default();
+    artist_titles_map.reserve(unique_artists.len());
+
+    let mut stmt = norm_conn.prepare(
+        "SELECT DISTINCT artist_norm, title_norm FROM track_norm"
+    )?;
+    let mut rows = stmt.query([])?;
+    let mut rows_processed = 0u64;
+
+    while let Some(row) = rows.next()? {
+        let artist: String = row.get(0)?;
+
+        // Only keep if this artist is in our lookup set
+        if unique_artists.contains(artist.as_str()) {
+            let title: String = row.get(1)?;
+            artist_titles_map.entry(artist).or_insert_with(Vec::new).push(title);
+        }
+
+        rows_processed += 1;
+        if rows_processed % 5_000_000 == 0 {
+            eprintln!(
+                "[FUZZY] Streamed {}/{} pairs ({:.1}%), found {} artists so far",
+                rows_processed, total_rows,
+                100.0 * rows_processed as f64 / total_rows.max(1) as f64,
+                artist_titles_map.len()
+            );
+        }
+    }
+
+    eprintln!(
+        "[FUZZY] Prefetch complete: {} artists with titles from {} pairs ({})",
+        artist_titles_map.len(),
+        rows_processed,
+        format_duration(prefetch_start.elapsed())
+    );
+
+    // =========================================================================
+    // Parallel Levenshtein matching using rayon
+    // =========================================================================
+    const TITLE_SIMILARITY_THRESHOLD: f64 = 0.90;
+    eprintln!("[FUZZY] Computing Levenshtein similarities (parallel)...");
+    let lev_start = Instant::now();
+
+    // Prepare data for parallel processing: (group_idx, title_norm, artist_norm, lrclib_duration_sec)
+    let candidates_with_duration: Vec<(usize, &str, &str, i64)> = rescue_candidates
+        .iter()
+        .map(|(idx, title, artist)| {
+            let group = &groups[*idx];
+            let best_variant = group.tracks.iter().max_by_key(|t| t.quality).unwrap();
+            (*idx, *title, *artist, best_variant.track.duration_sec)
+        })
+        .collect();
+
+    // Parallel fuzzy matching - returns (group_idx, matched_title, best_similarity)
+    let fuzzy_matches: Vec<(usize, String, f64)> = candidates_with_duration
+        .par_iter()
+        .filter_map(|(group_idx, title_norm, artist_norm, _)| {
+            let artist_titles = artist_titles_map.get(*artist_norm)?;
+
+            // Find best matching title
+            let mut best_sim = 0.0f64;
+            let mut best_title: Option<&String> = None;
+
+            for spotify_title in artist_titles {
+                let sim = normalized_levenshtein(title_norm, spotify_title);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_title = Some(spotify_title);
+                }
+                // Early exit for excellent match
+                if sim >= 0.98 {
+                    break;
+                }
+            }
+
+            if best_sim >= TITLE_SIMILARITY_THRESHOLD {
+                Some((*group_idx, best_title?.clone(), best_sim))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    eprintln!(
+        "[FUZZY] Levenshtein complete: {} potential matches ({})",
+        fuzzy_matches.len(),
+        format_duration(lev_start.elapsed())
+    );
+
+    // Count stats
+    let no_artist_count = candidates_with_duration
+        .iter()
+        .filter(|(_, _, artist, _)| !artist_titles_map.contains_key(*artist))
+        .count();
+    let no_close_match_count = rescue_candidates.len() - no_artist_count - fuzzy_matches.len();
+
+    // =========================================================================
+    // Fetch candidates for matched titles (sequential DB access)
+    // =========================================================================
     let mut candidate_stmt = norm_conn.prepare_cached(
         "SELECT track_rowid, popularity, duration_ms
          FROM track_norm
@@ -1974,62 +2222,16 @@ fn fuzzy_title_rescue(
          LIMIT 20",
     )?;
 
-    const TITLE_SIMILARITY_THRESHOLD: f64 = 0.90;
-    let pb = create_progress_bar(rescue_candidates.len() as u64, "Fuzzy title matching");
+    let mut rowids_to_fetch: Vec<(usize, i64, String, f64)> = Vec::new();
+    let pb = create_progress_bar(fuzzy_matches.len() as u64, "Fetching fuzzy candidates");
 
-    let mut no_artist_count = 0usize;
-    let mut no_close_match_count = 0usize;
-    let mut rowids_to_fetch: Vec<(usize, i64, String, f64)> = Vec::new(); // (group_idx, rowid, matched_title, similarity)
-
-    for (i, (group_idx, title_norm, artist_norm)) in rescue_candidates.iter().enumerate() {
-        // Get all titles for this artist
-        let mut rows = artist_titles_stmt.query(rusqlite::params![artist_norm])?;
-
-        let mut artist_titles: Vec<String> = Vec::new();
-        while let Some(row) = rows.next()? {
-            artist_titles.push(row.get(0)?);
-        }
-
-        if artist_titles.is_empty() {
-            no_artist_count += 1;
-            if i % 50_000 == 0 {
-                pb.set_position(i as u64);
-            }
-            continue;
-        }
-
-        // Find best matching title using Levenshtein similarity
-        let mut best_sim = 0.0f64;
-        let mut best_title: Option<&String> = None;
-
-        for spotify_title in &artist_titles {
-            let sim = normalized_levenshtein(title_norm, spotify_title);
-            if sim > best_sim {
-                best_sim = sim;
-                best_title = Some(spotify_title);
-            }
-            // Early exit if we found an excellent match
-            if sim >= 0.98 {
-                break;
-            }
-        }
-
-        if best_sim < TITLE_SIMILARITY_THRESHOLD {
-            no_close_match_count += 1;
-            if i % 50_000 == 0 {
-                pb.set_position(i as u64);
-            }
-            continue;
-        }
-
-        // Found a close match - get candidates for this (matched_title, artist) pair
-        let matched_title = best_title.unwrap();
-        let mut cand_rows = candidate_stmt.query(rusqlite::params![matched_title, artist_norm])?;
-
-        // Get LRCLIB duration for filtering
+    for (i, (group_idx, matched_title, similarity)) in fuzzy_matches.iter().enumerate() {
         let group = &groups[*group_idx];
         let best_variant = group.tracks.iter().max_by_key(|t| t.quality).unwrap();
         let lrclib_duration_sec = best_variant.track.duration_sec;
+
+        let artist_norm = &group.key.1;
+        let mut cand_rows = candidate_stmt.query(rusqlite::params![matched_title, artist_norm.as_str()])?;
 
         while let Some(row) = cand_rows.next()? {
             let track_rowid: i64 = row.get(0)?;
@@ -2038,12 +2240,12 @@ fn fuzzy_title_rescue(
             // Duration check (30s tolerance)
             let diff = (lrclib_duration_sec - duration_ms / 1000).abs();
             if diff <= 30 {
-                rowids_to_fetch.push((*group_idx, track_rowid, matched_title.clone(), best_sim));
-                break; // Take first duration-matching candidate
+                rowids_to_fetch.push((*group_idx, track_rowid, matched_title.clone(), *similarity));
+                break;
             }
         }
 
-        if i % 50_000 == 0 {
+        if i % 10_000 == 0 {
             pb.set_position(i as u64);
         }
     }
@@ -2121,8 +2323,9 @@ fn fuzzy_title_rescue(
     stats.fuzzy_title_matches = matches_found as usize;
 
     eprintln!(
-        "[FUZZY] Complete: {} additional matches from fuzzy title rescue",
-        matches_found
+        "[FUZZY] Complete: {} additional matches from fuzzy title rescue ({})",
+        matches_found,
+        format_duration(phase_start.elapsed())
     );
 
     Ok(matches_found)
@@ -2582,8 +2785,40 @@ fn convert_to_enriched_without_spotify(tracks: Vec<ScoredTrack>) -> Vec<Enriched
         .collect()
 }
 
-/// Write enriched tracks to output database
+/// Batch size for enriched track writes.
+/// SQLite limit: SQLITE_MAX_VARIABLE_NUMBER = 32766.
+/// With 16 columns per row: 32766 / 16 = 2047. Using 2000 for safety.
+const ENRICHED_BATCH_SIZE: usize = 2_000;
+
+/// Build a multi-value INSERT SQL statement for enriched tracks.
+/// Pre-building avoids repeated string allocation during batch writes.
+fn build_enriched_batch_sql(num_rows: usize) -> String {
+    if num_rows == 0 {
+        return String::new();
+    }
+    // 16 columns: "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)," is ~35 chars
+    let mut sql = String::with_capacity(200 + num_rows * 35);
+    sql.push_str(
+        "INSERT INTO tracks (
+            id, title, artist, album, duration_sec,
+            title_norm, artist_norm, quality,
+            spotify_id, popularity, tempo, musical_key, mode, time_signature,
+            isrc, album_image_url
+        ) VALUES "
+    );
+    for i in 0..num_rows {
+        if i > 0 {
+            sql.push(',');
+        }
+        sql.push_str("(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    }
+    sql
+}
+
+/// Write enriched tracks to output database using batched multi-value INSERTs.
+/// Optimized for ~3.8M rows with 16 columns each.
 fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Result<()> {
+    let phase_start = Instant::now();
     conn.execute_batch(
         "PRAGMA journal_mode = WAL;
         PRAGMA synchronous = NORMAL;
@@ -2653,46 +2888,66 @@ fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Res
 
     let pb = create_progress_bar(tracks.len() as u64, "Phase 3: Writing enriched tracks");
 
-    for chunk in tracks.chunks(WRITE_BATCH_SIZE) {
-        let tx = conn.transaction()?;
-        {
-            let mut stmt = tx.prepare_cached(
-                "INSERT INTO tracks (
-                    id, title, artist, album, duration_sec,
-                    title_norm, artist_norm, quality,
-                    spotify_id, popularity, tempo, musical_key, mode, time_signature,
-                    isrc, album_image_url
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
-            )?;
+    // Pre-build SQL for full batches
+    let batch_sql = build_enriched_batch_sql(ENRICHED_BATCH_SIZE);
+    let mut written = 0u64;
 
-            for t in chunk {
-                stmt.execute(params![
-                    // LRCLIB (source of truth)
-                    t.lrclib_id,
-                    t.title,
-                    t.artist,
-                    t.album,
-                    t.duration_sec,
-                    t.title_norm,
-                    t.artist_norm,
-                    t.quality,
-                    // Spotify (enrichment, nullable)
-                    t.spotify_id,
-                    t.popularity,
-                    t.tempo,
-                    t.musical_key,
-                    t.mode,
-                    t.time_signature,
-                    t.isrc,
-                    t.album_image_url,
-                ])?;
-                pb.inc(1);
-            }
+    let tx = conn.transaction()?;
+
+    for chunk in tracks.chunks(ENRICHED_BATCH_SIZE) {
+        // Use pre-built SQL for full batches, build custom for final partial batch
+        let sql = if chunk.len() == ENRICHED_BATCH_SIZE {
+            &batch_sql
+        } else {
+            &build_enriched_batch_sql(chunk.len())
+        };
+
+        let mut stmt = tx.prepare_cached(sql)?;
+
+        // Build flat parameter array using array literals (no heap allocation per row)
+        let params: Vec<&dyn rusqlite::ToSql> = chunk
+            .iter()
+            .flat_map(|t| {
+                [
+                    &t.lrclib_id as &dyn rusqlite::ToSql,
+                    &t.title as &dyn rusqlite::ToSql,
+                    &t.artist as &dyn rusqlite::ToSql,
+                    &t.album as &dyn rusqlite::ToSql,
+                    &t.duration_sec as &dyn rusqlite::ToSql,
+                    &t.title_norm as &dyn rusqlite::ToSql,
+                    &t.artist_norm as &dyn rusqlite::ToSql,
+                    &t.quality as &dyn rusqlite::ToSql,
+                    &t.spotify_id as &dyn rusqlite::ToSql,
+                    &t.popularity as &dyn rusqlite::ToSql,
+                    &t.tempo as &dyn rusqlite::ToSql,
+                    &t.musical_key as &dyn rusqlite::ToSql,
+                    &t.mode as &dyn rusqlite::ToSql,
+                    &t.time_signature as &dyn rusqlite::ToSql,
+                    &t.isrc as &dyn rusqlite::ToSql,
+                    &t.album_image_url as &dyn rusqlite::ToSql,
+                ]
+            })
+            .collect();
+
+        stmt.execute(params.as_slice())?;
+        written += chunk.len() as u64;
+        pb.set_position(written);
+
+        // Tail-friendly logging
+        if written % 500_000 == 0 {
+            eprintln!(
+                "[WRITE] {}/{} ({:.1}%)",
+                written,
+                tracks.len(),
+                100.0 * written as f64 / tracks.len() as f64
+            );
         }
-        tx.commit()?;
     }
 
+    tx.commit()?;
+
     pb.finish_with_message(format!("Phase 3: Wrote {} enriched tracks", tracks.len()));
+    eprintln!("[WRITE] Complete: {} tracks written ({})", tracks.len(), format_duration(phase_start.elapsed()));
     Ok(())
 }
 
@@ -2922,7 +3177,33 @@ fn write_match_failures(
     Ok(())
 }
 
+/// Build a multi-value INSERT SQL statement for failure entries.
+/// Pre-building avoids repeated string allocation during batch writes.
+fn build_failure_batch_sql(num_rows: usize) -> String {
+    if num_rows == 0 {
+        return String::new();
+    }
+    // 12 columns: "(?,?,?,?,?,?,?,?,?,?,?,?)," is ~26 chars
+    let mut sql = String::with_capacity(200 + num_rows * 26);
+    sql.push_str(
+        "INSERT INTO match_failures (
+            lrclib_id, lrclib_title, lrclib_artist, lrclib_album,
+            lrclib_duration_sec, lrclib_title_norm, lrclib_artist_norm,
+            lrclib_quality, group_variant_count,
+            failure_reason, best_score, spotify_candidates
+        ) VALUES "
+    );
+    for i in 0..num_rows {
+        if i > 0 {
+            sql.push(',');
+        }
+        sql.push_str("(?,?,?,?,?,?,?,?,?,?,?,?)");
+    }
+    sql
+}
+
 /// Execute a batched INSERT for failure entries.
+/// Uses array literals instead of vec![] for flat_map to avoid heap allocations.
 fn execute_failure_batch_insert(
     conn: &Connection,
     batch: &[PreparedFailureEntry],
@@ -2931,28 +3212,14 @@ fn execute_failure_batch_insert(
         return Ok(());
     }
 
-    // Build multi-value INSERT with 12 columns per row
-    let placeholders: Vec<&str> = (0..batch.len())
-        .map(|_| "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .collect();
-
-    let sql = format!(
-        "INSERT INTO match_failures (
-            lrclib_id, lrclib_title, lrclib_artist, lrclib_album,
-            lrclib_duration_sec, lrclib_title_norm, lrclib_artist_norm,
-            lrclib_quality, group_variant_count,
-            failure_reason, best_score, spotify_candidates
-        ) VALUES {}",
-        placeholders.join(", ")
-    );
-
+    let sql = build_failure_batch_sql(batch.len());
     let mut stmt = conn.prepare_cached(&sql)?;
 
-    // Flatten batch into parameter list
+    // Flatten batch into parameter list using array literals (no heap allocation per row)
     let params: Vec<&dyn rusqlite::ToSql> = batch
         .iter()
         .flat_map(|e| {
-            vec![
+            [
                 &e.lrclib_id as &dyn rusqlite::ToSql,
                 &e.lrclib_title as &dyn rusqlite::ToSql,
                 &e.lrclib_artist as &dyn rusqlite::ToSql,
@@ -3067,7 +3334,7 @@ fn main() -> Result<()> {
          PRAGMA temp_store = MEMORY;",
     )?;
 
-    let artist_filter: Option<Vec<String>> = args.artists.map(|s| {
+    let artist_filter: Option<Vec<String>> = args.artists.clone().map(|s| {
         s.split(',').map(|a| a.trim().to_string()).collect()
     });
 
@@ -3079,7 +3346,6 @@ fn main() -> Result<()> {
     drop(source_conn);
 
     // Phase 2: Build groups and index (delayed canonical selection - spec-03)
-    // Keep ALL variants per group, don't select canonical yet
     let (mut groups, index) = build_groups_and_index(tracks);
     println!("\nBuilt {} unique (title, artist) groups", groups.len());
 
