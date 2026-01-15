@@ -361,7 +361,7 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("משינה", "mashina");
     m.insert("אתניקס", "ethnix");
     m.insert("כוורת", "kaveret");
-    m.insert("טיפקס", "tipex");
+    m.insert("טיפקס", "teapacks");  // Israeli band, not Spanish "Tipex"
     m.insert("הדג נחש", "hadag nahash");
     m.insert("הדורבנים", "hadorbanim");
     m.insert("מוניקה סקס", "monica sex");
@@ -711,7 +711,7 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("שלומי שבת וליאור נרקיס", "shlomi shabat and lior narkis");
     m.insert("שירי מימון ושמעון בוסקילה", "shiri maimon and shimon buskila");
     m.insert("משה פרץ ועומר אדם", "moshe peretz and omer adam");
-    m.insert("שרית חדד וטיפקס", "sarit hadad and tipex");
+    m.insert("שרית חדד וטיפקס", "sarit hadad and teapacks");
     m.insert("אייל גולן ואלין גולן", "eyal golan and alin golan");
     m.insert("אייל גולן וחיים ישראל", "eyal golan and chaim israel");
     m.insert("אייל גולן ומשה פרץ", "eyal golan and moshe peretz");
@@ -993,7 +993,7 @@ mod tests {
         // Test Hebrew artists are properly transliterated via dictionary
         assert_eq!(normalize_artist("מוש בן ארי"), "mosh ben ari");
         assert_eq!(normalize_artist("אריק איינשטיין"), "arik einstein");
-        assert_eq!(normalize_artist("טיפקס"), "tipex");
+        assert_eq!(normalize_artist("טיפקס"), "teapacks");
         assert_eq!(normalize_artist("הדג נחש"), "hadag nahash");
         assert_eq!(normalize_artist("עומר אדם"), "omer adam");
         assert_eq!(normalize_artist("נעמי שמר"), "naomi shemer");
