@@ -30,8 +30,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
-// Import normalization functions from shared module
+// Import from shared library
 use lrclib_extract::normalize::{normalize_artist, normalize_title};
+use lrclib_extract::safety::validate_output_path;
 
 /// String interner for deduplicating normalized strings.
 /// Reduces memory usage significantly when many tracks share the same artist/title.
@@ -193,32 +194,9 @@ fn main() -> Result<()> {
     let start = Instant::now();
 
     // Safety check: prevent accidentally deleting source databases
-    // Output file MUST contain "normalized" and MUST NOT match source patterns
     let output_path = std::path::Path::new(output_db);
-    let output_name = output_path.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
-
-    if !output_name.contains("normalized") {
-        anyhow::bail!(
-            "Safety check failed: output file '{}' must contain 'normalized' in the name",
-            output_db
-        );
-    }
-
-    if output_name.contains("spotify_clean") && !output_name.contains("normalized") {
-        anyhow::bail!(
-            "Safety check failed: refusing to overwrite source database pattern '{}'",
-            output_db
-        );
-    }
-
-    if output_db == spotify_db {
-        anyhow::bail!(
-            "Safety check failed: output '{}' cannot be the same as input '{}'",
-            output_db, spotify_db
-        );
-    }
+    let source_path = std::path::Path::new(spotify_db);
+    validate_output_path(output_path, "normalized", &[source_path])?;
 
     // Remove existing output file to avoid corruption from previous runs
     if output_path.exists() {

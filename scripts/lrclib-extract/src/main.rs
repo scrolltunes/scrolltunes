@@ -3,6 +3,7 @@ mod normalize;
 use anyhow::{Context, Result};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
+use lrclib_extract::safety::validate_output_path;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
@@ -3218,6 +3219,19 @@ fn main() -> Result<()> {
     };
 
     // Phase 3: Write output
+    // Safety check: prevent accidentally deleting source databases
+    let mut source_paths: Vec<&std::path::Path> = vec![&args.source];
+    if let Some(ref spotify) = args.spotify {
+        source_paths.push(spotify);
+    }
+    if let Some(ref spotify_norm) = args.spotify_normalized {
+        source_paths.push(spotify_norm);
+    }
+    if let Some(ref audio_features) = args.audio_features {
+        source_paths.push(audio_features);
+    }
+    validate_output_path(&args.output, "enriched", &source_paths)?;
+
     if args.output.exists() {
         std::fs::remove_file(&args.output)
             .context("Failed to remove existing output file")?;
