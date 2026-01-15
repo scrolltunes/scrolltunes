@@ -3,6 +3,22 @@ name = "lrclib-extract"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "lrclib_extract"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lrclib-extract"
+path = "src/main.rs"
+
+[[bin]]
+name = "normalize-spotify"
+path = "src/bin/normalize-spotify.rs"
+
+[[bin]]
+name = "analyze-failures"
+path = "src/bin/analyze_failures.rs"
+
 [dependencies]
 rusqlite = { version = "0.31", features = ["bundled"] }
 rayon = "1.10"
@@ -12,6 +28,11 @@ clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 once_cell = "1.19"
 rustc-hash = "2.1"  # Fast non-cryptographic hashing (FxHash)
+unicode-normalization = "0.1"  # Unicode NFKD decomposition for diacritic folding
+serde = { version = "1.0", features = ["derive"] }  # Serialization for stats JSON
+serde_json = "1.0"  # JSON serialization for stats and Spotify candidates
+any_ascii = "0.3"  # Unicode to ASCII transliteration for Cyrillic/non-Latin scripts
+strsim = "0.11"    # String similarity for fuzzy artist matching (spec-06)
 
 [profile.release]
 lto = true

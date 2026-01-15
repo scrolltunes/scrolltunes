@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Ralph Wiggum Loop - Admin Catalog Redesign
+# Ralph Wiggum Loop - LRCLIB Enrichment v3
 # Reference: https://github.com/ghuntley/how-to-ralph-wiggum
 #
 # Features:
@@ -174,7 +174,7 @@ handle_usage_limit() {
 }
 
 echo -e "${GREEN}Ralph loop: $(echo "$MODE" | tr '[:lower:]' '[:upper:]') mode${NC}"
-echo -e "${GREEN}Feature: Admin Catalog Redesign${NC}"
+echo -e "${GREEN}Feature: LRCLIB Enrichment v3${NC}"
 [[ $MAX_ITERATIONS -gt 0 ]] && echo "Max iterations: $MAX_ITERATIONS"
 echo "Press Ctrl+C to stop"
 echo "---"
@@ -226,7 +226,7 @@ while true; do
   if [[ "$OUTPUT" =~ "RALPH_COMPLETE" ]]; then
     echo ""
     echo -e "${GREEN}=== All Tasks Complete ===${NC}"
-    echo -e "${GREEN}Admin Catalog Redesign implementation finished.${NC}"
+    echo -e "${GREEN}LRCLIB Enrichment v3 implementation finished.${NC}"
     break
   fi
 

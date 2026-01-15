@@ -1,81 +1,79 @@
-# Admin Catalog Redesign - Plan Mode
+# Planning Mode Prompt
 
-You are in PLANNING mode. Research and update the implementation plan.
+You are implementing improvements to the LRCLIB-Spotify enrichment pipeline (v3). Your goal is to improve match rate from 57.5% toward 65-72%.
 
-## Phase 0: Orient
+## Context
 
-### 0a. Study context
-Read `CLAUDE.md` for project rules:
-- Use bun exclusively (not npm/node)
-- Effect.ts for async operations
-- No `any` types, no `@ts-ignore`
-- Path alias: `@/*` → `src/*`
+Read these files to understand the current state:
+- `docs/lrclib-extraction-technical-report.md` - Current methodology and limitations
+- `docs/lrclib-enrichment-v2-spec.md` - Current implementation details
+- `IMPLEMENTATION_PLAN.md` - The implementation plan you're following
 
-### 0b. Study the plan
-Read `IMPLEMENTATION_PLAN.md` to understand current state.
+## Available Specs (v3)
 
-### 0c. Study specs
-Read specs in `specs/` for detailed requirements:
-- `admin-catalog-api.md`
-- `admin-track-search.md`
-- `admin-add-to-catalog.md`
-- `admin-catalog-hook.md`
-- `admin-songs-page-redesign.md`
+The `specs/` directory contains detailed specifications:
+- `spec-01-normalization.md` - Single-source normalization (Foundation)
+- `spec-02-topk-candidates.md` - Top-K candidates per key (+2-4%)
+- `spec-03-multi-artist.md` - Multi-artist scoring (+1-2%)
+- `spec-04-pop0-fallback.md` - Pop=0 fallback fix (+0.5-1%)
+- `spec-05-adaptive-duration.md` - Adaptive duration tolerance (+1-2%)
+- `spec-06-title-rescue.md` - Title-first rescue pass (+2-4%)
+- `spec-07-instrumentation.md` - Instrumentation & evaluation
 
-## Phase 1: Research
+## Source Analysis
+- [Data Scientist Recommendations](/Users/hmemcpy/Downloads/lrclib_spotify_enrichment_recommendations.md)
 
-### 1a. Understand existing code
-Study these directories and files:
-- `src/app/api/admin/` - Existing admin API patterns
-- `src/app/admin/songs/` - Current page implementation
-- `src/lib/db/schema.ts` - Database schema (songs, song_lrclib_ids, user_song_items)
-- `src/services/turso.ts` - Turso service patterns
-- `src/hooks/` - Existing hook patterns
+## Your Task
 
-### 1b. Identify dependencies
-For each task, identify:
-- What tables/columns are needed
-- What services are required
-- What existing code can be reused
+1. Read `IMPLEMENTATION_PLAN.md` to see current progress
+2. Find the next uncompleted task (marked `[ ]`)
+3. Read the corresponding spec file from `specs/`
+4. Create a detailed implementation plan for JUST that spec
+5. Update the task status in `IMPLEMENTATION_PLAN.md` to in-progress
+6. Write your plan to `CURRENT_PLAN.md`
 
-### 1c. Flag blockers
-If you discover issues:
-- Missing database columns
-- Schema changes needed
-- Unclear requirements
+## Planning Guidelines
 
-Document blockers in the plan and ask user for clarification.
+- Break the spec into small, atomic tasks
+- Each task should be independently testable
+- Include file paths and specific code locations
+- Reference existing code patterns in the codebase
+- Include validation steps after each task
 
-## Phase 2: Update Plan
+## Directories to Explore
 
-### 2a. Refine tasks
-For each task in `IMPLEMENTATION_PLAN.md`:
-- Add specific file paths
-- Add code snippets where helpful
-- Add acceptance criteria details
-- Note any dependencies between tasks
+- `scripts/lrclib-extract/src/` - Rust source code
+- `scripts/lrclib-extract/src/main.rs` - Main extraction logic
+- `scripts/lrclib-extract/src/bin/normalize-spotify.rs` - Normalization binary
+- `scripts/lrclib-extract/Cargo.toml` - Rust dependencies
 
-### 2b. Mark discoveries
-If you find:
-- Existing code that can be reused → note it
-- Schema changes needed → add as prerequisite task
-- Edge cases → add to acceptance criteria
+## Output Format
 
-### 2c. Save changes
-Update `IMPLEMENTATION_PLAN.md` with your findings.
+Write your plan to `CURRENT_PLAN.md` with this structure:
 
-## Exit Conditions
+```markdown
+# Current Plan: [Spec Name]
 
-**Success**: Plan is refined, blockers documented → Exit
+## Spec Reference
+specs/spec-XX-name.md
 
-**Blocked**: Need user input → Document question and exit
+## Tasks
 
-## Context Files
+### Task 1: [Name]
+- File: [path]
+- Changes: [description]
+- Validation: [how to test]
 
-- @CLAUDE.md
-- @IMPLEMENTATION_PLAN.md
-- @specs/admin-catalog-api.md
-- @specs/admin-track-search.md
-- @specs/admin-add-to-catalog.md
-- @specs/admin-catalog-hook.md
-- @specs/admin-songs-page-redesign.md
+### Task 2: [Name]
+...
+
+## Validation Command
+[Command to validate all changes]
+```
+
+## Important
+
+- Do NOT write code in planning mode
+- Do NOT modify source files
+- Only read files and create the plan
+- Focus on ONE spec at a time
