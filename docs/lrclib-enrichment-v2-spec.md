@@ -26,8 +26,9 @@
 | Primary-artist fallback | +2.9% |
 | `any_ascii` transliteration | +1.4% |
 | Pop=0 fallback | +4.1% (~157K matches) |
-| Hebrew/Russian artist aliases | ~205 hand-crafted mappings |
+| Hebrew/Russian artist aliases | ~150 hand-crafted mappings (cleaned) |
 | Batched INSERTs | 10x faster writes |
+| normalize-spotify optimization | 6x faster (90 min → 15 min) |
 
 ---
 
@@ -36,8 +37,8 @@
 ### Processing Pipeline
 
 ```
-normalize-spotify (one-time, ~11 min)
-    └─ Creates spotify_normalized.sqlite3 (54M keys)
+normalize-spotify (one-time, ~15 min)
+    └─ Creates spotify_normalized.sqlite3 (54M keys, 56M rows)
 
 lrclib-extract (~48 min)
     ├─ Read LRCLIB (12.2M → 10M valid tracks)
@@ -55,7 +56,7 @@ lrclib-extract (~48 min)
 |------|------|---------|
 | `lrclib-db-dump-*.sqlite3` | 77 GB | Source lyrics (12.2M tracks) |
 | `spotify_clean.sqlite3` | 125 GB | Spotify catalog (64M track-artists) |
-| `spotify_normalized.sqlite3` | 5 GB | Pre-normalized index (54M keys) |
+| `spotify_normalized.sqlite3` | 10 GB | Pre-normalized index (54M keys, 56M rows) |
 | `spotify_clean_audio_features.sqlite3` | 41 GB | BPM, key, mode, time signature |
 | `spotify_clean_track_files.sqlite3` | ~146 GB* | Language, original_title, versions |
 
@@ -254,6 +255,39 @@ score = duration_score (0-100, graduated by diff)
 | Cyrillic (а-я) | ru, uk, bg | `language LIKE 'ru%'` |
 | Hebrew (א-ת) | he | `language = 'he'` |
 | CJK (一-龯) | zh, ja, ko | `language IN ('zh','ja','ko')` |
+
+---
+
+## normalize-spotify Performance Optimization
+
+The `normalize-spotify` binary preprocesses the Spotify catalog (64M track-artist rows) into a normalized lookup table. Performance was improved from ~90 minutes to ~15 minutes.
+
+### Optimizations Applied
+
+| Optimization | Before | After | Impact |
+|-------------|--------|-------|--------|
+| Batch size | 1,000 rows | 6,000 rows | 6x fewer INSERT operations |
+| SQL building | Rebuilt every batch | Pre-built once, reused | Eliminates string allocations |
+| Parameter binding | `vec![...]` per row | `[...]` array | No heap allocation per row |
+| Key ordering | Random HashMap iteration | Sorted before write | Sequential B-tree inserts |
+| Duplicate handling | HashSet (64M lookups) | `INSERT OR IGNORE` | SQLite handles conflicts |
+
+### SQLite Parameter Limit
+
+Tested limit: `SQLITE_MAX_VARIABLE_NUMBER = 32766` (SQLite 3.32+ default)
+- Max safe batch: 6553 rows × 5 columns = 32,765 params
+- Used: 6000 rows for safety margin
+
+### Performance Breakdown
+
+| Phase | Time |
+|-------|------|
+| Read + normalize (64M rows) | ~8 min |
+| Sort keys (53.6M) | 17s |
+| Write (56M rows) | ~4 min |
+| Create indexes | 73s |
+| Analyze | ~30s |
+| **Total** | **~15 min** |
 
 ---
 

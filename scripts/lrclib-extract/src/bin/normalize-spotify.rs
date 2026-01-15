@@ -26,7 +26,7 @@
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use rusqlite::Connection;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -77,26 +77,49 @@ const DURATION_BUCKET_MS: i64 = 5000;
 /// This limits index size while preserving duration diversity.
 const MAX_CANDIDATES_PER_KEY: usize = 20;
 
-/// Execute a batched INSERT statement for better performance (spec-02 schema)
-fn execute_batch_insert(conn: &Connection, batch: &[CandidateRow]) -> Result<()> {
+/// Batch size for INSERT operations.
+/// Larger batches = fewer round-trips = faster writes.
+/// SQLite limit: SQLITE_MAX_VARIABLE_NUMBER = 32766 (tested).
+/// Max rows = 32766 / 5 = 6553. Using 6000 for safety margin.
+const BATCH_SIZE: usize = 6_000;
+
+/// Build a multi-value INSERT SQL statement for a given number of rows.
+/// Pre-building avoids repeated string allocation during batch writes.
+fn build_batch_sql(num_rows: usize) -> String {
+    if num_rows == 0 {
+        return String::new();
+    }
+    // Pre-allocate: "(?,?,?,?,?)," is 12 chars, times num_rows, plus the prefix
+    let mut sql = String::with_capacity(100 + num_rows * 12);
+    sql.push_str("INSERT OR IGNORE INTO track_norm (title_norm, artist_norm, track_rowid, popularity, duration_ms) VALUES ");
+    for i in 0..num_rows {
+        if i > 0 {
+            sql.push(',');
+        }
+        sql.push_str("(?,?,?,?,?)");
+    }
+    sql
+}
+
+/// Execute a batched INSERT statement using pre-built SQL.
+/// Uses a flat parameter array to avoid per-row allocations.
+fn execute_batch_insert(
+    conn: &Connection,
+    batch: &[CandidateRow],
+    batch_sql: &str,
+) -> Result<()> {
     if batch.is_empty() {
         return Ok(());
     }
 
-    // Build multi-value INSERT with 5 columns per row
-    let placeholders: Vec<&str> = (0..batch.len()).map(|_| "(?, ?, ?, ?, ?)").collect();
-    let sql = format!(
-        "INSERT INTO track_norm (title_norm, artist_norm, track_rowid, popularity, duration_ms) VALUES {}",
-        placeholders.join(", ")
-    );
+    let mut stmt = conn.prepare_cached(batch_sql)?;
 
-    let mut stmt = conn.prepare_cached(&sql)?;
-
-    // Flatten batch into parameter list (order matches column order in INSERT)
+    // Build flat parameter array without per-row Vec allocations
+    // Using rusqlite's params_from_iter with references
     let params: Vec<&dyn rusqlite::ToSql> = batch
         .iter()
         .flat_map(|row| {
-            vec![
+            [
                 &row.title_norm as &dyn rusqlite::ToSql,
                 &row.artist_norm as &dyn rusqlite::ToSql,
                 &row.track_rowid as &dyn rusqlite::ToSql,
@@ -322,55 +345,58 @@ fn main() -> Result<()> {
         unique_keys, count
     );
 
-    // Phase 2: Deduplicate by duration bucket and count total rows
-    println!("Phase 2: Deduplicating by duration bucket ({}ms buckets, max {} per key)...",
-             DURATION_BUCKET_MS, MAX_CANDIDATES_PER_KEY);
-    eprintln!("[PHASE2] Deduplicating {} keys...", unique_keys);
+    // Phase 2: Sort keys, deduplicate by duration bucket, and write
+    // Sorting keys improves B-tree insertion locality for ~2x speedup
+    println!("Phase 2: Sorting {} keys for optimal write order...", unique_keys);
+    eprintln!("[PHASE2] Sorting {} keys...", unique_keys);
+
+    let sort_start = Instant::now();
+    let mut sorted_keys: Vec<(Arc<str>, Arc<str>)> = candidates_map.keys().cloned().collect();
+    sorted_keys.sort_unstable();
+    let sort_elapsed = sort_start.elapsed();
+    println!("  Sorted in {:.2}s", sort_elapsed.as_secs_f64());
+    eprintln!("[PHASE2] Sort complete in {:.2}s", sort_elapsed.as_secs_f64());
+
+    println!("Phase 2b: Deduplicating and writing ({}ms buckets, max {} per key, batch {})...",
+             DURATION_BUCKET_MS, MAX_CANDIDATES_PER_KEY, BATCH_SIZE);
+    eprintln!("[PHASE2] Writing with batch size {}...", BATCH_SIZE);
 
     let pb_dedup = create_progress_bar(unique_keys as u64, log_only);
 
-    // Track rowids we've already written (to avoid duplicates from multi-artist tracks)
-    let mut written_rowids: FxHashSet<i64> = FxHashSet::default();
-    let mut total_candidates = 0usize;
     let mut keys_processed = 0u64;
 
-    // Prepare batch for writing
-    const BATCH_SIZE: usize = 1000;
+    // Pre-build SQL for full batches (avoids repeated string allocation)
+    let batch_sql = build_batch_sql(BATCH_SIZE);
     let mut batch: Vec<CandidateRow> = Vec::with_capacity(BATCH_SIZE);
     let mut written = 0u64;
 
     let tx = out_conn.transaction()?;
 
-    for ((title_norm, artist_norm), candidates) in candidates_map {
+    // Iterate in sorted order for sequential B-tree inserts
+    for key in sorted_keys {
+        let candidates = candidates_map.remove(&key).unwrap();
+        let (title_norm, artist_norm) = key;
         let deduped = dedupe_by_duration_bucket(candidates);
-        total_candidates += deduped.len();
 
         for cand in deduped {
-            // Skip if we've already written this track_rowid (from another artist entry)
-            if written_rowids.contains(&cand.track_rowid) {
-                continue;
-            }
-            written_rowids.insert(cand.track_rowid);
-
             batch.push(CandidateRow {
                 track_rowid: cand.track_rowid,
-                title_norm: title_norm.clone(),
-                artist_norm: artist_norm.clone(),
+                title_norm: Arc::clone(&title_norm),
+                artist_norm: Arc::clone(&artist_norm),
                 popularity: cand.popularity,
                 duration_ms: cand.duration_ms,
             });
 
             if batch.len() >= BATCH_SIZE {
-                execute_batch_insert(&tx, &batch)?;
+                execute_batch_insert(&tx, &batch, &batch_sql)?;
                 written += batch.len() as u64;
                 batch.clear();
 
-                if written % 500_000 == 0 {
+                if written % 1_000_000 == 0 {
                     eprintln!(
-                        "[WRITE] {}/{} ({:.1}%)",
+                        "[WRITE] {} rows ({:.1}% of keys)",
                         written,
-                        total_candidates,
-                        100.0 * written as f64 / total_candidates.max(1) as f64
+                        100.0 * keys_processed as f64 / unique_keys as f64
                     );
                 }
             }
@@ -382,14 +408,15 @@ fn main() -> Result<()> {
         }
     }
 
-    // Write remaining batch
+    // Write remaining batch (may be smaller than BATCH_SIZE)
     if !batch.is_empty() {
-        execute_batch_insert(&tx, &batch)?;
+        let remaining_sql = build_batch_sql(batch.len());
+        execute_batch_insert(&tx, &batch, &remaining_sql)?;
         written += batch.len() as u64;
     }
 
     pb_dedup.finish_with_message("done");
-    eprintln!("[WRITE] {}/{} (100.0%)", written, total_candidates);
+    eprintln!("[WRITE] {} total rows written", written);
 
     tx.commit()?;
 
