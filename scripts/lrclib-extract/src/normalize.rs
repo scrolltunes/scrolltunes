@@ -48,6 +48,31 @@ pub static TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(r"(?i)\s*[-–—_]?\s*[a-z0-9]+\.(?:com|net|org|io|ru|de|fr|es|co\.uk)").unwrap(),
         // Visualizer/commentary tags: "(Visualiser)", "(Lyric Video)", "(comentario)"
         Regex::new(r"(?i)\s*[\(\[](?:visuali[sz]er|lyric\s*video|official\s*video|audio|comentario|commentary)[\)\]]").unwrap(),
+        // Additional suffix patterns identified from failure analysis (Jan 2026)
+        // Digital remaster with year: "- 2001 Digital Remaster"
+        Regex::new(r"(?i)\s*[-–—]\s*\d{4}\s+digital\s+remaster(?:ed)?\s*$").unwrap(),
+        // Disc/CD markers: "(Disc 1)", "[CD 2]"
+        Regex::new(r"(?i)\s*[\(\[](?:disc|cd)\s*\d+[\)\]]").unwrap(),
+        // Single/LP version with dash: "- Single Version", "- LP Version"
+        Regex::new(r#"(?i)\s*[-–—]\s*(?:single|lp|7["']?|12["']?)\s+version\s*$"#).unwrap(),
+        // Bonus track markers: "(Bonus Track)", "[Bonus]"
+        Regex::new(r"(?i)\s*[\(\[](?:bonus(?:\s+track)?|hidden\s+track)[\)\]]").unwrap(),
+        // From soundtrack/movie: "(From Movie Soundtrack)", "(from The Album)"
+        Regex::new(r"(?i)\s*[\(\[]from\s+[^)\]]+[\)\]]").unwrap(),
+        // UK/US mix: "(UK Mix)", "[US Version]"
+        Regex::new(r"(?i)\s*[\(\[](?:uk|us|usa|original)\s+(?:mix|version|edit)[\)\]]").unwrap(),
+        // Remix artist attribution: "(Artist Remix)", "- DJ Remix"
+        Regex::new(r"(?i)\s*[-–—]\s*[a-z0-9\s]+\s+(?:remix|mix|edit)\s*$").unwrap(),
+        // Session/take info: "(BBC Session)", "[Peel Session]", "(Take 1)"
+        Regex::new(r"(?i)\s*[\(\[](?:[a-z]+\s+)?(?:session|sessions|take\s*\d+)[\)\]]").unwrap(),
+        // Tour/concert year: "(Live 2019)", "[Concert 2021]"
+        Regex::new(r"(?i)\s*[\(\[](?:live|concert|tour)(?:\s+\d{4})?[\)\]]").unwrap(),
+        // Parenthetical prod credits: "(Prod. by Someone)"
+        Regex::new(r"(?i)\s*[\(\[]prod\.?\s+(?:by\s+)?[^)\]]+[\)\]]").unwrap(),
+        // Copyright free/no copyright markers
+        Regex::new(r"(?i)\s*[\(\[](?:copyright\s+free|no\s+copyright|royalty\s+free)[\)\]]").unwrap(),
+        // Music video markers with year: "(Official Music Video 2023)"
+        Regex::new(r"(?i)\s*[\(\[](?:official\s+)?music\s+video(?:\s+\d{4})?[\)\]]").unwrap(),
     ]
 });
 
@@ -61,6 +86,17 @@ pub static TRACK_NUMBER_PREFIX: Lazy<Regex> = Lazy::new(||
 /// Pattern: 01-09 or 1-99 followed by space and uppercase letter.
 pub static TRACK_NUMBER_SPACE_PREFIX: Lazy<Regex> = Lazy::new(||
     Regex::new(r"^(?:0[1-9]|[1-9]\d?)\s+([A-Z])").unwrap()
+);
+
+/// Matches track number in brackets: "[01] Song", "[12] Title"
+pub static TRACK_NUMBER_BRACKET: Lazy<Regex> = Lazy::new(||
+    Regex::new(r"^\[\d{1,2}\]\s*").unwrap()
+);
+
+/// Matches "Artist - Title" format where track number precedes artist
+/// e.g., "117.任贤齐 - 小狼狗" → "小狼狗" (when processed with artist context)
+pub static TRACK_ARTIST_TITLE: Lazy<Regex> = Lazy::new(||
+    Regex::new(r"^\d{1,3}\.\s*[^-–—]+\s*[-–—]\s*").unwrap()
 );
 
 /// Matches mojibake replacement characters at end of string
@@ -394,6 +430,12 @@ pub fn normalize_title(title: &str) -> String {
     // Keep the captured capital letter: replace "16 E" with "E"
     result = TRACK_NUMBER_SPACE_PREFIX.replace(&result, "$1").to_string();
 
+    // Strip track number in brackets: "[01] Song" → "Song"
+    result = TRACK_NUMBER_BRACKET.replace(&result, "").to_string();
+
+    // Strip "Artist - Title" format: "117.Artist - Title" → "Title"
+    result = TRACK_ARTIST_TITLE.replace(&result, "").to_string();
+
     // Strip bracket suffix like [Mono], [RM1], [take 2]
     result = BRACKET_SUFFIX.replace(&result, "").to_string();
 
@@ -408,7 +450,16 @@ pub fn normalize_title(title: &str) -> String {
         result = pattern.replace_all(&result, "").to_string();
     }
 
-    fold_to_ascii(&result).trim().to_string()
+    // Fold to ASCII and normalize
+    let mut normalized = fold_to_ascii(&result).trim().to_string();
+
+    // Strip "the " prefix from titles (e.g., "the sound of silence" → "sound of silence")
+    // This helps match "The Sound of Silence" to "Sound of Silence"
+    if normalized.starts_with("the ") && normalized.len() > 6 {
+        normalized = normalized[4..].to_string();
+    }
+
+    normalized
 }
 
 /// Normalize title with artist context to strip artist prefix from title.
@@ -425,6 +476,12 @@ pub fn normalize_title_with_artist(title: &str, artist: &str) -> String {
     // Strip track number prefix (space only, e.g., "16 Eleanor Rigby")
     // Keep the captured capital letter: replace "16 E" with "E"
     result = TRACK_NUMBER_SPACE_PREFIX.replace(&result, "$1").to_string();
+
+    // Strip track number in brackets: "[01] Song" → "Song"
+    result = TRACK_NUMBER_BRACKET.replace(&result, "").to_string();
+
+    // Strip "Artist - Title" format: "117.Artist - Title" → "Title"
+    result = TRACK_ARTIST_TITLE.replace(&result, "").to_string();
 
     // Strip artist prefix if artist is long enough (avoid false positives for short names)
     let artist_norm = normalize_artist(artist);
@@ -449,7 +506,15 @@ pub fn normalize_title_with_artist(title: &str, artist: &str) -> String {
         result = pattern.replace_all(&result, "").to_string();
     }
 
-    fold_to_ascii(&result).trim().to_string()
+    // Fold to ASCII and normalize
+    let mut normalized = fold_to_ascii(&result).trim().to_string();
+
+    // Strip "the " prefix from titles (e.g., "the sound of silence" → "sound of silence")
+    if normalized.starts_with("the ") && normalized.len() > 6 {
+        normalized = normalized[4..].to_string();
+    }
+
+    normalized
 }
 
 /// Normalize an artist name for matching.
@@ -547,9 +612,29 @@ mod tests {
 
     #[test]
     fn test_extract_primary_artist() {
+        // Comma separator
         assert_eq!(extract_primary_artist("mustard, migos"), Some("mustard".to_string()));
+        // No separator - returns None
         assert_eq!(extract_primary_artist("beatles"), None);
+        // Ampersand separator with "the" prefix stripped
         assert_eq!(extract_primary_artist("the beatles & someone"), Some("beatles".to_string()));
+        // Slash separator
+        assert_eq!(extract_primary_artist("artist1/artist2"), Some("artist1".to_string()));
+        assert_eq!(extract_primary_artist("artist1 / artist2"), Some("artist1".to_string()));
+        // "x" separator (common in electronic music)
+        assert_eq!(extract_primary_artist("dj snake x lil jon"), Some("dj snake".to_string()));
+        // "vs" separator
+        assert_eq!(extract_primary_artist("artist1 vs artist2"), Some("artist1".to_string()));
+        assert_eq!(extract_primary_artist("artist1 vs. artist2"), Some("artist1".to_string()));
+        // "and" separator
+        assert_eq!(extract_primary_artist("hall and oates"), Some("hall".to_string()));
+        // "feat" / "ft" separator
+        assert_eq!(extract_primary_artist("drake feat rihanna"), Some("drake".to_string()));
+        assert_eq!(extract_primary_artist("drake ft. rihanna"), Some("drake".to_string()));
+        // Multiple separators - should take first
+        assert_eq!(extract_primary_artist("artist1, artist2 & artist3"), Some("artist1".to_string()));
+        // Plus separator
+        assert_eq!(extract_primary_artist("artist1+artist2"), Some("artist1".to_string()));
     }
 
     #[test]
@@ -565,5 +650,49 @@ mod tests {
         assert_eq!(normalize_punctuation("Can't Stop"), "Can't Stop");
         assert_eq!(normalize_punctuation("Can?t Stop"), "Can't Stop");
         assert_eq!(normalize_punctuation("Rock & Roll"), "Rock and Roll");
+    }
+
+    #[test]
+    fn test_normalize_title_new_patterns() {
+        // Track number in brackets
+        assert_eq!(normalize_title("[01] Song Name"), "song name");
+        assert_eq!(normalize_title("[12] Another Song"), "another song");
+
+        // Digital remaster with year
+        assert_eq!(normalize_title("Song - 2001 Digital Remaster"), "song");
+
+        // Disc/CD markers
+        assert_eq!(normalize_title("Track (Disc 1)"), "track");
+        assert_eq!(normalize_title("Song [CD 2]"), "song");
+
+        // LP/Single version
+        assert_eq!(normalize_title("Hit - Single Version"), "hit");
+        assert_eq!(normalize_title("Song - LP Version"), "song");
+
+        // Bonus track
+        assert_eq!(normalize_title("Hidden (Bonus Track)"), "hidden");
+
+        // From soundtrack
+        assert_eq!(normalize_title("Theme (From Movie Soundtrack)"), "theme");
+
+        // UK/US mix
+        assert_eq!(normalize_title("Song (UK Mix)"), "song");
+
+        // The prefix stripping
+        assert_eq!(normalize_title("The Sound of Silence"), "sound of silence");
+        assert_eq!(normalize_title("The Wall"), "wall");
+    }
+
+    #[test]
+    fn test_normalize_title_track_artist_format() {
+        // Track number with dot is stripped, leaving "Artist - Song" which isn't further processed
+        // This is expected - the "Artist - Title" embedded case needs normalize_title_with_artist
+        assert_eq!(normalize_title("117.Artist Name - Actual Song"), "artist name - actual song");
+
+        // But with artist context, the artist prefix can be stripped
+        assert_eq!(
+            normalize_title_with_artist("Artist Name - Actual Song", "Artist Name"),
+            "actual song"
+        );
     }
 }

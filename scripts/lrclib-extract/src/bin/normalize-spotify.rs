@@ -27,17 +27,43 @@ use anyhow::Result;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use rusqlite::Connection;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::sync::Arc;
 use std::time::Instant;
 
 // Import normalization functions from shared module
 use lrclib_extract::normalize::{normalize_artist, normalize_title};
 
+/// String interner for deduplicating normalized strings.
+/// Reduces memory usage significantly when many tracks share the same artist/title.
+struct StringInterner {
+    strings: FxHashMap<Arc<str>, Arc<str>>,
+}
+
+impl StringInterner {
+    fn new() -> Self {
+        Self {
+            strings: FxHashMap::default(),
+        }
+    }
+
+    /// Intern a string, returning a shared reference to the deduplicated version.
+    fn intern(&mut self, s: String) -> Arc<str> {
+        if let Some(existing) = self.strings.get(s.as_str()) {
+            Arc::clone(existing)
+        } else {
+            let arc: Arc<str> = Arc::from(s);
+            self.strings.insert(Arc::clone(&arc), Arc::clone(&arc));
+            arc
+        }
+    }
+}
+
 /// Candidate row for batch insert (spec-02 top-K schema)
 #[derive(Clone)]
 struct CandidateRow {
     track_rowid: i64,
-    title_norm: String,
-    artist_norm: String,
+    title_norm: Arc<str>,
+    artist_norm: Arc<str>,
     popularity: i32,
     duration_ms: i64,
 }
@@ -219,9 +245,13 @@ fn main() -> Result<()> {
     );
     let pb = create_progress_bar(total, log_only);
 
+    // String interner for deduplicating normalized strings
+    // Reduces memory usage significantly (many tracks share the same artist)
+    let mut interner = StringInterner::new();
+
     // Map: (title_norm, artist_norm) -> Vec<RawCandidate>
-    // Collect ALL candidates first, then dedupe by duration bucket
-    let mut candidates_map: FxHashMap<(String, String), Vec<RawCandidate>> = FxHashMap::default();
+    // Using Arc<str> keys for efficient memory sharing
+    let mut candidates_map: FxHashMap<(Arc<str>, Arc<str>), Vec<RawCandidate>> = FxHashMap::default();
 
     let mut stmt = src_conn.prepare(
         "SELECT t.rowid, t.name, a.name, t.popularity, t.duration_ms
@@ -241,9 +271,10 @@ fn main() -> Result<()> {
         let popularity: i32 = row.get(3)?;
         let duration_ms: i64 = row.get(4)?;
 
-        let title_norm = normalize_title(&title);
-        let artist_norm = normalize_artist(&artist);
-        let key = (title_norm, artist_norm);
+        // Intern normalized strings to reduce memory allocations
+        let title_norm = interner.intern(normalize_title(&title));
+        let artist_norm = interner.intern(normalize_artist(&artist));
+        let key = (Arc::clone(&title_norm), Arc::clone(&artist_norm));
 
         candidates_map
             .entry(key)
@@ -272,7 +303,14 @@ fn main() -> Result<()> {
     pb.finish_with_message("done");
     eprintln!("[READ] {}/{} (100.0%)", count, total);
 
+    // Report interner stats
+    let interned_strings = interner.strings.len();
     let unique_keys = candidates_map.len();
+    println!(
+        "  Interned {} unique strings (saved {} allocations)",
+        interned_strings,
+        count.saturating_sub(interned_strings as u64)
+    );
     println!(
         "  {} unique (title, artist) keys from {} rows",
         unique_keys, count

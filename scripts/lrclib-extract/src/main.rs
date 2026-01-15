@@ -96,6 +96,12 @@ pub struct MatchingStats {
     pub rescue_rejected_low_similarity: usize,
     pub rescue_rejected_duration: usize,
 
+    // Phase 2b: Fuzzy title matching (new)
+    pub fuzzy_title_attempted: usize,
+    pub fuzzy_title_matches: usize,
+    pub fuzzy_title_no_artist: usize,      // Artist not found in Spotify
+    pub fuzzy_title_no_close_match: usize, // No title with >=90% similarity
+
     // Phase 3: Pop=0 fallback (spec-04: includes previously-rejected groups)
     pub pop0_eligible: usize,
     pub pop0_from_no_candidates: usize,  // Groups that never had candidates
@@ -1909,6 +1915,218 @@ fn title_first_rescue(
     Ok(matches_found)
 }
 
+/// Fuzzy title rescue pass for remaining unmatched groups.
+/// For groups where the artist exists in Spotify but no exact title match was found,
+/// this pass tries to find similar titles using Levenshtein distance.
+/// Helps recover matches for typos, slight variations, and encoding differences.
+fn fuzzy_title_rescue(
+    spotify_conn: &Connection,
+    spotify_norm_path: &std::path::Path,
+    groups: &mut [LrclibGroup],
+    _groups_seen: &FxHashSet<usize>,
+    stats: &mut MatchingStats,
+) -> Result<u64> {
+    // Collect groups eligible for fuzzy title rescue:
+    // - No match yet (best_match is None)
+    // - Not a common title (those are too ambiguous)
+    let rescue_candidates: Vec<(usize, &str, &str)> = groups
+        .iter()
+        .enumerate()
+        .filter(|(_, g)| g.best_match.is_none())
+        .filter(|(_, g)| !is_common_title(&g.key.0))
+        .map(|(idx, g)| (idx, g.key.0.as_str(), g.key.1.as_str()))
+        .collect();
+
+    if rescue_candidates.is_empty() {
+        eprintln!("[FUZZY] No eligible groups for fuzzy title rescue");
+        return Ok(0);
+    }
+
+    stats.fuzzy_title_attempted = rescue_candidates.len();
+    eprintln!(
+        "[FUZZY] Running fuzzy title rescue for {} groups...",
+        rescue_candidates.len()
+    );
+
+    // Open normalized DB for title lookups by artist
+    let norm_conn = Connection::open(spotify_norm_path)?;
+    norm_conn.execute_batch(
+        "PRAGMA query_only = 1;
+         PRAGMA journal_mode = OFF;
+         PRAGMA synchronous = OFF;
+         PRAGMA temp_store = MEMORY;
+         PRAGMA cache_size = -500000;
+         PRAGMA mmap_size = 8589934592;",
+    )?;
+
+    // Prepare statement to get all titles for a given artist
+    let mut artist_titles_stmt = norm_conn.prepare_cached(
+        "SELECT DISTINCT title_norm FROM track_norm WHERE artist_norm = ? LIMIT 500",
+    )?;
+
+    // Prepare statement to get candidates for a (title, artist) pair
+    let mut candidate_stmt = norm_conn.prepare_cached(
+        "SELECT track_rowid, popularity, duration_ms
+         FROM track_norm
+         WHERE title_norm = ? AND artist_norm = ?
+         ORDER BY popularity DESC
+         LIMIT 20",
+    )?;
+
+    const TITLE_SIMILARITY_THRESHOLD: f64 = 0.90;
+    let pb = create_progress_bar(rescue_candidates.len() as u64, "Fuzzy title matching");
+
+    let mut no_artist_count = 0usize;
+    let mut no_close_match_count = 0usize;
+    let mut rowids_to_fetch: Vec<(usize, i64, String, f64)> = Vec::new(); // (group_idx, rowid, matched_title, similarity)
+
+    for (i, (group_idx, title_norm, artist_norm)) in rescue_candidates.iter().enumerate() {
+        // Get all titles for this artist
+        let mut rows = artist_titles_stmt.query(rusqlite::params![artist_norm])?;
+
+        let mut artist_titles: Vec<String> = Vec::new();
+        while let Some(row) = rows.next()? {
+            artist_titles.push(row.get(0)?);
+        }
+
+        if artist_titles.is_empty() {
+            no_artist_count += 1;
+            if i % 50_000 == 0 {
+                pb.set_position(i as u64);
+            }
+            continue;
+        }
+
+        // Find best matching title using Levenshtein similarity
+        let mut best_sim = 0.0f64;
+        let mut best_title: Option<&String> = None;
+
+        for spotify_title in &artist_titles {
+            let sim = normalized_levenshtein(title_norm, spotify_title);
+            if sim > best_sim {
+                best_sim = sim;
+                best_title = Some(spotify_title);
+            }
+            // Early exit if we found an excellent match
+            if sim >= 0.98 {
+                break;
+            }
+        }
+
+        if best_sim < TITLE_SIMILARITY_THRESHOLD {
+            no_close_match_count += 1;
+            if i % 50_000 == 0 {
+                pb.set_position(i as u64);
+            }
+            continue;
+        }
+
+        // Found a close match - get candidates for this (matched_title, artist) pair
+        let matched_title = best_title.unwrap();
+        let mut cand_rows = candidate_stmt.query(rusqlite::params![matched_title, artist_norm])?;
+
+        // Get LRCLIB duration for filtering
+        let group = &groups[*group_idx];
+        let best_variant = group.tracks.iter().max_by_key(|t| t.quality).unwrap();
+        let lrclib_duration_sec = best_variant.track.duration_sec;
+
+        while let Some(row) = cand_rows.next()? {
+            let track_rowid: i64 = row.get(0)?;
+            let duration_ms: i64 = row.get(2)?;
+
+            // Duration check (30s tolerance)
+            let diff = (lrclib_duration_sec - duration_ms / 1000).abs();
+            if diff <= 30 {
+                rowids_to_fetch.push((*group_idx, track_rowid, matched_title.clone(), best_sim));
+                break; // Take first duration-matching candidate
+            }
+        }
+
+        if i % 50_000 == 0 {
+            pb.set_position(i as u64);
+        }
+    }
+    pb.finish();
+
+    stats.fuzzy_title_no_artist = no_artist_count;
+    stats.fuzzy_title_no_close_match = no_close_match_count;
+
+    if rowids_to_fetch.is_empty() {
+        eprintln!("[FUZZY] No fuzzy matches found");
+        return Ok(0);
+    }
+
+    eprintln!(
+        "[FUZZY] {} candidates passed filters, fetching details...",
+        rowids_to_fetch.len()
+    );
+
+    // Batch fetch track details
+    let unique_rowids: Vec<i64> = rowids_to_fetch
+        .iter()
+        .map(|(_, rowid, _, _)| *rowid)
+        .collect::<FxHashSet<_>>()
+        .into_iter()
+        .collect();
+
+    let track_details = batch_fetch_track_details(spotify_conn, &unique_rowids)?;
+
+    // Score and apply matches
+    let mut matches_found = 0u64;
+    let pb2 = create_progress_bar(rowids_to_fetch.len() as u64, "Scoring fuzzy matches");
+
+    for (i, (group_idx, track_rowid, _matched_title, similarity)) in rowids_to_fetch.iter().enumerate() {
+        let group = &mut groups[*group_idx];
+
+        // Skip if already matched by another candidate
+        if group.best_match.is_some() {
+            continue;
+        }
+
+        if let Some(spotify_track) = track_details.get(track_rowid) {
+            // Score against best variant
+            let mut best_score = i32::MIN;
+            let mut best_variant_idx = 0;
+
+            for (variant_idx, variant) in group.tracks.iter().enumerate() {
+                let base_score = combined_score(&variant.track, variant.quality, spotify_track, &group.key.1);
+                // Add similarity bonus (fuzzy match gets some credit)
+                let similarity_bonus = (*similarity * 30.0) as i32;
+                let score = base_score + similarity_bonus;
+
+                if score > best_score {
+                    best_score = score;
+                    best_variant_idx = variant_idx;
+                }
+            }
+
+            if best_score >= ACCEPT_THRESHOLD {
+                group.best_match = Some((best_variant_idx, spotify_track.clone(), best_score));
+                matches_found += 1;
+
+                // Record duration bucket
+                let lrclib_duration = group.tracks[best_variant_idx].track.duration_sec;
+                let diff_sec = lrclib_duration - spotify_track.duration_ms / 1000;
+                stats.record_duration_bucket(diff_sec);
+            }
+        }
+
+        if i % 10_000 == 0 {
+            pb2.set_position(i as u64);
+        }
+    }
+    pb2.finish();
+
+    stats.fuzzy_title_matches = matches_found as usize;
+
+    eprintln!(
+        "[FUZZY] Complete: {} additional matches from fuzzy title rescue",
+        matches_found
+    );
+
+    Ok(matches_found)
+}
+
 /// Batch fetch track details by rowids with all artists (spec-03 multi-artist).
 fn batch_fetch_track_details(
     conn: &Connection,
@@ -2916,6 +3134,21 @@ fn main() -> Result<()> {
                 let matched = groups.iter().filter(|g| g.best_match.is_some()).count();
                 let rate = 100.0 * matched as f64 / total as f64;
                 println!("[MATCH] After rescue: {:.1}% ({} total, +{} from rescue)", rate, matched, rescue_matches);
+            }
+
+            // Phase 2b: Fuzzy title matching for remaining unmatched groups
+            let fuzzy_matches = fuzzy_title_rescue(
+                &spotify_conn,
+                spotify_norm_path,
+                &mut groups,
+                &groups_seen,
+                &mut stats,
+            )?;
+            if fuzzy_matches > 0 {
+                let total = groups.len();
+                let matched = groups.iter().filter(|g| g.best_match.is_some()).count();
+                let rate = 100.0 * matched as f64 / total as f64;
+                println!("[MATCH] After fuzzy: {:.1}% ({} total, +{} from fuzzy)", rate, matched, fuzzy_matches);
             }
 
             // Fallback: search pop=0 tracks for unmatched groups
