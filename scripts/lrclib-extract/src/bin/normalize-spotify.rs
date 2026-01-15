@@ -1,7 +1,10 @@
 //! Pre-normalize Spotify database for faster extraction
 //! Creates spotify_normalized.sqlite3 with normalized title/artist keys
 //!
-//! Usage: normalize-spotify [--log-only] <spotify_clean.sqlite3> [output.sqlite3]
+//! Usage: normalize-spotify [OPTIONS] <spotify_clean.sqlite3> [output.sqlite3]
+//!
+//! Options:
+//!   --log-only      Disable progress bars, use log output only
 //!
 //! NOTE: Do not create output files in the project directory.
 //! Use a separate location like /Users/hmemcpy/git/music/
@@ -185,21 +188,33 @@ fn dedupe_by_duration_bucket(candidates: Vec<RawCandidate>) -> Vec<RawCandidate>
     result
 }
 
-fn main() -> Result<()> {
+/// Parsed command-line arguments
+struct Args {
+    spotify_db: String,
+    output_db: String,
+    log_only: bool,
+}
+
+fn parse_args() -> Result<Args> {
     let args: Vec<String> = std::env::args().collect();
 
-    // Parse --log-only flag
+    // Parse flags
     let log_only = args.iter().any(|a| a == "--log-only");
-    let args_filtered: Vec<&String> = args.iter().filter(|a| *a != "--log-only").collect();
+
+    // Filter out flags
+    let args_filtered: Vec<&String> = args
+        .iter()
+        .filter(|a| !matches!(a.as_str(), "--log-only"))
+        .collect();
 
     if args_filtered.len() < 2 {
         eprintln!(
-            "Usage: normalize-spotify [--log-only] <spotify_clean.sqlite3> [spotify_normalized.sqlite3]"
+            "Usage: normalize-spotify [OPTIONS] <spotify_clean.sqlite3> [spotify_normalized.sqlite3]"
         );
         eprintln!();
         eprintln!("Options:");
         eprintln!(
-            "  --log-only  Disable progress bars, use log output only (for background runs)"
+            "  --log-only       Disable progress bars, use log output only (for background runs)"
         );
         eprintln!();
         eprintln!("Creates a normalized lookup table with multiple candidates per key (spec-02).");
@@ -208,12 +223,26 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    let spotify_db = args_filtered[1];
+    let spotify_db = args_filtered[1].clone();
     let output_db = args_filtered
         .get(2)
-        .map(|s| s.as_str())
-        .unwrap_or("spotify_normalized.sqlite3");
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "spotify_normalized.sqlite3".to_string());
 
+    Ok(Args {
+        spotify_db,
+        output_db,
+        log_only,
+    })
+}
+
+fn main() -> Result<()> {
+    let args = parse_args()?;
+
+    let spotify_db = &args.spotify_db;
+    let output_db = &args.output_db;
+
+    let log_only = args.log_only;
     let start = Instant::now();
 
     // Safety check: prevent accidentally deleting source databases

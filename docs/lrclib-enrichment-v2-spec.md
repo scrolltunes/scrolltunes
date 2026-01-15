@@ -13,8 +13,8 @@
 |--------|----------|----------|-------------|--------|
 | Match rate | 46.4% | 57.5% | **71.6%** | 65-72% ✓ |
 | Unique groups | 4.1M | 3.84M | 3.79M | — |
-| Extraction time | 45 min | 48 min | **48 min** | — |
-| Output size | — | 1.1 GB | **1.08 GB** | — |
+| Extraction time | 45 min | 48 min | **~44 min** | — |
+| Output size | — | 1.1 GB | **~980 MB** | — |
 
 ### Match Rate by Phase
 
@@ -25,23 +25,23 @@
 | RESCUE (title-first) | 64.5% | +56,266 | +1.5% |
 | FUZZY (Levenshtein ≥0.85) | 68.5% | +151,027 | +4.0% |
 | POP0 (popularity=0 tracks) | 68.3% | +119,438 | +3.2% |
-| **Final (after scoring)** | **71.6%** | **2,711,382** | — |
+| **Final (after scoring)** | **71.6%** | **2,711,390** | — |
 
 ### Timing Breakdown
 
 | Phase | Time | Details |
 |-------|------|---------|
-| READ | 1.9m | Load 12.2M → 10.0M filtered tracks |
-| GROUP | 1.6m | Parallel normalization (1.5m) + string interning (4.8s) |
-| MATCH | 5.1m | Indexed lookup → 63.0% (2.46M candidates) |
-| FETCH | 2.6m | Load 2.78M track details |
-| RESCUE | 1.8m | Title-first rescue → 64.5% (+56K) |
-| FUZZY | 3.1m | Streaming (1.9m) + Levenshtein (55s) → 68.5% (+151K) |
-| POP0 | 29.1m | Stream 284M pop=0 rows → +119K matches |
+| READ | 1.6m | Load 12.2M → 10.0M filtered tracks |
+| GROUP | 1.4m | Parallel normalization + string interning |
+| MATCH | 4.8m | Indexed lookup → 63.0% (2.46M candidates) |
+| FETCH | 2.5m | Load 2.78M track details |
+| RESCUE | 1.6m | Title-first rescue → 64.5% (+56K) |
+| FUZZY | 2.7m | Streaming (1.6m) + Levenshtein (46s) → 68.5% (+151K) |
+| POP0 | 27.6m | Streaming scan 284M pop=0 tracks → +119K matches |
 | AUDIO/IMAGES | ~1m | Load BPM, key, album art |
-| WRITE | 1.0m | Write 3.79M tracks + failures |
-| FTS + OPTIMIZE | 12.6s | Build full-text search index |
-| **Total** | **~48 min** | |
+| WRITE | ~1m | Write 3.79M tracks |
+| FTS + OPTIMIZE | ~13s | Build full-text search index |
+| **Total** | **~44 min** | |
 
 ### Improvements Implemented
 
@@ -61,7 +61,6 @@
 | Parallel GROUP normalization | Uses rayon for 10M tracks |
 | String interning | Saves ~8.6M allocations |
 | FUZZY streaming approach | Reads 54M pairs once vs batch queries |
-| POP0 title-only pre-filter | Skips 75% of artist normalizations |
 
 ---
 
@@ -71,7 +70,7 @@
 
 ```
 normalize-spotify (one-time, ~15 min)
-    └─ Creates spotify_normalized.sqlite3 (54M keys, 56M rows)
+    └─ Creates spotify_normalized.sqlite3 (54M keys, pop≥1)
 
 lrclib-extract (~48 min)
     ├─ READ: Load LRCLIB (12.2M → 10.0M filtered tracks)
@@ -80,7 +79,7 @@ lrclib-extract (~48 min)
     ├─ FETCH: Load track details for candidates (2.78M)
     ├─ RESCUE: Title-first rescue for no_candidates → 64.5% (+56K)
     ├─ FUZZY: Levenshtein similarity ≥0.85 → 68.5% (+151K)
-    ├─ POP0: Stream 284M popularity=0 tracks → 68.3% (+119K)
+    ├─ POP0: Streaming scan 284M pop=0 tracks → 71.6% (+119K)
     ├─ SCORE: Select best candidate per group → 71.6% (2.71M)
     ├─ ENRICH: Batch-load audio features + album images
     └─ WRITE: Output tracks + FTS index + failure logs
@@ -103,10 +102,9 @@ lrclib-extract (~48 min)
 - Impact: +151K matches (+4.0%)
 
 **POP0 (Popularity Zero):**
-- Searches 284M tracks with popularity=0 (excluded from main index)
-- Uses title-only pre-filter HashSet (859K unique titles)
-- Only normalizes artist for rows where title matches
-- Impact: +119K matches (+3.2%)
+- Searches 284M tracks with popularity=0 (excluded from main index for size)
+- Streams all rows with title pre-filter index for efficiency
+- Impact: +119K matches (+3.2%), ~29 min runtime
 
 ### Database Files
 
@@ -114,7 +112,7 @@ lrclib-extract (~48 min)
 |------|------|---------|
 | `lrclib-db-dump-*.sqlite3` | 77 GB | Source lyrics (12.2M tracks) |
 | `spotify_clean.sqlite3` | 125 GB | Spotify catalog (64M track-artists) |
-| `spotify_normalized.sqlite3` | 10 GB | Pre-normalized index (54M keys, 56M rows) |
+| `spotify_normalized.sqlite3` | 10 GB | Pre-normalized index (54M keys, pop≥1) |
 | `spotify_clean_audio_features.sqlite3` | 41 GB | BPM, key, mode, time signature |
 | `spotify_clean_track_files.sqlite3` | ~146 GB* | Language, original_title, versions |
 
@@ -456,8 +454,7 @@ Ask Me Why.flac            | ask me why.flac (extension not stripped)
 ### Not Recommended
 
 1. **Lower fuzzy threshold below 0.85** - False positive rate increases significantly
-2. **Further POP0 optimization** - 29 min is acceptable, limited by I/O
-3. **Machine learning matching** - Effort/maintenance outweighs ~5% potential gain
+2. **Machine learning matching** - Effort/maintenance outweighs ~5% potential gain
 
 ---
 
@@ -720,21 +717,23 @@ cargo build --release
 ### Pre-normalize Spotify (one-time after normalization changes)
 
 ```bash
+# Builds spotify_normalized.sqlite3 (~15 min)
 ./target/release/normalize-spotify \
-  /Users/hmemcpy/git/music/spotify_clean.sqlite3 \
-  /Users/hmemcpy/git/music/spotify_normalized.sqlite3 \
+  ~/git/music/spotify_clean.sqlite3 \
+  ~/git/music/spotify_normalized.sqlite3 \
   --log-only
 ```
 
 ### Run Extraction
 
 ```bash
+# Full extraction (~48 min)
 ./target/release/lrclib-extract \
-  /Users/hmemcpy/git/music/lrclib-db-dump-*.sqlite3 \
-  /Users/hmemcpy/git/music/output.sqlite3 \
-  --spotify /Users/hmemcpy/git/music/spotify_clean.sqlite3 \
-  --spotify-normalized /Users/hmemcpy/git/music/spotify_normalized.sqlite3 \
-  --audio-features /Users/hmemcpy/git/music/spotify_clean_audio_features.sqlite3 \
+  ~/git/music/lrclib-db-dump-*.sqlite3 \
+  ~/git/music/output.sqlite3 \
+  --spotify ~/git/music/spotify_clean.sqlite3 \
+  --spotify-normalized ~/git/music/spotify_normalized.sqlite3 \
+  --audio-features ~/git/music/spotify_clean_audio_features.sqlite3 \
   --log-only
 ```
 

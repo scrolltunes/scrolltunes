@@ -118,6 +118,10 @@ struct Args {
     /// Export stats to JSON file (spec-07 instrumentation)
     #[arg(long)]
     export_stats: Option<PathBuf>,
+
+    /// Log match failures to match_failures table (adds ~100MB to output)
+    #[arg(long)]
+    log_failures: bool,
 }
 
 #[allow(dead_code)]
@@ -533,12 +537,11 @@ fn compute_artist_similarity(a: &str, b: &str) -> f64 {
 
 /// Multi-artist matching result (spec-03).
 /// Returns the best similarity score across all credited artists, plus whether it was an exact match
-/// and whether the best match was from a secondary (non-primary) artist.
+/// Result includes best similarity score and whether it was an exact match.
 #[derive(Debug, Clone)]
 struct MultiArtistMatchResult {
     best_similarity: f64,
     is_exact: bool,
-    is_secondary_artist: bool,  // True if best match was not the primary artist
 }
 
 /// Score LRCLIB artist against all credited Spotify artists (spec-03 R3.2).
@@ -548,15 +551,13 @@ fn score_artist_multi(lrclib_artist_norm: &str, spotify_artists: &[String]) -> M
         return MultiArtistMatchResult {
             best_similarity: 0.0,
             is_exact: false,
-            is_secondary_artist: false,
         };
     }
 
     let mut best_similarity: f64 = 0.0;
     let mut best_is_exact = false;
-    let mut best_artist_idx: usize = 0;
 
-    for (idx, artist) in spotify_artists.iter().enumerate() {
+    for artist in spotify_artists.iter() {
         let artist_norm = normalize_artist(artist);
 
         if artist_norm == lrclib_artist_norm {
@@ -564,14 +565,12 @@ fn score_artist_multi(lrclib_artist_norm: &str, spotify_artists: &[String]) -> M
             return MultiArtistMatchResult {
                 best_similarity: 1.0,
                 is_exact: true,
-                is_secondary_artist: idx > 0,
             };
         }
 
         let similarity = compute_artist_similarity(&artist_norm, lrclib_artist_norm);
         if similarity > best_similarity {
             best_similarity = similarity;
-            best_artist_idx = idx;
             best_is_exact = false;
         }
     }
@@ -579,7 +578,6 @@ fn score_artist_multi(lrclib_artist_norm: &str, spotify_artists: &[String]) -> M
     MultiArtistMatchResult {
         best_similarity,
         is_exact: best_is_exact,
-        is_secondary_artist: best_artist_idx > 0,
     }
 }
 
@@ -1809,6 +1807,9 @@ fn match_pop0_fallback(
     Ok(matches_found)
 }
 
+// ============================================================================
+// Pop0 Indexed Lookup (Optimized)
+// ============================================================================
 // ============================================================================
 // Title-First Rescue Pass (spec-06)
 // ============================================================================
@@ -3425,6 +3426,7 @@ fn main() -> Result<()> {
                 &mut groups_seen,
                 &mut stats,
             )?;
+
             if pop0_matches > 0 {
                 let total = groups.len();
                 let matched = groups_seen.len();
@@ -3444,8 +3446,13 @@ fn main() -> Result<()> {
         }
 
         // Collect match failures BEFORE consuming groups (spec-05)
-        let failures = collect_match_failures(&groups, &groups_seen);
-        println!("[FAILURES] Found {} potential failures to log", failures.len());
+        let failures = if args.log_failures {
+            let f = collect_match_failures(&groups, &groups_seen);
+            println!("[FAILURES] Found {} potential failures to log", f.len());
+            Some(f)
+        } else {
+            None
+        };
 
         // Collect IDs we actually need for audio features and images
         let (needed_track_ids, needed_album_rowids) = collect_needed_ids_from_groups(&groups);
@@ -3476,7 +3483,7 @@ fn main() -> Result<()> {
         println!("\nSelecting canonical tracks and enriching...");
         let enriched = select_canonical_and_enrich(groups, &audio_lookup, &image_lookup);
 
-        (enriched, Some(failures))
+        (enriched, failures)
     } else {
         // No Spotify data: select best quality variant from each group
         println!("\nNo Spotify data - selecting canonical by quality...");
@@ -4130,7 +4137,6 @@ mod tests {
         ]);
         assert!(result.is_exact);
         assert_eq!(result.best_similarity, 1.0);
-        assert!(!result.is_secondary_artist);
     }
 
     #[test]
@@ -4142,7 +4148,6 @@ mod tests {
         ]);
         assert!(result.is_exact);
         assert_eq!(result.best_similarity, 1.0);
-        assert!(result.is_secondary_artist);  // Match was from index 1
     }
 
     #[test]
@@ -4154,7 +4159,6 @@ mod tests {
         ]);
         assert!(!result.is_exact);
         assert!(result.best_similarity > 0.3);  // Should have some similarity
-        assert!(!result.is_secondary_artist);   // Best match was from primary
     }
 
     #[test]
@@ -4174,7 +4178,6 @@ mod tests {
         let result = score_artist_multi("metallica", &vec![]);
         assert!(!result.is_exact);
         assert_eq!(result.best_similarity, 0.0);
-        assert!(!result.is_secondary_artist);
     }
 
     #[test]
