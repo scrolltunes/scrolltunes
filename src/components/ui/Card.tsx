@@ -46,13 +46,22 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
 
   if (interactive || glowOnHover) {
     const hoverBoxShadow = glowOnHover
-      ? "0 0 20px rgba(122, 162, 247, 0.4)"
+      ? "0 0 30px rgba(122, 162, 247, 0.3), 0 0 60px rgba(122, 162, 247, 0.1)"
       : (styles.boxShadow ?? "none")
+
+    const interactiveClasses = [
+      "rounded-sm",
+      interactive ? "cursor-pointer" : "",
+      glowOnHover ? "hover:border-[var(--accent-primary)]/50" : "",
+      className,
+    ]
+      .filter(Boolean)
+      .join(" ")
 
     return (
       <motion.div
         ref={ref}
-        className={`rounded-sm ${interactive ? "cursor-pointer" : ""} ${className}`}
+        className={interactiveClasses}
         style={{
           background: styles.background,
           border: styles.border,

@@ -26,14 +26,14 @@ const baseStyles = [
 const variantStyles: Record<ButtonVariant, string> = {
   default: [
     "bg-[var(--accent-primary)] text-[var(--bg-primary)]",
-    "hover:bg-[var(--accent-primary)]/90 hover:shadow-[0_0_20px_rgba(122,162,247,0.4)]",
-    "active:bg-[var(--accent-primary)]/80 active:shadow-[0_0_10px_rgba(122,162,247,0.3)]",
+    "hover:bg-[var(--accent-primary)]/90 hover:shadow-[0_0_30px_rgba(122,162,247,0.5),0_0_60px_rgba(122,162,247,0.2)]",
+    "active:bg-[var(--accent-primary)]/80 active:shadow-[0_0_15px_rgba(122,162,247,0.4)]",
     "border border-[var(--accent-primary)]/50",
   ].join(" "),
 
   secondary: [
     "bg-[var(--bg-tertiary)] text-[var(--fg-primary)]",
-    "hover:bg-[var(--bg-highlight)] hover:text-[var(--accent-tertiary)]",
+    "hover:bg-[var(--bg-highlight)] hover:text-[var(--accent-tertiary)] hover:shadow-[0_0_20px_rgba(125,207,255,0.3)]",
     "active:bg-[var(--bg-secondary)]",
     "border border-[var(--border-default)]",
     "hover:border-[var(--accent-tertiary)]/50",
@@ -42,7 +42,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   outline: [
     "bg-transparent text-[var(--accent-primary)]",
     "border-2 border-[var(--accent-primary)]/60",
-    "hover:bg-[var(--accent-primary)]/10 hover:border-[var(--accent-primary)] hover:shadow-[0_0_15px_rgba(122,162,247,0.2)]",
+    "hover:bg-[var(--accent-primary)]/10 hover:border-[var(--accent-primary)] hover:shadow-[0_0_25px_rgba(122,162,247,0.3)]",
     "active:bg-[var(--accent-primary)]/20",
   ].join(" "),
 
