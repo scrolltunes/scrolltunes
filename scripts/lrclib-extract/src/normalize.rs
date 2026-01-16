@@ -26,6 +26,9 @@ pub static TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(r"(?i)\s*[\(\[](?:deluxe|super\s+deluxe|expanded|anniversary|bonus\s+track(?:s)?|special|collector'?s?)(?:\s+edition)?[\)\]]").unwrap(),
         // Mix/version variants: "(Radio Edit)", "[Album Version]", "(Mono)", "(Stereo)"
         Regex::new(r"(?i)\s*[\(\[](?:radio\s+edit|single\s+version|album\s+version|extended(?:\s+(?:mix|version))?|original\s+mix|mono|stereo)[\)\]]").unwrap(),
+        // Standalone edit: "(Edit)", "[Edit]", "- Edit"
+        Regex::new(r"(?i)\s*[\(\[]edit[\)\]]").unwrap(),
+        Regex::new(r"(?i)\s*[-–—]\s*edit\s*$").unwrap(),
         // Content variants: "(Explicit)", "[Clean]", "(Instrumental)"
         Regex::new(r"(?i)\s*[\(\[](?:explicit|clean|censored|instrumental|karaoke)[\)\]]").unwrap(),
         // Recording variants: "(Demo)", "[Alternate Take]", "(Outtake)"
@@ -1020,6 +1023,16 @@ mod tests {
         assert_eq!(normalize_title("03 - Song Name"), "song name");
         assert_eq!(normalize_title("Song [Mono]"), "song");
         assert_eq!(normalize_title("Track (2021 Remaster)"), "track");
+    }
+
+    #[test]
+    fn test_normalize_title_edit_suffix() {
+        // Standalone edit variants
+        assert_eq!(normalize_title("Love You To Death (Edit)"), "love you to death");
+        assert_eq!(normalize_title("Song [Edit]"), "song");
+        assert_eq!(normalize_title("Track - Edit"), "track");
+        // Radio edit (existing pattern)
+        assert_eq!(normalize_title("Song (Radio Edit)"), "song");
     }
 
     #[test]
