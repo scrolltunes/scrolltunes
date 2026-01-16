@@ -56,7 +56,9 @@ function StatusRow({ label, value, hasValue }: StatusRowProps) {
       ) : (
         <X size={14} weight="bold" style={{ color: "var(--color-text-muted)" }} />
       )}
-      <span className="font-medium" style={{ color: "var(--color-text3)" }}>{label}:</span>
+      <span className="font-medium" style={{ color: "var(--color-text3)" }}>
+        {label}:
+      </span>
       <span
         className="tabular-nums"
         style={{ color: hasValue ? "var(--color-text)" : "var(--color-text-muted)" }}
@@ -167,20 +169,26 @@ export function TrackDetail({ track, renderActions }: TrackDetailProps) {
       >
         <div className="flex items-center gap-2">
           <Clock size={16} style={{ color: "var(--color-text-muted)" }} />
-          <span className="font-medium" style={{ color: "var(--color-text3)" }}>Duration:</span>
+          <span className="font-medium" style={{ color: "var(--color-text3)" }}>
+            Duration:
+          </span>
           <span className="tabular-nums" style={{ color: "var(--color-text)" }}>
             {formatDuration(track.durationSec)}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <Textbox size={16} style={{ color: "var(--color-text-muted)" }} />
-          <span className="font-medium" style={{ color: "var(--color-text3)" }}>Quality:</span>
+          <span className="font-medium" style={{ color: "var(--color-text3)" }}>
+            Quality:
+          </span>
           <span className="tabular-nums" style={{ color: "var(--color-text)" }}>
             {track.quality}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-medium" style={{ color: "var(--color-text3)" }}>LRCLIB:</span>
+          <span className="font-medium" style={{ color: "var(--color-text3)" }}>
+            LRCLIB:
+          </span>
           <span className="tabular-nums" style={{ color: "var(--color-text)" }}>
             {track.lrclibId}
           </span>

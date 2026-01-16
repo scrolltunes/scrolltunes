@@ -1,45 +1,43 @@
 #!/bin/bash
 
-# Ralph Wiggum Loop - LRCLIB Enrichment v3
-# Reference: https://github.com/ghuntley/how-to-ralph-wiggum
-#
-# Features:
-#   - Automatic usage limit detection and recovery
-#   - Sleep until reset with countdown
-#   - Graceful retry after rate limits
-#
-# Usage:
-#   ./loop.sh           # Build mode (default)
-#   ./loop.sh plan      # Planning mode
-#   ./loop.sh 10        # Max 10 iterations
-#   ./loop.sh plan 5    # Planning mode, max 5 iterations
+# Ralph Wiggum Build Loop (Amp)
+# Runs build iterations until RALPH_COMPLETE
 
 set -e
 
-MODE="build"
+FEATURE_NAME="tui-redesign"
 MAX_ITERATIONS=0
 ITERATION=0
 CONSECUTIVE_FAILURES=0
 MAX_CONSECUTIVE_FAILURES=3
+PARENT_THREAD_FILE=$(mktemp)
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 for arg in "$@"; do
-  if [[ "$arg" == "plan" ]]; then
-    MODE="plan"
-  elif [[ "$arg" =~ ^[0-9]+$ ]]; then
+  if [[ "$arg" =~ ^[0-9]+$ ]]; then
     MAX_ITERATIONS=$arg
   fi
 done
 
-PROMPT_FILE="PROMPT_${MODE}.md"
+PROMPT_FILE="PROMPT_build.md"
 
-# Calculate seconds until next hour boundary
+if [[ ! -f "$PROMPT_FILE" ]]; then
+  echo -e "${RED}Error: $PROMPT_FILE not found${NC}"
+  echo "Run the ralph skill first to generate the required files."
+  exit 1
+fi
+
+cleanup() {
+  rm -f "$PARENT_THREAD_FILE"
+}
+trap cleanup EXIT
+
 seconds_until_next_hour() {
   local now=$(date +%s)
   local current_minute=$(date +%M)
@@ -49,7 +47,6 @@ seconds_until_next_hour() {
   echo $seconds_until
 }
 
-# Calculate seconds until specific reset time
 seconds_until_daily_reset() {
   local reset_hour=5
   local now=$(date +%s)
@@ -63,7 +60,6 @@ seconds_until_daily_reset() {
   fi
 }
 
-# Display countdown timer
 countdown() {
   local seconds=$1
   local message=$2
@@ -79,56 +75,30 @@ countdown() {
   printf "\r%-80s\r" " "
 }
 
-# Check if error indicates usage limit exceeded
-is_usage_limit_error() {
-  local output="$1"
-  local exit_code="$2"
-
-  if [[ "$output" =~ "Claude usage limit reached" ]]; then
-    return 0
-  fi
-
-  if [[ "$output" =~ \"type\":\"rate_limit_error\" ]]; then
-    return 0
-  fi
-
-  if [[ "$output" =~ \"type\":\"overloaded_error\" ]]; then
-    return 0
-  fi
-
-  if [[ "$output" =~ Error:\ 429 ]] || [[ "$output" =~ Error:\ 529 ]]; then
-    return 0
-  fi
-
+is_recoverable_error() {
   return 1
 }
 
-# Determine sleep duration based on error type
 get_sleep_duration() {
   local output="$1"
 
-  if [[ "$output" =~ "reset at "([A-Za-z]+)" "([0-9]+)", "([0-9]+)(am|pm) ]]; then
-    local month="${BASH_REMATCH[1]}"
-    local day="${BASH_REMATCH[2]}"
-    local hour="${BASH_REMATCH[3]}"
-    local ampm="${BASH_REMATCH[4]}"
-
-    if [[ "$ampm" == "pm" && "$hour" != "12" ]]; then
-      hour=$((hour + 12))
-    elif [[ "$ampm" == "am" && "$hour" == "12" ]]; then
-      hour=0
-    fi
-
-    local reset_time=$(date -j -f "%b %d %H" "$month $day $hour" +%s 2>/dev/null)
-    if [[ -n "$reset_time" ]]; then
+  local json_reset=$(echo "$output" | grep -oE '"resetsAt"\s*:\s*"[^"]+"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+  if [[ -n "$json_reset" ]]; then
+    local reset_epoch=$(date -jf "%Y-%m-%dT%H:%M:%S%z" "$json_reset" +%s 2>/dev/null || \
+                        date -d "$json_reset" +%s 2>/dev/null)
+    if [[ -n "$reset_epoch" ]]; then
       local now=$(date +%s)
-      local diff=$((reset_time - now))
-      if [[ $diff -lt 0 ]]; then
-        diff=$((diff + 86400 * 30))
+      local diff=$((reset_epoch - now))
+      if [[ $diff -gt 0 ]]; then
+        echo $((diff + 60))
+        return
       fi
-      echo $((diff + 60))
-      return
     fi
+  fi
+
+  if [[ "$output" =~ retry.after[[:space:]]*:?[[:space:]]*([0-9]+) ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return
   fi
 
   if [[ "$output" =~ "try again in "([0-9]+)" minute" ]]; then
@@ -146,35 +116,33 @@ get_sleep_duration() {
     return
   fi
 
-  local wait_time=$(seconds_until_next_hour)
-  echo $((wait_time + 60))
+  echo 300
 }
 
-# Handle usage limit - sleep and retry
-handle_usage_limit() {
+handle_recoverable_error() {
   local output="$1"
   local sleep_duration=$(get_sleep_duration "$output")
 
   echo ""
-  echo -e "${YELLOW}=== Usage Limit Detected ===${NC}"
-  echo -e "${YELLOW}Claude usage limit exceeded. Waiting for reset...${NC}"
+  echo -e "${YELLOW}=== Recoverable Error Detected ===${NC}"
+  echo -e "${YELLOW}Waiting before retry...${NC}"
   echo ""
 
   local resume_time=$(date -v+${sleep_duration}S "+%Y-%m-%d %H:%M:%S" 2>/dev/null || date -d "+${sleep_duration} seconds" "+%Y-%m-%d %H:%M:%S")
   echo -e "Expected resume: ${CYAN}${resume_time}${NC}"
   echo ""
 
-  countdown $sleep_duration "Waiting for usage reset..."
+  countdown $sleep_duration "Waiting..."
 
   echo ""
-  echo -e "${GREEN}Usage limit should be reset. Resuming...${NC}"
+  echo -e "${GREEN}Resuming...${NC}"
   echo ""
 
   CONSECUTIVE_FAILURES=0
 }
 
-echo -e "${GREEN}Ralph loop: $(echo "$MODE" | tr '[:lower:]' '[:upper:]') mode${NC}"
-echo -e "${GREEN}Feature: LRCLIB Enrichment v3${NC}"
+echo -e "${GREEN}Ralph Build Loop (Amp)${NC}"
+echo -e "${GREEN}Feature: ${FEATURE_NAME}${NC}"
 [[ $MAX_ITERATIONS -gt 0 ]] && echo "Max iterations: $MAX_ITERATIONS"
 echo "Press Ctrl+C to stop"
 echo "---"
@@ -182,25 +150,84 @@ echo "---"
 while true; do
   ITERATION=$((ITERATION + 1))
   echo ""
-  echo -e "${GREEN}=== Iteration $ITERATION ===${NC}"
+  echo -e "${GREEN}=== Build Iteration $ITERATION ===${NC}"
   echo ""
 
   TEMP_OUTPUT=$(mktemp)
+  PARENT_THREAD=$(cat "$PARENT_THREAD_FILE" 2>/dev/null || true)
   set +e
 
-  claude -p \
-    --dangerously-skip-permissions \
-    --model opus \
-    --output-format stream-json \
-    <<< "$(cat "$PROMPT_FILE")" 2>&1 | tee "$TEMP_OUTPUT" | jq -r 'select(.type == "assistant") | .message.content[]?.text // empty' 2>/dev/null
+  if [[ -n "$PARENT_THREAD" ]]; then
+    # Create child thread via handoff from parent
+    echo -e "${CYAN}Creating handoff from parent ${PARENT_THREAD}...${NC}"
+    
+    cat "$PROMPT_FILE" | amp threads handoff "$PARENT_THREAD" \
+      --goal "$(cat "$PROMPT_FILE")" \
+      -x \
+      --dangerously-allow-all \
+      --stream-json > "$TEMP_OUTPUT" 2>&1
+  else
+    # First iteration: create parent thread
+    amp -x --dangerously-allow-all --stream-json < "$PROMPT_FILE" > "$TEMP_OUTPUT" 2>&1
+  fi
+
+  # Extract thread ID from JSON output
+  THREAD_ID=$(jq -r 'select(.type == "system") | .session_id' "$TEMP_OUTPUT" 2>/dev/null | head -1)
+
+  # Display progress
+  cat "$TEMP_OUTPUT" | jq -r '
+      def tool_info:
+        if .name == "edit_file" or .name == "create_file" or .name == "Read" then
+          (.input.path | split("/") | last | .[0:60])
+        elif .name == "todo_write" then
+          ((.input.todos // []) | map(.content) | join(", ") | if contains("\n") then .[0:60] else . end)
+        elif .name == "Bash" then
+          (.input.cmd | if contains("\n") then split("\n") | first | .[0:50] else .[0:80] end)
+        elif .name == "Grep" then
+          (.input.pattern | .[0:40])
+        elif .name == "glob" then
+          (.input.filePattern | .[0:40])
+        elif .name == "finder" then
+          (.input.query | if contains("\n") then .[0:40] else . end)
+        elif .name == "oracle" then
+          (.input.task | if contains("\n") then .[0:40] else .[0:80] end)
+        elif .name == "Task" then
+          (.input.description // .input.prompt | if contains("\n") then .[0:40] else .[0:80] end)
+        else null end;
+      if .type == "assistant" then
+        .message.content[] |
+        if .type == "text" then
+          if (.text | split("\n") | length) <= 3 then .text else empty end
+        elif .type == "tool_use" then
+          "    [" + .name + "]" + (tool_info | if . then " " + . else "" end)
+        else empty end
+      elif .type == "result" then
+        "--- " + ((.duration_ms / 1000 * 10 | floor / 10) | tostring) + "s, " + (.num_turns | tostring) + " turns ---"
+      else empty end
+    ' 2>/dev/null
 
   EXIT_CODE=$?
   OUTPUT=$(cat "$TEMP_OUTPUT")
+  RESULT_MSG=$(jq -r 'select(.type == "result") | .result // empty' "$TEMP_OUTPUT" 2>/dev/null | tail -1)
   rm -f "$TEMP_OUTPUT"
   set -e
 
-  if is_usage_limit_error "$OUTPUT" "$EXIT_CODE"; then
-    handle_usage_limit "$OUTPUT"
+  # Name/rename thread
+  if [[ -n "$THREAD_ID" ]]; then
+    if [[ -z "$PARENT_THREAD" ]]; then
+      # First iteration: save as parent, name it
+      echo "$THREAD_ID" > "$PARENT_THREAD_FILE"
+      amp threads rename "$THREAD_ID" "ralph: ${FEATURE_NAME} (parent)" 2>/dev/null || true
+      echo -e "${CYAN}Parent thread: $THREAD_ID${NC}"
+    else
+      # Child iteration: name it
+      amp threads rename "$THREAD_ID" "ralph: ${FEATURE_NAME} #${ITERATION}" 2>/dev/null || true
+      echo -e "${CYAN}Child thread: $THREAD_ID${NC}"
+    fi
+  fi
+
+  if is_recoverable_error "$OUTPUT" "$EXIT_CODE"; then
+    handle_recoverable_error "$OUTPUT"
     ITERATION=$((ITERATION - 1))
     continue
   fi
@@ -223,10 +250,10 @@ while true; do
 
   CONSECUTIVE_FAILURES=0
 
-  if [[ "$OUTPUT" =~ "RALPH_COMPLETE" ]]; then
+  if [[ "$RESULT_MSG" =~ "RALPH_COMPLETE" ]]; then
     echo ""
-    echo -e "${GREEN}=== All Tasks Complete ===${NC}"
-    echo -e "${GREEN}LRCLIB Enrichment v3 implementation finished.${NC}"
+    echo -e "${GREEN}=== Ralph Complete ===${NC}"
+    echo -e "${GREEN}All tasks finished.${NC}"
     break
   fi
 

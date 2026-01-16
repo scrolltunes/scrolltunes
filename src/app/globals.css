@@ -1,78 +1,114 @@
 @import "tailwindcss";
 
 :root {
-  /* Studio Pro Dark theme tokens */
-  --color-bg: #070a12;
-  --color-surface1: #0c1220;
-  --color-surface2: #111a2c;
-  --color-surface3: #151f33;
-  --color-surface-elevated: #1a2540;
+  /* ============================================
+     Tokyo Night Design Tokens (TUI Redesign)
+     ============================================ */
 
-  /* Text hierarchy */
-  --color-text: #f3f5f7;
-  --color-text2: rgba(243, 245, 247, 0.72);
-  --color-text3: rgba(243, 245, 247, 0.46);
-  --color-text-muted: rgba(243, 245, 247, 0.28);
-  --color-text-ghost: rgba(243, 245, 247, 0.12);
+  /* Background layers */
+  --bg-primary: #1a1b26; /* deepest background */
+  --bg-secondary: #24283b; /* cards, elevated surfaces */
+  --bg-tertiary: #2f3449; /* hover states */
+  --bg-highlight: #3d4259; /* active states */
+
+  /* Foreground (text) */
+  --fg-primary: #c0caf5; /* primary text */
+  --fg-secondary: #a9b1d6; /* secondary text */
+  --fg-muted: #565f89; /* muted/placeholder */
+  --fg-dim: #414868; /* disabled/ghost */
 
   /* Accent colors */
-  --color-accent: #5b6cff;
-  --color-accent-hover: #6f7dff;
-  --color-accent-bright: #818cf8;
-  --color-accent-soft: rgba(91, 108, 255, 0.14);
-  --color-accent-glow: rgba(91, 108, 255, 0.25);
-  --color-progress-start: #3730a3;
-  --color-progress-end: #818cf8;
-  --color-progress-track: var(--color-surface2);
+  --accent-primary: #7aa2f7; /* blue (primary actions) */
+  --accent-secondary: #bb9af7; /* purple (secondary) */
+  --accent-tertiary: #7dcfff; /* cyan (highlights) */
+
+  /* Status colors */
+  --status-success: #9ece6a; /* green */
+  --status-warning: #e0af68; /* amber */
+  --status-error: #f7768e; /* pink/red */
+  --status-info: #7aa2f7; /* blue */
+
+  /* Borders */
+  --border-default: #3d4259; /* default border */
+  --border-active: #7aa2f7; /* focused/active */
+  --border-muted: #2f3449; /* subtle */
+
+  /* ============================================
+     Legacy mappings (for backward compatibility)
+     ============================================ */
+
+  /* Background mappings */
+  --color-bg: var(--bg-primary);
+  --color-surface1: var(--bg-secondary);
+  --color-surface2: var(--bg-tertiary);
+  --color-surface3: var(--bg-highlight);
+  --color-surface-elevated: var(--bg-secondary);
+
+  /* Text mappings */
+  --color-text: var(--fg-primary);
+  --color-text2: var(--fg-secondary);
+  --color-text3: var(--fg-muted);
+  --color-text-muted: var(--fg-muted);
+  --color-text-ghost: var(--fg-dim);
+
+  /* Accent mappings */
+  --color-accent: var(--accent-primary);
+  --color-accent-hover: #8eb5ff;
+  --color-accent-bright: var(--accent-tertiary);
+  --color-accent-soft: rgba(122, 162, 247, 0.14);
+  --color-accent-glow: rgba(122, 162, 247, 0.25);
+  --color-progress-start: var(--accent-secondary);
+  --color-progress-end: var(--accent-primary);
+  --color-progress-track: var(--bg-tertiary);
 
   /* Semantic colors */
-  --color-success: #22c55e;
-  --color-success-soft: rgba(34, 197, 94, 0.14);
-  --color-warning: #f59e0b;
-  --color-warning-soft: rgba(245, 158, 11, 0.14);
-  --color-danger: #fb7185;
-  --color-danger-soft: rgba(251, 113, 133, 0.14);
-  --color-favorite: #ef4444;
+  --color-success: var(--status-success);
+  --color-success-soft: rgba(158, 206, 106, 0.14);
+  --color-warning: var(--status-warning);
+  --color-warning-soft: rgba(224, 175, 104, 0.14);
+  --color-danger: var(--status-error);
+  --color-danger-soft: rgba(247, 118, 142, 0.14);
+  --color-favorite: #f7768e;
 
   /* Chord display */
-  --color-chord: #fbbf24;
-  --color-chord-soft: rgba(251, 191, 36, 0.14);
+  --color-chord: #e0af68;
+  --color-chord-soft: rgba(224, 175, 104, 0.14);
 
-  /* Spotify brand */
+  /* Spotify brand (keep for compliance) */
   --color-spotify: #1db954;
   --color-spotify-soft: rgba(29, 185, 84, 0.14);
 
   /* Header */
-  --color-header-bg: rgba(7, 10, 18, 0.8);
+  --color-header-bg: rgba(26, 27, 38, 0.85);
 
-  /* Borders */
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-border-strong: rgba(255, 255, 255, 0.16);
+  /* Border mappings */
+  --color-border: var(--border-default);
+  --color-border-strong: var(--border-active);
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(91, 108, 255, 0.15);
-  --shadow-glow-active: 0 0 30px rgba(91, 108, 255, 0.25);
-  --shadow-glow-chord: 0 0 20px rgba(251, 191, 36, 0.3);
+  --shadow-glow: 0 0 20px rgba(122, 162, 247, 0.15);
+  --shadow-glow-active: 0 0 30px rgba(122, 162, 247, 0.25);
+  --shadow-glow-chord: 0 0 20px rgba(224, 175, 104, 0.3);
 
-  /* Border radius */
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
+  /* Border radius (terminal = sharper) */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
 
-  /* Legacy variables (for backward compatibility) */
-  --background: #070a12;
-  --foreground: #f3f5f7;
-  --scrollbar-thumb: #404040;
-  --scrollbar-thumb-hover: #525252;
+  /* Legacy variables */
+  --background: var(--bg-primary);
+  --foreground: var(--fg-primary);
+  --scrollbar-thumb: var(--bg-highlight);
+  --scrollbar-thumb-hover: var(--fg-dim);
 
   /* Active line highlight tokens (legacy) */
-  --stage-accent: #5b6cff;
-  --stage-border-strong: rgba(255, 255, 255, 0.16);
+  --stage-accent: var(--accent-primary);
+  --stage-border-strong: var(--border-active);
 }
 
 /* Light mode overrides */
