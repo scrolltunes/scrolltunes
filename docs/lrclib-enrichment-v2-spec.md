@@ -363,6 +363,119 @@ See `docs/search-optimization-findings.md` for details.
 
 ---
 
+## Post-Extraction Testing Checklist
+
+Run these checks after extraction completes to validate the output database.
+
+### 1. Basic Metrics
+
+```bash
+sqlite3 ~/git/music/lrclib-enriched.sqlite3 <<'EOF'
+.mode column
+.headers on
+
+-- Total tracks and match rate
+SELECT
+    COUNT(*) as total_tracks,
+    SUM(CASE WHEN spotify_id IS NOT NULL THEN 1 ELSE 0 END) as matched,
+    ROUND(100.0 * SUM(CASE WHEN spotify_id IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) || '%' as match_rate
+FROM tracks;
+EOF
+```
+
+**Expected:** ~3.4M tracks, ~68-72% match rate
+
+### 2. No Duplicate Spotify IDs
+
+```bash
+sqlite3 ~/git/music/lrclib-enriched.sqlite3 "
+SELECT COUNT(*) as duplicates FROM (
+    SELECT spotify_id FROM tracks
+    WHERE spotify_id IS NOT NULL
+    GROUP BY spotify_id HAVING COUNT(*) > 1
+);"
+```
+
+**Expected:** 0
+
+### 3. Audio Features Coverage
+
+```bash
+sqlite3 ~/git/music/lrclib-enriched.sqlite3 "
+SELECT
+    COUNT(*) as matched,
+    SUM(CASE WHEN tempo IS NOT NULL THEN 1 ELSE 0 END) as with_tempo,
+    SUM(CASE WHEN album_image_url IS NOT NULL THEN 1 ELSE 0 END) as with_art,
+    ROUND(100.0 * SUM(CASE WHEN tempo IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 1) || '%' as tempo_rate
+FROM tracks WHERE spotify_id IS NOT NULL;"
+```
+
+**Expected:** >90% tempo coverage
+
+### 4. FTS Search Sanity
+
+```bash
+sqlite3 ~/git/music/lrclib-enriched.sqlite3 "
+SELECT title, artist, popularity
+FROM tracks_fts JOIN tracks ON tracks_fts.rowid = tracks.id
+WHERE tracks_fts MATCH 'bohemian rhapsody'
+ORDER BY popularity DESC LIMIT 3;"
+```
+
+**Expected:** Queen's version at top with high popularity
+
+### 5. Search Optimization Tables
+
+```bash
+sqlite3 ~/git/music/lrclib-enriched.sqlite3 "
+SELECT
+    (SELECT COUNT(*) FROM tracks_search) as search_rows,
+    (SELECT COUNT(*) FROM tracks_search_fts) as fts_rows;"
+```
+
+**Expected:** Both should equal total matched tracks
+
+### 6. Album Type Selection (1979 Test)
+
+```bash
+sqlite3 ~/git/music/lrclib-enriched.sqlite3 "
+SELECT title, artist, spotify_id, popularity
+FROM tracks
+WHERE title_norm = '1979' AND artist_norm LIKE '%smashing pumpkins%';"
+```
+
+**Expected:** Should show album version (Mellon Collie), not single
+
+### 7. Failure Distribution (if --log-failures used)
+
+```bash
+sqlite3 ~/git/music/lrclib-enriched.sqlite3 "
+SELECT failure_reason, COUNT(*) as count
+FROM match_failures
+GROUP BY 1
+ORDER BY 2 DESC;"
+```
+
+**Expected:** Most failures should be `NoSpotifyCandidates`
+
+### 8. Database Integrity
+
+```bash
+sqlite3 ~/git/music/lrclib-enriched.sqlite3 "PRAGMA integrity_check;"
+```
+
+**Expected:** `ok`
+
+### 9. File Size Check
+
+```bash
+ls -lh ~/git/music/lrclib-enriched.sqlite3
+```
+
+**Expected:** ~1.3-1.5 GB
+
+---
+
 ## Testing Strategies
 
 ### Quick Validation Script

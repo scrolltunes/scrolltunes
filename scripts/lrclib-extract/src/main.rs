@@ -4241,12 +4241,61 @@ fn test_search_enriched(conn: &Connection, query: &str) -> Result<()> {
     Ok(())
 }
 
-// Standard filenames used by the `run` command
+// Standard filenames and expected sizes used by the `run` command
+// Sizes are sanity checks to prevent using wrong files or deleting sources
 const LRCLIB_DUMP_FILENAME: &str = "lrclib-db-dump-20251209T092057Z.sqlite3";
+const LRCLIB_DUMP_MIN_SIZE_GB: u64 = 70; // ~72 GB source, DO NOT DELETE
+
 const LRCLIB_OUTPUT_FILENAME: &str = "lrclib-enriched.sqlite3";
+const LRCLIB_OUTPUT_MAX_SIZE_GB: u64 = 3; // ~1.5 GB output, safe to recreate
+
 const SPOTIFY_CLEAN_FILENAME: &str = "spotify_clean.sqlite3";
+const SPOTIFY_CLEAN_MIN_SIZE_GB: u64 = 100; // ~117 GB source, DO NOT DELETE
+
 const SPOTIFY_NORMALIZED_FILENAME: &str = "spotify_normalized.sqlite3";
+const SPOTIFY_NORMALIZED_MIN_SIZE_GB: u64 = 15; // ~20 GB, can be regenerated
+
 const SPOTIFY_AUDIO_FEATURES_FILENAME: &str = "spotify_clean_audio_features.sqlite3";
+const SPOTIFY_AUDIO_FEATURES_MIN_SIZE_GB: u64 = 35; // ~39 GB source, DO NOT DELETE
+
+/// Validate source file sizes to prevent using wrong files
+fn validate_source_file_sizes(workdir: &std::path::Path) -> Result<()> {
+    let checks = [
+        (LRCLIB_DUMP_FILENAME, LRCLIB_DUMP_MIN_SIZE_GB, "LRCLIB dump"),
+        (SPOTIFY_CLEAN_FILENAME, SPOTIFY_CLEAN_MIN_SIZE_GB, "Spotify clean"),
+        (SPOTIFY_AUDIO_FEATURES_FILENAME, SPOTIFY_AUDIO_FEATURES_MIN_SIZE_GB, "Audio features"),
+        (SPOTIFY_NORMALIZED_FILENAME, SPOTIFY_NORMALIZED_MIN_SIZE_GB, "Spotify normalized"),
+    ];
+
+    for (filename, min_gb, label) in checks {
+        let path = workdir.join(filename);
+        if path.exists() {
+            let size_bytes = std::fs::metadata(&path)?.len();
+            let size_gb = size_bytes / (1024 * 1024 * 1024);
+            if size_gb < min_gb {
+                anyhow::bail!(
+                    "{} ({}) is only {} GB, expected >= {} GB. Wrong file?",
+                    label, filename, size_gb, min_gb
+                );
+            }
+        }
+    }
+
+    // Warn if output file is suspiciously large (might be overwriting a source)
+    let output_path = workdir.join(LRCLIB_OUTPUT_FILENAME);
+    if output_path.exists() {
+        let size_bytes = std::fs::metadata(&output_path)?.len();
+        let size_gb = size_bytes / (1024 * 1024 * 1024);
+        if size_gb > LRCLIB_OUTPUT_MAX_SIZE_GB {
+            anyhow::bail!(
+                "Output file {} is {} GB (expected < {} GB). Refusing to overwrite - might be a source file!",
+                LRCLIB_OUTPUT_FILENAME, size_gb, LRCLIB_OUTPUT_MAX_SIZE_GB
+            );
+        }
+    }
+
+    Ok(())
+}
 
 /// Resolve workdir, expanding ~ to home directory
 fn resolve_workdir(workdir: Option<PathBuf>) -> Result<PathBuf> {
@@ -4298,6 +4347,9 @@ fn main() -> Result<()> {
                     workdir.display()
                 );
             }
+
+            // Validate file sizes to prevent using wrong files
+            validate_source_file_sizes(&workdir)?;
 
             info!("  Source: {}", LRCLIB_DUMP_FILENAME);
             info!("  Output: {}", LRCLIB_OUTPUT_FILENAME);
