@@ -10,6 +10,17 @@ export interface AttributionSource {
   readonly url: string
 }
 
+/**
+ * Warning types for lyrics loading issues that don't prevent loading
+ * but indicate missing or potentially inaccurate metadata
+ */
+export type LyricsWarningType = "missing_spotify_metadata"
+
+export interface LyricsWarning {
+  readonly type: LyricsWarningType
+  readonly message: string
+}
+
 export interface LyricsApiAttribution {
   readonly lyrics?: AttributionSource | null | undefined
   readonly bpm?: AttributionSource | null | undefined
@@ -26,6 +37,7 @@ export interface LyricsApiSuccessResponse {
   readonly attribution: LyricsApiAttribution
   readonly hasEnhancement?: boolean
   readonly hasChordEnhancement?: boolean
+  readonly warnings?: readonly LyricsWarning[]
 }
 
 export interface LyricsApiErrorResponse {

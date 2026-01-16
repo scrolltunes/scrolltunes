@@ -2,6 +2,7 @@
 
 import { springs } from "@/animations"
 import { INPUT_LIMITS } from "@/constants/limits"
+import type { LyricsWarning } from "@/lib/lyrics-api-types"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { loadPublicConfig } from "@/services/public-config"
 import { Bug, CheckCircle, PaperPlaneTilt, X } from "@phosphor-icons/react"
@@ -21,6 +22,7 @@ export interface SongContext {
   readonly chordsErrorUrl?: string | null
   readonly lyricsError?: string | null
   readonly hasEnhancedTiming?: boolean
+  readonly warnings?: readonly LyricsWarning[]
 }
 
 export interface ReportIssueModalProps {
@@ -50,7 +52,10 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
   const hasMissingBpm = songContext && !songContext.bpm
   const hasChordsError = songContext?.chordsError
   const hasLyricsError = songContext?.lyricsError
-  const hasKnownIssue = hasMissingBpm || hasChordsError || hasLyricsError
+  const hasMissingSpotifyMetadata = songContext?.warnings?.some(
+    w => w.type === "missing_spotify_metadata",
+  )
+  const hasKnownIssue = hasMissingBpm || hasChordsError || hasLyricsError || hasMissingSpotifyMetadata
   const isDescriptionRequired = !hasKnownIssue
 
   const displayTitle = useMemo(
@@ -105,7 +110,9 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
           ? `Chords error: ${songContext?.chordsError}`
           : hasLyricsError
             ? `Lyrics error: ${songContext?.lyricsError}`
-            : ""
+            : hasMissingSpotifyMetadata
+              ? "Missing Spotify metadata - album art may be incorrect"
+              : ""
       const formData: Record<string, string> = {
         access_key: WEB3FORMS_ACCESS_KEY,
         subject: songContext
@@ -136,6 +143,9 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
           formData.chords_error_url = songContext.chordsErrorUrl
         }
         formData.enhanced_timing = songContext.hasEnhancedTiming ? "Yes" : "No"
+        if (songContext.warnings && songContext.warnings.length > 0) {
+          formData.warnings = songContext.warnings.map(w => `${w.type}: ${w.message}`).join("; ")
+        }
       }
 
       try {
@@ -166,7 +176,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
       hasMissingBpm,
       hasChordsError,
       hasLyricsError,
-      hasKnownIssue,
+      hasMissingSpotifyMetadata,
       displayTitle,
       displayArtist,
     ],
@@ -194,7 +204,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
           <motion.div
             className="relative w-full max-w-md rounded-sm shadow-xl"
             style={{
-              background: "var(--color-bg)",
+              background: "var(--color-surface1)",
               border: "1px solid var(--color-border)",
             }}
             initial={{ scale: 0.95, opacity: 0 }}
@@ -228,7 +238,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
               {songContext && (
                 <div
                   className="rounded-sm p-3 text-sm"
-                  style={{ background: "var(--color-surface2)" }}
+                  style={{ background: "var(--color-surface1)" }}
                 >
                   <div className="mb-1" style={{ color: "var(--color-text3)" }}>
                     Reporting issue for:
@@ -250,6 +260,11 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   {songContext.lyricsError && (
                     <div className="mt-2 text-xs" style={{ color: "var(--color-warning)" }}>
                       ⚠ Lyrics error: {songContext.lyricsError}
+                    </div>
+                  )}
+                  {hasMissingSpotifyMetadata && (
+                    <div className="mt-2 text-xs" style={{ color: "var(--color-warning)" }}>
+                      ⚠ Missing Spotify metadata - album art may be incorrect
                     </div>
                   )}
                 </div>
@@ -274,7 +289,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   maxLength={INPUT_LIMITS.REPORT_DESCRIPTION}
                   className="w-full rounded-sm px-3 py-2 focus:outline-none focus:ring-2 disabled:opacity-50"
                   style={{
-                    background: "var(--color-surface2)",
+                    background: "var(--color-surface1)",
                     border: "1px solid var(--color-border)",
                     color: "var(--color-text)",
                   }}
@@ -299,7 +314,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   maxLength={INPUT_LIMITS.EMAIL}
                   className="w-full rounded-sm px-3 py-2 focus:outline-none focus:ring-2 disabled:opacity-50"
                   style={{
-                    background: "var(--color-surface2)",
+                    background: "var(--color-surface1)",
                     border: "1px solid var(--color-border)",
                     color: "var(--color-text)",
                   }}

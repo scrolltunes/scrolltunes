@@ -15,6 +15,7 @@ import {
   findBestAlternativeLyrics,
   getLyricsById,
 } from "@/lib/lyrics-client"
+import type { LyricsWarning } from "@/lib/lyrics-api-types"
 import { formatMusicalKey } from "@/lib/musical-key"
 import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import {
@@ -22,7 +23,6 @@ import {
   formatArtists,
   getAlbumImageUrl,
   getTrackEffect,
-  searchTracksEffect,
 } from "@/lib/spotify-client"
 import { ServerLayer } from "@/services/server-layer"
 import { TursoService } from "@/services/turso"
@@ -47,6 +47,7 @@ export interface SongDataSuccess {
   readonly lyricsSource: AttributionSource
   readonly hasEnhancement: boolean
   readonly hasChordEnhancement: boolean
+  readonly warnings: readonly LyricsWarning[]
 }
 
 export interface SongDataNotFound {
@@ -111,14 +112,6 @@ async function getCachedSongFromCatalog(lrclibId: number): Promise<CatalogCacheR
   }
 }
 
-function normalizeForMatch(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
 interface SpotifyLookupResult {
   readonly spotifyId: string
   readonly trackName: string
@@ -140,39 +133,6 @@ function lookupSpotifyById(
       albumArt: getAlbumImageUrl(track.album, "medium"),
       albumArtLarge: getAlbumImageUrl(track.album, "large"),
     })),
-    Effect.catchAll(() => Effect.succeed(null)),
-  )
-}
-
-function lookupSpotifyBySearch(
-  title: string,
-  artist: string,
-): Effect.Effect<SpotifyLookupResult | null, never, SpotifyService> {
-  return searchTracksEffect(`${title} ${artist}`, 5).pipe(
-    Effect.map(result => {
-      const normalizedTitle = normalizeForMatch(title)
-      const normalizedArtist = normalizeForMatch(artist)
-
-      const match = result.tracks.items.find(track => {
-        const spotifyTitle = normalizeForMatch(track.name)
-        const spotifyArtist = normalizeForMatch(formatArtists(track.artists))
-        const titleMatch =
-          spotifyTitle.includes(normalizedTitle) || normalizedTitle.includes(spotifyTitle)
-        const artistMatch =
-          spotifyArtist.includes(normalizedArtist) || normalizedArtist.includes(spotifyArtist)
-        return titleMatch && artistMatch
-      })
-
-      if (!match) return null
-      return {
-        spotifyId: match.id,
-        trackName: normalizeTrackName(match.name),
-        artistName: normalizeArtistName(formatArtists(match.artists)),
-        albumName: normalizeAlbumName(match.album.name),
-        albumArt: getAlbumImageUrl(match.album, "medium"),
-        albumArtLarge: getAlbumImageUrl(match.album, "large"),
-      }
-    }),
     Effect.catchAll(() => Effect.succeed(null)),
   )
 }
@@ -238,7 +198,7 @@ function getEmbeddedTempoFromTurso(lrclibId: number) {
   })
 }
 
-// Fire-and-forget catalog update with album art
+// Fire-and-forget catalog update with album art and BPM
 export function fireAndForgetCatalogUpdate(
   actualLrclibId: number,
   lyrics: Lyrics,
@@ -249,6 +209,7 @@ export function fireAndForgetCatalogUpdate(
   albumArt: string | null,
   albumArtLarge: string | null,
   cachedSong: CatalogCacheResult | null,
+  bpmData: { bpm: number; key: string | null; source: string } | null,
 ) {
   ;(async () => {
     try {
@@ -303,6 +264,11 @@ export function fireAndForgetCatalogUpdate(
             hasSyncedLyrics: prepared.hasSyncedLyrics,
             albumArtUrl: albumArt,
             albumArtLargeUrl: albumArtLarge,
+            ...(bpmData && {
+              bpm: bpmData.bpm,
+              musicalKey: bpmData.key,
+              bpmSource: bpmData.source,
+            }),
           })
           .onConflictDoUpdate({
             target: [songs.artistLower, songs.titleLower],
@@ -395,26 +361,27 @@ export async function loadSongData(lrclibId: number): Promise<SongDataResult> {
   const hasCachedAlbumArt = cachedSong !== null && cachedSong.albumArtUrl !== null
   const cachedSpotifyId = cachedSong?.spotifyId ?? null
 
+  // Track warnings for missing metadata
+  const warnings: LyricsWarning[] = []
+
   // Determine what we need to fetch
   let spotifyResult: SpotifyLookupResult | null = null
   let albumArt: string | null = cachedSong?.albumArtUrl ?? null
   let albumArtLarge: string | null = cachedSong?.albumArtLargeUrl ?? null
   let resolvedSpotifyId: string | undefined = cachedSpotifyId ?? undefined
 
-  // Only fetch Spotify if we need album art
+  // Fetch Turso data early - use it as authoritative source for spotify_id and album art
+  const tursoStart = Date.now()
+  const tursoTrack = await Effect.runPromise(
+    getEmbeddedTempoFromTurso(actualLrclibId).pipe(Effect.provide(ServerLayer)),
+  )
+
+  // Album art resolution strategy (Turso as authoritative source for spotify_id)
   if (!hasCachedAlbumArt) {
-    if (cachedSpotifyId) {
-      // Use cached Spotify ID for lookup
-      const spotifyEffect = lookupSpotifyById(cachedSpotifyId)
-      spotifyResult = await Effect.runPromise(spotifyEffect.pipe(Effect.provide(ServerLayer)))
-      if (spotifyResult) {
-        albumArt = spotifyResult.albumArt
-        albumArtLarge = spotifyResult.albumArtLarge
-        resolvedSpotifyId = spotifyResult.spotifyId
-      }
-    } else {
-      // Search Spotify by title/artist
-      const spotifyEffect = lookupSpotifyBySearch(lyrics.title, lyrics.artist)
+    // Priority 1: Use Turso's spotify_id for Spotify API lookup (authoritative)
+    const tursoSpotifyId = tursoTrack?.spotifyId
+    if (tursoSpotifyId) {
+      const spotifyEffect = lookupSpotifyById(tursoSpotifyId)
       spotifyResult = await Effect.runPromise(spotifyEffect.pipe(Effect.provide(ServerLayer)))
       if (spotifyResult) {
         albumArt = spotifyResult.albumArt
@@ -422,9 +389,31 @@ export async function loadSongData(lrclibId: number): Promise<SongDataResult> {
         resolvedSpotifyId = spotifyResult.spotifyId
       }
     }
+    // Priority 2: Use Neon's cached spotify_id if Turso doesn't have one
+    else if (cachedSpotifyId) {
+      const spotifyEffect = lookupSpotifyById(cachedSpotifyId)
+      spotifyResult = await Effect.runPromise(spotifyEffect.pipe(Effect.provide(ServerLayer)))
+      if (spotifyResult) {
+        albumArt = spotifyResult.albumArt
+        albumArtLarge = spotifyResult.albumArtLarge
+        resolvedSpotifyId = spotifyResult.spotifyId
+      }
+    }
+    // Priority 3: Use Turso's pre-fetched album art if available
+    else if (tursoTrack?.albumImageUrl) {
+      albumArt = tursoTrack.albumImageUrl
+      // Turso stores medium-sized images, no large variant available
+      albumArtLarge = tursoTrack.albumImageUrl
+    }
+    // Priority 4: No spotify_id in Turso - add warning and try Deezer only
+    else {
+      // Add warning about missing Spotify metadata (no text search fallback)
+      warnings.push({
+        type: "missing_spotify_metadata",
+        message: "No Spotify match found for this song. Album art and metadata may be inaccurate.",
+      })
 
-    // If still no album art, try Deezer
-    if (!albumArt) {
+      // Try Deezer as last resort (safer than Spotify text search)
       const deezerResult = await fetchAlbumArt(lyrics.artist, lyrics.title)
       albumArt = deezerResult.albumArt
       albumArtLarge = deezerResult.albumArtLarge
@@ -434,7 +423,7 @@ export async function loadSongData(lrclibId: number): Promise<SongDataResult> {
   // Check if enhancements exist (deferred loading - client fetches payload separately)
   const { hasEnhancement, hasChordEnhancement } = await checkEnhancementsExist(actualLrclibId)
 
-  // BPM handling: use cached, embedded tempo, or defer fetching
+  // BPM handling: use cached, or Turso data (already fetched)
   let bpm: number | null = null
   let key: string | null = null
   let timeSignature: number | null = null
@@ -446,62 +435,55 @@ export async function loadSongData(lrclibId: number): Promise<SongDataResult> {
     bpm = cachedSong.bpm
     key = cachedSong.musicalKey
     bpmSource = getBpmAttribution(cachedSong.bpmSource, cachedSong.bpmSourceUrl)
-  } else {
-    // Priority 2: Try embedded tempo from Turso (Spotify enrichment)
-    const tursoStart = Date.now()
-    const tursoTrack = await Effect.runPromise(
-      getEmbeddedTempoFromTurso(actualLrclibId).pipe(Effect.provide(ServerLayer)),
-    )
+  } else if (tursoTrack?.tempo !== null && tursoTrack?.tempo !== undefined) {
+    // Priority 2: Use embedded tempo from Turso (already fetched above)
+    bpm = Math.round(tursoTrack.tempo)
+    key = formatMusicalKey(tursoTrack.musicalKey, tursoTrack.mode)
+    timeSignature = tursoTrack.timeSignature
+    bpmSource = getBpmAttribution("Spotify")
 
-    if (tursoTrack?.tempo !== null && tursoTrack?.tempo !== undefined) {
-      bpm = Math.round(tursoTrack.tempo)
-      key = formatMusicalKey(tursoTrack.musicalKey, tursoTrack.mode)
-      timeSignature = tursoTrack.timeSignature
-      bpmSource = getBpmAttribution("Spotify")
+    // Log successful Turso lookup
+    logBpmAttempt({
+      lrclibId: actualLrclibId,
+      songId: cachedSong?.songId,
+      title: lyrics.title,
+      artist: lyrics.artist,
+      stage: "turso_embedded",
+      provider: "Turso",
+      success: true,
+      bpm,
+      latencyMs: Date.now() - tursoStart,
+    })
 
-      // Log successful Turso lookup
-      logBpmAttempt({
-        lrclibId: actualLrclibId,
-        songId: cachedSong?.songId,
-        title: lyrics.title,
-        artist: lyrics.artist,
-        stage: "turso_embedded",
-        provider: "Turso",
-        success: true,
-        bpm,
-        latencyMs: Date.now() - tursoStart,
-      })
-
-      // Cache the embedded BPM in Neon for future requests
-      if (cachedSong) {
-        db.update(songs)
-          .set({
-            bpm,
-            musicalKey: key,
-            bpmSource: "Spotify",
-            updatedAt: new Date(),
-          })
-          .where(eq(songs.id, cachedSong.songId))
-          .then(() => {})
-          .catch(err => console.error("[BPM] Failed to cache embedded tempo:", err))
-      }
-    } else {
-      // Log failed Turso lookup
-      logBpmAttempt({
-        lrclibId: actualLrclibId,
-        songId: cachedSong?.songId,
-        title: lyrics.title,
-        artist: lyrics.artist,
-        stage: "turso_embedded",
-        provider: "Turso",
-        success: false,
-        errorReason: "not_found",
-        latencyMs: Date.now() - tursoStart,
-      })
+    // Cache the embedded BPM in Neon for future requests
+    if (cachedSong) {
+      db.update(songs)
+        .set({
+          bpm,
+          musicalKey: key,
+          bpmSource: "Spotify",
+          updatedAt: new Date(),
+        })
+        .where(eq(songs.id, cachedSong.songId))
+        .then(() => {})
+        .catch(err => console.error("[BPM] Failed to cache embedded tempo:", err))
     }
+  } else {
+    // Log failed Turso lookup
+    logBpmAttempt({
+      lrclibId: actualLrclibId,
+      songId: cachedSong?.songId,
+      title: lyrics.title,
+      artist: lyrics.artist,
+      stage: "turso_embedded",
+      provider: "Turso",
+      success: false,
+      errorReason: "not_found",
+      latencyMs: Date.now() - tursoStart,
+    })
   }
 
-  // Fire-and-forget catalog update (with album art)
+  // Fire-and-forget catalog update (with album art and BPM)
   fireAndForgetCatalogUpdate(
     actualLrclibId,
     lyrics,
@@ -512,6 +494,7 @@ export async function loadSongData(lrclibId: number): Promise<SongDataResult> {
     albumArt,
     albumArtLarge,
     cachedSong,
+    bpm !== null && bpmSource ? { bpm, key, source: bpmSource.name } : null,
   )
 
   const normalizedLyrics: Lyrics = {
@@ -534,5 +517,6 @@ export async function loadSongData(lrclibId: number): Promise<SongDataResult> {
     lyricsSource: { name: "LRCLIB", url: "https://lrclib.net" },
     hasEnhancement,
     hasChordEnhancement,
+    warnings,
   }
 }

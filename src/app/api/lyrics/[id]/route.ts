@@ -43,6 +43,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     },
     hasEnhancement: result.hasEnhancement,
     hasChordEnhancement: result.hasChordEnhancement,
+    ...(result.warnings.length > 0 && { warnings: result.warnings }),
   }
 
   return NextResponse.json(body, {

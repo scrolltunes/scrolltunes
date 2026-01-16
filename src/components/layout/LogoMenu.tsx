@@ -39,13 +39,16 @@ export const LogoMenu = memo(function LogoMenu() {
       <button
         type="button"
         onClick={handleToggle}
-        className="flex items-center gap-1 px-2 py-1.5 rounded-full transition-colors focus:outline-none focus:ring-2 hover:brightness-95"
+        className="flex items-center gap-2 px-2 py-1 rounded-lg transition-colors focus:outline-none focus:ring-2 hover:brightness-95"
         style={{ background: "var(--bg-tertiary)" }}
         aria-label="ScrollTunes menu"
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
         <Logo size={24} />
+        <span className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          ScrollTunes
+        </span>
         {isAdmin && (
           <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-sm uppercase tracking-wide bg-amber-500 text-black">
             Admin
@@ -61,7 +64,7 @@ export const LogoMenu = memo(function LogoMenu() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 mt-2 w-56 rounded-sm shadow-lg overflow-hidden z-50"
+            className="absolute left-0 mt-2 w-56 rounded-xl shadow-lg overflow-hidden z-50"
             style={{
               background: "var(--bg-secondary)",
               border: "1px solid var(--border-default)",

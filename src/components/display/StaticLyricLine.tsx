@@ -267,12 +267,8 @@ export const StaticLyricLine = memo(function StaticLyricLine({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="absolute inset-0 z-0 rounded-2xl"
-            style={{
-              background: "var(--color-accent-soft)",
-              border: "1px solid var(--color-border-strong)",
-              boxShadow: "0 4px 20px rgba(91, 108, 255, 0.1)",
-            }}
+            className="absolute inset-y-0 left-1/2 -translate-x-1/2 z-0 lyric-active"
+            style={{ width: "fit-content", minWidth: "60%", maxWidth: "90%", padding: "0 2rem" }}
           />
         )}
       </AnimatePresence>

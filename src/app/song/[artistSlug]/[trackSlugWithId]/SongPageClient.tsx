@@ -36,7 +36,7 @@ import {
 } from "@/hooks"
 import { applyEnhancement } from "@/lib"
 import { computeLrcHashSync } from "@/lib/lrc-hash"
-import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
+import type { LyricsApiSuccessResponse, LyricsWarning } from "@/lib/lyrics-api-types"
 import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import { applyEditPatches } from "@/lib/song-edits"
@@ -80,6 +80,7 @@ type LoadState =
       readonly spotifyId: string | null
       readonly bpmSource: AttributionSource | null
       readonly lyricsSource: AttributionSource | null
+      readonly warnings: readonly LyricsWarning[]
     }
 
 interface EnhancementsState {
@@ -144,6 +145,7 @@ function computeInitialLoadState(
         spotifyId: cached.spotifyId ?? null,
         bpmSource: cached.bpmSource ?? null,
         lyricsSource: cached.lyricsSource ?? null,
+        warnings: cached.warnings ?? [],
       }
     }
   }
@@ -166,6 +168,7 @@ function computeInitialLoadState(
       spotifyId: initialData.spotifyId,
       bpmSource: initialData.bpmSource,
       lyricsSource: initialData.lyricsSource,
+      warnings: initialData.warnings,
     }
   }
 
@@ -254,6 +257,7 @@ export default function SongPageClient({
           lyricsSource: data.attribution.lyrics ?? undefined,
           hasEnhancement: data.hasEnhancement,
           hasChordEnhancement: data.hasChordEnhancement,
+          warnings: data.warnings,
         })
 
         setLoadState({
@@ -269,6 +273,7 @@ export default function SongPageClient({
           spotifyId: data.spotifyId ?? null,
           bpmSource: data.attribution.bpm ?? null,
           lyricsSource: data.attribution.lyrics ?? null,
+          warnings: data.warnings ?? [],
         })
       } catch {
         if (!cancelled) {
@@ -812,7 +817,7 @@ export default function SongPageClient({
                 onAddToSetlist={() => setShowAddToSetlist(true)}
                 onShareClick={() => setShowShareModal(true)}
                 onInfoClick={() => setShowInfo(true)}
-                hasIssue={loadState.bpm === null}
+                hasIssue={loadState.bpm === null || loadState.warnings.length > 0}
                 onWarningClick={() => setShowReportModal(true)}
               />
             </div>
@@ -833,8 +838,6 @@ export default function SongPageClient({
           bpm={loadState.bpm}
           musicalKey={loadState.key}
           spotifyId={loadState.spotifyId}
-          bpmSource={loadState.bpmSource}
-          lyricsSource={loadState.lyricsSource}
           albumArt={loadState.albumArt}
           hasEnhancedTiming={enhancements.enhancement !== null}
         />
@@ -856,6 +859,7 @@ export default function SongPageClient({
             chordsError: chordsState.status === "error" ? chordsState.error : null,
             chordsErrorUrl: chordsState.status === "error" ? chordsState.errorUrl : null,
             hasEnhancedTiming: enhancements.enhancement !== null,
+            warnings: loadState.warnings,
           }}
         />
       )}

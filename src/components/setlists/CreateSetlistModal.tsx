@@ -88,7 +88,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={springs.default}
             className="relative mx-4 w-full max-w-sm rounded-sm p-6 shadow-xl"
-            style={{ background: "var(--color-bg)" }}
+            style={{ background: "var(--color-surface1)" }}
           >
             <button
               type="button"
@@ -123,7 +123,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
                   maxLength={INPUT_LIMITS.SETLIST_NAME}
                   className="w-full px-3 py-2 rounded-sm focus:outline-none focus:ring-2"
                   style={{
-                    background: "var(--color-surface2)",
+                    background: "var(--color-surface1)",
                     border: "1px solid var(--color-border)",
                     color: "var(--color-text)",
                   }}
@@ -147,7 +147,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
                   maxLength={INPUT_LIMITS.SETLIST_DESCRIPTION}
                   className="w-full px-3 py-2 rounded-sm focus:outline-none focus:ring-2 resize-none"
                   style={{
-                    background: "var(--color-surface2)",
+                    background: "var(--color-surface1)",
                     border: "1px solid var(--color-border)",
                     color: "var(--color-text)",
                   }}
@@ -187,7 +187,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
                   type="button"
                   onClick={handleClose}
                   className="flex-1 px-4 py-2.5 rounded-sm transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
-                  style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
+                  style={{ background: "var(--color-surface1)", color: "var(--color-text)" }}
                 >
                   Cancel
                 </button>

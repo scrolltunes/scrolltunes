@@ -3,13 +3,14 @@ import { auth } from "@/auth"
 import { AuthProvider } from "@/components/auth"
 import { DevTitle, Footer, FooterProvider, ThemeProvider } from "@/components/layout"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist_Mono, Roboto } from "next/font/google"
 import { headers } from "next/headers"
 import "./globals.css"
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const roboto = Roboto({
+  variable: "--font-roboto",
   subsets: ["latin"],
+  weight: ["400", "500", "700"],
 })
 
 const geistMono = Geist_Mono({
@@ -103,7 +104,7 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased dark`}>
+      <body className={`${roboto.variable} ${geistMono.variable} antialiased dark`}>
         <AuthProvider session={session}>
           <ThemeProvider>
             <FooterProvider>

@@ -123,7 +123,7 @@
 body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-roboto), Arial, Helvetica, sans-serif;
 }
 
 /* Custom scrollbar styling using CSS variables */
@@ -210,9 +210,28 @@ html {
 
 /* Active lyric line styling */
 .lyric-active {
-  background: var(--color-accent-soft);
-  border: 1px solid var(--color-border-strong);
-  box-shadow: 0 4px 20px rgba(91, 108, 255, 0.1);
+  background: linear-gradient(135deg, var(--color-accent-soft) 0%, rgba(139, 92, 246, 0.08) 100%);
+  border-radius: 1rem;
+}
+
+/* Active line indicator bar */
+.lyric-active::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 45%;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, var(--color-accent-bright), var(--color-accent));
+  box-shadow: var(--shadow-glow);
+  animation: bar-glow 2s ease-in-out infinite;
+}
+
+@keyframes bar-glow {
+  0%, 100% { opacity: 1; box-shadow: var(--shadow-glow); }
+  50% { opacity: 0.7; box-shadow: var(--shadow-glow-active); }
 }
 
 /* Chord badge styling */

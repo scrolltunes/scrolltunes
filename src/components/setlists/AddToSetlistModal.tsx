@@ -130,7 +130,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={springs.default}
               className="relative mx-4 w-full max-w-sm rounded-sm p-6 shadow-xl"
-              style={{ background: "var(--color-bg)" }}
+              style={{ background: "var(--color-surface1)" }}
             >
               <button
                 type="button"
@@ -272,7 +272,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                   >
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ background: "var(--color-surface2)" }}
+                      style={{ background: "var(--color-surface1)" }}
                     >
                       <Plus size={20} style={{ color: "var(--color-text3)" }} />
                     </div>

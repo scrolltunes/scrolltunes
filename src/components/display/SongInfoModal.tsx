@@ -3,14 +3,9 @@
 import { springs } from "@/animations"
 import { ReportIssueModal } from "@/components/feedback"
 import { normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
-import { Bug, Sparkle, SpotifyLogo, X } from "@phosphor-icons/react"
+import { ArrowSquareOut, Bug, Sparkle, SpotifyLogo, X } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
 import { useCallback, useMemo, useState } from "react"
-
-export interface AttributionSource {
-  readonly name: string
-  readonly url: string
-}
 
 export interface SongInfoModalProps {
   readonly isOpen: boolean
@@ -21,8 +16,6 @@ export interface SongInfoModalProps {
   readonly bpm: number | null
   readonly musicalKey: string | null
   readonly spotifyId: string | null
-  readonly bpmSource: AttributionSource | null
-  readonly lyricsSource: AttributionSource | null
   readonly albumArt: string | null
   readonly hasEnhancedTiming?: boolean
 }
@@ -42,8 +35,6 @@ export function SongInfoModal({
   bpm,
   musicalKey,
   spotifyId,
-  bpmSource,
-  lyricsSource,
   albumArt,
   hasEnhancedTiming = false,
 }: SongInfoModalProps) {
@@ -81,7 +72,7 @@ export function SongInfoModal({
               transition={springs.default}
               className="relative mx-4 w-full max-w-sm rounded-sm p-6"
               style={{
-                background: "var(--color-bg)",
+                background: "var(--color-surface1)",
                 border: "1px solid var(--color-border)",
                 boxShadow: "var(--shadow-lg)",
               }}
@@ -147,56 +138,21 @@ export function SongInfoModal({
                 )}
 
                 {spotifyId !== null && (
-                  <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5" style={{ color: "var(--color-text3)" }}>
+                      Spotify
+                      <SpotifyLogo size={14} weight="fill" style={{ color: "var(--color-spotify)" }} />
+                    </span>
                     <a
                       href={`https://open.spotify.com/track/${spotifyId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full px-4 py-2 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
-                      style={{
-                        background: "var(--color-spotify-soft)",
-                        color: "var(--color-spotify)",
-                      }}
+                      className="flex items-center gap-1 transition-colors hover:brightness-110"
+                      style={{ color: "var(--color-text)" }}
                     >
-                      <SpotifyLogo size={20} weight="fill" />
-                      Open in Spotify
+                      <span className="font-mono text-sm">{spotifyId.slice(0, 8)}…</span>
+                      <ArrowSquareOut size={14} style={{ color: "var(--color-text3)" }} />
                     </a>
-                  </div>
-                )}
-
-                {(lyricsSource || bpmSource) && (
-                  <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
-                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                      {lyricsSource && (
-                        <>
-                          Lyrics from{" "}
-                          <a
-                            href={lyricsSource.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline transition-colors"
-                            style={{ color: "var(--color-text3)" }}
-                          >
-                            {lyricsSource.name}
-                          </a>
-                        </>
-                      )}
-                      {lyricsSource && bpmSource && " • "}
-                      {bpmSource && (
-                        <>
-                          BPM from{" "}
-                          <a
-                            href={bpmSource.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline transition-colors"
-                            style={{ color: "var(--color-text3)" }}
-                          >
-                            {bpmSource.name}
-                          </a>
-                        </>
-                      )}
-                    </p>
                   </div>
                 )}
 
@@ -230,7 +186,7 @@ export function SongInfoModal({
           bpm,
           key: musicalKey,
           spotifyId,
-          bpmSource: bpmSource?.name ?? null,
+          bpmSource: null,
         }}
       />
     </>
