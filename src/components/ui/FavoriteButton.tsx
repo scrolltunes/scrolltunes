@@ -46,7 +46,7 @@ export const FavoriteButton = memo(function FavoriteButton({
     <motion.button
       type="button"
       onClick={handleToggle}
-      className={`flex items-center justify-center rounded-full transition-colors hover:brightness-110 ${className}`}
+      className={`flex items-center justify-center rounded-sm transition-colors hover:brightness-110 ${className}`}
       style={{ width: config.button, height: config.button, background: "var(--color-surface2)" }}
       aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
       aria-pressed={isFavorite}

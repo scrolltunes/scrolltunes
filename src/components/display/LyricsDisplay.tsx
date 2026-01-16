@@ -805,7 +805,7 @@ export function LyricsDisplay({
     >
       {/* Manual scroll indicator */}
       {showManualScrollIndicator && (
-        <div className="fixed top-32 right-4 z-30 px-3 py-1 bg-neutral-800/80 backdrop-blur-sm rounded-full text-sm text-neutral-400">
+        <div className="fixed top-32 right-4 z-30 px-3 py-1 bg-[var(--color-surface2)] backdrop-blur-sm rounded-sm text-sm text-[var(--color-text-muted)]">
           Manual scroll
         </div>
       )}

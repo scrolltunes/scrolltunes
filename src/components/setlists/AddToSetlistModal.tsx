@@ -129,13 +129,13 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={springs.default}
-              className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-xl"
-              style={{ background: "var(--color-surface1)" }}
+              className="relative mx-4 w-full max-w-sm rounded-sm p-6 shadow-xl"
+              style={{ background: "var(--color-bg)" }}
             >
               <button
                 type="button"
                 onClick={handleClose}
-                className="absolute right-4 top-4 rounded-lg p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                className="absolute right-4 top-4 rounded-sm p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                 style={{ color: "var(--color-text3)" }}
                 aria-label="Close"
               >
@@ -143,7 +143,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
               </button>
 
               <h2
-                className="text-xl font-semibold mb-2 pr-8"
+                className="font-mono text-xl font-semibold mb-2 pr-8"
                 style={{ color: "var(--color-text)" }}
               >
                 Add to setlist
@@ -165,7 +165,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                   </p>
                   <Link
                     href="/login"
-                    className="inline-block px-6 py-2.5 rounded-lg transition-colors hover:brightness-110"
+                    className="inline-block px-6 py-2.5 rounded-sm transition-colors hover:brightness-110"
                     style={{ background: "var(--color-accent)", color: "white" }}
                     onClick={handleClose}
                   >
@@ -195,7 +195,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(true)}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg transition-colors hover:brightness-110"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-sm transition-colors hover:brightness-110"
                     style={{ background: "var(--color-accent)", color: "white" }}
                   >
                     <Plus size={20} weight="bold" />
@@ -215,7 +215,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                         type="button"
                         onClick={() => handleToggleSetlist(setlist.id)}
                         disabled={addingToSetlistId !== null}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
                         style={{
                           background: isInSetlist
                             ? "var(--color-accent-soft)"
@@ -223,7 +223,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                         }}
                       >
                         <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                          className="w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: setlist.color ?? "var(--color-accent)" }}
                         >
                           {isAdding ? (
@@ -267,11 +267,11 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                     type="button"
                     onClick={() => setShowCreateModal(true)}
                     disabled={addingToSetlistId !== null}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-sm border-2 border-dashed transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
                     style={{ borderColor: "var(--color-border)" }}
                   >
                     <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                      className="w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0"
                       style={{ background: "var(--color-surface2)" }}
                     >
                       <Plus size={20} style={{ color: "var(--color-text3)" }} />

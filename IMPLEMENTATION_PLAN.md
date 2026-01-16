@@ -59,18 +59,18 @@ Migrate ScrollTunes to a terminal-inspired dark theme (Tokyo Night palette) with
 
 ## Phase 5: Feature Components
 
-- [ ] **5.1** Update `LyricsDisplay.tsx` and `LyricLine.tsx` - active line glow, updated colors
-- [ ] **5.2** Update `ChordBadge.tsx` and `InlineChord.tsx` to use new accent colors
-- [ ] **5.3** Update `VoiceIndicator.tsx`, `SingingDebugIndicator.tsx` with new status colors
-- [ ] **5.4** Update `FloatingMetronome.tsx`, `Metronome.tsx`, `MetronomeOrb.tsx` styling
-- [ ] **5.5** Update `SongActionBar.tsx` and `FloatingActions.tsx` with new IconButton/Button
-- [ ] **5.6** Update `SongInfoModal.tsx` to use new Modal primitive
-- [ ] **5.7** Update `ReportIssueModal.tsx` to use new Modal/Input/Button primitives
-- [ ] **5.8** Update setlist modals (`CreateSetlistModal`, `EditSetlistModal`, `AddToSetlistModal`)
-- [ ] **5.9** Update `SongListItem.tsx` (ui/) with new Card-like styling
-- [ ] **5.10** Update `GlassCard.tsx` to align with new Card or mark for deprecation
-- [ ] **5.11** Update `AmbientBackground.tsx` - remove light mode branch, update colors
-- [ ] **5.12** Update `BackButton.tsx`, `FavoriteButton.tsx` to use new primitives
+- [x] **5.1** Update `LyricsDisplay.tsx` and `LyricLine.tsx` - active line glow, updated colors
+- [x] **5.2** Update `ChordBadge.tsx` and `InlineChord.tsx` to use new accent colors
+- [x] **5.3** Update `VoiceIndicator.tsx`, `SingingDebugIndicator.tsx` with new status colors
+- [x] **5.4** Update `FloatingMetronome.tsx`, `Metronome.tsx`, `MetronomeOrb.tsx` styling
+- [x] **5.5** Update `SongActionBar.tsx` and `FloatingActions.tsx` with new IconButton/Button
+- [x] **5.6** Update `SongInfoModal.tsx` to use new Modal primitive
+- [x] **5.7** Update `ReportIssueModal.tsx` to use new Modal/Input/Button primitives
+- [x] **5.8** Update setlist modals (`CreateSetlistModal`, `EditSetlistModal`, `AddToSetlistModal`)
+- [x] **5.9** Update `SongListItem.tsx` (ui/) with new Card-like styling
+- [x] **5.10** Update `GlassCard.tsx` to align with new Card or mark for deprecation
+- [x] **5.11** Update `AmbientBackground.tsx` - remove light mode branch, update colors
+- [x] **5.12** Update `BackButton.tsx`, `FavoriteButton.tsx` to use new primitives
 
 ---
 

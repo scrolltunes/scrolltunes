@@ -27,12 +27,12 @@ export const SingingDebugIndicator = memo(function SingingDebugIndicator() {
   const pSinging = activationState.lastProbability?.pSinging ?? 0
   const pSpeech = activationState.lastProbability?.pSpeech
 
-  // Color based on probability (red -> yellow -> green)
-  const getColor = (p: number) => {
-    if (p >= 0.9) return "text-green-400"
-    if (p >= 0.6) return "text-yellow-400"
-    if (p >= 0.3) return "text-orange-400"
-    return "text-red-400"
+  // Color based on probability using Tokyo Night tokens
+  const getColorStyle = (p: number) => {
+    if (p >= 0.9) return { color: "var(--status-success)" }
+    if (p >= 0.6) return { color: "var(--status-warning)" }
+    if (p >= 0.3) return { color: "#ff9e64" } // Tokyo Night orange
+    return { color: "var(--status-error)" }
   }
 
   return (
@@ -40,19 +40,27 @@ export const SingingDebugIndicator = memo(function SingingDebugIndicator() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
-      className="fixed bottom-20 left-4 z-50 font-mono text-xs px-3 py-2 rounded-lg backdrop-blur-sm"
-      style={{ background: "rgba(0, 0, 0, 0.7)" }}
+      className="fixed bottom-20 left-4 z-50 font-mono text-xs px-3 py-2 rounded-sm backdrop-blur-sm"
+      style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-default)" }}
     >
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <span className="text-neutral-400">Singing:</span>
-          <span className={getColor(pSinging)}>{(pSinging * 100).toFixed(0)}%</span>
+          <span style={{ color: "var(--fg-muted)" }}>Singing:</span>
+          <span style={getColorStyle(pSinging)}>{(pSinging * 100).toFixed(0)}%</span>
           <motion.div
-            className="h-1 rounded-full bg-neutral-700 w-16"
-            style={{ overflow: "hidden" }}
+            className="h-1 rounded-sm w-16"
+            style={{ overflow: "hidden", background: "var(--bg-tertiary)" }}
           >
             <motion.div
-              className={`h-full ${pSinging >= 0.9 ? "bg-green-500" : pSinging >= 0.6 ? "bg-yellow-500" : "bg-red-500"}`}
+              className="h-full"
+              style={{
+                background:
+                  pSinging >= 0.9
+                    ? "var(--status-success)"
+                    : pSinging >= 0.6
+                      ? "var(--status-warning)"
+                      : "var(--status-error)",
+              }}
               animate={{ width: `${pSinging * 100}%` }}
               transition={{ duration: 0.1 }}
             />
@@ -60,20 +68,20 @@ export const SingingDebugIndicator = memo(function SingingDebugIndicator() {
         </div>
         {pSpeech !== undefined && (
           <div className="flex items-center gap-2">
-            <span className="text-neutral-400">Speech:</span>
-            <span className="text-neutral-300">{(pSpeech * 100).toFixed(0)}%</span>
+            <span style={{ color: "var(--fg-muted)" }}>Speech:</span>
+            <span style={{ color: "var(--fg-secondary)" }}>{(pSpeech * 100).toFixed(0)}%</span>
           </div>
         )}
         <div className="flex items-center gap-2">
-          <span className="text-neutral-400">State:</span>
+          <span style={{ color: "var(--fg-muted)" }}>State:</span>
           <span
-            className={
-              activationState.isSinging
-                ? "text-green-400"
+            style={{
+              color: activationState.isSinging
+                ? "var(--status-success)"
                 : activationState.detectorState === "listening"
-                  ? "text-indigo-400"
-                  : "text-neutral-400"
-            }
+                  ? "var(--accent-primary)"
+                  : "var(--fg-muted)",
+            }}
           >
             {activationState.detectorState}
           </span>

@@ -67,19 +67,16 @@ export const MetronomeOrb = memo(function MetronomeOrb({
       aria-label={isDormant ? "Metronome inactive" : `Metronome running at ${bpm} beats per minute`}
     >
       <div
-        className={`
-          absolute inset-0 rounded-full
-          transition-colors duration-300
-          ${isDormant ? "" : "bg-indigo-500/20"}
-        `}
-        style={isDormant ? { background: "var(--color-surface3)" } : {}}
+        className="absolute inset-0 rounded-full transition-colors duration-300"
+        style={{ background: isDormant ? "var(--color-surface3)" : "var(--color-accent-soft)" }}
       />
 
       <AnimatePresence>
         {!isDormant && (
           <motion.div
             key={`glow-${pulseKey}`}
-            className="absolute inset-[-2px] rounded-full bg-indigo-500/30 blur-sm"
+            className="absolute inset-[-2px] rounded-full blur-sm"
+            style={{ background: "var(--color-accent-glow)" }}
             initial={{ opacity: 0.6, scale: 1 }}
             animate={{ opacity: 0, scale: 1.2 }}
             exit={{ opacity: 0 }}
@@ -93,7 +90,8 @@ export const MetronomeOrb = memo(function MetronomeOrb({
           rings.map(ringIndex => (
             <motion.div
               key={`ring-${ringIndex}-${pulseKey}`}
-              className="absolute inset-0 rounded-full border-2 border-indigo-500"
+              className="absolute inset-0 rounded-full border-2"
+              style={{ borderColor: "var(--accent-primary)" }}
               initial={{ scale: 1, opacity: 0.5 - ringIndex * 0.1 }}
               animate={{ scale: 1.5 + ringIndex * 0.3, opacity: 0 }}
               transition={{
@@ -105,12 +103,8 @@ export const MetronomeOrb = memo(function MetronomeOrb({
       </AnimatePresence>
 
       <motion.div
-        className={`
-          rounded-full
-          ${domeSizes[size]}
-          ${isDormant ? "" : "bg-indigo-500"}
-        `}
-        style={isDormant ? { background: "var(--color-text-muted)" } : {}}
+        className={`rounded-full ${domeSizes[size]}`}
+        style={{ background: isDormant ? "var(--color-text-muted)" : "var(--accent-primary)" }}
         animate={
           !isDormant
             ? {

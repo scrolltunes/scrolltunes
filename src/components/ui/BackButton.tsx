@@ -34,7 +34,7 @@ export const BackButton = memo(function BackButton({
     <button
       type="button"
       onClick={handleClick}
-      className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110 ${className}`}
+      className={`w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110 ${className}`}
       style={{ background: "var(--color-surface2)" }}
       aria-label={ariaLabel}
     >

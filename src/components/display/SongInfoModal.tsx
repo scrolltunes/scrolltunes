@@ -79,9 +79,9 @@ export function SongInfoModal({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={springs.default}
-              className="relative mx-4 w-full max-w-sm rounded-2xl p-6"
+              className="relative mx-4 w-full max-w-sm rounded-sm p-6"
               style={{
-                background: "var(--color-surface1)",
+                background: "var(--color-bg)",
                 border: "1px solid var(--color-border)",
                 boxShadow: "var(--shadow-lg)",
               }}
@@ -89,7 +89,7 @@ export function SongInfoModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="absolute right-4 top-4 rounded-lg p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                className="absolute right-4 top-4 rounded-sm p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                 style={{ color: "var(--color-text3)" }}
                 aria-label="Close"
               >
@@ -99,14 +99,17 @@ export function SongInfoModal({
               <div className="mb-4 flex gap-4 pr-8">
                 {albumArt && (
                   <div
-                    className="h-14 w-14 flex-shrink-0 overflow-hidden"
-                    style={{ background: "var(--color-surface2)", borderRadius: "10px" }}
+                    className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-sm"
+                    style={{ background: "var(--color-surface2)" }}
                   >
                     <img src={albumArt} alt="" className="h-full w-full object-cover" />
                   </div>
                 )}
                 <div className="min-w-0">
-                  <h2 className="text-xl font-semibold" style={{ color: "var(--color-text)" }}>
+                  <h2
+                    className="font-mono text-xl font-semibold"
+                    style={{ color: "var(--color-text)" }}
+                  >
                     {displayTitle}
                   </h2>
                   <p style={{ color: "var(--color-text3)" }}>{displayArtist}</p>
@@ -152,7 +155,7 @@ export function SongInfoModal({
                       href={`https://open.spotify.com/track/${spotifyId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg px-4 py-2 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                      className="inline-flex items-center gap-2 rounded-sm px-4 py-2 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                       style={{
                         background: "var(--color-spotify-soft)",
                         color: "var(--color-spotify)",
@@ -204,7 +207,7 @@ export function SongInfoModal({
                   <button
                     type="button"
                     onClick={() => setShowReportModal(true)}
-                    className="inline-flex items-center gap-2 rounded-lg px-4 py-2 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                    className="inline-flex items-center gap-2 rounded-sm px-4 py-2 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                     style={{
                       background: "var(--color-surface2)",
                       color: "var(--color-text3)",
