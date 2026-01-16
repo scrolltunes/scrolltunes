@@ -18,26 +18,26 @@ export function Footer() {
 
   return (
     <footer
-      className="fixed bottom-0 left-0 right-0 h-7 text-xs flex items-center justify-between px-3 z-40 backdrop-blur-lg"
+      className="fixed bottom-0 left-0 right-0 h-7 text-xs flex items-center justify-between px-3 z-40 backdrop-blur-lg rounded-sm"
       style={{
-        background: "var(--color-header-bg)",
-        borderTop: "1px solid var(--color-border)",
-        color: "var(--color-text-muted)",
+        background: "rgba(26, 27, 38, 0.85)",
+        borderTop: "1px solid var(--border-default)",
+        color: "var(--fg-muted)",
       }}
     >
       {/* Left: Version + Terms/Privacy + Report an issue */}
       <div className="flex items-center gap-3 shrink-0">
         <span className="font-mono hidden sm:flex items-center gap-1.5">
-          <span style={{ color: "var(--color-text-muted)" }}>v</span>
+          <span style={{ color: "var(--fg-muted)" }}>v</span>
           {shortSha}
           {env && env !== "production" && (
-            <span className="ml-1" style={{ color: "var(--color-warning)" }}>
+            <span className="ml-1" style={{ color: "var(--status-warning)" }}>
               {env}
             </span>
           )}
         </span>
 
-        <span className="hidden sm:inline" style={{ color: "var(--color-border)" }}>
+        <span className="hidden sm:inline" style={{ color: "var(--border-default)" }}>
           ·
         </span>
 
@@ -48,7 +48,7 @@ export function Footer() {
           Privacy
         </Link>
 
-        <span className="hidden sm:inline" style={{ color: "var(--color-border)" }}>
+        <span className="hidden sm:inline" style={{ color: "var(--border-default)" }}>
           ·
         </span>
 

@@ -35,10 +35,10 @@ Migrate ScrollTunes to a terminal-inspired dark theme (Tokyo Night palette) with
 
 ## Phase 3: Layout Components
 
-- [ ] **3.1** Create/update Header component with sticky positioning, blur backdrop, terminal-styled logo, navigation links
-- [ ] **3.2** Update `Footer.tsx` to use new tokens and terminal styling
-- [ ] **3.3** Update `LogoMenu.tsx` dropdown to use new Card/Button primitives and tokens
-- [ ] **3.4** Create `PageShell.tsx` wrapper component for consistent page layout (optional ambient background, padding, max-width)
+- [x] **3.1** Create/update Header component with sticky positioning, blur backdrop, terminal-styled logo, navigation links
+- [x] **3.2** Update `Footer.tsx` to use new tokens and terminal styling
+- [x] **3.3** Update `LogoMenu.tsx` dropdown to use new Card/Button primitives and tokens
+- [x] **3.4** Create `PageShell.tsx` wrapper component for consistent page layout (optional ambient background, padding, max-width)
 
 ---
 
