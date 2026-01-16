@@ -87,6 +87,7 @@ Always use `SongListItem` from `@/components/ui` when displaying songs in lists.
 - `spotify_normalized.sqlite3` — Pre-normalized index, 10 GB
 - `spotify_clean_audio_features.sqlite3` — BPM, key, mode, 41 GB
 - **Always use artist rowid/ID for queries**, never LIKE on artist names (slow, error-prone)
+- **Batch INSERT sizes must not exceed 6,000 rows** — SQLite has a 32,766 variable limit; 6000 rows × 5 cols = 30,000 vars (safe margin)
 
 ## Best Practices
 

@@ -137,9 +137,9 @@ enum Commands {
         #[arg(long)]
         log_only: bool,
 
-        /// Skip building pop0_albums_norm table (built by default)
+        /// Skip building pop0_tracks_norm table (built by default)
         #[arg(long)]
-        skip_pop0_albums: bool,
+        skip_pop0_tracks: bool,
     },
 
     /// Analyze unmatched tracks and test recovery strategies
@@ -217,6 +217,9 @@ pub struct MatchingStats {
     pub pop0_from_no_candidates: usize, // Groups that never had candidates
     pub pop0_from_rejected: usize,      // Groups that had candidates but all rejected
     pub pop0_matches: usize,
+    pub pop0_common_title_skipped: usize, // Titles skipped due to count > 10K
+    pub pop0_candidate_count_max: usize,  // Largest candidate set processed
+    pub pop0_used_indexed: bool,          // Whether indexed lookup was used
 
     // Duration statistics
     pub duration_matches_0_to_2: usize,
@@ -351,6 +354,21 @@ impl SpotifyAlbumType {
             SpotifyAlbumType::Unknown => 3,
         }
     }
+
+    /// Convert from integer representation (stored in pop0_tracks.album_type)
+    pub fn from_int(i: i32) -> Self {
+        match i {
+            0 => SpotifyAlbumType::Album,
+            1 => SpotifyAlbumType::Single,
+            2 => SpotifyAlbumType::Compilation,
+            _ => SpotifyAlbumType::Unknown,
+        }
+    }
+
+    /// Convert to integer representation for storage
+    pub fn to_int(self) -> i32 {
+        self.rank()
+    }
 }
 
 impl From<Option<&str>> for SpotifyAlbumType {
@@ -406,15 +424,14 @@ fn is_better_match(
     }
 }
 
-/// Spotify track info for matching
+/// Spotify track info for matching (v3: includes album_name for canonical display)
 #[derive(Clone, Debug)]
 struct SpotifyTrack {
-    id: String, // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
-    #[allow(dead_code)]
-    name: String, // Original title (kept for debugging)
-    #[allow(dead_code)]
-    artist: String, // Primary artist (kept for debugging)
-    artists: Vec<String>, // All credited artists (spec-03 multi-artist verification)
+    id: String,           // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
+    name: String,         // Canonical track name from Spotify (v3: used for display)
+    artist: String,       // Primary artist (kept for backwards compat)
+    artists: Vec<String>, // All credited artists in Spotify's credited order (v3: ORDER BY ta.rowid)
+    album_name: Option<String>, // Canonical album name from Spotify (v3: used for display)
     duration_ms: i64,
     popularity: i32,              // 0-100
     isrc: Option<String>,         // For Deezer album art lookup
@@ -477,24 +494,50 @@ enum FailureReason {
     LowConfidenceMatch { accepted_score: i32, threshold: i32 },
 }
 
-/// Final enriched track for output.
-/// LRCLIB fields are always present (source of truth).
-/// Spotify fields are nullable (enrichment, NULL if no match).
+/// Final enriched track for output (v3 schema).
+///
+/// ## Display vs Source Fields (v3)
+///
+/// - `title`, `artist`, `album`: **Display fields**
+///   - When Spotify matched: Spotify canonical names (corrected spelling, proper casing)
+///   - When unmatched: LRCLIB source values (fallback)
+///
+/// - `lrclib_title`, `lrclib_artist`, `lrclib_album`: **Source fields**
+///   - Original LRCLIB values (preserved for auditing/debugging/lyrics matching)
+///   - Always populated from LRCLIB regardless of match status
+///
+/// ## Key Invariants
+///
+/// 1. **Matched tracks** (`spotify_id IS NOT NULL`):
+///    - `title`, `artist`, `album` = Spotify canonical values
+///    - `artist` = `spotify_artists_json.join(", ")`
+///
+/// 2. **Unmatched tracks** (`spotify_id IS NULL`):
+///    - `title == lrclib_title`, `artist == lrclib_artist`, `album == lrclib_album`
+///    - `spotify_artists_json` = NULL
 #[derive(Clone, Debug)]
 struct EnrichedTrack {
-    // From LRCLIB (source of truth, always present)
+    // Identifiers
     lrclib_id: i64,
-    title: String,
-    artist: String,
-    album: Option<String>,
     duration_sec: i64,
     title_norm: String,
     artist_norm: String,
     quality: i32,
 
-    // From Spotify (enrichment, all nullable)
+    // Display names (Spotify canonical when matched, LRCLIB fallback when unmatched)
+    title: String,
+    artist: String,
+    album: Option<String>,
+
+    // Source LRCLIB names (preserved for auditing/debugging/lyrics matching)
+    lrclib_title: String,
+    lrclib_artist: String,
+    lrclib_album: Option<String>,
+
+    // Spotify enrichment (all nullable, NULL = no match)
     spotify_id: Option<String>,
-    popularity: Option<i32>, // NULL if no match (not 0)
+    spotify_artists_json: Option<String>, // JSON array: ["Artist1", "Artist2"]
+    popularity: Option<i32>,              // NULL if no match (not 0)
     tempo: Option<f64>,
     musical_key: Option<i32>,
     mode: Option<i32>,
@@ -1410,6 +1453,7 @@ fn stream_match_spotify(
             name: row.get(1)?,
             artist: primary_artist.clone(),
             artists: vec![primary_artist.clone()], // Streaming gets only primary artist (spec-03: multi-artist via batch fetch)
+            album_name: None, // Not fetched during streaming (v3: fetched via batch_fetch_track_details)
             duration_ms: row.get(3)?,
             popularity: row.get(4)?,
             isrc: row.get(5)?,
@@ -1638,6 +1682,7 @@ fn stream_and_match_spotify_delayed(
             name: row.get(1)?,
             artist: primary_artist.clone(),
             artists: vec![primary_artist.clone()], // Streaming gets only primary artist (spec-03: multi-artist via batch fetch)
+            album_name: None, // Not fetched during streaming (v3: fetched via batch_fetch_track_details)
             duration_ms: row.get(3)?,
             popularity: row.get(4)?,
             isrc: row.get(5)?,
@@ -2057,7 +2102,7 @@ fn match_pop0_fallback(
     let title_filter = Arc::new(title_only_index);
 
     let mut stmt = spotify_conn.prepare(
-        "SELECT t.rowid, t.id, t.name, t.duration_ms, t.external_id_isrc, t.album_rowid, al.album_type
+        "SELECT t.rowid, t.id, t.name, t.duration_ms, t.external_id_isrc, t.album_rowid, al.album_type, al.name
          FROM tracks t
          LEFT JOIN albums al ON al.rowid = t.album_rowid
          WHERE t.popularity = 0",
@@ -2072,6 +2117,7 @@ fn match_pop0_fallback(
         isrc: Option<String>,
         album_rowid: i64,
         album_type: SpotifyAlbumType,
+        album_name: Option<String>, // v3: Spotify canonical album name
     }
 
     let mut rows = stmt.query([])?;
@@ -2093,6 +2139,7 @@ fn match_pop0_fallback(
             isrc: row.get(4)?,
             album_rowid: row.get(5)?,
             album_type: SpotifyAlbumType::from(album_type_str.as_deref()),
+            album_name: row.get(7)?, // v3: from al.name
         });
 
         rows_processed += 1;
@@ -2114,6 +2161,7 @@ fn match_pop0_fallback(
                             isrc: r.isrc,
                             album_rowid: r.album_rowid,
                             album_type: r.album_type,
+                            album_name: r.album_name, // v3
                         })
                     } else {
                         None
@@ -2166,6 +2214,7 @@ fn match_pop0_fallback(
                         isrc: r.isrc,
                         album_rowid: r.album_rowid,
                         album_type: r.album_type,
+                        album_name: r.album_name, // v3
                     })
                 } else {
                     None
@@ -2217,6 +2266,7 @@ struct Pop0Candidate {
     isrc: Option<String>,
     album_rowid: i64,
     album_type: SpotifyAlbumType,
+    album_name: Option<String>, // v3: Spotify canonical album name
 }
 
 /// Process a batch of pop=0 candidates: fetch artists in bulk, then match against groups.
@@ -2258,6 +2308,7 @@ fn process_pop0_candidate_batch(
                     name: c.name.clone(),
                     artist: artist.clone(),
                     artists: artists.clone(),
+                    album_name: c.album_name.clone(), // v3: from Pop0CandidateFull
                     duration_ms: c.duration_ms,
                     popularity: 0,
                     isrc: c.isrc.clone(),
@@ -2337,7 +2388,7 @@ fn batch_fetch_artists_for_tracks(
              FROM track_artists ta
              JOIN artists a ON a.rowid = ta.artist_rowid
              WHERE ta.track_rowid IN ({})
-             ORDER BY ta.track_rowid, ta.artist_rowid",
+             ORDER BY ta.track_rowid, ta.rowid",
             placeholders
         );
 
@@ -2357,8 +2408,753 @@ fn batch_fetch_artists_for_tracks(
 }
 
 // ============================================================================
-// Pop0 Indexed Lookup (Optimized)
+// Pop0 Indexed Lookup (Optimized v3)
 // ============================================================================
+
+/// Optimized pop0 matching using pre-built `pop0_tracks_norm` index.
+/// Uses pre-joined pop0_tracks table for fast matching.
+/// Falls back to old pop0_tracks_norm approach if pop0_tracks doesn't exist.
+///
+/// Returns the number of matches found.
+fn match_pop0_indexed(
+    normalized_conn: &Connection,
+    spotify_conn: &Connection,
+    groups: &mut [LrclibGroup],
+    groups_seen: &mut FxHashSet<usize>,
+    stats: &mut MatchingStats,
+) -> Result<u64> {
+    let phase_start = Instant::now();
+
+    // Check if we have the new pre-joined pop0_tracks table
+    let has_pop0_enriched: bool = normalized_conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='pop0_tracks'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
+    if has_pop0_enriched {
+        return match_pop0_enriched(normalized_conn, groups, groups_seen, stats, phase_start);
+    }
+
+    // Fallback to old approach if pop0_tracks doesn't exist
+    log!("[POP0-INDEXED] pop0_tracks not found, falling back to pop0_tracks_norm (slower)");
+    match_pop0_legacy(normalized_conn, spotify_conn, groups, groups_seen, stats, phase_start)
+}
+
+/// Fast pop0 matching using pre-joined pop0_tracks table.
+/// All data is available in one query - no separate artist/album fetches needed.
+fn match_pop0_enriched(
+    normalized_conn: &Connection,
+    groups: &mut [LrclibGroup],
+    groups_seen: &mut FxHashSet<usize>,
+    stats: &mut MatchingStats,
+    phase_start: Instant,
+) -> Result<u64> {
+    log!("[POP0-ENRICHED] Using pre-joined pop0_tracks table (fast path)");
+
+    // Build index of unmatched groups for fast lookup
+    let mut unmatched_index: FxHashMap<(String, String), Vec<usize>> = FxHashMap::default();
+    let mut from_no_candidates = 0usize;
+    let mut from_rejected = 0usize;
+
+    for (idx, group) in groups.iter().enumerate() {
+        if group.best_match.is_none() {
+            let key = group.key.clone();
+            unmatched_index.entry(key).or_default().push(idx);
+
+            if groups_seen.contains(&idx) {
+                from_rejected += 1;
+            } else {
+                from_no_candidates += 1;
+            }
+        }
+    }
+
+    stats.pop0_eligible = unmatched_index.len();
+    stats.pop0_from_no_candidates = from_no_candidates;
+    stats.pop0_from_rejected = from_rejected;
+
+    if unmatched_index.is_empty() {
+        return Ok(0);
+    }
+
+    println!(
+        "[POP0-ENRICHED] Searching pop=0 tracks for {} unmatched groups ({} never seen, {} previously rejected)...",
+        unmatched_index.len(),
+        from_no_candidates,
+        from_rejected
+    );
+
+    // Load common titles to skip
+    let common_titles: FxHashSet<String> = {
+        let has_title_counts: bool = normalized_conn
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='pop0_title_counts'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+
+        if has_title_counts {
+            let mut stmt = normalized_conn.prepare("SELECT title_norm FROM pop0_title_counts")?;
+            let mut rows = stmt.query([])?;
+            let mut set = FxHashSet::default();
+            while let Some(row) = rows.next()? {
+                let title: String = row.get(0)?;
+                set.insert(title);
+            }
+            set
+        } else {
+            FxHashSet::default()
+        }
+    };
+    log!(
+        "[POP0-ENRICHED] Loaded {} common titles to skip",
+        common_titles.len()
+    );
+
+    // Build map of title_norm -> (target durations, matching groups)
+    // This combines duration filtering with group lookup
+    struct TitleInfo {
+        durations: Vec<i64>,
+        groups: Vec<(usize, String)>, // (group_idx, expected_artist_norm)
+    }
+    let mut title_info_map: FxHashMap<String, TitleInfo> = FxHashMap::default();
+    let mut skipped_common = 0usize;
+
+    for ((title_norm, artist_norm), group_indices) in &unmatched_index {
+        if common_titles.contains(title_norm) {
+            skipped_common += 1;
+            continue;
+        }
+
+        let info = title_info_map.entry(title_norm.clone()).or_insert_with(|| TitleInfo {
+            durations: Vec::new(),
+            groups: Vec::new(),
+        });
+
+        for &group_idx in group_indices {
+            info.groups.push((group_idx, artist_norm.clone()));
+            for variant in &groups[group_idx].tracks {
+                let duration_ms = (variant.track.duration_sec as i64) * 1000;
+                if !info.durations.contains(&duration_ms) {
+                    info.durations.push(duration_ms);
+                }
+            }
+        }
+    }
+    stats.pop0_common_title_skipped = skipped_common;
+
+    log!(
+        "[POP0-ENRICHED] {} unique titles to search, {} skipped as common",
+        title_info_map.len(),
+        skipped_common
+    );
+
+    if title_info_map.is_empty() {
+        return Ok(0);
+    }
+
+    // Prepare the query - we'll run it once per title with duration range
+    // This uses the compound index on (title_norm, duration_ms)
+    let mut stmt = normalized_conn.prepare_cached(
+        "SELECT track_rowid, duration_ms, track_name, track_id, isrc, artists_json, album_rowid, album_name, album_type
+         FROM pop0_tracks
+         WHERE title_norm = ?
+         LIMIT 5000"
+    )?;
+
+    const DURATION_TOLERANCE_MS: i64 = 3000;
+    let mut matches_found = 0u64;
+    let mut total_candidates = 0u64;
+    let mut duration_filtered = 0u64;
+
+    let pb = create_progress_bar(title_info_map.len() as u64, "Processing pop0 titles");
+
+    for (i, (title_norm, info)) in title_info_map.iter().enumerate() {
+        let mut rows = stmt.query([title_norm])?;
+
+        while let Some(row) = rows.next()? {
+            let _track_rowid: i64 = row.get(0)?; // Not used but needed to preserve column order
+            let duration_ms: i64 = row.get(1)?;
+            let track_name: String = row.get(2)?;
+            let track_id: String = row.get(3)?;
+            let isrc: Option<String> = row.get(4)?;
+            let artists_json: String = row.get(5)?;
+            let album_rowid: i64 = row.get(6)?;
+            let album_name: Option<String> = row.get(7)?;
+            let album_type_int: i32 = row.get(8)?;
+
+            // Duration pre-filter
+            let duration_matches = info
+                .durations
+                .iter()
+                .any(|&target| (duration_ms - target).abs() <= DURATION_TOLERANCE_MS);
+
+            if !duration_matches {
+                duration_filtered += 1;
+                continue;
+            }
+            total_candidates += 1;
+
+            // Parse artists from JSON
+            let artists: Vec<String> = serde_json::from_str(&artists_json).unwrap_or_default();
+            if artists.is_empty() {
+                continue;
+            }
+
+            let album_type = SpotifyAlbumType::from_int(album_type_int);
+
+            // Try matching against each artist
+            for artist in &artists {
+                let artist_norm = normalize_artist(artist);
+
+                for (group_idx, expected_artist_norm) in &info.groups {
+                    if &artist_norm != expected_artist_norm {
+                        continue;
+                    }
+
+                    if groups_seen.contains(group_idx) {
+                        continue;
+                    }
+
+                    let group = &mut groups[*group_idx];
+
+                    let spotify_track = SpotifyTrack {
+                        id: track_id.clone(),
+                        name: track_name.clone(),
+                        artist: artist.clone(),
+                        artists: artists.clone(),
+                        album_name: album_name.clone(),
+                        duration_ms,
+                        popularity: 0,
+                        isrc: isrc.clone(),
+                        album_rowid,
+                        album_type,
+                    };
+
+                    for (track_idx, variant) in group.tracks.iter().enumerate() {
+                        let score = combined_score(
+                            &variant.track,
+                            variant.quality,
+                            &spotify_track,
+                            &artist_norm,
+                        );
+
+                        if score >= ACCEPT_THRESHOLD {
+                            let should_replace = match &group.best_match {
+                                Some((_, current_track, current_score)) => is_better_match(
+                                    score,
+                                    spotify_track.album_type,
+                                    *current_score,
+                                    current_track.album_type,
+                                ),
+                                None => true,
+                            };
+                            if should_replace {
+                                group.best_match = Some((track_idx, spotify_track.clone(), score));
+                            }
+                        }
+                    }
+
+                    if group.best_match.is_some() {
+                        groups_seen.insert(*group_idx);
+                        matches_found += 1;
+                        if let Some((track_idx, ref spotify, _)) = group.best_match {
+                            let lrclib_duration = group.tracks[track_idx].track.duration_sec;
+                            let diff_sec = lrclib_duration - spotify.duration_ms / 1000;
+                            stats.record_duration_bucket(diff_sec);
+                        }
+                    }
+
+                    break; // Break out of artist loop once matched
+                }
+            }
+        }
+
+        if i % 1000 == 0 {
+            pb.set_position(i as u64);
+        }
+    }
+    pb.finish();
+
+    log!(
+        "[POP0-ENRICHED] Duration pre-filter: {} candidates kept, {} filtered out ({:.1}% reduction)",
+        total_candidates,
+        duration_filtered,
+        if total_candidates + duration_filtered > 0 {
+            (duration_filtered as f64 / (total_candidates + duration_filtered) as f64) * 100.0
+        } else {
+            0.0
+        }
+    );
+
+    stats.pop0_matches = matches_found as usize;
+    stats.pop0_used_indexed = true;
+    stats.pop0_candidate_count_max = 0; // Not tracked in enriched path
+
+    log!(
+        "[POP0-ENRICHED] Complete: {} additional matches from pop=0 tracks ({})",
+        matches_found,
+        format_duration(phase_start.elapsed())
+    );
+    Ok(matches_found)
+}
+
+/// Legacy pop0 matching using pop0_tracks_norm table (slower, requires separate artist fetches).
+fn match_pop0_legacy(
+    normalized_conn: &Connection,
+    spotify_conn: &Connection,
+    groups: &mut [LrclibGroup],
+    groups_seen: &mut FxHashSet<usize>,
+    stats: &mut MatchingStats,
+    phase_start: Instant,
+) -> Result<u64> {
+    // Build index of unmatched groups for fast lookup (spec-04: includes rejected groups)
+    let mut unmatched_index: FxHashMap<(String, String), Vec<usize>> = FxHashMap::default();
+    let mut from_no_candidates = 0usize;
+    let mut from_rejected = 0usize;
+
+    for (idx, group) in groups.iter().enumerate() {
+        if group.best_match.is_none() {
+            let key = group.key.clone();
+            unmatched_index.entry(key).or_default().push(idx);
+
+            if groups_seen.contains(&idx) {
+                from_rejected += 1;
+            } else {
+                from_no_candidates += 1;
+            }
+        }
+    }
+
+    stats.pop0_eligible = unmatched_index.len();
+    stats.pop0_from_no_candidates = from_no_candidates;
+    stats.pop0_from_rejected = from_rejected;
+
+    if unmatched_index.is_empty() {
+        return Ok(0);
+    }
+
+    println!(
+        "[POP0-LEGACY] Searching pop=0 tracks for {} unmatched groups ({} never seen, {} previously rejected)...",
+        unmatched_index.len(),
+        from_no_candidates,
+        from_rejected
+    );
+
+    // Step 1: Load common titles to skip (count > 500)
+    let has_title_counts: bool = normalized_conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='pop0_title_counts'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
+    let common_titles: FxHashSet<String> = if has_title_counts {
+        let mut stmt = normalized_conn.prepare(
+            "SELECT title_norm FROM pop0_title_counts",
+        )?;
+        let mut rows = stmt.query([])?;
+        let mut set = FxHashSet::default();
+        while let Some(row) = rows.next()? {
+            let title: String = row.get(0)?;
+            set.insert(title);
+        }
+        set
+    } else {
+        log!("[POP0-LEGACY] pop0_title_counts table not found, skipping common-title filter");
+        FxHashSet::default()
+    };
+    log!(
+        "[POP0-LEGACY] Loaded {} common titles to skip",
+        common_titles.len()
+    );
+
+    // Step 2: Collect unique unmatched title_norms (excluding common titles)
+    let mut unmatched_titles: FxHashSet<String> = FxHashSet::default();
+    let mut skipped_common = 0usize;
+
+    for (title_norm, _artist_norm) in unmatched_index.keys() {
+        if common_titles.contains(title_norm) {
+            skipped_common += 1;
+        } else {
+            unmatched_titles.insert(title_norm.clone());
+        }
+    }
+    stats.pop0_common_title_skipped = skipped_common;
+    log!(
+        "[POP0-LEGACY] {} unique titles to search, {} skipped as common",
+        unmatched_titles.len(),
+        skipped_common
+    );
+
+    // Build map of title_norm -> target durations (in ms) for duration pre-filtering
+    let mut title_durations: FxHashMap<String, Vec<i64>> = FxHashMap::default();
+    for ((title_norm, _artist_norm), group_indices) in &unmatched_index {
+        if common_titles.contains(title_norm) {
+            continue;
+        }
+        let durations = title_durations.entry(title_norm.clone()).or_default();
+        for &group_idx in group_indices {
+            for variant in &groups[group_idx].tracks {
+                let duration_ms = (variant.track.duration_sec as i64) * 1000;
+                if !durations.contains(&duration_ms) {
+                    durations.push(duration_ms);
+                }
+            }
+        }
+    }
+    log!(
+        "[POP0-LEGACY] Built duration map for {} titles",
+        title_durations.len()
+    );
+
+    if unmatched_titles.is_empty() {
+        log!("[POP0-LEGACY] No titles to search after filtering common titles");
+        return Ok(0);
+    }
+
+    // Step 3: Create temp table of unmatched titles
+    normalized_conn.execute(
+        "CREATE TEMP TABLE IF NOT EXISTS tmp_unmatched_titles(title_norm TEXT PRIMARY KEY)",
+        [],
+    )?;
+    normalized_conn.execute("DELETE FROM tmp_unmatched_titles", [])?;
+
+    // Bulk insert titles into temp table
+    const TITLE_BATCH_SIZE: usize = 5000;
+    let titles_vec: Vec<&String> = unmatched_titles.iter().collect();
+
+    for chunk in titles_vec.chunks(TITLE_BATCH_SIZE) {
+        let placeholders: String = chunk.iter().map(|_| "(?)").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "INSERT OR IGNORE INTO tmp_unmatched_titles(title_norm) VALUES {}",
+            placeholders
+        );
+        let mut stmt = normalized_conn.prepare(&sql)?;
+        let params: Vec<&dyn rusqlite::ToSql> =
+            chunk.iter().map(|t| *t as &dyn rusqlite::ToSql).collect();
+        stmt.execute(params.as_slice())?;
+    }
+
+    log!(
+        "[POP0-LEGACY] Inserted {} titles into temp table",
+        unmatched_titles.len()
+    );
+
+    // Step 4: Set-based JOIN to get all matching candidates
+    let mut stmt = normalized_conn.prepare(
+        "SELECT p.title_norm, p.track_rowid, p.duration_ms, p.album_rowid
+         FROM pop0_tracks_norm p
+         JOIN tmp_unmatched_titles t USING(title_norm)
+         ORDER BY p.title_norm",
+    )?;
+
+    let mut rows = stmt.query([])?;
+
+    // Collect candidates with duration pre-filtering
+    const MAX_CANDIDATES_PER_TITLE: usize = 5000;
+    const DURATION_TOLERANCE_MS: i64 = 3000;
+    let mut candidates_by_title: FxHashMap<String, Vec<(i64, i64, i64)>> = FxHashMap::default();
+    let mut total_candidates = 0u64;
+    let mut duration_filtered = 0u64;
+    let mut max_candidates_per_title = 0usize;
+    let mut capped_titles = 0usize;
+
+    while let Some(row) = rows.next()? {
+        let title_norm: String = row.get(0)?;
+        let track_rowid: i64 = row.get(1)?;
+        let duration_ms: i64 = row.get(2)?;
+        let album_rowid: i64 = row.get(3)?;
+
+        let duration_matches = title_durations
+            .get(&title_norm)
+            .map(|targets| {
+                targets
+                    .iter()
+                    .any(|&target| (duration_ms - target).abs() <= DURATION_TOLERANCE_MS)
+            })
+            .unwrap_or(false);
+
+        if !duration_matches {
+            duration_filtered += 1;
+            continue;
+        }
+
+        let entry = candidates_by_title.entry(title_norm).or_default();
+        if entry.len() < MAX_CANDIDATES_PER_TITLE {
+            entry.push((track_rowid, duration_ms, album_rowid));
+            total_candidates += 1;
+        } else if entry.len() == MAX_CANDIDATES_PER_TITLE {
+            capped_titles += 1;
+        }
+    }
+
+    log!(
+        "[POP0-LEGACY] Duration pre-filter: {} candidates kept, {} filtered out ({:.1}% reduction)",
+        total_candidates,
+        duration_filtered,
+        if total_candidates + duration_filtered > 0 {
+            (duration_filtered as f64 / (total_candidates + duration_filtered) as f64) * 100.0
+        } else {
+            0.0
+        }
+    );
+
+    for candidates in candidates_by_title.values() {
+        max_candidates_per_title = max_candidates_per_title.max(candidates.len());
+    }
+    stats.pop0_candidate_count_max = max_candidates_per_title;
+
+    if capped_titles > 0 {
+        log!(
+            "[POP0-LEGACY] Capped {} titles at {} candidates each",
+            capped_titles,
+            MAX_CANDIDATES_PER_TITLE
+        );
+    }
+
+    log!(
+        "[POP0-LEGACY] Found {} total candidates across {} titles (max {} per title)",
+        total_candidates,
+        candidates_by_title.len(),
+        max_candidates_per_title
+    );
+
+    normalized_conn.execute("DROP TABLE IF EXISTS tmp_unmatched_titles", [])?;
+
+    if candidates_by_title.is_empty() {
+        log!("[POP0-LEGACY] No candidates found");
+        return Ok(0);
+    }
+
+    // Step 5: Batch fetch artists for all track rowids
+    let all_rowids: Vec<i64> = candidates_by_title
+        .values()
+        .flat_map(|v| v.iter().map(|(r, _, _)| *r))
+        .collect();
+
+    log!(
+        "[POP0-LEGACY] Fetching artists for {} tracks...",
+        all_rowids.len()
+    );
+    let track_artists = batch_fetch_artists_for_tracks(spotify_conn, &all_rowids)?;
+
+    let unique_album_rowids: Vec<i64> = {
+        let mut set: FxHashSet<i64> = FxHashSet::default();
+        for candidates in candidates_by_title.values() {
+            for (_, _, album_rowid) in candidates {
+                set.insert(*album_rowid);
+            }
+        }
+        set.into_iter().collect()
+    };
+
+    let album_types = batch_fetch_album_types(spotify_conn, &unique_album_rowids)?;
+    let album_names = batch_fetch_album_names(spotify_conn, &unique_album_rowids)?;
+
+    // Step 6: Process candidates and match against groups
+    let mut matches_found = 0u64;
+    let pb = create_progress_bar(candidates_by_title.len() as u64, "Processing pop0 candidates");
+
+    for (i, (title_norm, candidates)) in candidates_by_title.iter().enumerate() {
+        let matching_groups: Vec<(usize, String)> = unmatched_index
+            .iter()
+            .filter(|((t, _), _)| t == title_norm)
+            .flat_map(|((_, a), indices)| indices.iter().map(|&idx| (idx, a.clone())))
+            .collect();
+
+        for (track_rowid, duration_ms, album_rowid) in candidates {
+            let artists = match track_artists.get(track_rowid) {
+                Some(a) => a,
+                None => continue,
+            };
+
+            let album_type = album_types
+                .get(album_rowid)
+                .copied()
+                .unwrap_or(SpotifyAlbumType::Unknown);
+
+            let album_name = album_names.get(album_rowid).cloned();
+
+            for artist in artists {
+                let artist_norm = normalize_artist(artist);
+
+                for (group_idx, expected_artist_norm) in &matching_groups {
+                    if &artist_norm != expected_artist_norm {
+                        continue;
+                    }
+
+                    if groups_seen.contains(group_idx) {
+                        continue;
+                    }
+
+                    let group = &mut groups[*group_idx];
+
+                    let track_name = get_track_name_cached(spotify_conn, *track_rowid)?;
+                    let track_id = get_track_id_cached(spotify_conn, *track_rowid)?;
+                    let isrc = get_track_isrc_cached(spotify_conn, *track_rowid)?;
+
+                    let spotify_track = SpotifyTrack {
+                        id: track_id,
+                        name: track_name,
+                        artist: artist.clone(),
+                        artists: artists.clone(),
+                        album_name: album_name.clone(),
+                        duration_ms: *duration_ms,
+                        popularity: 0,
+                        isrc,
+                        album_rowid: *album_rowid,
+                        album_type,
+                    };
+
+                    for (track_idx, variant) in group.tracks.iter().enumerate() {
+                        let score = combined_score(
+                            &variant.track,
+                            variant.quality,
+                            &spotify_track,
+                            &artist_norm,
+                        );
+
+                        if score >= ACCEPT_THRESHOLD {
+                            let should_replace = match &group.best_match {
+                                Some((_, current_track, current_score)) => is_better_match(
+                                    score,
+                                    spotify_track.album_type,
+                                    *current_score,
+                                    current_track.album_type,
+                                ),
+                                None => true,
+                            };
+                            if should_replace {
+                                group.best_match =
+                                    Some((track_idx, spotify_track.clone(), score));
+                            }
+                        }
+                    }
+
+                    if group.best_match.is_some() {
+                        groups_seen.insert(*group_idx);
+                        matches_found += 1;
+                        if let Some((track_idx, ref spotify, _)) = group.best_match {
+                            let lrclib_duration = group.tracks[track_idx].track.duration_sec;
+                            let diff_sec = lrclib_duration - spotify.duration_ms / 1000;
+                            stats.record_duration_bucket(diff_sec);
+                        }
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        if i % 1000 == 0 {
+            pb.set_position(i as u64);
+        }
+    }
+    pb.finish();
+
+    stats.pop0_matches = matches_found as usize;
+    stats.pop0_used_indexed = true;
+
+    log!(
+        "[POP0-LEGACY] Complete: {} additional matches from pop=0 tracks ({})",
+        matches_found,
+        format_duration(phase_start.elapsed())
+    );
+    Ok(matches_found)
+}
+
+/// Batch fetch album types for a set of album rowids.
+fn batch_fetch_album_types(
+    conn: &Connection,
+    rowids: &[i64],
+) -> Result<FxHashMap<i64, SpotifyAlbumType>> {
+    if rowids.is_empty() {
+        return Ok(FxHashMap::default());
+    }
+
+    let mut result: FxHashMap<i64, SpotifyAlbumType> = FxHashMap::default();
+    const BATCH_SIZE: usize = 10_000;
+
+    for chunk in rowids.chunks(BATCH_SIZE) {
+        let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT rowid, album_type FROM albums WHERE rowid IN ({})",
+            placeholders
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params: Vec<&dyn rusqlite::ToSql> =
+            chunk.iter().map(|r| r as &dyn rusqlite::ToSql).collect();
+        let mut rows = stmt.query(params.as_slice())?;
+
+        while let Some(row) = rows.next()? {
+            let rowid: i64 = row.get(0)?;
+            let album_type_str: Option<String> = row.get(1)?;
+            result.insert(rowid, SpotifyAlbumType::from(album_type_str.as_deref()));
+        }
+    }
+
+    Ok(result)
+}
+
+/// Batch fetch album names for a set of album rowids.
+fn batch_fetch_album_names(conn: &Connection, rowids: &[i64]) -> Result<FxHashMap<i64, String>> {
+    if rowids.is_empty() {
+        return Ok(FxHashMap::default());
+    }
+
+    let mut result: FxHashMap<i64, String> = FxHashMap::default();
+    const BATCH_SIZE: usize = 10_000;
+
+    for chunk in rowids.chunks(BATCH_SIZE) {
+        let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT rowid, name FROM albums WHERE rowid IN ({})",
+            placeholders
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params: Vec<&dyn rusqlite::ToSql> =
+            chunk.iter().map(|r| r as &dyn rusqlite::ToSql).collect();
+        let mut rows = stmt.query(params.as_slice())?;
+
+        while let Some(row) = rows.next()? {
+            let rowid: i64 = row.get(0)?;
+            let name: String = row.get(1)?;
+            result.insert(rowid, name);
+        }
+    }
+
+    Ok(result)
+}
+
+/// Get track name by rowid (cached via prepare_cached).
+fn get_track_name_cached(conn: &Connection, rowid: i64) -> Result<String> {
+    let mut stmt = conn.prepare_cached("SELECT name FROM tracks WHERE rowid = ?")?;
+    let name: String = stmt.query_row([rowid], |row| row.get(0))?;
+    Ok(name)
+}
+
+/// Get track ID by rowid (cached via prepare_cached).
+fn get_track_id_cached(conn: &Connection, rowid: i64) -> Result<String> {
+    let mut stmt = conn.prepare_cached("SELECT id FROM tracks WHERE rowid = ?")?;
+    let id: String = stmt.query_row([rowid], |row| row.get(0))?;
+    Ok(id)
+}
+
+/// Get track ISRC by rowid (cached via prepare_cached).
+fn get_track_isrc_cached(conn: &Connection, rowid: i64) -> Result<Option<String>> {
+    let mut stmt = conn.prepare_cached("SELECT external_id_isrc FROM tracks WHERE rowid = ?")?;
+    let isrc: Option<String> = stmt.query_row([rowid], |row| row.get(0))?;
+    Ok(isrc)
+}
+
 // ============================================================================
 // Title-First Rescue Pass (spec-06)
 // ============================================================================
@@ -3150,22 +3946,19 @@ fn batch_fetch_track_details(
     for chunk in rowids.chunks(BATCH_SIZE) {
         let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
 
-        // Phase 1: Fetch track data with primary artist and album_type
+        // Phase 1: Fetch track data with album_type and album_name (v3: canonical names)
         let sql = format!(
             r#"SELECT
                 t.rowid,
                 t.id,
                 t.name,
-                a.name as artist_name,
                 t.duration_ms,
                 t.popularity,
                 t.external_id_isrc,
                 t.album_rowid,
-                al.album_type
+                al.album_type,
+                al.name as album_name
             FROM tracks t
-            JOIN artists a ON a.rowid = (
-                SELECT MIN(artist_rowid) FROM track_artists WHERE track_rowid = t.rowid
-            )
             LEFT JOIN albums al ON al.rowid = t.album_rowid
             WHERE t.rowid IN ({})"#,
             placeholders
@@ -3178,29 +3971,31 @@ fn batch_fetch_track_details(
 
         while let Some(row) = rows.next()? {
             let rowid: i64 = row.get(0)?;
-            let primary_artist: String = row.get(3)?;
-            let album_type_str: Option<String> = row.get(8)?;
+            let album_type_str: Option<String> = row.get(7)?;
+            let album_name: Option<String> = row.get(8)?;
             let track = SpotifyTrack {
                 id: row.get(1)?,
                 name: row.get(2)?,
-                artist: primary_artist.clone(),
-                artists: vec![primary_artist], // Will be extended with all artists
-                duration_ms: row.get(4)?,
-                popularity: row.get(5)?,
-                isrc: row.get(6)?,
-                album_rowid: row.get(7)?,
+                artist: String::new(), // Will be set from artists list
+                artists: Vec::new(),   // Will be populated in Phase 2
+                album_name,            // v3: Spotify canonical album name
+                duration_ms: row.get(3)?,
+                popularity: row.get(4)?,
+                isrc: row.get(5)?,
+                album_rowid: row.get(6)?,
                 album_type: SpotifyAlbumType::from(album_type_str.as_deref()),
             };
             result.insert(rowid, track);
         }
 
-        // Phase 2: Fetch ALL artists for these tracks (spec-03 R3.3)
+        // Phase 2: Fetch ALL artists for these tracks in credited order (v3: ORDER BY ta.rowid)
+        // This preserves Spotify's credited order instead of using MIN(artist_rowid)
         let artists_sql = format!(
             r#"SELECT ta.track_rowid, a.name
             FROM track_artists ta
             JOIN artists a ON a.rowid = ta.artist_rowid
             WHERE ta.track_rowid IN ({})
-            ORDER BY ta.track_rowid, ta.artist_rowid"#,
+            ORDER BY ta.track_rowid, ta.rowid"#,
             placeholders
         );
 
@@ -3218,9 +4013,13 @@ fn batch_fetch_track_details(
                 .push(artist_name);
         }
 
-        // Update tracks with all artists
+        // Update tracks with all artists (v3: set artist field from first credited artist)
         for (track_rowid, artists) in track_artists_map {
             if let Some(track) = result.get_mut(&track_rowid) {
+                // Set primary artist from first credited artist (Spotify's order)
+                if let Some(first) = artists.first() {
+                    track.artist = first.clone();
+                }
                 track.artists = artists;
             }
         }
@@ -3232,9 +4031,18 @@ fn batch_fetch_track_details(
     Ok(result)
 }
 
-/// Select canonical track and enrich with Spotify data (spec-03).
-/// For matched groups: use the variant that matched best with Spotify.
-/// For unmatched groups: fall back to best quality variant.
+/// Select canonical track and enrich with Spotify data (v3: canonical display names).
+///
+/// ## v3 Changes
+///
+/// - **Matched tracks**: Display fields use Spotify canonical names (corrected spelling)
+///   - `title` = `spotify.name`
+///   - `artist` = `spotify.artists.join(", ")`
+///   - `album` = `spotify.album_name`
+///   - `lrclib_*` fields preserve original LRCLIB values
+///
+/// - **Unmatched tracks**: Display fields = LRCLIB source (fallback)
+///   - `title == lrclib_title`, `artist == lrclib_artist`, `album == lrclib_album`
 fn select_canonical_and_enrich(
     groups: Vec<LrclibGroup>,
     audio_lookup: &FxHashMap<String, AudioFeatures>,
@@ -3254,16 +4062,28 @@ fn select_canonical_and_enrich(
                     let features = audio_lookup.get(&spotify.id);
                     let album_image = image_lookup.get(&spotify.album_rowid).cloned();
 
+                    // v3: Display names from Spotify canonical
+                    let display_artist = spotify.artists.join(", ");
+                    let spotify_artists_json =
+                        serde_json::to_string(&spotify.artists).unwrap_or_default();
+
                     EnrichedTrack {
                         lrclib_id: variant.track.id,
-                        title: variant.track.title.clone(),
-                        artist: variant.track.artist.clone(),
-                        album: variant.track.album.clone(),
                         duration_sec: variant.track.duration_sec,
                         title_norm,
                         artist_norm,
                         quality: variant.quality,
+                        // v3: Display fields = Spotify canonical
+                        title: spotify.name.clone(),
+                        artist: display_artist,
+                        album: spotify.album_name.clone(),
+                        // v3: Source LRCLIB fields preserved
+                        lrclib_title: variant.track.title.clone(),
+                        lrclib_artist: variant.track.artist.clone(),
+                        lrclib_album: variant.track.album.clone(),
+                        // Spotify enrichment
                         spotify_id: Some(spotify.id),
+                        spotify_artists_json: Some(spotify_artists_json),
                         popularity: Some(spotify.popularity),
                         tempo: features.and_then(|f| f.tempo),
                         musical_key: features.and_then(|f| f.key),
@@ -3285,16 +4105,24 @@ fn select_canonical_and_enrich(
                         })
                         .unwrap(); // Safe: groups always have at least one track
 
+                    // v3: Unmatched = display fields equal LRCLIB source
                     EnrichedTrack {
                         lrclib_id: best_variant.track.id,
-                        title: best_variant.track.title.clone(),
-                        artist: best_variant.track.artist.clone(),
-                        album: best_variant.track.album.clone(),
                         duration_sec: best_variant.track.duration_sec,
                         title_norm,
                         artist_norm,
                         quality: best_variant.quality,
+                        // v3: Display fields = LRCLIB source (fallback)
+                        title: best_variant.track.title.clone(),
+                        artist: best_variant.track.artist.clone(),
+                        album: best_variant.track.album.clone(),
+                        // v3: Source LRCLIB fields (same as display for unmatched)
+                        lrclib_title: best_variant.track.title.clone(),
+                        lrclib_artist: best_variant.track.artist.clone(),
+                        lrclib_album: best_variant.track.album.clone(),
+                        // No Spotify enrichment
                         spotify_id: None,
+                        spotify_artists_json: None,
                         popularity: None,
                         tempo: None,
                         musical_key: None,
@@ -3598,18 +4426,24 @@ fn enrich_tracks_with_matches(
 
             pb.inc(1);
 
+            // v3: For legacy pipeline, display = lrclib (no Spotify canonical names available)
             EnrichedTrack {
-                // LRCLIB (source of truth, always present)
                 lrclib_id: lrclib.track.id,
-                title: lrclib.track.title,
-                artist: lrclib.track.artist,
-                album: lrclib.track.album,
                 duration_sec: lrclib.track.duration_sec,
                 title_norm: lrclib.title_norm,
                 artist_norm: lrclib.artist_norm,
                 quality: lrclib.quality,
-                // Spotify (enrichment, nullable)
+                // Display fields = LRCLIB source (legacy pipeline)
+                title: lrclib.track.title.clone(),
+                artist: lrclib.track.artist.clone(),
+                album: lrclib.track.album.clone(),
+                // Source LRCLIB fields
+                lrclib_title: lrclib.track.title,
+                lrclib_artist: lrclib.track.artist,
+                lrclib_album: lrclib.track.album,
+                // Spotify enrichment (nullable)
                 spotify_id: enrichment.0,
+                spotify_artists_json: None, // Legacy pipeline doesn't have this
                 popularity: enrichment.1,
                 tempo: enrichment.2,
                 musical_key: enrichment.3,
@@ -3645,17 +4479,23 @@ fn convert_to_enriched_without_spotify(tracks: Vec<ScoredTrack>) -> Vec<Enriched
     tracks
         .into_iter()
         .map(|t| EnrichedTrack {
-            // LRCLIB (source of truth)
+            // v3: Unmatched = display fields equal LRCLIB source
             lrclib_id: t.track.id,
-            title: t.track.title,
-            artist: t.track.artist,
-            album: t.track.album,
             duration_sec: t.track.duration_sec,
             title_norm: t.title_norm,
             artist_norm: t.artist_norm,
             quality: t.quality,
+            // Display fields = LRCLIB source (no Spotify match)
+            title: t.track.title.clone(),
+            artist: t.track.artist.clone(),
+            album: t.track.album.clone(),
+            // Source LRCLIB fields
+            lrclib_title: t.track.title,
+            lrclib_artist: t.track.artist,
+            lrclib_album: t.track.album,
             // Spotify (all NULL when no enrichment)
             spotify_id: None,
+            spotify_artists_json: None,
             popularity: None,
             tempo: None,
             musical_key: None,
@@ -3669,8 +4509,8 @@ fn convert_to_enriched_without_spotify(tracks: Vec<ScoredTrack>) -> Vec<Enriched
 
 /// Batch size for enriched track writes.
 /// SQLite limit: SQLITE_MAX_VARIABLE_NUMBER = 32766.
-/// With 16 columns per row: 32766 / 16 = 2047. Using 2000 for safety.
-const ENRICHED_BATCH_SIZE: usize = 2_000;
+/// With 20 columns per row (v3 schema): 32766 / 20 = 1638. Using 1500 for safety.
+const ENRICHED_BATCH_SIZE: usize = 1_500;
 
 /// Build a multi-value INSERT SQL statement for enriched tracks.
 /// Pre-building avoids repeated string allocation during batch writes.
@@ -3678,13 +4518,14 @@ fn build_enriched_batch_sql(num_rows: usize) -> String {
     if num_rows == 0 {
         return String::new();
     }
-    // 16 columns: "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)," is ~35 chars
-    let mut sql = String::with_capacity(200 + num_rows * 35);
+    // v3: 19 columns
+    let mut sql = String::with_capacity(300 + num_rows * 42);
     sql.push_str(
         "INSERT INTO tracks (
-            id, title, artist, album, duration_sec,
-            title_norm, artist_norm, quality,
-            spotify_id, popularity, tempo, musical_key, mode, time_signature,
+            id, duration_sec, title_norm, artist_norm, quality,
+            title, artist, album,
+            lrclib_title, lrclib_artist, lrclib_album,
+            spotify_id, spotify_artists_json, popularity, tempo, musical_key, mode, time_signature,
             isrc, album_image_url
         ) VALUES ",
     );
@@ -3692,13 +4533,13 @@ fn build_enriched_batch_sql(num_rows: usize) -> String {
         if i > 0 {
             sql.push(',');
         }
-        sql.push_str("(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        sql.push_str("(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     }
     sql
 }
 
-/// Write enriched tracks to output database using batched multi-value INSERTs.
-/// Optimized for ~3.8M rows with 16 columns each.
+/// Write enriched tracks to output database using batched multi-value INSERTs (v3 schema).
+/// Optimized for ~3.8M rows with 19 columns each.
 fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Result<()> {
     let phase_start = Instant::now();
     conn.execute_batch(
@@ -3707,19 +4548,28 @@ fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Res
         PRAGMA cache_size = -64000;
         PRAGMA temp_store = MEMORY;
 
+        -- v3 Schema: Spotify canonical names for display, LRCLIB for matching
         CREATE TABLE tracks (
-            -- LRCLIB (source of truth, always present)
+            -- Identifiers
             id INTEGER PRIMARY KEY,
-            title TEXT NOT NULL,
-            artist TEXT NOT NULL,
-            album TEXT,
             duration_sec INTEGER NOT NULL,
             title_norm TEXT NOT NULL,
             artist_norm TEXT NOT NULL,
             quality INTEGER NOT NULL,
 
+            -- Display names (Spotify canonical when matched, LRCLIB fallback)
+            title TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            album TEXT,
+
+            -- Source LRCLIB names (preserved for auditing/debugging)
+            lrclib_title TEXT NOT NULL,
+            lrclib_artist TEXT NOT NULL,
+            lrclib_album TEXT,
+
             -- Spotify enrichment (all nullable, NULL = no match)
             spotify_id TEXT,
+            spotify_artists_json TEXT,
             popularity INTEGER,
             tempo REAL,
             musical_key INTEGER,
@@ -3821,20 +4671,28 @@ fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Res
 
         let mut stmt = tx.prepare_cached(sql)?;
 
-        // Build flat parameter array using array literals (no heap allocation per row)
+        // Build flat parameter array using array literals (v3: 19 columns)
         let params: Vec<&dyn rusqlite::ToSql> = chunk
             .iter()
             .flat_map(|t| {
                 [
+                    // Identifiers
                     &t.lrclib_id as &dyn rusqlite::ToSql,
-                    &t.title as &dyn rusqlite::ToSql,
-                    &t.artist as &dyn rusqlite::ToSql,
-                    &t.album as &dyn rusqlite::ToSql,
                     &t.duration_sec as &dyn rusqlite::ToSql,
                     &t.title_norm as &dyn rusqlite::ToSql,
                     &t.artist_norm as &dyn rusqlite::ToSql,
                     &t.quality as &dyn rusqlite::ToSql,
+                    // Display names
+                    &t.title as &dyn rusqlite::ToSql,
+                    &t.artist as &dyn rusqlite::ToSql,
+                    &t.album as &dyn rusqlite::ToSql,
+                    // Source LRCLIB names
+                    &t.lrclib_title as &dyn rusqlite::ToSql,
+                    &t.lrclib_artist as &dyn rusqlite::ToSql,
+                    &t.lrclib_album as &dyn rusqlite::ToSql,
+                    // Spotify enrichment
                     &t.spotify_id as &dyn rusqlite::ToSql,
+                    &t.spotify_artists_json as &dyn rusqlite::ToSql,
                     &t.popularity as &dyn rusqlite::ToSql,
                     &t.tempo as &dyn rusqlite::ToSql,
                     &t.musical_key as &dyn rusqlite::ToSql,
@@ -4430,13 +5288,13 @@ fn main() -> Result<()> {
             spotify_db,
             output_db,
             log_only,
-            skip_pop0_albums,
+            skip_pop0_tracks,
         } => {
             let args = normalize_spotify::NormalizeSpotifyArgs {
                 spotify_db: spotify_db.to_string_lossy().to_string(),
                 output_db: output_db.to_string_lossy().to_string(),
                 log_only,
-                skip_pop0_albums,
+                skip_pop0_tracks,
             };
             normalize_spotify::run(args)
         }
@@ -4580,16 +5438,60 @@ fn run_extract(args: ExtractArgs) -> Result<()> {
             }
 
             // Fallback: search pop=0 tracks for unmatched groups
-            let pop0_matches =
-                match_pop0_fallback(&spotify_conn, &mut groups, &mut groups_seen, &mut stats)?;
+            // Try indexed approach first (uses pop0_tracks_norm), fall back to streaming
+            let pop0_matches = {
+                // Open normalized DB to check for pop0_tracks_norm table
+                // NOTE: Do NOT use query_only=1 here - we need temp tables for indexed lookup
+                let norm_conn = Connection::open(spotify_norm_path)?;
+                norm_conn.execute_batch(
+                    "PRAGMA journal_mode = OFF;
+                     PRAGMA synchronous = OFF;
+                     PRAGMA temp_store = MEMORY;
+                     PRAGMA cache_size = -100000;
+                     PRAGMA mmap_size = 4294967296;",
+                )?;
+
+                // Check if pop0_tracks_norm table exists
+                let has_pop0_index: bool = norm_conn
+                    .query_row(
+                        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='pop0_tracks_norm'",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .unwrap_or(false);
+
+                if has_pop0_index {
+                    log!("[POP0] Using indexed lookup via pop0_tracks_norm");
+                    match_pop0_indexed(
+                        &norm_conn,
+                        &spotify_conn,
+                        &mut groups,
+                        &mut groups_seen,
+                        &mut stats,
+                    )?
+                } else {
+                    log!("[POP0] pop0_tracks_norm not found, falling back to streaming");
+                    match_pop0_fallback(
+                        &spotify_conn,
+                        &mut groups,
+                        &mut groups_seen,
+                        &mut stats,
+                    )?
+                }
+            };
 
             if pop0_matches > 0 {
                 let total = groups.len();
                 let matched = groups_seen.len();
                 let rate = 100.0 * matched as f64 / total as f64;
+                let method = if stats.pop0_used_indexed {
+                    "indexed"
+                } else {
+                    "streaming"
+                };
                 println!(
-                    "[MATCH] Updated match rate: {:.1}% ({} total, +{} from pop=0)",
-                    rate, matched, pop0_matches
+                    "[MATCH] Updated match rate: {:.1}% ({} total, +{} from pop=0 {})",
+                    rate, matched, pop0_matches, method
                 );
             }
         } else {
@@ -4945,6 +5847,7 @@ mod tests {
             name: "Love You to Death".to_string(),
             artist: "Type O Negative".to_string(),
             artists: vec!["Type O Negative".to_string()],
+            album_name: Some("October Rust".to_string()),
             duration_ms: 429_000,
             popularity: 64,
             isrc: None,
@@ -4979,6 +5882,7 @@ mod tests {
             name: "Song".to_string(),
             artist: "Artist".to_string(),
             artists: vec!["Artist".to_string()],
+            album_name: None,
             duration_ms: 200_000, // 100s diff - way over 30s limit
             popularity: 80,
             isrc: None,
@@ -5004,6 +5908,7 @@ mod tests {
             name: "Song".to_string(),
             artist: "Completely Different".to_string(), // No token overlap
             artists: vec!["Completely Different".to_string()],
+            album_name: None,
             duration_ms: 200_000,
             popularity: 80,
             isrc: None,
@@ -5030,6 +5935,7 @@ mod tests {
             name: "Radio Edit".to_string(),
             artist: "Artist".to_string(),
             artists: vec!["Artist".to_string()],
+            album_name: Some("Album".to_string()),
             duration_ms: 295_000, // 4:55 = 45s diff (relaxed)
             popularity: 50,
             isrc: None,
@@ -5070,6 +5976,7 @@ mod tests {
             name: "Song".to_string(),
             artist: "Artist Bar".to_string(), // Only partial match
             artists: vec!["Artist Bar".to_string()],
+            album_name: None,
             duration_ms: 295_000, // 45s diff (relaxed)
             popularity: 50,
             isrc: None,
@@ -5101,6 +6008,7 @@ mod tests {
             name: "Extended Mix".to_string(),
             artist: "DJ Artist".to_string(),
             artists: vec!["DJ Artist".to_string()],
+            album_name: Some("Singles".to_string()),
             duration_ms: 360_000, // 6:00 = 60s diff
             popularity: 70,
             isrc: None,
@@ -5139,6 +6047,7 @@ mod tests {
             name: "Song".to_string(),
             artist: "Artist".to_string(),
             artists: vec!["Artist".to_string()],
+            album_name: None,
             duration_ms: 250_000, // 4:10 = 70s diff
             popularity: 80,
             isrc: None,
@@ -5429,6 +6338,7 @@ mod tests {
             name: "Cold Heart".to_string(),
             artist: "Elton John".to_string(), // Primary is Elton John
             artists: vec!["Elton John".to_string(), "Dua Lipa".to_string()], // But Dua Lipa is credited
+            album_name: None,
             duration_ms: 210_000,
             popularity: 85,
             isrc: None,
@@ -5468,6 +6378,7 @@ mod tests {
             name: "Song".to_string(),
             artist: "Elton John".to_string(),
             artists: vec!["Elton John".to_string(), "Dua Lipa".to_string()],
+            album_name: None,
             duration_ms: 210_000,
             popularity: 85,
             isrc: None,

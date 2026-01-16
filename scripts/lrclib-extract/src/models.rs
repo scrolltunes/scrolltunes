@@ -146,9 +146,10 @@ impl From<Option<&str>> for SpotifyAlbumType {
 #[derive(Clone, Debug)]
 pub struct SpotifyTrack {
     pub id: String,           // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
-    pub name: String,         // Original title (kept for debugging)
-    pub artist: String,       // Primary artist (kept for debugging)
-    pub artists: Vec<String>, // All credited artists (spec-03 multi-artist verification)
+    pub name: String,         // Canonical track name from Spotify (v3: used for display)
+    pub artist: String,       // Primary artist (kept for backwards compat)
+    pub artists: Vec<String>, // All credited artists in Spotify's credited order (v3: ORDER BY ta.rowid)
+    pub album_name: Option<String>, // Canonical album name from Spotify (v3: used for display)
     pub duration_ms: i64,
     pub popularity: i32,              // 0-100
     pub isrc: Option<String>,         // For Deezer album art lookup
@@ -231,24 +232,50 @@ pub enum FailureReason {
 // Output Models
 // ============================================================================
 
-/// Final enriched track for output.
-/// LRCLIB fields are always present (source of truth).
-/// Spotify fields are nullable (enrichment, NULL if no match).
+/// Final enriched track for output (v3 schema).
+///
+/// ## Display vs Source Fields (v3)
+///
+/// - `title`, `artist`, `album`: **Display fields**
+///   - When Spotify matched: Spotify canonical names (corrected spelling, proper casing)
+///   - When unmatched: LRCLIB source values (fallback)
+///
+/// - `lrclib_title`, `lrclib_artist`, `lrclib_album`: **Source fields**
+///   - Original LRCLIB values (preserved for auditing/debugging/lyrics matching)
+///   - Always populated from LRCLIB regardless of match status
+///
+/// ## Key Invariants
+///
+/// 1. **Matched tracks** (`spotify_id IS NOT NULL`):
+///    - `title`, `artist`, `album` = Spotify canonical values
+///    - `artist` = `spotify_artists_json.join(", ")`
+///
+/// 2. **Unmatched tracks** (`spotify_id IS NULL`):
+///    - `title == lrclib_title`, `artist == lrclib_artist`, `album == lrclib_album`
+///    - `spotify_artists_json` = NULL
 #[derive(Clone, Debug)]
 pub struct EnrichedTrack {
-    // From LRCLIB (source of truth, always present)
+    // Identifiers
     pub lrclib_id: i64,
-    pub title: String,
-    pub artist: String,
-    pub album: Option<String>,
     pub duration_sec: i64,
     pub title_norm: String,
     pub artist_norm: String,
     pub quality: i32,
 
-    // From Spotify (enrichment, all nullable)
+    // Display names (Spotify canonical when matched, LRCLIB fallback when unmatched)
+    pub title: String,
+    pub artist: String,
+    pub album: Option<String>,
+
+    // Source LRCLIB names (preserved for auditing/debugging/lyrics matching)
+    pub lrclib_title: String,
+    pub lrclib_artist: String,
+    pub lrclib_album: Option<String>,
+
+    // Spotify enrichment (all nullable, NULL = no match)
     pub spotify_id: Option<String>,
-    pub popularity: Option<i32>, // NULL if no match (not 0)
+    pub spotify_artists_json: Option<String>, // JSON array: ["Artist1", "Artist2"]
+    pub popularity: Option<i32>,              // NULL if no match (not 0)
     pub tempo: Option<f64>,
     pub musical_key: Option<i32>,
     pub mode: Option<i32>,

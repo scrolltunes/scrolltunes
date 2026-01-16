@@ -39,8 +39,7 @@ macro_rules! log_only {
     };
 }
 
-/// Type alias for normalized key → (track_rowid, duration_ms) candidates map.
-type NormCandidatesMap = FxHashMap<(Arc<str>, Arc<str>), Vec<(i64, i64)>>;
+
 
 /// String interner for deduplicating normalized strings.
 /// Reduces memory usage significantly when many tracks share the same artist/title.
@@ -185,7 +184,7 @@ pub struct NormalizeSpotifyArgs {
     pub spotify_db: String,
     pub output_db: String,
     pub log_only: bool,
-    pub skip_pop0_albums: bool,
+    pub skip_pop0_tracks: bool,
 }
 
 /// Run the normalize-spotify command
@@ -465,141 +464,113 @@ pub fn run(args: NormalizeSpotifyArgs) -> Result<()> {
     println!("  Elapsed: {:.2}s", elapsed.as_secs_f64());
     println!("============================================================");
 
-    // Phase 3: Build pop0_albums_norm table (unless skipped)
-    if !args.skip_pop0_albums {
-        build_pop0_albums_index(&src_conn, &mut out_conn, log_only)?;
+    // Phase 3: Build pop0_tracks_norm table (unless skipped)
+    if !args.skip_pop0_tracks {
+        build_pop0_tracks_index(&src_conn, &mut out_conn, log_only)?;
+        // Phase 4: Build pop0_tracks with pre-joined artists (for fast extraction)
+        build_pop0_enriched(&src_conn, &mut out_conn, log_only)?;
     }
 
     Ok(())
 }
 
-/// Build pop0_albums_norm index for album upgrade pass.
-fn build_pop0_albums_index(
+/// Build pop0_tracks_norm index for pop=0 fallback matching.
+/// No artist join - fetches artist at query time for smaller index (~100M rows vs 180M).
+fn build_pop0_tracks_index(
     src_conn: &Connection,
     out_conn: &mut Connection,
     log_only: bool,
 ) -> Result<()> {
     let phase_start = Instant::now();
     println!();
-    println!("Building pop0_albums_norm index for album upgrade pass...");
+    println!("Building pop0_tracks_norm index for pop=0 fallback...");
     log_only!(
         log_only,
-        "[POP0_ALBUMS] Starting pop0_albums_norm index build..."
+        "[POP0_TRACKS] Starting pop0_tracks_norm index build..."
     );
 
-    // Create table
+    // Create table WITHOUT PRIMARY KEY for faster bulk insert
     out_conn.execute(
-        "CREATE TABLE IF NOT EXISTS pop0_albums_norm (
+        "CREATE TABLE IF NOT EXISTS pop0_tracks_norm (
             title_norm   TEXT NOT NULL,
-            artist_norm  TEXT NOT NULL,
             track_rowid  INTEGER NOT NULL,
             duration_ms  INTEGER NOT NULL,
-            PRIMARY KEY (title_norm, artist_norm, track_rowid)
+            album_rowid  INTEGER NOT NULL
         )",
         [],
     )?;
 
-    // Count rows for progress
+    // Count rows for progress (all pop=0 tracks, no joins)
     let total: u64 = src_conn.query_row(
-        "SELECT COUNT(*) FROM tracks t
-         JOIN track_artists ta ON ta.track_rowid = t.rowid
-         JOIN albums al ON al.rowid = t.album_rowid
-         WHERE t.popularity = 0 AND al.album_type = 'album'",
+        "SELECT COUNT(*) FROM tracks WHERE popularity = 0",
         [],
         |row| row.get(0),
     )?;
     log_only!(
         log_only,
-        "[POP0_ALBUMS] Found {} pop=0 album tracks to index",
+        "[POP0_TRACKS] Found {} pop=0 tracks to index",
         total
     );
 
     let pb = create_progress_bar(total, log_only);
 
-    // Stream and collect candidates
+    // Stream tracks and normalize titles
     let mut interner = StringInterner::new();
-    let mut candidates_map: NormCandidatesMap = FxHashMap::default();
 
     let mut stmt = src_conn.prepare(
-        "SELECT t.rowid, t.name, a.name, t.duration_ms
+        "SELECT t.rowid, t.name, t.duration_ms, t.album_rowid
          FROM tracks t
-         JOIN track_artists ta ON ta.track_rowid = t.rowid
-         JOIN artists a ON a.rowid = ta.artist_rowid
-         JOIN albums al ON al.rowid = t.album_rowid
-         WHERE t.popularity = 0 AND al.album_type = 'album'",
+         WHERE t.popularity = 0",
     )?;
 
     let mut rows = stmt.query([])?;
     let mut count = 0u64;
 
+    // Collect rows for batch insert
+    const POP0_BATCH_SIZE: usize = 6_000; // 6000 rows × 4 cols = 24K vars (under SQLite 32K limit)
+    let mut batch: Vec<(Arc<str>, i64, i64, i64)> = Vec::with_capacity(POP0_BATCH_SIZE);
+    let mut written = 0u64;
+
+    // Single transaction with aggressive PRAGMAs for bulk insert
+    out_conn.execute_batch(
+        "PRAGMA synchronous = OFF;
+         PRAGMA journal_mode = OFF;
+         PRAGMA temp_store = MEMORY;
+         PRAGMA cache_size = -2000000;",
+    )?;
+    let tx = out_conn.transaction()?;
+
     while let Some(row) = rows.next()? {
         let track_rowid: i64 = row.get(0)?;
         let title: String = row.get(1)?;
-        let artist: String = row.get(2)?;
-        let duration_ms: i64 = row.get(3)?;
+        let duration_ms: i64 = row.get(2)?;
+        let album_rowid: i64 = row.get(3)?;
 
         let title_norm = interner.intern(normalize_title(&title));
-        let artist_norm = interner.intern(normalize_artist(&artist));
-        let key = (Arc::clone(&title_norm), Arc::clone(&artist_norm));
 
-        candidates_map
-            .entry(key)
-            .or_default()
-            .push((track_rowid, duration_ms));
+        batch.push((title_norm, track_rowid, duration_ms, album_rowid));
+
+        if batch.len() >= POP0_BATCH_SIZE {
+            write_pop0_batch(&tx, &batch)?;
+            written += batch.len() as u64;
+            batch.clear();
+        }
 
         count += 1;
         if count % 100_000 == 0 {
             pb.set_position(count);
         }
-        if count % 1_000_000 == 0 {
+        if count % 5_000_000 == 0 {
             log_only!(
                 log_only,
-                "[POP0_ALBUMS] Read {}/{} ({:.1}%)",
-                count,
+                "[POP0_TRACKS] Inserted {}/{} ({:.1}%)",
+                written,
                 total,
-                100.0 * count as f64 / total as f64
+                100.0 * written as f64 / total as f64
             );
         }
     }
     pb.finish_with_message("done");
-    log_only!(
-        log_only,
-        "[POP0_ALBUMS] Read {} rows, {} unique keys",
-        count,
-        candidates_map.len()
-    );
-
-    // Sort keys for sequential B-tree inserts
-    let mut sorted_keys: Vec<(Arc<str>, Arc<str>)> = candidates_map.keys().cloned().collect();
-    sorted_keys.sort_unstable();
-
-    // Write to table using batch inserts
-    println!("  Writing {} unique keys...", sorted_keys.len());
-    let tx = out_conn.transaction()?;
-
-    const POP0_BATCH_SIZE: usize = 8000;
-    let mut batch: Vec<(Arc<str>, Arc<str>, i64, i64)> = Vec::with_capacity(POP0_BATCH_SIZE);
-    let mut written = 0u64;
-
-    for key in sorted_keys {
-        let entries = candidates_map.remove(&key).unwrap();
-        let (title_norm, artist_norm) = key;
-
-        for (track_rowid, duration_ms) in entries {
-            batch.push((
-                Arc::clone(&title_norm),
-                Arc::clone(&artist_norm),
-                track_rowid,
-                duration_ms,
-            ));
-
-            if batch.len() >= POP0_BATCH_SIZE {
-                write_pop0_batch(&tx, &batch)?;
-                written += batch.len() as u64;
-                batch.clear();
-            }
-        }
-    }
 
     // Write remaining batch
     if !batch.is_empty() {
@@ -608,30 +579,71 @@ fn build_pop0_albums_index(
     }
 
     tx.commit()?;
-    log_only!(log_only, "[POP0_ALBUMS] Wrote {} rows", written);
+    log_only!(log_only, "[POP0_TRACKS] Wrote {} rows", written);
 
-    // Create index
-    println!("  Creating index...");
+    // Create index AFTER all inserts (much faster)
+    println!("  Creating index on title_norm...");
     log_only!(
         log_only,
-        "[POP0_ALBUMS] Creating index on (title_norm, artist_norm)..."
+        "[POP0_TRACKS] Creating index idx_pop0_title on title_norm..."
     );
     out_conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_pop0_albums_key ON pop0_albums_norm(title_norm, artist_norm)",
+        "CREATE INDEX IF NOT EXISTS idx_pop0_title ON pop0_tracks_norm(title_norm)",
         [],
     )?;
 
-    out_conn.execute("ANALYZE pop0_albums_norm", [])?;
+    // Build pop0_title_counts for common-title guardrails
+    println!("  Building pop0_title_counts table...");
+    log_only!(
+        log_only,
+        "[POP0_TRACKS] Building pop0_title_counts table..."
+    );
+    out_conn.execute(
+        "CREATE TABLE IF NOT EXISTS pop0_title_counts (
+            title_norm TEXT PRIMARY KEY,
+            cnt INTEGER NOT NULL
+        )",
+        [],
+    )?;
+    out_conn.execute(
+        "INSERT INTO pop0_title_counts
+         SELECT title_norm, COUNT(*) as cnt
+         FROM pop0_tracks_norm
+         GROUP BY title_norm
+         HAVING cnt > 500",
+        [],
+    )?;
+    let high_count_titles: i64 = out_conn.query_row(
+        "SELECT COUNT(*) FROM pop0_title_counts",
+        [],
+        |row| row.get(0),
+    )?;
+    log_only!(
+        log_only,
+        "[POP0_TRACKS] Found {} titles with >500 tracks (common-title guardrail)",
+        high_count_titles
+    );
+
+    // ANALYZE for query planner
+    println!("  Running ANALYZE...");
+    out_conn.execute("ANALYZE pop0_tracks_norm", [])?;
+    out_conn.execute("ANALYZE pop0_title_counts", [])?;
+
+    // Reset PRAGMAs to safer defaults
+    out_conn.execute_batch(
+        "PRAGMA synchronous = NORMAL;
+         PRAGMA journal_mode = WAL;",
+    )?;
 
     let elapsed = phase_start.elapsed();
     println!(
-        "  pop0_albums_norm complete: {} rows ({:.1}s)",
+        "  pop0_tracks_norm complete: {} rows ({:.1}s)",
         written,
         elapsed.as_secs_f64()
     );
     log_only!(
         log_only,
-        "[POP0_ALBUMS] Complete: {} rows in {:.1}s",
+        "[POP0_TRACKS] Complete: {} rows in {:.1}s",
         written,
         elapsed.as_secs_f64()
     );
@@ -639,15 +651,15 @@ fn build_pop0_albums_index(
     Ok(())
 }
 
-/// Write a batch of pop0_albums_norm rows.
-fn write_pop0_batch(conn: &Connection, batch: &[(Arc<str>, Arc<str>, i64, i64)]) -> Result<()> {
+/// Write a batch of pop0_tracks_norm rows (title_norm, track_rowid, duration_ms, album_rowid).
+fn write_pop0_batch(conn: &Connection, batch: &[(Arc<str>, i64, i64, i64)]) -> Result<()> {
     if batch.is_empty() {
         return Ok(());
     }
 
     let mut sql = String::with_capacity(100 + batch.len() * 10);
     sql.push_str(
-        "INSERT OR IGNORE INTO pop0_albums_norm (title_norm, artist_norm, track_rowid, duration_ms) VALUES ",
+        "INSERT INTO pop0_tracks_norm (title_norm, track_rowid, duration_ms, album_rowid) VALUES ",
     );
     for i in 0..batch.len() {
         if i > 0 {
@@ -659,12 +671,309 @@ fn write_pop0_batch(conn: &Connection, batch: &[(Arc<str>, Arc<str>, i64, i64)])
     let mut stmt = conn.prepare_cached(&sql)?;
     let params: Vec<&dyn rusqlite::ToSql> = batch
         .iter()
-        .flat_map(|(t, a, r, d)| {
+        .flat_map(|(t, r, d, a)| {
             [
                 t as &dyn rusqlite::ToSql,
-                a as &dyn rusqlite::ToSql,
                 r as &dyn rusqlite::ToSql,
                 d as &dyn rusqlite::ToSql,
+                a as &dyn rusqlite::ToSql,
+            ]
+        })
+        .collect();
+
+    stmt.execute(params.as_slice())?;
+    Ok(())
+}
+
+/// Row for pop0_tracks enriched table
+struct Pop0EnrichedRow {
+    track_rowid: i64,
+    title_norm: Arc<str>,
+    duration_ms: i64,
+    track_name: String,
+    track_id: String,
+    isrc: Option<String>,
+    artists_json: String,
+    album_rowid: i64,
+    album_name: Option<String>,
+    album_type: i32,
+}
+
+/// Build pop0_tracks table with pre-joined artists and album data.
+/// This eliminates the expensive artist fetch step during extraction.
+pub fn build_pop0_enriched(
+    src_conn: &Connection,
+    out_conn: &mut Connection,
+    log_only: bool,
+) -> Result<()> {
+    use std::collections::HashMap;
+
+    let phase_start = Instant::now();
+    println!();
+    println!("Building pop0_tracks table with pre-joined artists...");
+    log_only!(
+        log_only,
+        "[POP0_ENRICHED] Starting pop0_tracks build with pre-joined artists..."
+    );
+
+    // Create table
+    out_conn.execute(
+        "CREATE TABLE IF NOT EXISTS pop0_tracks (
+            track_rowid INTEGER PRIMARY KEY,
+            title_norm TEXT NOT NULL,
+            duration_ms INTEGER NOT NULL,
+            track_name TEXT NOT NULL,
+            track_id TEXT NOT NULL,
+            isrc TEXT,
+            artists_json TEXT NOT NULL,
+            album_rowid INTEGER NOT NULL,
+            album_name TEXT,
+            album_type INTEGER NOT NULL
+        )",
+        [],
+    )?;
+
+    // Count tracks for progress
+    let total: u64 = src_conn.query_row(
+        "SELECT COUNT(*) FROM tracks WHERE popularity = 0",
+        [],
+        |row| row.get(0),
+    )?;
+    log_only!(
+        log_only,
+        "[POP0_ENRICHED] Found {} pop=0 tracks to enrich",
+        total
+    );
+
+    // Step 1: Build album cache (album_rowid -> (name, type_int))
+    // Convert album_type string to int: album=0, single=1, compilation=2, unknown=3
+    println!("  Loading album metadata...");
+    log_only!(log_only, "[POP0_ENRICHED] Loading album metadata...");
+    let album_cache: HashMap<i64, (Option<String>, i32)> = {
+        let mut cache = HashMap::new();
+        let mut stmt = src_conn.prepare(
+            "SELECT rowid, name, album_type FROM albums"
+        )?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let rowid: i64 = row.get(0)?;
+            let name: Option<String> = row.get(1)?;
+            let album_type_str: Option<String> = row.get(2)?;
+            // Convert string to int: album=0, single=1, compilation=2, unknown=3
+            let album_type_int = match album_type_str.as_deref() {
+                Some("album") => 0,
+                Some("single") => 1,
+                Some("compilation") => 2,
+                _ => 3,
+            };
+            cache.insert(rowid, (name, album_type_int));
+        }
+        log_only!(log_only, "[POP0_ENRICHED] Loaded {} albums", cache.len());
+        cache
+    };
+
+    // Step 2: Build track -> artists mapping for pop=0 tracks
+    // ORDER BY ta.rowid preserves Spotify credited order
+    println!("  Loading artist mappings for pop=0 tracks...");
+    log_only!(log_only, "[POP0_ENRICHED] Loading artist mappings...");
+    let artists_cache: HashMap<i64, Vec<String>> = {
+        let mut cache: HashMap<i64, Vec<String>> = HashMap::new();
+        let mut stmt = src_conn.prepare(
+            "SELECT ta.track_rowid, a.name
+             FROM track_artists ta
+             JOIN artists a ON a.rowid = ta.artist_rowid
+             JOIN tracks t ON t.rowid = ta.track_rowid
+             WHERE t.popularity = 0
+             ORDER BY ta.track_rowid, ta.rowid"
+        )?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let track_rowid: i64 = row.get(0)?;
+            let artist_name: String = row.get(1)?;
+            cache.entry(track_rowid).or_default().push(artist_name);
+        }
+        log_only!(
+            log_only,
+            "[POP0_ENRICHED] Loaded artists for {} tracks",
+            cache.len()
+        );
+        cache
+    };
+
+    // Step 3: Stream tracks and build enriched rows
+    println!("  Building enriched pop0_tracks...");
+    let pb = create_progress_bar(total, log_only);
+    let mut interner = StringInterner::new();
+
+    let mut stmt = src_conn.prepare(
+        "SELECT t.rowid, t.name, t.duration_ms, t.album_rowid, t.id, t.external_id_isrc
+         FROM tracks t
+         WHERE t.popularity = 0"
+    )?;
+
+    let mut rows = stmt.query([])?;
+    let mut count = 0u64;
+
+    // Batch insert settings
+    // 10 columns per row: 32766 / 10 = 3276, use 3000 for safety
+    const POP0_ENRICHED_BATCH_SIZE: usize = 3_000;
+    let mut batch: Vec<Pop0EnrichedRow> = Vec::with_capacity(POP0_ENRICHED_BATCH_SIZE);
+    let mut written = 0u64;
+    let mut skipped_no_artists = 0u64;
+
+    out_conn.execute_batch(
+        "PRAGMA synchronous = OFF;
+         PRAGMA journal_mode = OFF;
+         PRAGMA temp_store = MEMORY;
+         PRAGMA cache_size = -2000000;"
+    )?;
+    let tx = out_conn.transaction()?;
+
+    while let Some(row) = rows.next()? {
+        let track_rowid: i64 = row.get(0)?;
+        let track_name: String = row.get(1)?;
+        let duration_ms: i64 = row.get(2)?;
+        let album_rowid: i64 = row.get(3)?;
+        let track_id: String = row.get(4)?;
+        let isrc: Option<String> = row.get(5)?;
+
+        // Get artists from cache
+        let artists = match artists_cache.get(&track_rowid) {
+            Some(a) if !a.is_empty() => a,
+            _ => {
+                skipped_no_artists += 1;
+                count += 1;
+                continue;
+            }
+        };
+
+        // Build JSON array of artists
+        let artists_json = serde_json::to_string(artists).unwrap_or_else(|_| "[]".to_string());
+
+        // Get album metadata from cache
+        let (album_name, album_type) = album_cache
+            .get(&album_rowid)
+            .cloned()
+            .unwrap_or((None, 0));
+
+        let title_norm = interner.intern(crate::normalize::normalize_title(&track_name));
+
+        batch.push(Pop0EnrichedRow {
+            track_rowid,
+            title_norm,
+            duration_ms,
+            track_name,
+            track_id,
+            isrc,
+            artists_json,
+            album_rowid,
+            album_name,
+            album_type,
+        });
+
+        if batch.len() >= POP0_ENRICHED_BATCH_SIZE {
+            write_pop0_enriched_batch(&tx, &batch)?;
+            written += batch.len() as u64;
+            batch.clear();
+        }
+
+        count += 1;
+        if count % 100_000 == 0 {
+            pb.set_position(count);
+        }
+        if count % 5_000_000 == 0 {
+            log_only!(
+                log_only,
+                "[POP0_ENRICHED] Processed {}/{} ({:.1}%), written {}",
+                count,
+                total,
+                100.0 * count as f64 / total as f64,
+                written
+            );
+        }
+    }
+    pb.finish_with_message("done");
+
+    // Write remaining batch
+    if !batch.is_empty() {
+        write_pop0_enriched_batch(&tx, &batch)?;
+        written += batch.len() as u64;
+    }
+
+    tx.commit()?;
+    log_only!(
+        log_only,
+        "[POP0_ENRICHED] Wrote {} rows, skipped {} (no artists)",
+        written,
+        skipped_no_artists
+    );
+
+    // Create compound index for efficient lookups
+    println!("  Creating index on (title_norm, duration_ms)...");
+    log_only!(
+        log_only,
+        "[POP0_ENRICHED] Creating index idx_pop0_title_duration..."
+    );
+    out_conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pop0_title_duration
+         ON pop0_tracks(title_norm, duration_ms)",
+        [],
+    )?;
+
+    // ANALYZE for query planner
+    println!("  Running ANALYZE...");
+    out_conn.execute("ANALYZE pop0_tracks", [])?;
+
+    let elapsed = phase_start.elapsed();
+    println!(
+        "  pop0_tracks complete: {} rows ({:.1}s)",
+        written,
+        elapsed.as_secs_f64()
+    );
+    log_only!(
+        log_only,
+        "[POP0_ENRICHED] Complete: {} rows in {:.1}s",
+        written,
+        elapsed.as_secs_f64()
+    );
+
+    Ok(())
+}
+
+/// Write a batch of pop0_tracks enriched rows.
+fn write_pop0_enriched_batch(conn: &Connection, batch: &[Pop0EnrichedRow]) -> Result<()> {
+    if batch.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql = String::with_capacity(200 + batch.len() * 25);
+    sql.push_str(
+        "INSERT OR IGNORE INTO pop0_tracks
+         (track_rowid, title_norm, duration_ms, track_name, track_id, isrc, artists_json, album_rowid, album_name, album_type)
+         VALUES "
+    );
+    for i in 0..batch.len() {
+        if i > 0 {
+            sql.push(',');
+        }
+        sql.push_str("(?,?,?,?,?,?,?,?,?,?)");
+    }
+
+    let mut stmt = conn.prepare_cached(&sql)?;
+    let params: Vec<&dyn rusqlite::ToSql> = batch
+        .iter()
+        .flat_map(|row| {
+            [
+                &row.track_rowid as &dyn rusqlite::ToSql,
+                &row.title_norm as &dyn rusqlite::ToSql,
+                &row.duration_ms as &dyn rusqlite::ToSql,
+                &row.track_name as &dyn rusqlite::ToSql,
+                &row.track_id as &dyn rusqlite::ToSql,
+                &row.isrc as &dyn rusqlite::ToSql,
+                &row.artists_json as &dyn rusqlite::ToSql,
+                &row.album_rowid as &dyn rusqlite::ToSql,
+                &row.album_name as &dyn rusqlite::ToSql,
+                &row.album_type as &dyn rusqlite::ToSql,
             ]
         })
         .collect();
