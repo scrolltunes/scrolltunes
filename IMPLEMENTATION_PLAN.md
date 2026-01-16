@@ -91,7 +91,7 @@ Migrate ScrollTunes to a terminal-inspired dark theme (Tokyo Night palette) with
 - [x] **7.5** Remove theme picker UI from Settings page (done in Phase 4)
 - [x] **7.6** Audit for any remaining hardcoded colors (should use tokens)
 - [x] **7.7** Merged ui2/ into ui/ (no rename needed)
-- [ ] **7.8** Run `bun run check` (lint + typecheck + test) and fix any issues
+- [x] **7.8** Run `bun run check` (lint + typecheck + test) and fix any issues
 - [ ] **7.9** Manual visual QA on mobile and desktop
 
 ---

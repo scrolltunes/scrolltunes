@@ -230,7 +230,10 @@ export const FloatingMetronome = memo(function FloatingMetronome({
                     value={metronomeState.volume}
                     onChange={handleVolumeChange}
                     className="h-1.5 w-full cursor-pointer appearance-none rounded-sm"
-                    style={{ background: "var(--color-surface3)", accentColor: "var(--accent-primary)" }}
+                    style={{
+                      background: "var(--color-surface3)",
+                      accentColor: "var(--accent-primary)",
+                    }}
                     aria-label="Metronome volume"
                   />
                 </div>

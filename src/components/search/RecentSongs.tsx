@@ -108,7 +108,9 @@ export const RecentSongs = memo(function RecentSongs({
           ) : (
             <ClockCounterClockwise size={16} weight="bold" />
           )}
-          <span className="text-sm font-mono font-medium uppercase tracking-wider">Recently played</span>
+          <span className="text-sm font-mono font-medium uppercase tracking-wider">
+            Recently played
+          </span>
         </div>
         {recents.length > 0 || showSkeleton ? (
           <button

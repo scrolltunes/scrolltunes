@@ -288,7 +288,10 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
               style={{ background: "var(--color-surface1)" }}
               onClick={e => e.stopPropagation()}
             >
-              <h2 className="text-xl font-semibold font-mono mb-2" style={{ color: "var(--color-text)" }}>
+              <h2
+                className="text-xl font-semibold font-mono mb-2"
+                style={{ color: "var(--color-text)" }}
+              >
                 Delete setlist?
               </h2>
               <p className="mb-6" style={{ color: "var(--color-text3)" }}>
