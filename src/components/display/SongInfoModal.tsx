@@ -89,7 +89,7 @@ export function SongInfoModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="absolute right-4 top-4 rounded-sm p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                className="absolute right-4 top-4 rounded-full p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                 style={{ color: "var(--color-text3)" }}
                 aria-label="Close"
               >
@@ -155,7 +155,7 @@ export function SongInfoModal({
                       href={`https://open.spotify.com/track/${spotifyId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-sm px-4 py-2 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                      className="inline-flex items-center gap-2 rounded-full px-4 py-2 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                       style={{
                         background: "var(--color-spotify-soft)",
                         color: "var(--color-spotify)",
@@ -207,7 +207,7 @@ export function SongInfoModal({
                   <button
                     type="button"
                     onClick={() => setShowReportModal(true)}
-                    className="inline-flex items-center gap-2 rounded-sm px-4 py-2 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                    className="inline-flex items-center gap-2 rounded-full px-4 py-2 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                     style={{
                       background: "var(--color-surface2)",
                       color: "var(--color-text3)",

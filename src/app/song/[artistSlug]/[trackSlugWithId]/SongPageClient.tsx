@@ -623,6 +623,7 @@ export default function SongPageClient({
   if (loadState._tag === "Loading") {
     return (
       <div
+        suppressHydrationWarning
         className="min-h-screen flex flex-col items-center justify-center gap-4"
         style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
       >
@@ -695,6 +696,7 @@ export default function SongPageClient({
 
   return (
     <div
+      suppressHydrationWarning
       ref={doubleTapRef}
       className="h-dvh overflow-hidden"
       style={{ background: "var(--color-bg)", color: "var(--color-text)" }}

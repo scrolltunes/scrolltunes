@@ -48,7 +48,7 @@ export const FloatingActions = memo(function FloatingActions({
           <motion.button
             type="button"
             onClick={handleWarningClick}
-            className="flex items-center gap-2 h-11 px-3 rounded-sm bg-tokyoNight-orange/20 hover:bg-tokyoNight-orange/30 backdrop-blur-sm border border-tokyoNight-orange/30 transition-colors"
+            className="flex items-center gap-2 h-11 px-3 rounded-full bg-tokyoNight-orange/20 hover:bg-tokyoNight-orange/30 backdrop-blur-sm border border-tokyoNight-orange/30 transition-colors"
             aria-label="Report issue"
             whileTap={{ scale: 0.95 }}
           >
@@ -59,7 +59,7 @@ export const FloatingActions = memo(function FloatingActions({
           <motion.button
             type="button"
             onClick={onInfoPress}
-            className="w-11 h-11 rounded-sm flex items-center justify-center bg-tokyoNight-bg/80 backdrop-blur-sm border border-tokyoNight-selection hover:bg-tokyoNight-selection/50 transition-colors"
+            className="w-11 h-11 rounded-full flex items-center justify-center bg-tokyoNight-bg/80 backdrop-blur-sm border border-tokyoNight-selection hover:bg-tokyoNight-selection/50 transition-colors"
             aria-label="Song info"
             whileTap={{ scale: 0.9 }}
           >
