@@ -116,14 +116,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-space-mono);
 }
 
 body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
 }
 
 /* Custom scrollbar styling using CSS variables */
@@ -262,4 +262,81 @@ html {
 
 .scrollbar-visible::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
+}
+
+/* ============================================
+   Terminal Utility Classes (TUI Redesign)
+   ============================================ */
+
+/* Terminal glow effect */
+.terminal-glow {
+  box-shadow: 0 0 20px rgba(122, 162, 247, 0.4);
+}
+
+.terminal-glow-subtle {
+  box-shadow: 0 0 12px rgba(122, 162, 247, 0.2);
+}
+
+/* Terminal scanlines effect */
+.terminal-scanlines {
+  position: relative;
+}
+
+.terminal-scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+/* Glass/frosted effect */
+.glass {
+  background: rgba(36, 40, 59, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-subtle {
+  background: rgba(36, 40, 59, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Focus ring for accessibility */
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--accent-primary);
+}
+
+/* Grid pattern overlay */
+.grid-pattern {
+  position: relative;
+}
+
+.grid-pattern::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(to right, rgba(122, 162, 247, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(122, 162, 247, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
 }

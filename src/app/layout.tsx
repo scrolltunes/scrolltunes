@@ -3,18 +3,19 @@ import { auth } from "@/auth"
 import { AuthProvider } from "@/components/auth"
 import { DevTitle, Footer, FooterProvider, ThemeProvider } from "@/components/layout"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Inter, Space_Mono } from "next/font/google"
 import { headers } from "next/headers"
 import "./globals.css"
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 })
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const spaceMono = Space_Mono({
+  variable: "--font-space-mono",
   subsets: ["latin"],
+  weight: ["400", "700"],
 })
 
 export const metadata: Metadata = {
@@ -93,25 +94,17 @@ export default async function RootLayout({
   const session = await auth()
 
   return (
-    <html lang="en" suppressHydrationWarning style={{ background: "#070A12" }}>
+    <html lang="en" style={{ background: "#1a1b26" }}>
       <head>
-        {/* Color scheme hint for browser - processed very early */}
-        <meta name="color-scheme" content="dark light" />
-        {/* Critical CSS for theme - no media query to avoid flash before JS checks preferences */}
+        {/* Dark theme only */}
+        <meta name="color-scheme" content="dark" />
         <style
           dangerouslySetInnerHTML={{
-            __html:
-              "html,body{background:#070A12!important}html.light,html.light body{background:#FAF7F2!important}",
-          }}
-        />
-        {/* Inline blocking script to set theme class based on user preference */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){let d=true;try{const s=localStorage.getItem("scrolltunes-preferences");const p=s?JSON.parse(s):{};const m=p.themeMode||"system";d=m==="dark"||(m==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches)}catch(e){}document.documentElement.classList.add(d?"dark":"light");document.documentElement.style.background=d?"#070A12":"#FAF7F2"})()`,
+            __html: "html,body{background:#1a1b26!important}",
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${inter.variable} ${spaceMono.variable} antialiased dark`}>
         <AuthProvider session={session}>
           <ThemeProvider>
             <FooterProvider>
