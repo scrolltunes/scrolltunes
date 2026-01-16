@@ -145,9 +145,9 @@ impl From<Option<&str>> for SpotifyAlbumType {
 /// Spotify track info for matching
 #[derive(Clone, Debug)]
 pub struct SpotifyTrack {
-    pub id: String,           // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
-    pub name: String,         // Canonical track name from Spotify (v3: used for display)
-    pub artist: String,       // Primary artist (kept for backwards compat)
+    pub id: String,                 // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
+    pub name: String,               // Canonical track name from Spotify (v3: used for display)
+    pub artist: String,             // Primary artist (kept for backwards compat)
     pub artists: Vec<String>, // All credited artists in Spotify's credited order (v3: ORDER BY ta.rowid)
     pub album_name: Option<String>, // Canonical album name from Spotify (v3: used for display)
     pub duration_ms: i64,

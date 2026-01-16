@@ -427,9 +427,9 @@ fn is_better_match(
 /// Spotify track info for matching (v3: includes album_name for canonical display)
 #[derive(Clone, Debug)]
 struct SpotifyTrack {
-    id: String,           // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
-    name: String,         // Canonical track name from Spotify (v3: used for display)
-    artist: String,       // Primary artist (kept for backwards compat)
+    id: String,                 // Spotify track ID (e.g., "2takcwOaAZWiXQijPHIx7B")
+    name: String,               // Canonical track name from Spotify (v3: used for display)
+    artist: String,             // Primary artist (kept for backwards compat)
     artists: Vec<String>, // All credited artists in Spotify's credited order (v3: ORDER BY ta.rowid)
     album_name: Option<String>, // Canonical album name from Spotify (v3: used for display)
     duration_ms: i64,
@@ -2008,7 +2008,10 @@ fn match_lrclib_to_spotify_normalized(
     );
     log!(
         "[STATS:MAIN] exact={}, fallback={}, rejected={}, no_candidates={}",
-        exact_accepted, fallback_accepted, all_rejected, stats.main_no_candidates
+        exact_accepted,
+        fallback_accepted,
+        all_rejected,
+        stats.main_no_candidates
     );
 
     Ok(())
@@ -2229,7 +2232,9 @@ fn match_pop0_fallback(
     // Final progress log
     log!(
         "[POP0] {}/{} (100.0%) - {} title matches, processing final batch...",
-        rows_processed, total, title_matches
+        rows_processed,
+        total,
+        title_matches
     );
 
     // Process remaining candidates
@@ -2440,7 +2445,14 @@ fn match_pop0_indexed(
 
     // Fallback to old approach if pop0_tracks doesn't exist
     log!("[POP0-INDEXED] pop0_tracks not found, falling back to pop0_tracks_norm (slower)");
-    match_pop0_legacy(normalized_conn, spotify_conn, groups, groups_seen, stats, phase_start)
+    match_pop0_legacy(
+        normalized_conn,
+        spotify_conn,
+        groups,
+        groups_seen,
+        stats,
+        phase_start,
+    )
 }
 
 /// Fast pop0 matching using pre-joined pop0_tracks table.
@@ -2530,15 +2542,17 @@ fn match_pop0_enriched(
             continue;
         }
 
-        let info = title_info_map.entry(title_norm.clone()).or_insert_with(|| TitleInfo {
-            durations: Vec::new(),
-            groups: Vec::new(),
-        });
+        let info = title_info_map
+            .entry(title_norm.clone())
+            .or_insert_with(|| TitleInfo {
+                durations: Vec::new(),
+                groups: Vec::new(),
+            });
 
         for &group_idx in group_indices {
             info.groups.push((group_idx, artist_norm.clone()));
             for variant in &groups[group_idx].tracks {
-                let duration_ms = (variant.track.duration_sec as i64) * 1000;
+                let duration_ms = variant.track.duration_sec * 1000;
                 if !info.durations.contains(&duration_ms) {
                     info.durations.push(duration_ms);
                 }
@@ -2755,9 +2769,7 @@ fn match_pop0_legacy(
         .unwrap_or(false);
 
     let common_titles: FxHashSet<String> = if has_title_counts {
-        let mut stmt = normalized_conn.prepare(
-            "SELECT title_norm FROM pop0_title_counts",
-        )?;
+        let mut stmt = normalized_conn.prepare("SELECT title_norm FROM pop0_title_counts")?;
         let mut rows = stmt.query([])?;
         let mut set = FxHashSet::default();
         while let Some(row) = rows.next()? {
@@ -2801,7 +2813,7 @@ fn match_pop0_legacy(
         let durations = title_durations.entry(title_norm.clone()).or_default();
         for &group_idx in group_indices {
             for variant in &groups[group_idx].tracks {
-                let duration_ms = (variant.track.duration_sec as i64) * 1000;
+                let duration_ms = variant.track.duration_sec * 1000;
                 if !durations.contains(&duration_ms) {
                     durations.push(duration_ms);
                 }
@@ -2886,11 +2898,15 @@ fn match_pop0_legacy(
         }
 
         let entry = candidates_by_title.entry(title_norm).or_default();
-        if entry.len() < MAX_CANDIDATES_PER_TITLE {
-            entry.push((track_rowid, duration_ms, album_rowid));
-            total_candidates += 1;
-        } else if entry.len() == MAX_CANDIDATES_PER_TITLE {
-            capped_titles += 1;
+        match entry.len().cmp(&MAX_CANDIDATES_PER_TITLE) {
+            std::cmp::Ordering::Less => {
+                entry.push((track_rowid, duration_ms, album_rowid));
+                total_candidates += 1;
+            }
+            std::cmp::Ordering::Equal => {
+                capped_titles += 1;
+            }
+            std::cmp::Ordering::Greater => {}
         }
     }
 
@@ -2959,7 +2975,10 @@ fn match_pop0_legacy(
 
     // Step 6: Process candidates and match against groups
     let mut matches_found = 0u64;
-    let pb = create_progress_bar(candidates_by_title.len() as u64, "Processing pop0 candidates");
+    let pb = create_progress_bar(
+        candidates_by_title.len() as u64,
+        "Processing pop0 candidates",
+    );
 
     for (i, (title_norm, candidates)) in candidates_by_title.iter().enumerate() {
         let matching_groups: Vec<(usize, String)> = unmatched_index
@@ -3031,8 +3050,7 @@ fn match_pop0_legacy(
                                 None => true,
                             };
                             if should_replace {
-                                group.best_match =
-                                    Some((track_idx, spotify_track.clone(), score));
+                                group.best_match = Some((track_idx, spotify_track.clone(), score));
                             }
                         }
                     }
@@ -3760,9 +3778,7 @@ fn album_upgrade_pass(
 
     if !table_exists {
         log!("[ALBUM_UPGRADE] pop0_albums_norm table not found, skipping album upgrade pass");
-        log!(
-            "[ALBUM_UPGRADE] Rebuild spotify_normalized.sqlite3 with normalize-spotify to enable"
-        );
+        log!("[ALBUM_UPGRADE] Rebuild spotify_normalized.sqlite3 with normalize-spotify to enable");
         return Ok(0);
     }
 
@@ -5120,9 +5136,21 @@ const SPOTIFY_AUDIO_FEATURES_MIN_SIZE_GB: u64 = 35; // ~39 GB source, DO NOT DEL
 fn validate_source_file_sizes(workdir: &std::path::Path) -> Result<()> {
     let checks = [
         (LRCLIB_DUMP_FILENAME, LRCLIB_DUMP_MIN_SIZE_GB, "LRCLIB dump"),
-        (SPOTIFY_CLEAN_FILENAME, SPOTIFY_CLEAN_MIN_SIZE_GB, "Spotify clean"),
-        (SPOTIFY_AUDIO_FEATURES_FILENAME, SPOTIFY_AUDIO_FEATURES_MIN_SIZE_GB, "Audio features"),
-        (SPOTIFY_NORMALIZED_FILENAME, SPOTIFY_NORMALIZED_MIN_SIZE_GB, "Spotify normalized"),
+        (
+            SPOTIFY_CLEAN_FILENAME,
+            SPOTIFY_CLEAN_MIN_SIZE_GB,
+            "Spotify clean",
+        ),
+        (
+            SPOTIFY_AUDIO_FEATURES_FILENAME,
+            SPOTIFY_AUDIO_FEATURES_MIN_SIZE_GB,
+            "Audio features",
+        ),
+        (
+            SPOTIFY_NORMALIZED_FILENAME,
+            SPOTIFY_NORMALIZED_MIN_SIZE_GB,
+            "Spotify normalized",
+        ),
     ];
 
     for (filename, min_gb, label) in checks {
@@ -5133,7 +5161,10 @@ fn validate_source_file_sizes(workdir: &std::path::Path) -> Result<()> {
             if size_gb < min_gb {
                 anyhow::bail!(
                     "{} ({}) is only {} GB, expected >= {} GB. Wrong file?",
-                    label, filename, size_gb, min_gb
+                    label,
+                    filename,
+                    size_gb,
+                    min_gb
                 );
             }
         }
@@ -5160,9 +5191,9 @@ fn resolve_workdir(workdir: Option<PathBuf>) -> Result<PathBuf> {
     let path = workdir.unwrap_or_else(|| PathBuf::from("~/git/music"));
     let path_str = path.to_string_lossy();
 
-    if path_str.starts_with("~/") {
+    if let Some(stripped) = path_str.strip_prefix("~/") {
         let home = std::env::var("HOME").context("HOME environment variable not set")?;
-        Ok(PathBuf::from(format!("{}/{}", home, &path_str[2..])))
+        Ok(PathBuf::from(format!("{}/{}", home, stripped)))
     } else {
         Ok(path)
     }
@@ -5193,10 +5224,18 @@ fn main() -> Result<()> {
 
             // Verify required files exist
             if !source.exists() {
-                anyhow::bail!("{} not found in {}", LRCLIB_DUMP_FILENAME, workdir.display());
+                anyhow::bail!(
+                    "{} not found in {}",
+                    LRCLIB_DUMP_FILENAME,
+                    workdir.display()
+                );
             }
             if !spotify.exists() {
-                anyhow::bail!("{} not found in {}", SPOTIFY_CLEAN_FILENAME, workdir.display());
+                anyhow::bail!(
+                    "{} not found in {}",
+                    SPOTIFY_CLEAN_FILENAME,
+                    workdir.display()
+                );
             }
             if !audio_features.exists() {
                 anyhow::bail!(
@@ -5471,12 +5510,7 @@ fn run_extract(args: ExtractArgs) -> Result<()> {
                     )?
                 } else {
                     log!("[POP0] pop0_tracks_norm not found, falling back to streaming");
-                    match_pop0_fallback(
-                        &spotify_conn,
-                        &mut groups,
-                        &mut groups_seen,
-                        &mut stats,
-                    )?
+                    match_pop0_fallback(&spotify_conn, &mut groups, &mut groups_seen, &mut stats)?
                 }
             };
 

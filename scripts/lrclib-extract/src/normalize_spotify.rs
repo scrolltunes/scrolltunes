@@ -39,8 +39,6 @@ macro_rules! log_only {
     };
 }
 
-
-
 /// String interner for deduplicating normalized strings.
 /// Reduces memory usage significantly when many tracks share the same artist/title.
 struct StringInterner {
@@ -613,11 +611,10 @@ fn build_pop0_tracks_index(
          HAVING cnt > 500",
         [],
     )?;
-    let high_count_titles: i64 = out_conn.query_row(
-        "SELECT COUNT(*) FROM pop0_title_counts",
-        [],
-        |row| row.get(0),
-    )?;
+    let high_count_titles: i64 =
+        out_conn.query_row("SELECT COUNT(*) FROM pop0_title_counts", [], |row| {
+            row.get(0)
+        })?;
     log_only!(
         log_only,
         "[POP0_TRACKS] Found {} titles with >500 tracks (common-title guardrail)",
@@ -701,25 +698,26 @@ struct Pop0EnrichedRow {
 
 /// Build pop0_tracks table with pre-joined artists and album data.
 /// This eliminates the expensive artist fetch step during extraction.
+///
+/// Uses SQL aggregation (group_concat) instead of in-memory caching to avoid OOM
+/// with 100M+ tracks. Memory usage stays constant regardless of dataset size.
 pub fn build_pop0_enriched(
     src_conn: &Connection,
     out_conn: &mut Connection,
     log_only: bool,
 ) -> Result<()> {
-    use std::collections::HashMap;
-
     let phase_start = Instant::now();
     println!();
-    println!("Building pop0_tracks table with pre-joined artists...");
+    println!("Building pop0_tracks table with pre-joined artists (streaming)...");
     log_only!(
         log_only,
-        "[POP0_ENRICHED] Starting pop0_tracks build with pre-joined artists..."
+        "[POP0_ENRICHED] Starting pop0_tracks build with SQL aggregation..."
     );
 
-    // Create table
+    // Create table WITHOUT PRIMARY KEY for faster bulk insert
     out_conn.execute(
         "CREATE TABLE IF NOT EXISTS pop0_tracks (
-            track_rowid INTEGER PRIMARY KEY,
+            track_rowid INTEGER NOT NULL,
             title_norm TEXT NOT NULL,
             duration_ms INTEGER NOT NULL,
             track_name TEXT NOT NULL,
@@ -733,82 +731,74 @@ pub fn build_pop0_enriched(
         [],
     )?;
 
-    // Count tracks for progress
+    // Count unique tracks for progress (GROUP BY reduces count)
     let total: u64 = src_conn.query_row(
-        "SELECT COUNT(*) FROM tracks WHERE popularity = 0",
+        "SELECT COUNT(DISTINCT t.rowid)
+         FROM tracks t
+         JOIN track_artists ta ON ta.track_rowid = t.rowid
+         WHERE t.popularity = 0",
         [],
         |row| row.get(0),
     )?;
     log_only!(
         log_only,
-        "[POP0_ENRICHED] Found {} pop=0 tracks to enrich",
+        "[POP0_ENRICHED] Found {} pop=0 tracks with artists to enrich",
         total
     );
 
-    // Step 1: Build album cache (album_rowid -> (name, type_int))
-    // Convert album_type string to int: album=0, single=1, compilation=2, unknown=3
-    println!("  Loading album metadata...");
-    log_only!(log_only, "[POP0_ENRICHED] Loading album metadata...");
-    let album_cache: HashMap<i64, (Option<String>, i32)> = {
-        let mut cache = HashMap::new();
-        let mut stmt = src_conn.prepare(
-            "SELECT rowid, name, album_type FROM albums"
-        )?;
-        let mut rows = stmt.query([])?;
-        while let Some(row) = rows.next()? {
-            let rowid: i64 = row.get(0)?;
-            let name: Option<String> = row.get(1)?;
-            let album_type_str: Option<String> = row.get(2)?;
-            // Convert string to int: album=0, single=1, compilation=2, unknown=3
-            let album_type_int = match album_type_str.as_deref() {
-                Some("album") => 0,
-                Some("single") => 1,
-                Some("compilation") => 2,
-                _ => 3,
-            };
-            cache.insert(rowid, (name, album_type_int));
-        }
-        log_only!(log_only, "[POP0_ENRICHED] Loaded {} albums", cache.len());
-        cache
-    };
+    // Single streaming query that aggregates artists via group_concat + json_quote
+    // This avoids building massive in-memory HashMap for 100M+ tracks
+    // ORDER BY ta.rowid inside group_concat preserves Spotify credited order
+    //
+    // Note: group_concat with ORDER BY requires SQLite 3.44+ (2023-11-01)
+    // For older versions, we rely on the outer ORDER BY + deterministic grouping
+    println!("  Streaming tracks with aggregated artists...");
+    log_only!(
+        log_only,
+        "[POP0_ENRICHED] Using SQL aggregation (no in-memory cache)..."
+    );
 
-    // Step 2: Build track -> artists mapping for pop=0 tracks
-    // ORDER BY ta.rowid preserves Spotify credited order
-    println!("  Loading artist mappings for pop=0 tracks...");
-    log_only!(log_only, "[POP0_ENRICHED] Loading artist mappings...");
-    let artists_cache: HashMap<i64, Vec<String>> = {
-        let mut cache: HashMap<i64, Vec<String>> = HashMap::new();
-        let mut stmt = src_conn.prepare(
-            "SELECT ta.track_rowid, a.name
-             FROM track_artists ta
-             JOIN artists a ON a.rowid = ta.artist_rowid
-             JOIN tracks t ON t.rowid = ta.track_rowid
-             WHERE t.popularity = 0
-             ORDER BY ta.track_rowid, ta.rowid"
-        )?;
-        let mut rows = stmt.query([])?;
-        while let Some(row) = rows.next()? {
-            let track_rowid: i64 = row.get(0)?;
-            let artist_name: String = row.get(1)?;
-            cache.entry(track_rowid).or_default().push(artist_name);
-        }
-        log_only!(
-            log_only,
-            "[POP0_ENRICHED] Loaded artists for {} tracks",
-            cache.len()
-        );
-        cache
-    };
-
-    // Step 3: Stream tracks and build enriched rows
-    println!("  Building enriched pop0_tracks...");
     let pb = create_progress_bar(total, log_only);
     let mut interner = StringInterner::new();
 
+    // Use a subquery to ensure artist ordering before aggregation
+    // This works on all SQLite versions
     let mut stmt = src_conn.prepare(
-        "SELECT t.rowid, t.name, t.duration_ms, t.album_rowid, t.id, t.external_id_isrc
-         FROM tracks t
-         WHERE t.popularity = 0"
+        "SELECT
+            sub.track_rowid,
+            sub.track_name,
+            sub.duration_ms,
+            sub.album_rowid,
+            sub.track_id,
+            sub.isrc,
+            sub.album_name,
+            sub.album_type_int,
+            '[' || group_concat(sub.artist_quoted, ',') || ']' AS artists_json
+         FROM (
+             SELECT
+                 t.rowid AS track_rowid,
+                 t.name AS track_name,
+                 t.duration_ms,
+                 t.album_rowid,
+                 t.id AS track_id,
+                 t.external_id_isrc AS isrc,
+                 al.name AS album_name,
+                 CASE al.album_type
+                     WHEN 'album' THEN 0
+                     WHEN 'single' THEN 1
+                     WHEN 'compilation' THEN 2
+                     ELSE 3
+                 END AS album_type_int,
+                 json_quote(a.name) AS artist_quoted,
+                 ta.rowid AS ta_order
+             FROM tracks t
+             JOIN track_artists ta ON ta.track_rowid = t.rowid
+             JOIN artists a ON a.rowid = ta.artist_rowid
+             LEFT JOIN albums al ON al.rowid = t.album_rowid
+             WHERE t.popularity = 0
+             ORDER BY t.rowid, ta.rowid
+         ) sub
+         GROUP BY sub.track_rowid",
     )?;
 
     let mut rows = stmt.query([])?;
@@ -819,13 +809,12 @@ pub fn build_pop0_enriched(
     const POP0_ENRICHED_BATCH_SIZE: usize = 3_000;
     let mut batch: Vec<Pop0EnrichedRow> = Vec::with_capacity(POP0_ENRICHED_BATCH_SIZE);
     let mut written = 0u64;
-    let mut skipped_no_artists = 0u64;
 
     out_conn.execute_batch(
         "PRAGMA synchronous = OFF;
          PRAGMA journal_mode = OFF;
          PRAGMA temp_store = MEMORY;
-         PRAGMA cache_size = -2000000;"
+         PRAGMA cache_size = -2000000;",
     )?;
     let tx = out_conn.transaction()?;
 
@@ -836,25 +825,9 @@ pub fn build_pop0_enriched(
         let album_rowid: i64 = row.get(3)?;
         let track_id: String = row.get(4)?;
         let isrc: Option<String> = row.get(5)?;
-
-        // Get artists from cache
-        let artists = match artists_cache.get(&track_rowid) {
-            Some(a) if !a.is_empty() => a,
-            _ => {
-                skipped_no_artists += 1;
-                count += 1;
-                continue;
-            }
-        };
-
-        // Build JSON array of artists
-        let artists_json = serde_json::to_string(artists).unwrap_or_else(|_| "[]".to_string());
-
-        // Get album metadata from cache
-        let (album_name, album_type) = album_cache
-            .get(&album_rowid)
-            .cloned()
-            .unwrap_or((None, 0));
+        let album_name: Option<String> = row.get(6)?;
+        let album_type: i32 = row.get(7)?;
+        let artists_json: String = row.get(8)?;
 
         let title_norm = interner.intern(crate::normalize::normalize_title(&track_name));
 
@@ -901,12 +874,7 @@ pub fn build_pop0_enriched(
     }
 
     tx.commit()?;
-    log_only!(
-        log_only,
-        "[POP0_ENRICHED] Wrote {} rows, skipped {} (no artists)",
-        written,
-        skipped_no_artists
-    );
+    log_only!(log_only, "[POP0_ENRICHED] Wrote {} rows", written);
 
     // Create compound index for efficient lookups
     println!("  Creating index on (title_norm, duration_ms)...");
@@ -917,6 +885,13 @@ pub fn build_pop0_enriched(
     out_conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_pop0_title_duration
          ON pop0_tracks(title_norm, duration_ms)",
+        [],
+    )?;
+
+    // Also create index on track_rowid for potential lookups
+    out_conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_pop0_track_rowid
+         ON pop0_tracks(track_rowid)",
         [],
     )?;
 

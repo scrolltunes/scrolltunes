@@ -566,34 +566,47 @@ CREATE INDEX idx_pop0_title_duration ON pop0_tracks(title_norm, duration_ms);
 
 #### Build Process (normalize-spotify)
 
+Uses **SQL aggregation** instead of in-memory caching to avoid OOM with 100M+ tracks:
+
+```sql
+-- Single streaming query that aggregates artists via group_concat + json_quote
+-- Subquery ensures artist ordering before aggregation (works on all SQLite versions)
+SELECT
+    sub.track_rowid, sub.track_name, sub.duration_ms, sub.album_rowid,
+    sub.track_id, sub.isrc, sub.album_name, sub.album_type_int,
+    '[' || group_concat(sub.artist_quoted, ',') || ']' AS artists_json
+FROM (
+    SELECT
+        t.rowid AS track_rowid, t.name AS track_name, t.duration_ms,
+        t.album_rowid, t.id AS track_id, t.external_id_isrc AS isrc,
+        al.name AS album_name,
+        CASE al.album_type
+            WHEN 'album' THEN 0 WHEN 'single' THEN 1
+            WHEN 'compilation' THEN 2 ELSE 3
+        END AS album_type_int,
+        json_quote(a.name) AS artist_quoted
+    FROM tracks t
+    JOIN track_artists ta ON ta.track_rowid = t.rowid
+    JOIN artists a ON a.rowid = ta.artist_rowid
+    LEFT JOIN albums al ON al.rowid = t.album_rowid
+    WHERE t.popularity = 0
+    ORDER BY t.rowid, ta.rowid  -- Preserves Spotify credited order
+) sub
+GROUP BY sub.track_rowid
+```
+
 ```rust
 pub fn build_pop0_enriched(src_conn: &Connection, out_conn: &mut Connection) {
-    // Step 1: Load ALL album metadata into memory
-    let album_cache: HashMap<i64, (Option<String>, i32)> = {
-        // album_rowid -> (name, album_type_int)
-        // album_type converted: "album"=0, "single"=1, "compilation"=2, else=3
-    };
-
-    // Step 2: Load ALL artists for pop=0 tracks into memory
-    // ORDER BY ta.rowid preserves Spotify credited order
-    let artists_cache: HashMap<i64, Vec<String>> = {
-        // track_rowid -> [artist1, artist2, ...]
-    };
-
-    // Step 3: Stream tracks, join with caches, write enriched rows
-    for track in pop0_tracks {
-        let artists = artists_cache.get(track_rowid);
-        let artists_json = serde_json::to_string(artists);
-        let (album_name, album_type) = album_cache.get(album_rowid);
-        // Write to pop0_tracks
-    }
-
-    // Step 4: Create index AFTER all inserts (faster)
+    // Step 1: Execute streaming SQL query (aggregates artists in SQL, not memory)
+    // Step 2: For each row, normalize title in Rust: title_norm = normalize_title(track_name)
+    // Step 3: Batch insert to pop0_tracks (3000 rows per batch)
+    // Step 4: Create indexes AFTER all inserts (faster)
     CREATE INDEX idx_pop0_title_duration ON pop0_tracks(title_norm, duration_ms);
+    CREATE UNIQUE INDEX idx_pop0_track_rowid ON pop0_tracks(track_rowid);
 }
 ```
 
-**Memory usage:** ~100M track→artists mappings, ~15M albums. Requires ~8-16GB RAM during build.
+**Memory usage:** Constant regardless of dataset size (batch buffer + SQLite row buffer only).
 
 #### Extraction Query
 
