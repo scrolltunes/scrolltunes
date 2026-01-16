@@ -114,15 +114,17 @@ pub static YEAR_SUFFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s*\(\d{4}\)\s*$
 /// Artist cleanup patterns
 pub static ARTIST_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
-        Regex::new(r"(?i)\s+(?:feat\.?|ft\.?|featuring|with|&|,|;|/)\s+.*").unwrap(),
+        // Strip everything after feat/ft/featuring/with and common separators
+        Regex::new(r"(?i)\s*[;]\s*.*").unwrap(), // Semicolon: "Artist1;Artist2" → "Artist1"
+        Regex::new(r"(?i)\s+(?:feat\.?|ft\.?|featuring|with|&|,|/)\s+.*").unwrap(),
         Regex::new(r"(?i)\s+(?:band|orchestra|ensemble|quartet|trio)$").unwrap(),
     ]
 });
 
 /// Multi-artist separator pattern for extracting primary artist.
-/// Matches: &, /, ,, •, +, x, vs, and, with, feat, ft
+/// Matches: &, /, ,, ;, •, +, x, vs, and, with, feat, ft
 pub static ARTIST_SEPARATOR: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\s*(?:[&/,•+×]|(?:\s+(?:x|vs\.?|and|with|feat\.?|ft\.?)\s+))\s*").unwrap()
+    Regex::new(r"(?i)\s*(?:[&/,;•+×]|(?:\s+(?:x|vs\.?|and|with|feat\.?|ft\.?)\s+))\s*").unwrap()
 });
 
 /// Regex to collapse multiple whitespace into single space
@@ -367,6 +369,9 @@ pub static ARTIST_TRANSLITERATIONS: Lazy<FxHashMap<&str, &str>> = Lazy::new(|| {
     m.insert("fiksiki", "fixiki"); // alias
     m.insert("тату", "tatu");
     m.insert("miyagi and эндшпиль", "miyagi and endshpil");
+
+    // === ARTIST REBRANDS ===
+    m.insert("lady antebellum", "lady a"); // Rebranded in 2020
 
     // === ISRAELI/HEBREW ARTISTS ===
     // Bands
@@ -1040,6 +1045,20 @@ mod tests {
         assert_eq!(normalize_artist("The Beatles"), "beatles");
         assert_eq!(normalize_artist("Band, The"), "band");
         assert_eq!(normalize_artist("Artist feat. Other"), "artist");
+    }
+
+    #[test]
+    fn test_normalize_artist_semicolon() {
+        // Semicolon separator (common in LRCLIB metadata)
+        assert_eq!(normalize_artist("Alan Walker;Noah Cyrus"), "alan walker");
+        assert_eq!(normalize_artist("Steve Aoki;Lauren Jauregui"), "steve aoki");
+        assert_eq!(normalize_artist("Kygo;OneRepublic"), "kygo");
+    }
+
+    #[test]
+    fn test_artist_rebrand_alias() {
+        // Lady Antebellum rebranded to Lady A in 2020
+        assert_eq!(normalize_artist("Lady Antebellum"), "lady a");
     }
 
     #[test]
