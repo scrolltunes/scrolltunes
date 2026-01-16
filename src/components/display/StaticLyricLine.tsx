@@ -1,6 +1,7 @@
 "use client"
 
 import { ChordBadge, InlineChord } from "@/components/chords"
+import type { LyricWord } from "@/core"
 import type { LyricChordPosition } from "@/lib/chords"
 
 import { AnimatePresence, motion } from "motion/react"
@@ -51,6 +52,32 @@ export interface StaticLyricLineProps {
    * Ref callback for the button element
    */
   readonly innerRef?: (el: HTMLButtonElement | null) => void
+
+  // Word timing props (reserved for future use)
+  /**
+   * Duration of the line in seconds
+   */
+  readonly duration?: number | undefined
+  /**
+   * Start time of the line in seconds
+   */
+  readonly lineStartTime?: number | undefined
+  /**
+   * Word-level timing data for karaoke-style animation
+   */
+  readonly wordTimings?: readonly LyricWord[] | undefined
+  /**
+   * Elapsed time within the current line in seconds
+   */
+  readonly elapsedInLine?: number | undefined
+  /**
+   * Whether playback is currently active
+   */
+  readonly isPlaying?: boolean
+  /**
+   * Enable variable speed word painting based on syllable count
+   */
+  readonly variableSpeed?: boolean
 }
 
 interface ChordInWord extends LyricChordPosition {
@@ -184,6 +211,19 @@ export const StaticLyricLine = memo(function StaticLyricLine({
   chordPositions,
   isRTL = false,
   innerRef,
+  // Word timing props - reserved for future use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  duration: _duration,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  lineStartTime: _lineStartTime,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  wordTimings: _wordTimings,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  elapsedInLine: _elapsedInLine,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isPlaying: _isPlaying,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  variableSpeed: _variableSpeed,
 }: StaticLyricLineProps) {
   // Handle empty lines with musical note placeholder
   if (!text.trim()) {
