@@ -183,13 +183,18 @@ Album type fetched via `tracks.album_rowid → albums.album_type` from `spotify_
 cd scripts/lrclib-extract && cargo build --release
 
 # Pre-normalize Spotify (one-time, ~15 min)
-# Builds track_norm + pop0_albums_norm tables by default
-./target/release/normalize-spotify \
+./target/release/lrclib-extract normalize-spotify \
   ~/git/music/spotify_clean.sqlite3 \
   ~/git/music/spotify_normalized.sqlite3
 
-# Run extraction (~45 min with optimizations)
-./target/release/lrclib-extract \
+# Simplest: run with defaults (recommended)
+./target/release/lrclib-extract run --log-only
+
+# Dry run to verify paths
+./target/release/lrclib-extract run --dry-run
+
+# Full extraction with explicit paths
+./target/release/lrclib-extract extract \
   ~/git/music/lrclib-db-dump-*.sqlite3 \
   ~/git/music/lrclib-enriched.sqlite3 \
   --spotify ~/git/music/spotify_clean.sqlite3 \
@@ -198,23 +203,48 @@ cd scripts/lrclib-extract && cargo build --release
   --log-only
 ```
 
+### Subcommands
+
+| Command | Description |
+|---------|-------------|
+| `run` | Simplified extraction with hardcoded paths (recommended) |
+| `extract` | Full extraction with explicit paths |
+| `normalize-spotify` | Pre-normalize Spotify database |
+| `analyze-failures` | Analyze unmatched tracks |
+
+### run Flags (Recommended)
+
+Uses hardcoded filenames from `~/git/music` by default.
+
+| Flag | Description |
+|------|-------------|
+| `-w, --workdir PATH` | Working directory [default: ~/git/music] |
+| `--dry-run` | Show what would be done without executing |
+| `--log-only` | Disable progress bars, use log output only |
+| `--log-failures` | Log match failures to match_failures table |
+| `--export-stats PATH` | Export matching stats to JSON file |
+| `--artists LIST` | Filter by artist names (comma-separated) |
+| `--min-popularity N` | Minimum Spotify popularity [default: 0] |
+
+### extract Flags
+
+| Flag | Description |
+|------|-------------|
+| `--spotify PATH` | Path to spotify_clean.sqlite3 for enrichment |
+| `--spotify-normalized PATH` | Pre-normalized index for faster matching |
+| `--audio-features PATH` | Path to audio features DB (tempo, key) |
+| `--log-only` | Disable progress bars, use log output only |
+| `--log-failures` | Log match failures to match_failures table |
+| `--export-stats PATH` | Export matching stats to JSON file |
+| `--artists LIST` | Filter by artist names (comma-separated) |
+| `--min-popularity N` | Minimum Spotify popularity [default: 0] |
+
 ### normalize-spotify Flags
 
 | Flag | Description |
 |------|-------------|
-| `--log-only` | Show log lines only (for `tail -f` in background runs) |
+| `--log-only` | Disable progress bars, use log output only |
 | `--skip-pop0-albums` | Skip building pop0_albums_norm table (built by default) |
-
-### lrclib-extract Flags
-
-| Flag | Description |
-|------|-------------|
-| `--spotify` | Path to spotify_clean.sqlite3 for enrichment |
-| `--spotify-normalized` | Pre-normalized index for faster matching |
-| `--audio-features` | Path to audio features DB (tempo, key) |
-| `--log-only` | Show log lines only (for `tail -f` in background runs) |
-| `--log-failures` | Log match failures to match_failures table |
-| `--export-stats` | Export stats to JSON file |
 
 ---
 

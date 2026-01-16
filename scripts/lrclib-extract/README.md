@@ -18,45 +18,111 @@ cd /Users/hmemcpy/git/scrolltunes/scripts/lrclib-extract
 cargo build --release
 ```
 
-## Binaries
+## Commands
 
-### lrclib-extract
-
-Main extraction tool.
+The CLI provides multiple subcommands:
 
 ```bash
-./target/release/lrclib-extract <source.sqlite3> <output.sqlite3> [OPTIONS]
+./target/release/lrclib-extract <COMMAND>
+
+Commands:
+  run                Simplified extraction with hardcoded paths (recommended)
+  extract            Full extraction with explicit paths
+  normalize-spotify  Pre-normalize Spotify database
+  analyze-failures   Analyze unmatched tracks
 ```
 
-### normalize-spotify
+### run (Recommended)
 
-Pre-normalizes Spotify database for faster extraction (creates indexed lookup table).
+Simplified command using hardcoded filenames from `~/git/music`:
 
 ```bash
-./target/release/normalize-spotify [--log-only] <spotify_clean.sqlite3> [output.sqlite3]
+# Check paths without executing
+./target/release/lrclib-extract run --dry-run
+
+# Run with defaults (uses ~/git/music)
+./target/release/lrclib-extract run --log-only
+
+# Run with artist filter
+./target/release/lrclib-extract run --artists "smashing pumpkins" --log-only
+
+# Custom working directory
+./target/release/lrclib-extract run -w /path/to/data --log-only
 ```
 
-## Options
+**Hardcoded filenames:**
+- Source: `lrclib-db-dump-20251209T092057Z.sqlite3`
+- Output: `lrclib-enriched.sqlite3`
+- Spotify: `spotify_clean.sqlite3`
+- Normalized: `spotify_normalized.sqlite3`
+- Audio features: `spotify_clean_audio_features.sqlite3`
+
+| Option | Description |
+|--------|-------------|
+| `-w, --workdir PATH` | Working directory [default: ~/git/music] |
+| `--dry-run` | Show what would be done without executing |
+| `--log-only` | Disable progress bars, use log output only |
+| `--log-failures` | Log match failures to match_failures table |
+| `--export-stats PATH` | Export matching stats to JSON file |
+| `--artists LIST` | Filter by artist names (comma-separated) |
+| `--min-popularity N` | Minimum Spotify popularity [default: 0] |
+
+### extract
+
+Full extraction with explicit paths (for custom setups):
+
+```bash
+./target/release/lrclib-extract extract <source.sqlite3> <output.sqlite3> [OPTIONS]
+```
 
 | Option | Description |
 |--------|-------------|
 | `--spotify PATH` | Path to spotify_clean.sqlite3 for enrichment |
 | `--spotify-normalized PATH` | Pre-normalized Spotify index (much faster) |
 | `--audio-features PATH` | Path to spotify_clean_audio_features.sqlite3 |
-| `--min-popularity N` | Minimum Spotify popularity (default: 1) |
-| `--workers N` | Number of parallel workers (default: all CPUs) |
+| `--min-popularity N` | Minimum Spotify popularity [default: 0] |
+| `--workers N` | Number of parallel workers [default: all CPUs] |
 | `--artists LIST` | Filter by artist names (comma-separated) |
 | `--log-only` | Disable progress bars, use log output only |
+| `--log-failures` | Log match failures to match_failures table |
+| `--export-stats PATH` | Export matching stats to JSON file |
 | `--test QUERY` | Run a test search after extraction |
+
+### normalize-spotify
+
+Pre-normalizes Spotify database for faster extraction:
+
+```bash
+./target/release/lrclib-extract normalize-spotify <spotify_clean.sqlite3> [output.sqlite3]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--log-only` | Disable progress bars, use log output only |
+| `--skip-pop0-albums` | Skip building pop0_albums_norm table |
+
+### analyze-failures
+
+Analyze unmatched tracks and test recovery strategies:
+
+```bash
+./target/release/lrclib-extract analyze-failures \
+  --lrclib-enriched output.sqlite3 \
+  --spotify-normalized spotify_normalized.sqlite3 \
+  --sample-size 10000
+```
 
 ## Examples
 
 ```bash
-# Basic extraction (no Spotify)
-./target/release/lrclib-extract lrclib-dump.sqlite3 output.sqlite3
+# Simplest: run with defaults (recommended)
+./target/release/lrclib-extract run --log-only
 
-# Full extraction with Spotify enrichment (recommended)
-./target/release/lrclib-extract \
+# Dry run to verify paths
+./target/release/lrclib-extract run --dry-run
+
+# Full extraction with explicit paths
+./target/release/lrclib-extract extract \
   lrclib-dump.sqlite3 \
   output.sqlite3 \
   --spotify spotify_clean.sqlite3 \
@@ -64,13 +130,7 @@ Pre-normalizes Spotify database for faster extraction (creates indexed lookup ta
   --audio-features spotify_clean_audio_features.sqlite3
 
 # Background run with log output
-./target/release/lrclib-extract \
-  lrclib-dump.sqlite3 output.sqlite3 \
-  --spotify spotify_clean.sqlite3 \
-  --spotify-normalized spotify_normalized.sqlite3 \
-  --log-only \
-  > extraction.log 2>&1 &
-tail -f extraction.log
+./target/release/lrclib-extract run --log-only 2>&1 | tee extraction.log
 ```
 
 ## Pre-normalization (Recommended)
