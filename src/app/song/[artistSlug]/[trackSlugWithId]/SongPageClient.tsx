@@ -754,7 +754,7 @@ export default function SongPageClient({
                 <button
                   type="button"
                   onClick={handleTogglePlayPause}
-                  className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
                   style={{ background: "var(--color-accent)", color: "white" }}
                   aria-label={isPlaying ? "Pause" : "Play"}
                 >
@@ -764,7 +764,7 @@ export default function SongPageClient({
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
                   style={{ background: "var(--color-surface2)" }}
                   aria-label="Reset"
                 >

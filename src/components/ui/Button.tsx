@@ -62,7 +62,17 @@ const sizeStyles: Record<ButtonSize, string> = {
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = "", variant = "default", size = "default", fullWidth = false, disabled, ...props }, ref) => {
+  (
+    {
+      className = "",
+      variant = "default",
+      size = "default",
+      fullWidth = false,
+      disabled,
+      ...props
+    },
+    ref,
+  ) => {
     const classes = [
       baseStyles,
       variantStyles[variant],
