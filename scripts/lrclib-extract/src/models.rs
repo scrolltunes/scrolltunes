@@ -378,3 +378,27 @@ impl MatchingStats {
             + self.duration_relaxed_61_plus
     }
 }
+
+// ============================================================================
+// Match Failure Logging
+// ============================================================================
+
+/// Entry for match_failures table (spec-05).
+/// Contains all data needed to write to match_failures table.
+#[derive(Clone, Debug)]
+pub struct MatchFailureEntry {
+    // LRCLIB entry info
+    pub lrclib_id: i64,
+    pub lrclib_title: String,
+    pub lrclib_artist: String,
+    pub lrclib_album: Option<String>,
+    pub lrclib_duration_sec: i64,
+    pub lrclib_title_norm: String,
+    pub lrclib_artist_norm: String,
+    pub lrclib_quality: i32,
+    pub group_variant_count: usize,
+    // Failure info
+    pub failure_reason: FailureReason,
+    pub best_score: Option<i32>,
+    pub spotify_candidates: Vec<SpotifyCandidate>,
+}
