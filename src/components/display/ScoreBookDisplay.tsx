@@ -245,10 +245,20 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
     return lyrics.lines.slice(currentPageRange.start, currentPageRange.end + 1)
   }, [lyrics, currentPageRange])
 
-  // Get preview line from next page (first line of next page)
-  const nextPageRange = pageLineRanges[currentPage + 1]
-  const previewLine = nextPageRange && lyrics ? lyrics.lines[nextPageRange.start] : undefined
-  const previewLineIndex = nextPageRange?.start
+  // Get preview line from next page (first non-empty line of next page)
+  const { previewLine, previewLineIndex } = useMemo(() => {
+    const nextPageRange = pageLineRanges[currentPage + 1]
+    if (!nextPageRange || !lyrics) {
+      return { previewLine: undefined, previewLineIndex: undefined }
+    }
+    for (let i = nextPageRange.start; i <= nextPageRange.end; i++) {
+      const line = lyrics.lines[i]
+      if (line && line.text.trim() !== "") {
+        return { previewLine: line, previewLineIndex: i }
+      }
+    }
+    return { previewLine: undefined, previewLineIndex: undefined }
+  }, [pageLineRanges, currentPage, lyrics])
 
   // Calculate page progress (0-1) - no memo for smooth continuous updates
   let pageProgress = 0

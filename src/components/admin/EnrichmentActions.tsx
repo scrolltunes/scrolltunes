@@ -7,6 +7,7 @@ import {
   PencilSimple,
   Spinner,
   SpotifyLogo,
+  Trash,
 } from "@phosphor-icons/react"
 import { useCallback, useState } from "react"
 import type { TrackWithEnrichment } from "./TracksList"
@@ -22,6 +23,7 @@ interface EnrichmentActionsProps {
   onFetchBpm: (track: TrackWithEnrichment) => Promise<void>
   onManualBpm: (track: TrackWithEnrichment) => void
   onViewLyrics: (track: TrackWithEnrichment) => void
+  onDelete?: (track: TrackWithEnrichment) => Promise<void>
   onRefresh?: () => void
 }
 
@@ -101,10 +103,12 @@ export function EnrichmentActions({
   onFetchBpm,
   onManualBpm,
   onViewLyrics,
+  onDelete,
   onRefresh,
 }: EnrichmentActionsProps) {
   const [copyState, setCopyState] = useState<ActionState>("idle")
   const [fetchBpmState, setFetchBpmState] = useState<ActionState>("idle")
+  const [deleteState, setDeleteState] = useState<ActionState>("idle")
 
   // Determine button availability
   const hasTursoEnrichment = track.spotifyId !== null && track.tempo !== null
@@ -158,6 +162,22 @@ export function EnrichmentActions({
   const handleViewLyrics = useCallback(() => {
     onViewLyrics(track)
   }, [onViewLyrics, track])
+
+  // Handle Delete
+  const handleDelete = useCallback(async () => {
+    if (deleteState === "loading" || !onDelete) return
+    if (!window.confirm(`Delete "${track.title}" by ${track.artist} from catalog?`)) return
+
+    setDeleteState("loading")
+    try {
+      await onDelete(track)
+      setDeleteState("success")
+      onRefresh?.()
+    } catch {
+      setDeleteState("error")
+      setTimeout(() => setDeleteState("idle"), 3000)
+    }
+  }, [deleteState, onDelete, track, onRefresh])
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -215,6 +235,20 @@ export function EnrichmentActions({
         onClick={handleViewLyrics}
         tooltip="Open song in player"
       />
+
+      {/* Delete */}
+      {onDelete && (
+        <>
+          <div className="w-px h-8 self-center" style={{ background: "var(--color-border)" }} />
+          <ActionButton
+            label="Delete"
+            icon={<Trash size={16} weight="bold" />}
+            onClick={handleDelete}
+            state={deleteState}
+            tooltip="Remove from catalog"
+          />
+        </>
+      )}
     </div>
   )
 }

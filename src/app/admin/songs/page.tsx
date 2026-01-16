@@ -311,6 +311,23 @@ export default function AdminTracksPage() {
     window.open(path, "_blank")
   }, [])
 
+  // Handler: Delete from catalog
+  const handleDelete = useCallback(
+    async (track: TrackWithEnrichment) => {
+      if (!track.neonSongId) return
+      const response = await fetch(`/api/admin/catalog/${track.neonSongId}`, {
+        method: "DELETE",
+      })
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string }
+        throw new Error(data.error ?? "Failed to delete")
+      }
+      setExpandedId(null)
+      await catalogData.mutate()
+    },
+    [catalogData],
+  )
+
   // Handler: Filter change
   const handleFilterChange = useCallback((newFilter: CatalogFilter) => {
     setFilter(newFilter)
@@ -346,6 +363,7 @@ export default function AdminTracksPage() {
               onFetchBpm={handleFetchBpm}
               onManualBpm={handleManualBpm}
               onViewLyrics={handleViewLyrics}
+              onDelete={handleDelete}
               onRefresh={() => catalogData.mutate()}
             />
           )}
@@ -358,6 +376,7 @@ export default function AdminTracksPage() {
       handleFetchBpm,
       handleManualBpm,
       handleViewLyrics,
+      handleDelete,
       catalogData,
     ],
   )
