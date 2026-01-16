@@ -23,10 +23,10 @@ export const MAX_FONT_SIZE = 48
 export const FONT_SIZE_STEP = 2
 export const DEFAULT_FONT_SIZE = 34
 
-export const SCOREBOOK_MIN_FONT_SIZE = 14
-export const SCOREBOOK_MAX_FONT_SIZE = 32
-export const SCOREBOOK_FONT_SIZE_STEP = 2
-export const SCOREBOOK_DEFAULT_FONT_SIZE = 20
+export const LYRICS_MIN_FONT_SIZE = 14
+export const LYRICS_MAX_FONT_SIZE = 32
+export const LYRICS_FONT_SIZE_STEP = 2
+export const LYRICS_DEFAULT_FONT_SIZE = 20
 
 export type ThemeMode = "system" | "light" | "dark"
 
@@ -84,8 +84,8 @@ export interface Preferences {
   readonly activationMode: ActivationMode
   readonly vadEnvironment: VadEnvironment
   readonly singingDetectorConfig: SingingDetectorConfig
-  readonly scoreBookShowChords: boolean
-  readonly scoreBookFontSize: number
+  readonly lyricsShowChords: boolean
+  readonly lyricsFontSize: number
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -98,8 +98,8 @@ const DEFAULT_PREFERENCES: Preferences = {
   activationMode: "vad_energy",
   vadEnvironment: "normal",
   singingDetectorConfig: DEFAULT_SINGING_DETECTOR_CONFIG,
-  scoreBookShowChords: false,
-  scoreBookFontSize: SCOREBOOK_DEFAULT_FONT_SIZE,
+  lyricsShowChords: false,
+  lyricsFontSize: LYRICS_DEFAULT_FONT_SIZE,
 }
 
 export class PreferencesStore {
@@ -279,20 +279,20 @@ export class PreferencesStore {
   }
 
   getScoreBookShowChords(): boolean {
-    return this.state.scoreBookShowChords
+    return this.state.lyricsShowChords
   }
 
   setScoreBookShowChords(value: boolean): void {
-    this.setState({ scoreBookShowChords: value })
+    this.setState({ lyricsShowChords: value })
   }
 
   getScoreBookFontSize(): number {
-    return this.state.scoreBookFontSize
+    return this.state.lyricsFontSize
   }
 
   setScoreBookFontSize(value: number): void {
-    const clamped = Math.max(SCOREBOOK_MIN_FONT_SIZE, Math.min(SCOREBOOK_MAX_FONT_SIZE, value))
-    this.setState({ scoreBookFontSize: clamped })
+    const clamped = Math.max(LYRICS_MIN_FONT_SIZE, Math.min(LYRICS_MAX_FONT_SIZE, value))
+    this.setState({ lyricsFontSize: clamped })
   }
 
   reset(): void {

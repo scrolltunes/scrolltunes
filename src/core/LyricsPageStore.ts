@@ -16,7 +16,7 @@ export interface PageLineRange {
 /**
  * Runtime state for Score Book pagination
  */
-export interface ScoreBookState {
+export interface LyricsPageState {
   readonly currentPage: number
   readonly totalPages: number
   readonly linesPerPage: number
@@ -52,11 +52,11 @@ export class SetPagination extends Data.TaggedClass("SetPagination")<{
   readonly linesPerPage: number
 }> {}
 
-export type ScoreBookEvent = GoToPage | NextPage | PrevPage | SetPagination
+export type LyricsPageEvent = GoToPage | NextPage | PrevPage | SetPagination
 
 // --- Default State ---
 
-const DEFAULT_STATE: ScoreBookState = {
+const DEFAULT_STATE: LyricsPageState = {
   currentPage: 0,
   totalPages: 0,
   linesPerPage: 6,
@@ -64,24 +64,24 @@ const DEFAULT_STATE: ScoreBookState = {
   direction: 1,
 }
 
-// --- ScoreBookStore Class ---
+// --- LyricsPageStore Class ---
 
 /**
- * ScoreBookStore - Manages Score Book pagination state
+ * LyricsPageStore - Manages Score Book pagination state
  *
  * Uses useSyncExternalStore pattern for React integration.
  * This store manages runtime state only (no persistence).
  */
-export class ScoreBookStore {
+export class LyricsPageStore {
   private listeners = new Set<() => void>()
-  private state: ScoreBookState = DEFAULT_STATE
+  private state: LyricsPageState = DEFAULT_STATE
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
   }
 
-  getSnapshot = (): ScoreBookState => this.state
+  getSnapshot = (): LyricsPageState => this.state
 
   private notify(): void {
     for (const listener of this.listeners) {
@@ -89,15 +89,15 @@ export class ScoreBookStore {
     }
   }
 
-  private setState(partial: Partial<ScoreBookState>): void {
+  private setState(partial: Partial<LyricsPageState>): void {
     this.state = { ...this.state, ...partial }
     this.notify()
   }
 
   /**
-   * Dispatch a ScoreBook event
+   * Dispatch a LyricsPage event
    */
-  dispatch(event: ScoreBookEvent): void {
+  dispatch(event: LyricsPageEvent): void {
     switch (event._tag) {
       case "GoToPage":
         this.goToPage(event.page)
@@ -213,17 +213,17 @@ export class ScoreBookStore {
 
 // --- Singleton Instance ---
 
-export const scoreBookStore = new ScoreBookStore()
+export const lyricsPageStore = new LyricsPageStore()
 
 // --- React Hooks ---
 
 /**
- * Subscribe to full ScoreBook state
+ * Subscribe to full LyricsPage state
  */
-export function useScoreBookState(): ScoreBookState {
+export function useLyricsPageState(): LyricsPageState {
   return useSyncExternalStore(
-    scoreBookStore.subscribe,
-    scoreBookStore.getSnapshot,
+    lyricsPageStore.subscribe,
+    lyricsPageStore.getSnapshot,
     () => DEFAULT_STATE,
   )
 }
@@ -232,7 +232,7 @@ export function useScoreBookState(): ScoreBookState {
  * Get current page number (0-indexed)
  */
 export function useCurrentPage(): number {
-  const state = useScoreBookState()
+  const state = useLyricsPageState()
   return state.currentPage
 }
 
@@ -240,7 +240,7 @@ export function useCurrentPage(): number {
  * Get total number of pages
  */
 export function useTotalPages(): number {
-  const state = useScoreBookState()
+  const state = useLyricsPageState()
   return state.totalPages
 }
 
@@ -248,7 +248,7 @@ export function useTotalPages(): number {
  * Get lines per page
  */
 export function useLinesPerPage(): number {
-  const state = useScoreBookState()
+  const state = useLyricsPageState()
   return state.linesPerPage
 }
 
@@ -256,6 +256,6 @@ export function useLinesPerPage(): number {
  * Get page line ranges
  */
 export function usePageLineRanges(): readonly PageLineRange[] {
-  const state = useScoreBookState()
+  const state = useLyricsPageState()
   return state.pageLineRanges
 }

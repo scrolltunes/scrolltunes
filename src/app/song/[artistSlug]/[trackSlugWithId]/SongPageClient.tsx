@@ -1,7 +1,7 @@
 "use client"
 
 import { FloatingMetronome, SingingDebugIndicator, VoiceIndicator } from "@/components/audio"
-import { ScoreBookDisplay, SongActionBar, SongInfoModal } from "@/components/display"
+import { LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
 import { EditModeProvider, EditToolbar, EditableLyricsDisplay } from "@/components/edit-mode"
 import { ReportIssueModal } from "@/components/feedback"
 import { useFooterSlot } from "@/components/layout/FooterContext"
@@ -14,7 +14,7 @@ import {
   chordsStore,
   metronomeStore,
   recentSongsStore,
-  scoreBookStore,
+  lyricsPageStore,
   songEditsStore,
   useChordsState,
   useCurrentLineIndex,
@@ -314,15 +314,15 @@ export default function SongPageClient({
   // Score Book manual navigation mode
   // When user navigates manually during playback, temporarily disable auto-follow
   const MANUAL_MODE_TIMEOUT_MS = 4000
-  const [isScoreBookManualMode, setIsScoreBookManualMode] = useState(false)
+  const [isLyricsPageManualMode, setIsLyricsPageManualMode] = useState(false)
   const manualModeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const currentLineIndex = useCurrentLineIndex()
   const isCurrentlyPlaying = playerState._tag === "Playing"
 
-  const enterScoreBookManualMode = useCallback(() => {
+  const enterLyricsPageManualMode = useCallback(() => {
     if (!isCurrentlyPlaying) return
 
-    setIsScoreBookManualMode(true)
+    setIsLyricsPageManualMode(true)
 
     // Clear any existing timeout
     if (manualModeTimeoutRef.current) {
@@ -331,10 +331,10 @@ export default function SongPageClient({
 
     // Schedule return to auto mode and snap to current line's page
     manualModeTimeoutRef.current = setTimeout(() => {
-      setIsScoreBookManualMode(false)
+      setIsLyricsPageManualMode(false)
       // Navigate to page containing current line when exiting manual mode
-      const targetPage = scoreBookStore.findPageForLine(currentLineIndex)
-      scoreBookStore.goToPage(targetPage)
+      const targetPage = lyricsPageStore.findPageForLine(currentLineIndex)
+      lyricsPageStore.goToPage(targetPage)
     }, MANUAL_MODE_TIMEOUT_MS)
   }, [isCurrentlyPlaying, currentLineIndex])
 
@@ -350,7 +350,7 @@ export default function SongPageClient({
   // Exit manual mode when playback stops
   useEffect(() => {
     if (!isCurrentlyPlaying) {
-      setIsScoreBookManualMode(false)
+      setIsLyricsPageManualMode(false)
       if (manualModeTimeoutRef.current) {
         clearTimeout(manualModeTimeoutRef.current)
         manualModeTimeoutRef.current = null
@@ -360,7 +360,7 @@ export default function SongPageClient({
 
   useKeyboardShortcuts({
     enabled: loadState._tag === "Loaded",
-    onScoreBookNav: enterScoreBookManualMode,
+    onLyricsPageNav: enterLyricsPageManualMode,
   })
 
   useTempoPreference({
@@ -410,7 +410,7 @@ export default function SongPageClient({
 
   const handleReset = useCallback(async () => {
     reset()
-    scoreBookStore.goToPage(0)
+    lyricsPageStore.goToPage(0)
     if (userEnabledMic.current) {
       await startListening()
     }
@@ -795,11 +795,11 @@ export default function SongPageClient({
           </EditModeProvider>
         ) : (
           <>
-            <ScoreBookDisplay
+            <LyricsDisplay
               className="flex-1 min-h-0"
               chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
-              isManualMode={isScoreBookManualMode}
-              enterManualMode={enterScoreBookManualMode}
+              isManualMode={isLyricsPageManualMode}
+              enterManualMode={enterLyricsPageManualMode}
             />
             {/* Action bar at bottom, directly above footer */}
             <div

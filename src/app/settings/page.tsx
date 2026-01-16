@@ -4,10 +4,10 @@ import { AmbientBackground } from "@/components/ui"
 import {
   type ActivationMode,
   DEFAULT_SINGING_DETECTOR_CONFIG,
-  SCOREBOOK_DEFAULT_FONT_SIZE,
-  SCOREBOOK_FONT_SIZE_STEP,
-  SCOREBOOK_MAX_FONT_SIZE,
-  SCOREBOOK_MIN_FONT_SIZE,
+  LYRICS_DEFAULT_FONT_SIZE,
+  LYRICS_FONT_SIZE_STEP,
+  LYRICS_MAX_FONT_SIZE,
+  LYRICS_MIN_FONT_SIZE,
   type VadEnvironment,
   preferencesStore,
   useAccount,
@@ -771,8 +771,8 @@ export default function SettingsPage() {
   }, [preferences.shakeToRestartEnabled])
 
   const handleToggleScoreBookChords = useCallback(() => {
-    preferencesStore.setScoreBookShowChords(!preferences.scoreBookShowChords)
-  }, [preferences.scoreBookShowChords])
+    preferencesStore.setScoreBookShowChords(!preferences.lyricsShowChords)
+  }, [preferences.lyricsShowChords])
 
   const handleScoreBookFontSizeChange = useCallback((value: number) => {
     preferencesStore.setScoreBookFontSize(value)
@@ -783,7 +783,7 @@ export default function SettingsPage() {
   }, [])
 
   const formatFontSize = (px: number): string => {
-    if (px === SCOREBOOK_DEFAULT_FONT_SIZE) return `${px}px (default)`
+    if (px === LYRICS_DEFAULT_FONT_SIZE) return `${px}px (default)`
     return `${px}px`
   }
 
@@ -833,18 +833,18 @@ export default function SettingsPage() {
             </h2>
             <div className="space-y-3">
               <SliderSetting
-                value={preferences.scoreBookFontSize}
+                value={preferences.lyricsFontSize}
                 onChange={handleScoreBookFontSizeChange}
                 label="Lyrics font size"
                 description="Adjust the size of lyrics text"
                 icon={<TextAa size={20} weight="duotone" />}
-                min={SCOREBOOK_MIN_FONT_SIZE}
-                max={SCOREBOOK_MAX_FONT_SIZE}
-                step={SCOREBOOK_FONT_SIZE_STEP}
+                min={LYRICS_MIN_FONT_SIZE}
+                max={LYRICS_MAX_FONT_SIZE}
+                step={LYRICS_FONT_SIZE_STEP}
                 formatValue={formatFontSize}
               />
               <Toggle
-                enabled={preferences.scoreBookShowChords}
+                enabled={preferences.lyricsShowChords}
                 onToggle={handleToggleScoreBookChords}
                 label="Show chords"
                 description="Display chord symbols above lyrics"

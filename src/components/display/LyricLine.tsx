@@ -7,7 +7,7 @@ import type { LyricChordPosition } from "@/lib/chords"
 import { AnimatePresence, motion } from "motion/react"
 import { memo } from "react"
 
-export interface StaticLyricLineProps {
+export interface LyricLineProps {
   /**
    * The text content of the line
    */
@@ -199,7 +199,7 @@ function renderWordWithChordAnchors(
  *
  * Supports chord display above text when chord data is provided.
  */
-export const StaticLyricLine = memo(function StaticLyricLine({
+export const LyricLine = memo(function LyricLine({
   text,
   isActive,
   isPast,
@@ -224,7 +224,7 @@ export const StaticLyricLine = memo(function StaticLyricLine({
   isPlaying: _isPlaying,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   variableSpeed: _variableSpeed,
-}: StaticLyricLineProps) {
+}: LyricLineProps) {
   // Handle empty lines with musical note placeholder
   if (!text.trim()) {
     return (

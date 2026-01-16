@@ -3,7 +3,7 @@
 import { springs, variants } from "@/animations"
 import {
   type LyricLine as LyricLineType,
-  scoreBookStore,
+  lyricsPageStore,
   useChordsData,
   useContinuousTime,
   useCurrentLineIndex,
@@ -11,7 +11,7 @@ import {
   usePlayerControls,
   usePlayerState,
   usePreferences,
-  useScoreBookState,
+  useLyricsPageState,
   useShowChords,
   useTranspose,
 } from "@/core"
@@ -24,7 +24,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { memo, useCallback, useEffect, useMemo, useRef } from "react"
 import { PageIndicator } from "./PageIndicator"
 import { PageNavigationArrows } from "./PageNavigationArrows"
-import { ScoreBookPage } from "./ScoreBookPage"
+import { LyricsPage } from "./LyricsPage"
 
 /**
  * Chord data for a single line
@@ -34,7 +34,7 @@ interface LineChordData {
   readonly chordPositions?: readonly LyricChordPosition[]
 }
 
-export interface ScoreBookDisplayProps {
+export interface LyricsDisplayProps {
   readonly className?: string
   readonly chordEnhancement?: ChordEnhancementPayloadV1 | null | undefined
   /**
@@ -50,20 +50,20 @@ export interface ScoreBookDisplayProps {
 /**
  * Main Score Book display - page-based lyrics with auto/manual page navigation
  *
- * Orchestrates ScoreBookPage, PageIndicator, PageSidebar, and pagination logic.
+ * Orchestrates LyricsPage, PageIndicator, PageSidebar, and pagination logic.
  * Pages flip automatically when the current line crosses a page boundary,
  * or manually via swipe gestures or navigation arrows.
  */
-export const ScoreBookDisplay = memo(function ScoreBookDisplay({
+export const LyricsDisplay = memo(function LyricsDisplay({
   className = "",
   chordEnhancement,
   isManualMode = false,
   enterManualMode,
-}: ScoreBookDisplayProps) {
+}: LyricsDisplayProps) {
   const state = usePlayerState()
   const currentLineIndex = useCurrentLineIndex()
   const { jumpToLine } = usePlayerControls()
-  const { scoreBookFontSize, scoreBookShowChords } = usePreferences()
+  const { lyricsFontSize, lyricsShowChords } = usePreferences()
   const chordsData = useChordsData()
   const showChords = useShowChords()
   const transposeSemitones = useTranspose()
@@ -71,8 +71,8 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   const currentTime = useContinuousTime()
   const isAdmin = useIsAdmin()
 
-  // ScoreBook pagination state
-  const { currentPage, totalPages, linesPerPage, pageLineRanges, direction } = useScoreBookState()
+  // LyricsPage pagination state
+  const { currentPage, totalPages, linesPerPage, pageLineRanges, direction } = useLyricsPageState()
 
   // Container ref for swipe gestures
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -86,20 +86,20 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   // Dynamic pagination calculation - measures actual content area
   const { linesPerPage: calculatedLinesPerPage, debugHeight } = useDynamicPagination({
     contentRef,
-    fontSize: scoreBookFontSize,
+    fontSize: lyricsFontSize,
     totalLines,
   })
 
   // Reset pagination when song changes (must be first to avoid race conditions)
   const songId = lyrics?.songId
   useEffect(() => {
-    scoreBookStore.reset()
+    lyricsPageStore.reset()
   }, [songId])
 
-  // Update ScoreBookStore when pagination parameters change
+  // Update LyricsPageStore when pagination parameters change
   useEffect(() => {
     if (totalLines > 0 && calculatedLinesPerPage > 0) {
-      scoreBookStore.setPagination(totalLines, calculatedLinesPerPage)
+      lyricsPageStore.setPagination(totalLines, calculatedLinesPerPage)
     }
   }, [totalLines, calculatedLinesPerPage])
 
@@ -109,8 +109,8 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   useEffect(() => {
     if (currentLineIndex < 0) return
 
-    const targetPage = scoreBookStore.findPageForLine(currentLineIndex)
-    scoreBookStore.goToPage(targetPage)
+    const targetPage = lyricsPageStore.findPageForLine(currentLineIndex)
+    lyricsPageStore.goToPage(targetPage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calculatedLinesPerPage])
 
@@ -120,21 +120,21 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   useEffect(() => {
     if (!isPlaying || currentLineIndex < 0 || isManualMode) return
 
-    const targetPage = scoreBookStore.findPageForLine(currentLineIndex)
+    const targetPage = lyricsPageStore.findPageForLine(currentLineIndex)
     if (targetPage !== currentPage) {
-      scoreBookStore.goToPage(targetPage)
+      lyricsPageStore.goToPage(targetPage)
     }
   }, [currentLineIndex, currentPage, isPlaying, isManualMode])
 
   // Manual navigation via swipe
   const handleSwipeLeft = useCallback(() => {
     enterManualMode?.()
-    scoreBookStore.nextPage()
+    lyricsPageStore.nextPage()
   }, [enterManualMode])
 
   const handleSwipeRight = useCallback(() => {
     enterManualMode?.()
-    scoreBookStore.prevPage()
+    lyricsPageStore.prevPage()
   }, [enterManualMode])
 
   const { handlers: swipeHandlers } = useSwipeGesture({
@@ -147,12 +147,12 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
   // Navigation arrow handlers
   const handlePrevPage = useCallback(() => {
     enterManualMode?.()
-    scoreBookStore.prevPage()
+    lyricsPageStore.prevPage()
   }, [enterManualMode])
 
   const handleNextPage = useCallback(() => {
     enterManualMode?.()
-    scoreBookStore.nextPage()
+    lyricsPageStore.nextPage()
   }, [enterManualMode])
 
   // Handle line click - jump to that line
@@ -349,7 +349,7 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
               {currentPageRange ? `${currentPageRange.start}-${currentPageRange.end}` : "none"}
             </div>
             <div>
-              Font: {scoreBookFontSize}px | Total: {totalLines}
+              Font: {lyricsFontSize}px | Total: {totalLines}
             </div>
           </div>
         )}
@@ -369,12 +369,12 @@ export const ScoreBookDisplay = memo(function ScoreBookDisplay({
             exit="exit"
             transition={transitionConfig}
           >
-            <ScoreBookPage
+            <LyricsPage
               lines={currentPageLines}
               currentLineIndex={activeIndex}
               pageStartIndex={currentPageRange?.start ?? 0}
-              fontSize={scoreBookFontSize}
-              showChords={scoreBookShowChords && showChords}
+              fontSize={lyricsFontSize}
+              showChords={lyricsShowChords && showChords}
               onLineClick={handleLineClick}
               lineChordData={lineChordData}
               isRTL={isRTL}

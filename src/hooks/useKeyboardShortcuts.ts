@@ -1,6 +1,6 @@
 "use client"
 
-import { scoreBookStore, usePlayerControls, usePlayerState } from "@/core"
+import { lyricsPageStore, usePlayerControls, usePlayerState } from "@/core"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
@@ -11,7 +11,7 @@ export interface UseKeyboardShortcutsOptions {
    * Callback when Score Book page navigation occurs via keyboard
    * Used to enter manual mode during playback
    */
-  readonly onScoreBookNav?: () => void
+  readonly onLyricsPageNav?: () => void
 }
 
 const PRESET_TEMPOS: Record<string, number> = {
@@ -22,7 +22,7 @@ const PRESET_TEMPOS: Record<string, number> = {
 }
 
 export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): void {
-  const { enabled = true, tempoStep = 0.1, onScoreBookNav } = options ?? {}
+  const { enabled = true, tempoStep = 0.1, onLyricsPageNav } = options ?? {}
   const state = usePlayerState()
   const { play, pause, reset, setScrollSpeed, getScrollSpeed } = usePlayerControls()
   const router = useRouter()
@@ -61,14 +61,14 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
         }
         case "ArrowLeft": {
           event.preventDefault()
-          onScoreBookNav?.()
-          scoreBookStore.prevPage()
+          onLyricsPageNav?.()
+          lyricsPageStore.prevPage()
           break
         }
         case "ArrowRight": {
           event.preventDefault()
-          onScoreBookNav?.()
-          scoreBookStore.nextPage()
+          onLyricsPageNav?.()
+          lyricsPageStore.nextPage()
           break
         }
         case "ArrowUp": {
@@ -108,7 +108,7 @@ export function useKeyboardShortcuts(options?: UseKeyboardShortcutsOptions): voi
     enabled,
     state,
     tempoStep,
-    onScoreBookNav,
+    onLyricsPageNav,
     play,
     pause,
     reset,

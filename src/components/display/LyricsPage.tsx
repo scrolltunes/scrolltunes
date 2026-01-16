@@ -5,7 +5,7 @@ import type { LyricChordPosition } from "@/lib/chords"
 import { ArrowBendDownRight } from "@phosphor-icons/react"
 
 import { memo } from "react"
-import { StaticLyricLine } from "./StaticLyricLine"
+import { LyricLine } from "./LyricLine"
 
 /**
  * Position of a line relative to the current line
@@ -37,7 +37,7 @@ interface LineChordData {
   readonly chordPositions?: readonly LyricChordPosition[]
 }
 
-export interface ScoreBookPageProps {
+export interface LyricsPageProps {
   /**
    * Lines to render on this page
    */
@@ -90,7 +90,7 @@ export interface ScoreBookPageProps {
  * - Next: 85% opacity, slight indent, font-weight 500
  * - Upcoming: 50% opacity
  */
-export const ScoreBookPage = memo(function ScoreBookPage({
+export const LyricsPage = memo(function LyricsPage({
   lines,
   currentLineIndex,
   pageStartIndex,
@@ -101,7 +101,7 @@ export const ScoreBookPage = memo(function ScoreBookPage({
   isRTL = false,
   previewLine,
   previewLineIndex,
-}: ScoreBookPageProps) {
+}: LyricsPageProps) {
   return (
     <div className="flex flex-col gap-2 px-4 py-2">
       {lines.map((line, i) => {
@@ -117,7 +117,7 @@ export const ScoreBookPage = memo(function ScoreBookPage({
 
         return (
           <div key={line.id}>
-            <StaticLyricLine
+            <LyricLine
               text={line.text}
               isActive={isActive}
               isPast={isPast}
