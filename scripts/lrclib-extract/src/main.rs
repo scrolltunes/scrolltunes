@@ -1,7 +1,9 @@
+mod analyze_failures;
 mod normalize;
+mod normalize_spotify;
 
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use lrclib_extract::safety::validate_output_path;
 use once_cell::sync::Lazy;
@@ -69,58 +71,112 @@ fn format_duration(d: std::time::Duration) -> String {
     }
 }
 
-/// Extract deduplicated LRCLIB search index with optional Spotify enrichment.
-///
-/// LRCLIB is the source of truth. Tracks are only included if they have synced lyrics.
-/// Spotify data (BPM, popularity, album art) is enrichment metadata — nullable and optional.
+/// LRCLIB extraction toolkit with Spotify enrichment.
 #[derive(Parser)]
 #[command(name = "lrclib-extract")]
-#[command(about = "Extract deduplicated LRCLIB search index with optional Spotify enrichment")]
-struct Args {
-    /// Path to LRCLIB SQLite dump (source of truth)
+#[command(about = "LRCLIB extraction toolkit with Spotify enrichment")]
+#[command(version)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Extract deduplicated LRCLIB search index with optional Spotify enrichment
+    Extract {
+        /// Path to LRCLIB SQLite dump (source of truth)
+        source: PathBuf,
+
+        /// Path to output SQLite database
+        output: PathBuf,
+
+        /// Path to spotify_clean.sqlite3 (for enrichment)
+        #[arg(long, requires = "audio_features")]
+        spotify: Option<PathBuf>,
+
+        /// Path to spotify_normalized.sqlite3 (pre-normalized Spotify data)
+        #[arg(long)]
+        spotify_normalized: Option<PathBuf>,
+
+        /// Path to spotify_clean_audio_features.sqlite3
+        #[arg(long, requires = "spotify")]
+        audio_features: Option<PathBuf>,
+
+        /// Minimum Spotify popularity (0-100)
+        #[arg(long, default_value = "0")]
+        min_popularity: i32,
+
+        #[arg(long, default_value = "0")]
+        workers: usize,
+
+        #[arg(long)]
+        test: Option<String>,
+
+        /// Filter by artist names (comma-separated)
+        #[arg(long)]
+        artists: Option<String>,
+
+        /// Disable progress bars, use log output only
+        #[arg(long)]
+        log_only: bool,
+
+        /// Export stats to JSON file
+        #[arg(long)]
+        export_stats: Option<PathBuf>,
+
+        /// Log match failures to match_failures table
+        #[arg(long)]
+        log_failures: bool,
+    },
+
+    /// Pre-normalize Spotify database for faster extraction
+    #[command(name = "normalize-spotify")]
+    NormalizeSpotify {
+        /// Path to spotify_clean.sqlite3 (source)
+        spotify_db: PathBuf,
+
+        /// Path to output spotify_normalized.sqlite3
+        #[arg(default_value = "spotify_normalized.sqlite3")]
+        output_db: PathBuf,
+
+        /// Disable progress bars, use log output only
+        #[arg(long)]
+        log_only: bool,
+
+        /// Skip building pop0_albums_norm table (built by default)
+        #[arg(long)]
+        skip_pop0_albums: bool,
+    },
+
+    /// Analyze unmatched tracks and test recovery strategies
+    #[command(name = "analyze-failures")]
+    AnalyzeFailures {
+        /// Path to lrclib-enriched.sqlite3 (output from extract)
+        lrclib_enriched: PathBuf,
+
+        /// Path to spotify_normalized.sqlite3
+        spotify_normalized: PathBuf,
+
+        /// Sample size for analysis
+        #[arg(long, default_value = "5000")]
+        sample: usize,
+    },
+}
+
+/// Internal args struct for extract mode
+struct ExtractArgs {
     source: PathBuf,
-
-    /// Path to output SQLite database
     output: PathBuf,
-
-    /// Path to spotify_clean.sqlite3 (for enrichment, requires --audio-features)
-    #[arg(long, requires = "audio_features")]
     spotify: Option<PathBuf>,
-
-    /// Path to spotify_normalized.sqlite3 (pre-normalized Spotify data for faster matching)
-    /// If provided, uses inverted lookup: LRCLIB → Spotify instead of streaming Spotify
-    #[arg(long)]
     spotify_normalized: Option<PathBuf>,
-
-    /// Path to spotify_clean_audio_features.sqlite3 (required with --spotify for tempo/key/mode)
-    #[arg(long, requires = "spotify")]
     audio_features: Option<PathBuf>,
-
-    /// Minimum Spotify popularity (0-100). Default 0 = include all.
-    /// Popularity used for ranking, not filtering - all LRCLIB entries should be enriched.
-    #[arg(long, default_value = "0")]
     min_popularity: i32,
-
-    #[arg(long, default_value = "0")]
     workers: usize,
-
-    #[arg(long)]
     test: Option<String>,
-
-    /// Filter by artist names (comma-separated, case-insensitive)
-    #[arg(long)]
     artists: Option<String>,
-
-    /// Disable progress bars, use log output only (for background runs)
-    #[arg(long)]
     log_only: bool,
-
-    /// Export stats to JSON file (spec-07 instrumentation)
-    #[arg(long)]
     export_stats: Option<PathBuf>,
-
-    /// Log match failures to match_failures table (adds ~100MB to output)
-    #[arg(long)]
     log_failures: bool,
 }
 
@@ -4196,8 +4252,69 @@ fn test_search_enriched(conn: &Connection, query: &str) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let args = Args::parse();
+    let cli = Cli::parse();
 
+    match cli.command {
+        Commands::Extract {
+            source,
+            output,
+            spotify,
+            spotify_normalized,
+            audio_features,
+            min_popularity,
+            workers,
+            test,
+            artists,
+            log_only,
+            export_stats,
+            log_failures,
+        } => {
+            let args = ExtractArgs {
+                source,
+                output,
+                spotify,
+                spotify_normalized,
+                audio_features,
+                min_popularity,
+                workers,
+                test,
+                artists,
+                log_only,
+                export_stats,
+                log_failures,
+            };
+            run_extract(args)
+        }
+        Commands::NormalizeSpotify {
+            spotify_db,
+            output_db,
+            log_only,
+            skip_pop0_albums,
+        } => {
+            let args = normalize_spotify::NormalizeSpotifyArgs {
+                spotify_db: spotify_db.to_string_lossy().to_string(),
+                output_db: output_db.to_string_lossy().to_string(),
+                log_only,
+                skip_pop0_albums,
+            };
+            normalize_spotify::run(args)
+        }
+        Commands::AnalyzeFailures {
+            lrclib_enriched,
+            spotify_normalized,
+            sample,
+        } => {
+            let args = analyze_failures::AnalyzeFailuresArgs {
+                lrclib_enriched: lrclib_enriched.to_string_lossy().to_string(),
+                spotify_normalized: spotify_normalized.to_string_lossy().to_string(),
+                sample_size: sample,
+            };
+            analyze_failures::run(args)
+        }
+    }
+}
+
+fn run_extract(args: ExtractArgs) -> Result<()> {
     // Set global log-only mode
     LOG_ONLY.store(args.log_only, std::sync::atomic::Ordering::Relaxed);
 

@@ -1,6 +1,8 @@
-//! Analyze unmatched tracks and test recovery strategies
+//! Analyze unmatched tracks and test recovery strategies.
 //!
-//! Usage: analyze-failures <lrclib-enriched.sqlite3> <spotify_normalized.sqlite3>
+//! Samples unmatched LRCLIB tracks and tests various recovery strategies
+//! (suffix stripping, primary artist, "the" prefix, track number stripping,
+//! fuzzy matching) to estimate potential match rate improvements.
 
 use anyhow::Result;
 use rayon::prelude::*;
@@ -9,7 +11,14 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-/// Levenshtein distance for fuzzy matching
+/// Arguments for the analyze-failures subcommand.
+pub struct AnalyzeFailuresArgs {
+    pub lrclib_enriched: String,
+    pub spotify_normalized: String,
+    pub sample_size: usize,
+}
+
+/// Levenshtein distance for fuzzy matching.
 fn levenshtein(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
@@ -48,7 +57,7 @@ fn levenshtein(a: &str, b: &str) -> usize {
     matrix[a_len][b_len]
 }
 
-/// Similarity ratio (0.0 to 1.0)
+/// Similarity ratio (0.0 to 1.0).
 fn similarity(a: &str, b: &str) -> f64 {
     let dist = levenshtein(a, b);
     let max_len = a.len().max(b.len());
@@ -58,39 +67,25 @@ fn similarity(a: &str, b: &str) -> f64 {
     1.0 - (dist as f64 / max_len as f64)
 }
 
-fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 3 {
-        eprintln!("Usage: analyze-failures <lrclib-enriched.sqlite3> <spotify_normalized.sqlite3> [--sample N]");
-        std::process::exit(1);
-    }
-
-    let lrclib_path = &args[1];
-    let spotify_path = &args[2];
-    let sample_size: usize = args
-        .iter()
-        .position(|a| a == "--sample")
-        .and_then(|i| args.get(i + 1))
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(5000);
-
+/// Run the analyze-failures analysis.
+pub fn run(args: AnalyzeFailuresArgs) -> Result<()> {
     let start = Instant::now();
 
     // Load unmatched tracks from LRCLIB
     println!("Loading unmatched tracks from LRCLIB...");
-    let lrclib_conn = Connection::open(lrclib_path)?;
+    let lrclib_conn = Connection::open(&args.lrclib_enriched)?;
     let mut stmt = lrclib_conn.prepare(
         "SELECT title_norm, artist_norm FROM tracks WHERE spotify_id IS NULL ORDER BY RANDOM() LIMIT ?",
     )?;
     let unmatched: Vec<(String, String)> = stmt
-        .query_map([sample_size], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .query_map([args.sample_size], |row| Ok((row.get(0)?, row.get(1)?)))?
         .filter_map(|r| r.ok())
         .collect();
     println!("  Loaded {} unmatched tracks", unmatched.len());
 
     // Load Spotify normalized index into memory for fast parallel access
     println!("Loading Spotify normalized index...");
-    let spotify_conn = Connection::open(spotify_path)?;
+    let spotify_conn = Connection::open(&args.spotify_normalized)?;
     let mut stmt = spotify_conn.prepare("SELECT title_norm, artist_norm FROM track_norm")?;
 
     // Build artist -> titles map

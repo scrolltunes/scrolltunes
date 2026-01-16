@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 
-use crate::models::{MatchConfidence, SpotifyTrack, Track};
+use crate::models::{MatchConfidence, SpotifyAlbumType, SpotifyTrack, Track};
 use crate::normalize::normalize_artist;
 
 // ============================================================================
@@ -463,4 +463,50 @@ pub fn compute_quality_score(track: &Track, median_duration: Option<i64>) -> i32
     }
 
     score
+}
+
+// ============================================================================
+// Album Type Selection
+// ============================================================================
+
+/// Minimum match score threshold for album_type preference to apply.
+/// Candidates below this threshold are considered non-viable and won't benefit
+/// from album_type preference over viable candidates.
+pub const MIN_VIABLE_MATCH_SCORE: i32 = 80;
+
+/// Check if a new candidate beats the current best using album_type-aware ranking.
+///
+/// Selection logic (DBA spec Section 6.2 + 7):
+/// 1. Viable candidates (score >= MIN_VIABLE_MATCH_SCORE) always beat non-viable ones
+/// 2. Among viable candidates: prefer lower album_type.rank(), then higher score
+/// 3. Among non-viable candidates: prefer higher score (fallback behavior)
+///
+/// Returns true if the new candidate should replace the current best.
+pub fn is_better_match(
+    new_score: i32,
+    new_album_type: SpotifyAlbumType,
+    current_score: i32,
+    current_album_type: SpotifyAlbumType,
+) -> bool {
+    let new_viable = new_score >= MIN_VIABLE_MATCH_SCORE;
+    let current_viable = current_score >= MIN_VIABLE_MATCH_SCORE;
+
+    match (new_viable, current_viable) {
+        // New is viable, current is not -> new wins
+        (true, false) => true,
+        // Current is viable, new is not -> current wins
+        (false, true) => false,
+        // Both viable -> compare by (album_type.rank(), -score)
+        (true, true) => {
+            let new_rank = new_album_type.rank();
+            let current_rank = current_album_type.rank();
+            if new_rank != current_rank {
+                new_rank < current_rank // Lower rank is better
+            } else {
+                new_score > current_score // Higher score is better
+            }
+        }
+        // Neither viable -> compare by score only (fallback)
+        (false, false) => new_score > current_score,
+    }
 }

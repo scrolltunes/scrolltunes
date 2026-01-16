@@ -11,14 +11,6 @@ path = "src/lib.rs"
 name = "lrclib-extract"
 path = "src/main.rs"
 
-[[bin]]
-name = "normalize-spotify"
-path = "src/bin/normalize-spotify.rs"
-
-[[bin]]
-name = "analyze-failures"
-path = "src/bin/analyze_failures.rs"
-
 [dependencies]
 rusqlite = { version = "0.31", features = ["bundled"] }
 rayon = "1.10"

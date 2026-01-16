@@ -1,13 +1,5 @@
-//! Pre-normalize Spotify database for faster extraction
-//! Creates spotify_normalized.sqlite3 with normalized title/artist keys
-//!
-//! Usage: normalize-spotify [OPTIONS] <spotify_clean.sqlite3> [output.sqlite3]
-//!
-//! Options:
-//!   --log-only      Disable progress bars, use log output only
-//!
-//! NOTE: Do not create output files in the project directory.
-//! Use a separate location like /Users/hmemcpy/git/music/
+//! Pre-normalize Spotify database for faster extraction.
+//! Creates spotify_normalized.sqlite3 with normalized title/artist keys.
 //!
 //! ## Schema (spec-02)
 //!
@@ -26,6 +18,17 @@
 //! );
 //! ```
 
+use anyhow::Result;
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
+use rusqlite::Connection;
+use rustc_hash::FxHashMap;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Instant;
+
+use crate::normalize::{normalize_artist, normalize_title};
+use lrclib_extract::safety::validate_output_path;
+
 /// Conditional logging macro - only prints when log_only is true.
 /// Used for tail-friendly output in background runs.
 macro_rules! log_only {
@@ -35,17 +38,6 @@ macro_rules! log_only {
         }
     };
 }
-
-use anyhow::Result;
-use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
-use rusqlite::Connection;
-use rustc_hash::FxHashMap;
-use std::sync::Arc;
-use std::time::Instant;
-
-// Import from shared library
-use lrclib_extract::normalize::{normalize_artist, normalize_title};
-use lrclib_extract::safety::validate_output_path;
 
 /// Type alias for normalized key → (track_rowid, duration_ms) candidates map.
 type NormCandidatesMap = FxHashMap<(Arc<str>, Arc<str>), Vec<(i64, i64)>>;
@@ -94,18 +86,13 @@ const DURATION_BUCKET_MS: i64 = 5000;
 const MAX_CANDIDATES_PER_KEY: usize = 20;
 
 /// Batch size for INSERT operations.
-/// Larger batches = fewer round-trips = faster writes.
-/// SQLite limit: SQLITE_MAX_VARIABLE_NUMBER = 32766 (tested).
-/// Max rows = 32766 / 5 = 6553. Using 6000 for safety margin.
 const BATCH_SIZE: usize = 6_000;
 
 /// Build a multi-value INSERT SQL statement for a given number of rows.
-/// Pre-building avoids repeated string allocation during batch writes.
 fn build_batch_sql(num_rows: usize) -> String {
     if num_rows == 0 {
         return String::new();
     }
-    // Pre-allocate: "(?,?,?,?,?)," is 12 chars, times num_rows, plus the prefix
     let mut sql = String::with_capacity(100 + num_rows * 12);
     sql.push_str("INSERT OR IGNORE INTO track_norm (title_norm, artist_norm, track_rowid, popularity, duration_ms) VALUES ");
     for i in 0..num_rows {
@@ -118,16 +105,12 @@ fn build_batch_sql(num_rows: usize) -> String {
 }
 
 /// Execute a batched INSERT statement using pre-built SQL.
-/// Uses a flat parameter array to avoid per-row allocations.
 fn execute_batch_insert(conn: &Connection, batch: &[CandidateRow], batch_sql: &str) -> Result<()> {
     if batch.is_empty() {
         return Ok(());
     }
 
     let mut stmt = conn.prepare_cached(batch_sql)?;
-
-    // Build flat parameter array without per-row Vec allocations
-    // Using rusqlite's params_from_iter with references
     let params: Vec<&dyn rusqlite::ToSql> = batch
         .iter()
         .flat_map(|row| {
@@ -197,63 +180,16 @@ fn dedupe_by_duration_bucket(candidates: Vec<RawCandidate>) -> Vec<RawCandidate>
     result
 }
 
-/// Parsed command-line arguments
-struct Args {
-    spotify_db: String,
-    output_db: String,
-    log_only: bool,
-    skip_pop0_albums: bool,
+/// Arguments for normalize-spotify mode
+pub struct NormalizeSpotifyArgs {
+    pub spotify_db: String,
+    pub output_db: String,
+    pub log_only: bool,
+    pub skip_pop0_albums: bool,
 }
 
-fn parse_args() -> Result<Args> {
-    let args: Vec<String> = std::env::args().collect();
-
-    // Parse flags
-    let log_only = args.iter().any(|a| a == "--log-only");
-    let skip_pop0_albums = args.iter().any(|a| a == "--skip-pop0-albums");
-
-    // Filter out flags
-    let args_filtered: Vec<&String> = args
-        .iter()
-        .filter(|a| !matches!(a.as_str(), "--log-only" | "--skip-pop0-albums"))
-        .collect();
-
-    if args_filtered.len() < 2 {
-        eprintln!(
-            "Usage: normalize-spotify [OPTIONS] <spotify_clean.sqlite3> [spotify_normalized.sqlite3]"
-        );
-        eprintln!();
-        eprintln!("Options:");
-        eprintln!(
-            "  --log-only           Disable progress bars, use log output only (for background runs)"
-        );
-        eprintln!("  --skip-pop0-albums   Skip building pop0_albums_norm table (built by default)");
-        eprintln!();
-        eprintln!("Creates a normalized lookup table with multiple candidates per key (spec-02).");
-        eprintln!(
-            "Schema: track_norm(title_norm, artist_norm, track_rowid, popularity, duration_ms)"
-        );
-        eprintln!("Uses duration bucketing to preserve variants while limiting index size.");
-        std::process::exit(1);
-    }
-
-    let spotify_db = args_filtered[1].clone();
-    let output_db = args_filtered
-        .get(2)
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "spotify_normalized.sqlite3".to_string());
-
-    Ok(Args {
-        spotify_db,
-        output_db,
-        log_only,
-        skip_pop0_albums,
-    })
-}
-
-fn main() -> Result<()> {
-    let args = parse_args()?;
-
+/// Run the normalize-spotify command
+pub fn run(args: NormalizeSpotifyArgs) -> Result<()> {
     let spotify_db = &args.spotify_db;
     let output_db = &args.output_db;
 
@@ -261,8 +197,8 @@ fn main() -> Result<()> {
     let start = Instant::now();
 
     // Safety check: prevent accidentally deleting source databases
-    let output_path = std::path::Path::new(output_db);
-    let source_path = std::path::Path::new(spotify_db);
+    let output_path = Path::new(output_db);
+    let source_path = Path::new(spotify_db);
     validate_output_path(output_path, "normalized", &[source_path])?;
 
     // Remove existing output file to avoid corruption from previous runs
@@ -320,11 +256,9 @@ fn main() -> Result<()> {
     let pb = create_progress_bar(total, log_only);
 
     // String interner for deduplicating normalized strings
-    // Reduces memory usage significantly (many tracks share the same artist)
     let mut interner = StringInterner::new();
 
     // Map: (title_norm, artist_norm) -> Vec<RawCandidate>
-    // Using Arc<str> keys for efficient memory sharing
     let mut candidates_map: FxHashMap<(Arc<str>, Arc<str>), Vec<RawCandidate>> =
         FxHashMap::default();
 
@@ -346,7 +280,6 @@ fn main() -> Result<()> {
         let popularity: i32 = row.get(3)?;
         let duration_ms: i64 = row.get(4)?;
 
-        // Intern normalized strings to reduce memory allocations
         let title_norm = interner.intern(normalize_title(&title));
         let artist_norm = interner.intern(normalize_artist(&artist));
         let key = (Arc::clone(&title_norm), Arc::clone(&artist_norm));
@@ -361,7 +294,6 @@ fn main() -> Result<()> {
         if count % 100_000 == 0 {
             pb.set_position(count);
         }
-        // Tail-friendly logging (only in log-only mode)
         if count % 500_000 == 0 {
             log_only!(
                 log_only,
@@ -390,7 +322,6 @@ fn main() -> Result<()> {
     );
 
     // Phase 2: Sort keys, deduplicate by duration bucket, and write
-    // Sorting keys improves B-tree insertion locality for ~2x speedup
     println!(
         "Phase 2: Sorting {} keys for optimal write order...",
         unique_keys
@@ -422,7 +353,7 @@ fn main() -> Result<()> {
 
     let mut keys_processed = 0u64;
 
-    // Pre-build SQL for full batches (avoids repeated string allocation)
+    // Pre-build SQL for full batches
     let batch_sql = build_batch_sql(BATCH_SIZE);
     let mut batch: Vec<CandidateRow> = Vec::with_capacity(BATCH_SIZE);
     let mut written = 0u64;
@@ -466,7 +397,7 @@ fn main() -> Result<()> {
         }
     }
 
-    // Write remaining batch (may be smaller than BATCH_SIZE)
+    // Write remaining batch
     if !batch.is_empty() {
         let remaining_sql = build_batch_sql(batch.len());
         execute_batch_insert(&tx, &batch, &remaining_sql)?;
@@ -543,19 +474,6 @@ fn main() -> Result<()> {
 }
 
 /// Build pop0_albums_norm index for album upgrade pass.
-/// Contains pop=0 tracks from albums (not singles/compilations) for promoting
-/// existing matches from Single/Compilation to Album releases.
-///
-/// Schema:
-/// ```sql
-/// CREATE TABLE pop0_albums_norm (
-///     title_norm   TEXT NOT NULL,
-///     artist_norm  TEXT NOT NULL,
-///     track_rowid  INTEGER NOT NULL,
-///     duration_ms  INTEGER NOT NULL,
-///     PRIMARY KEY (title_norm, artist_norm, track_rowid)
-/// );
-/// ```
 fn build_pop0_albums_index(
     src_conn: &Connection,
     out_conn: &mut Connection,
@@ -659,7 +577,6 @@ fn build_pop0_albums_index(
     println!("  Writing {} unique keys...", sorted_keys.len());
     let tx = out_conn.transaction()?;
 
-    // Use smaller batch size for 4-column table
     const POP0_BATCH_SIZE: usize = 8000;
     let mut batch: Vec<(Arc<str>, Arc<str>, i64, i64)> = Vec::with_capacity(POP0_BATCH_SIZE);
     let mut written = 0u64;
@@ -708,9 +625,8 @@ fn build_pop0_albums_index(
 
     let elapsed = phase_start.elapsed();
     println!(
-        "  pop0_albums_norm complete: {} rows, {} unique keys ({:.1}s)",
+        "  pop0_albums_norm complete: {} rows ({:.1}s)",
         written,
-        candidates_map.len(),
         elapsed.as_secs_f64()
     );
     log_only!(
@@ -729,7 +645,6 @@ fn write_pop0_batch(conn: &Connection, batch: &[(Arc<str>, Arc<str>, i64, i64)])
         return Ok(());
     }
 
-    // Build multi-value INSERT
     let mut sql = String::with_capacity(100 + batch.len() * 10);
     sql.push_str(
         "INSERT OR IGNORE INTO pop0_albums_norm (title_norm, artist_norm, track_rowid, duration_ms) VALUES ",
@@ -773,7 +688,7 @@ mod tests {
         let candidates = vec![RawCandidate {
             track_rowid: 1,
             popularity: 50,
-            duration_ms: 180000, // 3 minutes
+            duration_ms: 180000,
         }];
         let result = dedupe_by_duration_bucket(candidates);
         assert_eq!(result.len(), 1);
@@ -782,17 +697,16 @@ mod tests {
 
     #[test]
     fn test_dedupe_by_duration_bucket_same_bucket_keeps_highest_popularity() {
-        // Two candidates in the same 5-second bucket - should keep the higher popularity one
         let candidates = vec![
             RawCandidate {
                 track_rowid: 1,
                 popularity: 30,
-                duration_ms: 180000, // bucket 36
+                duration_ms: 180000,
             },
             RawCandidate {
                 track_rowid: 2,
-                popularity: 80,      // Higher popularity
-                duration_ms: 181000, // same bucket 36
+                popularity: 80,
+                duration_ms: 181000,
             },
         ];
         let result = dedupe_by_duration_bucket(candidates);
@@ -803,64 +717,37 @@ mod tests {
 
     #[test]
     fn test_dedupe_by_duration_bucket_different_buckets() {
-        // Two candidates in different buckets - should keep both
         let candidates = vec![
             RawCandidate {
                 track_rowid: 1,
                 popularity: 50,
-                duration_ms: 180000, // bucket 36 (3:00)
+                duration_ms: 180000,
             },
             RawCandidate {
                 track_rowid: 2,
                 popularity: 60,
-                duration_ms: 220000, // bucket 44 (3:40)
+                duration_ms: 220000,
             },
         ];
         let result = dedupe_by_duration_bucket(candidates);
         assert_eq!(result.len(), 2);
-        // Sorted by popularity DESC
-        assert_eq!(result[0].track_rowid, 2); // Higher popularity first
+        assert_eq!(result[0].track_rowid, 2);
         assert_eq!(result[1].track_rowid, 1);
     }
 
     #[test]
     fn test_dedupe_by_duration_bucket_max_limit() {
-        // Create more candidates than MAX_CANDIDATES_PER_KEY in different buckets
         let candidates: Vec<RawCandidate> = (0..30)
             .map(|i| RawCandidate {
                 track_rowid: i as i64,
-                popularity: (100 - i),         // Decreasing popularity
-                duration_ms: i as i64 * 10000, // Different buckets (10s apart)
+                popularity: (100 - i),
+                duration_ms: i as i64 * 10000,
             })
             .collect();
 
         let result = dedupe_by_duration_bucket(candidates);
-        // Should be limited to MAX_CANDIDATES_PER_KEY (20)
         assert_eq!(result.len(), MAX_CANDIDATES_PER_KEY);
-        // Should keep the highest popularity ones (first 20)
         assert_eq!(result[0].popularity, 100);
         assert_eq!(result[19].popularity, 81);
-    }
-
-    #[test]
-    fn test_dedupe_by_duration_bucket_radio_edit_vs_album() {
-        // Realistic scenario: radio edit (3:30) vs album version (4:00)
-        let candidates = vec![
-            RawCandidate {
-                track_rowid: 1,
-                popularity: 70,
-                duration_ms: 210000, // 3:30 - radio edit
-            },
-            RawCandidate {
-                track_rowid: 2,
-                popularity: 85,
-                duration_ms: 240000, // 4:00 - album version
-            },
-        ];
-        let result = dedupe_by_duration_bucket(candidates);
-        // Different buckets (42 vs 48), so both should be kept
-        assert_eq!(result.len(), 2);
-        // Higher popularity first
-        assert_eq!(result[0].duration_ms, 240000);
     }
 }

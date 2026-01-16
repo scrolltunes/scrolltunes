@@ -109,6 +109,39 @@ pub struct LrclibVariant {
 // Spotify Models
 // ============================================================================
 
+/// Spotify album type for preferring canonical releases over compilations.
+/// Used as primary ranking dimension when selecting among viable match candidates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpotifyAlbumType {
+    Album,
+    Single,
+    Compilation,
+    Unknown,
+}
+
+impl SpotifyAlbumType {
+    /// Rank for sorting: lower is better (album < single < compilation < unknown)
+    pub fn rank(self) -> i32 {
+        match self {
+            SpotifyAlbumType::Album => 0,
+            SpotifyAlbumType::Single => 1,
+            SpotifyAlbumType::Compilation => 2,
+            SpotifyAlbumType::Unknown => 3,
+        }
+    }
+}
+
+impl From<Option<&str>> for SpotifyAlbumType {
+    fn from(s: Option<&str>) -> Self {
+        match s {
+            Some("album") => SpotifyAlbumType::Album,
+            Some("single") => SpotifyAlbumType::Single,
+            Some("compilation") => SpotifyAlbumType::Compilation,
+            _ => SpotifyAlbumType::Unknown,
+        }
+    }
+}
+
 /// Spotify track info for matching
 #[derive(Clone, Debug)]
 pub struct SpotifyTrack {
@@ -117,9 +150,10 @@ pub struct SpotifyTrack {
     pub artist: String,       // Primary artist (kept for debugging)
     pub artists: Vec<String>, // All credited artists (spec-03 multi-artist verification)
     pub duration_ms: i64,
-    pub popularity: i32,      // 0-100
-    pub isrc: Option<String>, // For Deezer album art lookup
-    pub album_rowid: i64,     // For album_images lookup
+    pub popularity: i32,              // 0-100
+    pub isrc: Option<String>,         // For Deezer album art lookup
+    pub album_rowid: i64,             // For album_images lookup
+    pub album_type: SpotifyAlbumType, // For preferring albums over compilations
 }
 
 /// Partial Spotify track (before artist lookup) for 2-phase matching.
@@ -157,6 +191,20 @@ pub struct SpotifyCandidate {
     pub duration_diff_sec: i64,
     pub score: i32,
     pub reject_reason: Option<String>,
+}
+
+// ============================================================================
+// POP0 Candidate Structure
+// ============================================================================
+
+/// Candidate from POP0 fallback matching (stored before batch artist lookup).
+pub struct Pop0Candidate {
+    pub track_rowid: i64,
+    pub title_norm: String,
+    pub duration_ms: i64,
+    pub external_id_isrc: Option<String>,
+    pub album_rowid: i64,
+    pub spotify_id: String,
 }
 
 // ============================================================================
@@ -250,6 +298,10 @@ pub struct MatchingStats {
     pub fuzzy_title_matches: usize,
     pub fuzzy_title_no_artist: usize, // Artist not found in Spotify
     pub fuzzy_title_no_close_match: usize, // No title with >=90% similarity
+
+    // Phase 2c: Album upgrade pass (promote Single/Compilation to Album)
+    pub album_upgrade_candidates: usize, // Groups with non-Album match and score >= 80
+    pub album_upgrades: usize,           // Groups upgraded to Album release
 
     // Phase 3: Pop=0 fallback (spec-04: includes previously-rejected groups)
     pub pop0_eligible: usize,

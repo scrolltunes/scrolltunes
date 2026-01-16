@@ -2,5 +2,6 @@
 
 pub mod models;
 pub mod normalize;
+pub mod progress;
 pub mod safety;
 pub mod scoring;
