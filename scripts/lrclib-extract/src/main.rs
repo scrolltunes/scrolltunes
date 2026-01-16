@@ -5,7 +5,6 @@ mod normalize_spotify;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
-use lrclib_extract::safety::validate_output_path;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
@@ -17,59 +16,14 @@ use std::sync::Arc;
 use std::time::Instant;
 use strsim::normalized_levenshtein;
 
+// Library imports
+use lrclib_extract::models::StringInterner;
+use lrclib_extract::progress::format_duration;
+use lrclib_extract::safety::validate_output_path;
+
 use normalize::{
     extract_primary_artist, normalize_artist, normalize_title, normalize_title_with_artist,
 };
-
-// ============================================================================
-// String Interning for Memory Optimization
-// ============================================================================
-
-/// String interner for deduplicating normalized strings during grouping.
-/// Reduces memory usage when many tracks share the same artist/title.
-/// Similar to normalize-spotify optimization that saved 40M allocations.
-struct StringInterner {
-    strings: FxHashMap<Arc<str>, Arc<str>>,
-}
-
-impl StringInterner {
-    fn new() -> Self {
-        Self {
-            strings: FxHashMap::default(),
-        }
-    }
-
-    /// Intern a string, returning a shared reference to the deduplicated version.
-    fn intern(&mut self, s: String) -> Arc<str> {
-        if let Some(existing) = self.strings.get(s.as_str()) {
-            Arc::clone(existing)
-        } else {
-            let arc: Arc<str> = Arc::from(s);
-            self.strings.insert(Arc::clone(&arc), Arc::clone(&arc));
-            arc
-        }
-    }
-
-    /// Number of unique strings interned.
-    fn len(&self) -> usize {
-        self.strings.len()
-    }
-}
-
-// ============================================================================
-// Timing Helper
-// ============================================================================
-
-/// Format duration in human-readable format
-fn format_duration(d: std::time::Duration) -> String {
-    let secs = d.as_secs_f64();
-    if secs < 60.0 {
-        format!("{:.1}s", secs)
-    } else {
-        let mins = secs / 60.0;
-        format!("{:.1}m", mins)
-    }
-}
 
 /// LRCLIB extraction toolkit with Spotify enrichment.
 #[derive(Parser)]
@@ -1181,8 +1135,8 @@ fn build_groups_and_index(tracks: Vec<Track>) -> (Vec<LrclibGroup>, LrclibIndex)
         FxHashMap::with_capacity_and_hasher(estimated_groups, Default::default());
 
     for (title_norm, artist_norm, track, quality) in normalized {
-        let title_arc = interner.intern(title_norm);
-        let artist_arc = interner.intern(artist_norm);
+        let title_arc = interner.intern(&title_norm);
+        let artist_arc = interner.intern(&artist_norm);
         let variant = LrclibVariant { track, quality };
         temp_groups
             .entry((Arc::clone(&title_arc), Arc::clone(&artist_arc)))
