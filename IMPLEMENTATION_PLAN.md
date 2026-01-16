@@ -22,14 +22,14 @@ Migrate ScrollTunes to a terminal-inspired dark theme (Tokyo Night palette) with
 
 ## Phase 2: UI Primitives (`src/components/ui2/`)
 
-- [ ] **2.1** Create `src/components/ui2/Button.tsx` with variants (default, secondary, outline, ghost), sizes (sm, default, lg), terminal styling (rounded-sm, font-mono, glow on hover)
-- [ ] **2.2** Create `src/components/ui2/Card.tsx` with CardHeader, CardContent, CardFooter; variants (default, elevated, bordered); interactive + glowOnHover props
-- [ ] **2.3** Create `src/components/ui2/Badge.tsx` with status dot, accent border, monospace text
-- [ ] **2.4** Create `src/components/ui2/IconButton.tsx` (migrate from ui/, update to new tokens)
-- [ ] **2.5** Create `src/components/ui2/Input.tsx` with terminal styling (bg-secondary, border, focus glow)
-- [ ] **2.6** Create `src/components/ui2/Modal.tsx` base component with backdrop blur, slide-up animation
-- [ ] **2.7** Create `src/components/ui2/Skeleton.tsx` (migrate from ui/, update colors)
-- [ ] **2.8** Create `src/components/ui2/index.ts` barrel export
+- [x] **2.1** Create `src/components/ui2/Button.tsx` with variants (default, secondary, outline, ghost), sizes (sm, default, lg), terminal styling (rounded-sm, font-mono, glow on hover)
+- [x] **2.2** Create `src/components/ui2/Card.tsx` with CardHeader, CardContent, CardFooter; variants (default, elevated, bordered); interactive + glowOnHover props
+- [x] **2.3** Create `src/components/ui2/Badge.tsx` with status dot, accent border, monospace text
+- [x] **2.4** Create `src/components/ui2/IconButton.tsx` (migrate from ui/, update to new tokens)
+- [x] **2.5** Create `src/components/ui2/Input.tsx` with terminal styling (bg-secondary, border, focus glow)
+- [x] **2.6** Create `src/components/ui2/Modal.tsx` base component with backdrop blur, slide-up animation
+- [x] **2.7** Create `src/components/ui2/Skeleton.tsx` (migrate from ui/, update colors)
+- [x] **2.8** Create `src/components/ui2/index.ts` barrel export
 
 ---
 
