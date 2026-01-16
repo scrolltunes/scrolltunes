@@ -376,7 +376,7 @@ const SetlistSongItem = memo(function SetlistSongItem({
         e.stopPropagation()
         handleRemove(albumArt)
       }}
-      className="w-8 h-8 flex items-center justify-center rounded-sm transition-colors hover:brightness-110"
+      className="w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:brightness-110"
       style={{ background: "var(--color-surface2)", color: "var(--color-text-muted)" }}
       aria-label="Remove from setlist"
     >
@@ -444,7 +444,7 @@ function Header({ setlistName, shortUrl, onEdit }: HeaderProps) {
         <button
           type="button"
           onClick={onEdit}
-          className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
           style={{ background: "var(--color-surface2)" }}
           aria-label="Edit setlist"
         >
@@ -455,7 +455,7 @@ function Header({ setlistName, shortUrl, onEdit }: HeaderProps) {
           <button
             type="button"
             onClick={handleShare}
-            className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
             style={{ background: "var(--color-surface2)" }}
             aria-label="Share setlist"
           >

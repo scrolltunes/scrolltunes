@@ -93,7 +93,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
             <button
               type="button"
               onClick={handleClose}
-              className="absolute right-4 top-4 rounded-sm p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+              className="absolute right-4 top-4 rounded-full p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
               style={{ color: "var(--color-text3)" }}
               aria-label="Close"
             >

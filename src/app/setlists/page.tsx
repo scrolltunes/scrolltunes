@@ -328,7 +328,7 @@ function Header() {
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
         <Link
           href="/"
-          className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
           style={{ background: "var(--color-surface2)" }}
           aria-label="Back"
         >

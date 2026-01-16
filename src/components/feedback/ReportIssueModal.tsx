@@ -215,7 +215,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
               <button
                 type="button"
                 onClick={handleClose}
-                className="rounded-sm p-1 transition-colors hover:brightness-110"
+                className="rounded-full p-1 transition-colors hover:brightness-110"
                 style={{ color: "var(--color-text3)" }}
                 aria-label="Close"
                 disabled={submitState === "submitting"}

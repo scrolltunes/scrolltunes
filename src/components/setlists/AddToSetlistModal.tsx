@@ -135,7 +135,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
               <button
                 type="button"
                 onClick={handleClose}
-                className="absolute right-4 top-4 rounded-sm p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                className="absolute right-4 top-4 rounded-full p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                 style={{ color: "var(--color-text3)" }}
                 aria-label="Close"
               >
@@ -223,7 +223,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                         }}
                       >
                         <div
-                          className="w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0"
+                          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: setlist.color ?? "var(--color-accent)" }}
                         >
                           {isAdding ? (
@@ -271,7 +271,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
                     style={{ borderColor: "var(--color-border)" }}
                   >
                     <div
-                      className="w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0"
+                      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ background: "var(--color-surface2)" }}
                     >
                       <Plus size={20} style={{ color: "var(--color-text3)" }} />
