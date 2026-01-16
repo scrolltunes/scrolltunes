@@ -169,7 +169,7 @@ function FAQSection() {
   return (
     <section className="w-full max-w-md mx-auto">
       <h2
-        className="text-sm font-medium uppercase tracking-wider mb-4 px-1"
+        className="text-sm font-medium font-mono uppercase tracking-wider mb-4 px-1"
         style={{ color: "var(--color-text3)" }}
       >
         FAQ
@@ -178,7 +178,7 @@ function FAQSection() {
         {faqItems.map(item => (
           <details
             key={item.question}
-            className="group rounded-xl overflow-hidden"
+            className="group rounded-sm overflow-hidden"
             style={{
               background: "var(--color-surface1)",
               border: "1px solid var(--color-border)",

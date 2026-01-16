@@ -68,7 +68,7 @@ function EnhancedLrcView({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={springs.default}
-      className="rounded-xl p-5"
+      className="rounded-sm p-5"
       style={{ background: "var(--color-surface1)" }}
     >
       <div className="flex items-center justify-between mb-3">
@@ -158,7 +158,7 @@ function AccessDenied() {
           className="text-center max-w-sm"
         >
           <div
-            className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+            className="w-16 h-16 mx-auto mb-4 rounded-sm flex items-center justify-center"
             style={{ background: "var(--color-surface1)" }}
           >
             <ShieldWarning size={32} style={{ color: "var(--color-text-muted)" }} />
@@ -742,7 +742,7 @@ export default function EnhancePage({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={springs.default}
-              className="rounded-xl p-6 mb-6"
+              className="rounded-sm p-6 mb-6"
               style={{
                 background: "var(--color-danger-soft)",
                 border: "1px solid var(--color-danger)",
@@ -771,7 +771,7 @@ export default function EnhancePage({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={springs.default}
-              className="rounded-xl p-6"
+              className="rounded-sm p-6"
               style={{
                 background: "var(--color-success-soft)",
                 border: "1px solid var(--color-success)",
@@ -825,7 +825,7 @@ export default function EnhancePage({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={springs.default}
-              className="rounded-xl p-6"
+              className="rounded-sm p-6"
               style={{
                 background: "var(--color-warning-soft)",
                 border: "1px solid var(--color-warning)",
@@ -895,7 +895,7 @@ export default function EnhancePage({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ ...springs.default, delay: 0.1 }}
-                className="rounded-xl p-5"
+                className="rounded-sm p-5"
                 style={{ background: "var(--color-surface1)" }}
               >
                 <h2 className="text-lg font-medium mb-3">Song Info</h2>
@@ -1015,7 +1015,7 @@ export default function EnhancePage({
                     type="button"
                     onClick={handleSaveExistingEnhancements}
                     disabled={isSavingExisting}
-                    className="w-full px-4 py-3 rounded-xl font-medium transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+                    className="w-full px-4 py-3 rounded-full font-medium transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
                     style={{ background: "var(--color-success)", color: "white" }}
                   >
                     {isSavingExisting
@@ -1049,7 +1049,7 @@ export default function EnhancePage({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={springs.default}
-                  className="rounded-xl p-5"
+                  className="rounded-sm p-5"
                   style={{ background: "var(--color-surface1)" }}
                 >
                   <h2 className="text-lg font-medium mb-3">GP File Metadata</h2>
@@ -1139,7 +1139,7 @@ export default function EnhancePage({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={springs.default}
-                  className="rounded-xl p-5"
+                  className="rounded-sm p-5"
                   style={{ background: "var(--color-surface1)" }}
                 >
                   <div className="flex items-center gap-3">
@@ -1181,7 +1181,7 @@ export default function EnhancePage({
                     type="button"
                     onClick={handleSubmit}
                     disabled={pageState === "submitting"}
-                    className="w-full px-4 py-3 rounded-xl font-medium transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+                    className="w-full px-4 py-3 rounded-full font-medium transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
                     style={{ background: "var(--color-success)", color: "white" }}
                   >
                     {pageState === "submitting"

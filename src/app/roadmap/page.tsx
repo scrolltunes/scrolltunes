@@ -41,7 +41,7 @@ export default function RoadmapPage() {
       >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <BackButton fallbackHref="/about" ariaLabel="Back" />
-          <h1 className="text-lg font-semibold">Roadmap</h1>
+          <h1 className="text-lg font-semibold font-mono">Roadmap</h1>
         </div>
       </header>
 
@@ -61,7 +61,7 @@ export default function RoadmapPage() {
               Now
             </h2>
             <div
-              className="p-4 rounded-xl space-y-3"
+              className="p-4 rounded-sm space-y-3"
               style={{ background: "var(--color-surface1)" }}
             >
               {nowFeatures.map(feature => {
@@ -105,7 +105,7 @@ export default function RoadmapPage() {
               {nextFeatures.map(feature => (
                 <div
                   key={feature.title}
-                  className="p-4 rounded-xl"
+                  className="p-4 rounded-sm"
                   style={{ background: "var(--color-surface1)" }}
                 >
                   <div className="flex items-start gap-3">
@@ -139,7 +139,7 @@ export default function RoadmapPage() {
               {laterFeatures.map(feature => (
                 <div
                   key={feature.title}
-                  className="p-4 rounded-xl"
+                  className="p-4 rounded-sm"
                   style={{ background: "var(--color-surface1)" }}
                 >
                   <div className="flex items-start gap-3">
@@ -173,7 +173,7 @@ export default function RoadmapPage() {
               href="https://x.com/ScrollTunes"
               target="_blank"
               rel="noopener noreferrer"
-              className="block p-4 rounded-xl transition-colors hover:brightness-110"
+              className="block p-4 rounded-sm transition-colors hover:brightness-110"
               style={{ background: "var(--color-surface1)" }}
             >
               <div
@@ -186,7 +186,7 @@ export default function RoadmapPage() {
             </a>
             <a
               href="mailto:contact@scrolltunes.com"
-              className="block p-4 rounded-xl transition-colors hover:brightness-110 mt-3"
+              className="block p-4 rounded-sm transition-colors hover:brightness-110 mt-3"
               style={{ background: "var(--color-surface1)" }}
             >
               <div

@@ -106,11 +106,18 @@ export const Metronome = memo(function Metronome({
                 key={modeOption}
                 type="button"
                 onClick={() => handleModeChange(modeOption)}
-                className={`
-                  p-2 rounded-lg transition-colors
-                  focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
-                  ${isSelected ? "bg-indigo-600 text-white" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"}
-                `}
+                className="p-2 rounded-full transition-colors focus:outline-none focus-visible:ring-2"
+                style={
+                  isSelected
+                    ? {
+                        background: "var(--accent-primary)",
+                        color: "var(--bg-primary)",
+                      }
+                    : {
+                        background: "var(--bg-tertiary)",
+                        color: "var(--fg-muted)",
+                      }
+                }
                 whileTap={{ scale: 0.95 }}
                 transition={springs.snap}
                 aria-label={modeLabels[modeOption]}
@@ -134,11 +141,12 @@ export const Metronome = memo(function Metronome({
             <motion.button
               type="button"
               onClick={handleToggleMute}
-              className={`
-                p-1.5 rounded-lg transition-colors
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
-                ${isMuted ? "bg-red-500/20 text-red-400" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"}
-              `}
+              className="p-1.5 rounded-full transition-colors focus:outline-none focus-visible:ring-2"
+              style={
+                isMuted
+                  ? { background: "var(--color-danger-soft)", color: "var(--status-error)" }
+                  : { background: "var(--bg-tertiary)", color: "var(--fg-muted)" }
+              }
               whileTap={{ scale: 0.95 }}
               transition={springs.snap}
               aria-label={isMuted ? "Unmute metronome" : "Mute metronome"}
@@ -159,22 +167,24 @@ export const Metronome = memo(function Metronome({
               value={isMuted ? 0 : volume}
               onChange={handleVolumeChange}
               disabled={isMuted}
-              className="w-20 h-1.5 bg-neutral-700 rounded-full appearance-none cursor-pointer
+              className="w-20 h-1.5 rounded-sm appearance-none cursor-pointer
                 disabled:opacity-50 disabled:cursor-not-allowed
                 [&::-webkit-slider-thumb]:appearance-none
                 [&::-webkit-slider-thumb]:w-3
                 [&::-webkit-slider-thumb]:h-3
-                [&::-webkit-slider-thumb]:rounded-full
-                [&::-webkit-slider-thumb]:bg-indigo-500
+                [&::-webkit-slider-thumb]:rounded-sm
                 [&::-webkit-slider-thumb]:cursor-pointer
                 [&::-webkit-slider-thumb]:transition-transform
                 [&::-webkit-slider-thumb]:hover:scale-110
                 [&::-moz-range-thumb]:w-3
                 [&::-moz-range-thumb]:h-3
-                [&::-moz-range-thumb]:rounded-full
-                [&::-moz-range-thumb]:bg-indigo-500
+                [&::-moz-range-thumb]:rounded-sm
                 [&::-moz-range-thumb]:border-0
                 [&::-moz-range-thumb]:cursor-pointer"
+              style={{
+                background: "var(--bg-tertiary)",
+                accentColor: "var(--accent-primary)",
+              }}
               aria-label="Metronome volume"
             />
           </div>

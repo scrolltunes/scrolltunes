@@ -87,20 +87,23 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={springs.default}
-            className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-xl"
-            style={{ background: "var(--color-surface1)" }}
+            className="relative mx-4 w-full max-w-sm rounded-sm p-6 shadow-xl"
+            style={{ background: "var(--color-bg)" }}
           >
             <button
               type="button"
               onClick={handleClose}
-              className="absolute right-4 top-4 rounded-lg p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+              className="absolute right-4 top-4 rounded-sm p-1.5 transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
               style={{ color: "var(--color-text3)" }}
               aria-label="Close"
             >
               <X size={20} weight="bold" />
             </button>
 
-            <h2 className="text-xl font-semibold mb-6 pr-8" style={{ color: "var(--color-text)" }}>
+            <h2
+              className="text-xl font-semibold mb-6 pr-8"
+              style={{ color: "var(--color-text)" }}
+            >
               Create setlist
             </h2>
 
@@ -121,7 +124,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
                   placeholder="My setlist"
                   required
                   maxLength={INPUT_LIMITS.SETLIST_NAME}
-                  className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2"
+                  className="w-full px-3 py-2 rounded-sm focus:outline-none focus:ring-2"
                   style={{
                     background: "var(--color-surface2)",
                     border: "1px solid var(--color-border)",
@@ -145,7 +148,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
                   placeholder="Add a description"
                   rows={2}
                   maxLength={INPUT_LIMITS.SETLIST_DESCRIPTION}
-                  className="w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 resize-none"
+                  className="w-full px-3 py-2 rounded-sm focus:outline-none focus:ring-2 resize-none"
                   style={{
                     background: "var(--color-surface2)",
                     border: "1px solid var(--color-border)",
@@ -186,7 +189,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="flex-1 px-4 py-2.5 rounded-lg transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
+                  className="flex-1 px-4 py-2.5 rounded-sm transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2"
                   style={{ background: "var(--color-surface2)", color: "var(--color-text)" }}
                 >
                   Cancel
@@ -194,7 +197,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
                 <button
                   type="submit"
                   disabled={!name.trim() || isSubmitting}
-                  className="flex-1 px-4 py-2.5 rounded-lg transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2.5 rounded-sm transition-colors hover:brightness-110 focus:outline-none focus-visible:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ background: "var(--color-accent)", color: "white" }}
                 >
                   {isSubmitting ? "Creating..." : "Create"}

@@ -166,7 +166,7 @@ export const FloatingMetronome = memo(function FloatingMetronome({
         <AnimatePresence>
           {isOpen && (
             <motion.div
-              className={`absolute ${popoverPositionClasses[position]} w-48 rounded-lg border p-3 backdrop-blur-sm`}
+              className={`absolute ${popoverPositionClasses[position]} w-48 rounded-sm border p-3 backdrop-blur-sm`}
               style={{
                 background: "color-mix(in srgb, var(--color-surface1) 95%, transparent)",
                 borderColor: "var(--color-border-strong)",
@@ -187,12 +187,10 @@ export const FloatingMetronome = memo(function FloatingMetronome({
                       key={mode}
                       type="button"
                       onClick={() => handleModeChange(mode)}
-                      className={`flex-1 rounded px-2 py-1 text-xs transition-colors ${
-                        metronomeState.mode === mode ? "bg-indigo-500 text-white" : ""
-                      }`}
+                      className="flex-1 rounded-full px-2 py-1 text-xs transition-colors"
                       style={
                         metronomeState.mode === mode
-                          ? {}
+                          ? { background: "var(--accent-primary)", color: "var(--bg-primary)" }
                           : { background: "var(--color-surface3)", color: "var(--color-text2)" }
                       }
                       aria-pressed={metronomeState.mode === mode}
@@ -207,12 +205,10 @@ export const FloatingMetronome = memo(function FloatingMetronome({
                 <button
                   type="button"
                   onClick={handleMuteToggle}
-                  className={`w-full rounded px-2 py-1.5 text-xs transition-colors ${
-                    metronomeState.isMuted ? "bg-red-500/20 text-red-400" : ""
-                  }`}
+                  className="w-full rounded-full px-2 py-1.5 text-xs transition-colors"
                   style={
                     metronomeState.isMuted
-                      ? {}
+                      ? { background: "var(--color-danger-soft)", color: "var(--status-error)" }
                       : { background: "var(--color-surface3)", color: "var(--color-text2)" }
                   }
                   aria-pressed={metronomeState.isMuted}
@@ -233,8 +229,11 @@ export const FloatingMetronome = memo(function FloatingMetronome({
                     step="0.01"
                     value={metronomeState.volume}
                     onChange={handleVolumeChange}
-                    className="h-1.5 w-full cursor-pointer appearance-none rounded-lg accent-indigo-500"
-                    style={{ background: "var(--color-surface3)" }}
+                    className="h-1.5 w-full cursor-pointer appearance-none rounded-sm"
+                    style={{
+                      background: "var(--color-surface3)",
+                      accentColor: "var(--accent-primary)",
+                    }}
                     aria-label="Metronome volume"
                   />
                 </div>

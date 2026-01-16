@@ -177,13 +177,13 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
           >
             <div className="flex items-start gap-4 mb-6">
               <div
-                className="flex-shrink-0 w-16 h-16 rounded-xl flex items-center justify-center"
+                className="flex-shrink-0 w-16 h-16 rounded-sm flex items-center justify-center"
                 style={{ backgroundColor: currentSetlist.color ?? "#262626" }}
               >
                 <Queue size={32} weight="fill" className="text-white/80" />
               </div>
               <div className="flex-1 min-w-0">
-                <h1 className="text-2xl font-semibold truncate">{currentSetlist.name}</h1>
+                <h1 className="text-2xl font-semibold font-mono truncate">{currentSetlist.name}</h1>
                 {currentSetlist.description && (
                   <p className="mt-1" style={{ color: "var(--color-text3)" }}>
                     {currentSetlist.description}
@@ -233,7 +233,7 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
           >
             <div
-              className="flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg"
+              className="flex items-center gap-3 px-4 py-3 rounded-sm shadow-lg"
               style={{
                 background: "var(--color-surface1)",
                 border: "1px solid var(--color-border)",
@@ -284,11 +284,14 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={springs.default}
-              className="mx-4 w-full max-w-sm rounded-2xl p-6 shadow-xl"
+              className="mx-4 w-full max-w-sm rounded-sm p-6 shadow-xl"
               style={{ background: "var(--color-surface1)" }}
               onClick={e => e.stopPropagation()}
             >
-              <h2 className="text-xl font-semibold mb-2" style={{ color: "var(--color-text)" }}>
+              <h2
+                className="text-xl font-semibold font-mono mb-2"
+                style={{ color: "var(--color-text)" }}
+              >
                 Delete setlist?
               </h2>
               <p className="mb-6" style={{ color: "var(--color-text3)" }}>
@@ -348,7 +351,7 @@ const SetlistSongItem = memo(function SetlistSongItem({
         transition={{ ...springs.default, delay: index * 0.03 }}
       >
         <div
-          className="flex items-center gap-3 p-4 rounded-xl opacity-50"
+          className="flex items-center gap-3 p-4 rounded-sm opacity-50"
           style={{ background: "var(--color-surface1)" }}
         >
           <p className="font-medium truncate">{song.songTitle}</p>
@@ -373,7 +376,7 @@ const SetlistSongItem = memo(function SetlistSongItem({
         e.stopPropagation()
         handleRemove(albumArt)
       }}
-      className="w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:brightness-110"
+      className="w-8 h-8 flex items-center justify-center rounded-sm transition-colors hover:brightness-110"
       style={{ background: "var(--color-surface2)", color: "var(--color-text-muted)" }}
       aria-label="Remove from setlist"
     >
@@ -441,7 +444,7 @@ function Header({ setlistName, shortUrl, onEdit }: HeaderProps) {
         <button
           type="button"
           onClick={onEdit}
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+          className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
           style={{ background: "var(--color-surface2)" }}
           aria-label="Edit setlist"
         >
@@ -452,7 +455,7 @@ function Header({ setlistName, shortUrl, onEdit }: HeaderProps) {
           <button
             type="button"
             onClick={handleShare}
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+            className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
             style={{ background: "var(--color-surface2)" }}
             aria-label="Share setlist"
           >
@@ -461,7 +464,7 @@ function Header({ setlistName, shortUrl, onEdit }: HeaderProps) {
 
           {showShareMenu && (
             <div
-              className="absolute right-0 top-12 w-72 p-3 rounded-xl shadow-xl"
+              className="absolute right-0 top-12 w-72 p-3 rounded-sm shadow-xl"
               style={{
                 background: "var(--color-surface1)",
                 border: "1px solid var(--color-border)",

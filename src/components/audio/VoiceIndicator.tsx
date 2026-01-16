@@ -58,26 +58,27 @@ export const VoiceIndicator = memo(function VoiceIndicator({
   `
 
   const getBackgroundClass = () => {
-    if (permissionDenied) return "bg-red-500/20"
-    if (isSpeaking) return "bg-green-500/20"
-    if (isListening) return "bg-indigo-500/20"
+    if (permissionDenied) return "" // Use inline style
+    if (isSpeaking) return "" // Use inline style
+    if (isListening) return "" // Use inline style
     return "" // Use inline style for theme-aware idle state
   }
 
-  const getBackgroundStyle = () => {
-    if (permissionDenied || isSpeaking || isListening) return {}
+  const getStatusBackgroundStyle = () => {
+    if (permissionDenied) return { background: "var(--color-danger-soft)" }
+    if (isSpeaking) return { background: "var(--color-success-soft)" }
+    if (isListening) return { background: "var(--color-accent-soft)" }
     return { background: "var(--color-surface3)" }
   }
 
   const getIconColor = () => {
-    if (permissionDenied) return "text-red-400"
-    if (isSpeaking) return "text-green-400"
-    if (isListening) return "text-indigo-400"
-    return "" // Use inline style for theme-aware idle state
+    return "" // Use inline style for all states
   }
 
   const getIconStyle = () => {
-    if (permissionDenied || isSpeaking || isListening) return {}
+    if (permissionDenied) return { color: "var(--status-error)" }
+    if (isSpeaking) return { color: "var(--status-success)" }
+    if (isListening) return { color: "var(--accent-primary)" }
     return { color: "var(--color-text3)" }
   }
 
@@ -107,7 +108,7 @@ export const VoiceIndicator = memo(function VoiceIndicator({
       onClick={permissionDenied ? undefined : onToggle}
       disabled={permissionDenied}
       className={`${baseClasses} ${getBackgroundClass()}`}
-      style={getBackgroundStyle()}
+      style={getStatusBackgroundStyle()}
       whileHover={permissionDenied ? {} : { scale: 1.05 }}
       whileTap={permissionDenied ? {} : { scale: 0.95 }}
       title={getTooltip()}
@@ -125,7 +126,8 @@ export const VoiceIndicator = memo(function VoiceIndicator({
       <AnimatePresence>
         {isListening && !permissionDenied && (
           <motion.div
-            className="absolute inset-0 rounded-full bg-indigo-400"
+            className="absolute inset-0 rounded-full"
+            style={{ background: "var(--accent-primary)" }}
             initial={{ opacity: 0.6, scale: 1 }}
             animate={{ opacity: 0, scale: 1.5 }}
             exit={{ opacity: 0 }}
@@ -138,7 +140,8 @@ export const VoiceIndicator = memo(function VoiceIndicator({
       <AnimatePresence>
         {isListening && !isSpeaking && !permissionDenied && (
           <motion.div
-            className="absolute inset-[-4px] rounded-full bg-indigo-500/20"
+            className="absolute inset-[-4px] rounded-full"
+            style={{ background: "var(--color-accent-soft)" }}
             initial={{ opacity: 0 }}
             animate={{
               opacity: [0.2, 0.4, 0.2],
@@ -158,7 +161,8 @@ export const VoiceIndicator = memo(function VoiceIndicator({
       <AnimatePresence>
         {isListening && !isSpeaking && !permissionDenied && (
           <motion.div
-            className="absolute inset-0 rounded-full border-2 border-indigo-500/40"
+            className="absolute inset-0 rounded-full border-2"
+            style={{ borderColor: "rgba(122, 162, 247, 0.4)" }}
             initial={{ scale: 1, opacity: 0 }}
             animate={{
               scale: [1, 1.2, 1.15, 1.25, 1],
@@ -180,7 +184,8 @@ export const VoiceIndicator = memo(function VoiceIndicator({
           concentricRings.map(ringIndex => (
             <motion.div
               key={`ring-${ringIndex}`}
-              className="absolute inset-0 rounded-full border-2 border-green-500"
+              className="absolute inset-0 rounded-full border-2"
+              style={{ borderColor: "var(--status-success)" }}
               initial={{ scale: 1, opacity: 0 }}
               animate={{
                 scale: 1 + level * 0.3 + ringIndex * 0.15,
@@ -221,7 +226,7 @@ export const VoiceIndicator = memo(function VoiceIndicator({
                     y: y - 3,
                   }}
                   animate={{
-                    backgroundColor: isActive ? "rgb(34 197 94)" : "rgb(99 102 241 / 0.3)",
+                    backgroundColor: isActive ? "#9ece6a" : "rgba(122, 162, 247, 0.3)",
                     scale: isActive ? 1 + level * 0.5 : 0.8,
                   }}
                   transition={springs.snap}

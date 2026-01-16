@@ -8,7 +8,6 @@ import {
   SCOREBOOK_FONT_SIZE_STEP,
   SCOREBOOK_MAX_FONT_SIZE,
   SCOREBOOK_MIN_FONT_SIZE,
-  type ThemeMode,
   type VadEnvironment,
   preferencesStore,
   useAccount,
@@ -22,7 +21,6 @@ import {
   DownloadSimple,
   Hand,
   Microphone,
-  Moon,
   MusicNotes,
   SignOut,
   SlidersHorizontal,
@@ -178,7 +176,7 @@ function RadioOption({ selected, onSelect, label, description, icon, badge }: Ra
           </span>
           {badge && (
             <span
-              className="text-xs px-2 py-0.5 rounded-full"
+              className="text-xs px-2 py-0.5 rounded-sm"
               style={{ background: "var(--color-warning-soft)", color: "var(--color-warning)" }}
             >
               {badge}
@@ -246,7 +244,7 @@ function VoiceActivationSection({
   return (
     <section>
       <h2
-        className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+        className="text-sm font-medium font-mono uppercase tracking-wider mb-3 px-1"
         style={{ color: "var(--color-text-muted)" }}
       >
         Voice Activation
@@ -267,7 +265,7 @@ function VoiceActivationSection({
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="p-4 rounded-xl"
+            className="p-4 rounded-sm"
             style={{ background: "var(--color-surface1)" }}
           >
             <div className="text-sm font-medium mb-2" style={{ color: "var(--color-text)" }}>
@@ -342,7 +340,7 @@ function VoiceActivationSection({
                 className="mt-3 space-y-3"
               >
                 {/* Thresholds */}
-                <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
+                <div className="p-4 rounded-sm" style={{ background: "var(--color-surface1)" }}>
                   <div className="text-sm font-medium mb-4" style={{ color: "var(--color-text)" }}>
                     Detection thresholds
                   </div>
@@ -395,7 +393,7 @@ function VoiceActivationSection({
                 </div>
 
                 {/* Timing */}
-                <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
+                <div className="p-4 rounded-sm" style={{ background: "var(--color-surface1)" }}>
                   <div className="text-sm font-medium mb-4" style={{ color: "var(--color-text)" }}>
                     Timing
                   </div>
@@ -551,7 +549,7 @@ function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
           value={confirmText}
           onChange={e => setConfirmText(e.target.value)}
           placeholder="DELETE"
-          className="w-full px-4 py-3 rounded-xl mb-4 focus:outline-none"
+          className="w-full px-4 py-3 rounded-sm mb-4 focus:outline-none"
           style={{
             background: "var(--color-surface2)",
             border: "1px solid var(--color-border)",
@@ -605,12 +603,12 @@ function AccountSection() {
     return (
       <section>
         <h2
-          className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+          className="text-sm font-medium font-mono uppercase tracking-wider mb-3 px-1"
           style={{ color: "var(--color-text-muted)" }}
         >
           Account
         </h2>
-        <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
+        <div className="p-4 rounded-sm" style={{ background: "var(--color-surface1)" }}>
           <div className="animate-pulse flex items-center gap-4">
             <div
               className="w-12 h-12 rounded-full"
@@ -630,12 +628,12 @@ function AccountSection() {
     return (
       <section>
         <h2
-          className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+          className="text-sm font-medium font-mono uppercase tracking-wider mb-3 px-1"
           style={{ color: "var(--color-text-muted)" }}
         >
           Account
         </h2>
-        <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
+        <div className="p-4 rounded-sm" style={{ background: "var(--color-surface1)" }}>
           <div className="flex flex-col items-center text-center py-4">
             <div
               className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
@@ -669,12 +667,12 @@ function AccountSection() {
     <>
       <section>
         <h2
-          className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+          className="text-sm font-medium font-mono uppercase tracking-wider mb-3 px-1"
           style={{ color: "var(--color-text-muted)" }}
         >
           Account
         </h2>
-        <div className="rounded-xl overflow-hidden" style={{ background: "var(--color-surface1)" }}>
+        <div className="rounded-sm overflow-hidden" style={{ background: "var(--color-surface1)" }}>
           <div className="p-4">
             <div className="flex items-center gap-4">
               {account.user?.image ? (
@@ -772,10 +770,6 @@ export default function SettingsPage() {
     preferencesStore.setShakeToRestartEnabled(!preferences.shakeToRestartEnabled)
   }, [preferences.shakeToRestartEnabled])
 
-  const handleThemeModeChange = useCallback((mode: ThemeMode) => {
-    preferencesStore.setThemeMode(mode)
-  }, [])
-
   const handleToggleScoreBookChords = useCallback(() => {
     preferencesStore.setScoreBookShowChords(!preferences.scoreBookShowChords)
   }, [preferences.scoreBookShowChords])
@@ -809,7 +803,7 @@ export default function SettingsPage() {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <Link
             href="/"
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-95"
+            className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors hover:brightness-95"
             style={{ background: "var(--color-surface3)" }}
             aria-label="Back"
           >
@@ -829,29 +823,10 @@ export default function SettingsPage() {
           {/* Account Section */}
           <AccountSection />
 
-          {/* Appearance Section */}
-          <section>
-            <h2
-              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
-              style={{ color: "var(--color-text-muted)" }}
-            >
-              Appearance
-            </h2>
-            <Toggle
-              enabled={preferences.themeMode === "dark"}
-              onToggle={() =>
-                handleThemeModeChange(preferences.themeMode === "dark" ? "light" : "dark")
-              }
-              label="Dark Mode"
-              description="Use dark color scheme"
-              icon={<Moon size={20} weight="duotone" />}
-            />
-          </section>
-
           {/* Display Section */}
           <section>
             <h2
-              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+              className="text-sm font-medium font-mono uppercase tracking-wider mb-3 px-1"
               style={{ color: "var(--color-text-muted)" }}
             >
               Display
@@ -881,7 +856,7 @@ export default function SettingsPage() {
           {/* Gestures Section */}
           <section>
             <h2
-              className="text-sm font-medium uppercase tracking-wider mb-3 px-1"
+              className="text-sm font-medium font-mono uppercase tracking-wider mb-3 px-1"
               style={{ color: "var(--color-text-muted)" }}
             >
               Gestures

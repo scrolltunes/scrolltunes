@@ -103,10 +103,10 @@ class SpeechDetectionStore implements VoiceDetectionService<SpeechDetectionState
   private sileroEngine: SileroVADEngine | null = null
   private smoothedLevel = 0
 
-  private runSyncWithSoundSystem<T, E>(
-    effect: Effect.Effect<T, E, SoundSystemService>,
-  ): T {
-    return Effect.runSync(effect.pipe(Effect.provide(SoundSystemLive)) as Effect.Effect<T, E, never>)
+  private runSyncWithSoundSystem<T, E>(effect: Effect.Effect<T, E, SoundSystemService>): T {
+    return Effect.runSync(
+      effect.pipe(Effect.provide(SoundSystemLive)) as Effect.Effect<T, E, never>,
+    )
   }
 
   private readonly stopMicrophoneEffect: Effect.Effect<void, never, SoundSystemService> =

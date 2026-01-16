@@ -1,109 +1,69 @@
-# Build Mode Prompt
+# Ralph Build Mode
 
-You are in BUILDING mode. Implement ONE task from the plan, validate, commit, exit.
+Implement ONE task from the plan, validate, commit, exit.
+
+## Tools
+
+- **finder**: Semantic code discovery (use before implementing)
+- **Task**: Parallel file operations
+- **Oracle**: Debug complex issues
+- **Librarian**: External library docs
 
 ## Phase 0: Orient
 
-### 0a. Study context
-Read `CLAUDE.md` for project rules.
+Read:
+- @AGENTS.md (project rules)
+- @IMPLEMENTATION_PLAN.md (current state)
+- @specs/tui-redesign.md (requirements)
 
-### 0b. Study the plan
-Read `IMPLEMENTATION_PLAN.md` and `CURRENT_PLAN.md` to understand current state.
+### Check for completion
 
-### 0c. Check for completion
-**IMPORTANT**: Check if ALL tasks in the plan are marked complete.
+Run:
+```bash
+grep -c "^\- \[ \]" IMPLEMENTATION_PLAN.md || echo 0
+```
 
-If ALL tasks are complete:
-1. Run validation: `cd scripts/lrclib-extract && cargo test`
-2. If validation fails, fix issues and retry
-3. Check for uncommitted changes: `git status --porcelain`
-4. If there are uncommitted changes:
-   - Stage all changes: `git add -A`
-   - Commit with message: `feat(lrclib-extract): complete enrichment v3 improvements`
-5. Output the completion signal: **RALPH_COMPLETE**
-6. Exit immediately
-
-### 0d. Select task
-If tasks remain, choose the next incomplete task in dependency order.
+- If 0: Run validation → commit → output **RALPH_COMPLETE** → exit
+- If > 0: Continue to Phase 1
 
 ## Phase 1: Implement
 
-### 1a. Read specs first
-Read the relevant spec file for the current task from `specs/`:
-- `spec-01-normalization.md` - Single-source normalization
-- `spec-02-topk-candidates.md` - Top-K candidates per key
-- `spec-03-multi-artist.md` - Multi-artist scoring
-- `spec-04-pop0-fallback.md` - Pop=0 fallback fix
-- `spec-05-adaptive-duration.md` - Adaptive duration tolerance
-- `spec-06-title-rescue.md` - Title-first rescue pass
-- `spec-07-instrumentation.md` - Instrumentation & evaluation
+1. **Search first** — Use finder to verify the behavior doesn't already exist
+2. **Implement** — ONE task only (use Task for parallel independent work)
+3. **Validate** — Run `bun run check`, must pass
 
-### 1b. Study existing code
-Read the source files relevant to the task:
-- `scripts/lrclib-extract/src/main.rs` - Main extraction logic
-- `scripts/lrclib-extract/src/bin/normalize-spotify.rs` - Normalization binary
-- `scripts/lrclib-extract/Cargo.toml` - Dependencies
-- `docs/lrclib-extraction-technical-report.md` - Current methodology
-
-### 1c. Implement
-Make the code changes for this ONE task. Follow Rust patterns:
-
-For Rust code:
-- Use `anyhow::Result` for error handling
-- Use `FxHashMap`/`FxHashSet` for fast lookups
-- Use `Lazy<Regex>` for static regex patterns
-- Follow existing naming conventions
-- Add `#[cfg(test)]` unit tests
-
-### 1d. Validate
-Run validation command: `cd scripts/lrclib-extract && cargo test`
-
-Must pass before proceeding. If it fails, fix and retry.
+If stuck, use Oracle to debug.
 
 ## Phase 2: Update Plan
 
-Mark the task complete in `IMPLEMENTATION_PLAN.md`:
-- Check the checkbox: `- [x]`
-- Update status in tables
-- Note any discoveries or deviations
+In `IMPLEMENTATION_PLAN.md`:
+- Mark task `- [x] Completed`
+- Add discovered tasks if any
 
-## Phase 3: Commit
+## Phase 3: Commit & Exit
 
-Create atomic commit with conventional commit format:
+```bash
+git add -A && git commit -m "feat(tui): [description]
+
+Thread: $AMP_THREAD_URL"
 ```
-feat(lrclib-extract): short description
 
-Details if needed.
-
-Co-Authored-By: Claude <noreply@anthropic.com>
+Run completion check again:
+```bash
+grep -c "^\- \[ \]" IMPLEMENTATION_PLAN.md || echo 0
 ```
+
+- If > 0: Say "X tasks remaining" and EXIT
+- If = 0: Output **RALPH_COMPLETE**
 
 ## Guardrails
 
-1. ONE task per iteration - do not batch
-2. Read specs and source files before modifying
-3. Validation MUST pass before commit
-4. Keep existing functionality working
-5. Add tests for new functions
-
-## Exit Conditions
-
-**All Complete**: All tasks done, validation passes → Output `RALPH_COMPLETE` → Exit
-
-**Success**: Task complete, tests pass, committed → Exit
-
-**Blocked**: Document blocker in plan, commit plan update → Exit
-
-## Context Files
-
-- @CLAUDE.md
-- @IMPLEMENTATION_PLAN.md
-- @CURRENT_PLAN.md
-- @specs/spec-01-normalization.md
-- @specs/spec-02-topk-candidates.md
-- @specs/spec-03-multi-artist.md
-- @specs/spec-04-pop0-fallback.md
-- @specs/spec-05-adaptive-duration.md
-- @specs/spec-06-title-rescue.md
-- @specs/spec-07-instrumentation.md
-- @docs/lrclib-extraction-technical-report.md
+- ONE task per iteration
+- Search before implementing
+- Validation MUST pass
+- Never output RALPH_COMPLETE if tasks remain
+- **Exclude** Share Designer components (`src/components/share/*`)
+- **Exclude** Test pages (`/test/*`)
+- Preserve all `motion/react` animations
+- Keep chord diagram styling (`.chord-diagram-svg`)
+- Keep Spotify green for brand compliance

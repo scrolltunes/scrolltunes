@@ -31,7 +31,7 @@ export const ChordBadge = memo(function ChordBadge({
     [isActive],
   )
 
-  const baseClassName = `inline-flex items-center justify-center font-black transition-all ${sizeClasses} ${isActive ? "rounded px-1.5" : ""}`
+  const baseClassName = `inline-flex items-center justify-center font-black transition-all ${sizeClasses} ${isActive ? "rounded-sm px-1.5" : ""}`
   const animateProps = {
     animate: isActive ? { scale: 1.05 } : { scale: 1 },
     transition: { type: "spring" as const, stiffness: 400, damping: 20 },

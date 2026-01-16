@@ -192,9 +192,9 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
           onClick={handleBackdropClick}
         >
           <motion.div
-            className="relative w-full max-w-md rounded-xl shadow-xl"
+            className="relative w-full max-w-md rounded-sm shadow-xl"
             style={{
-              background: "var(--color-surface1)",
+              background: "var(--color-bg)",
               border: "1px solid var(--color-border)",
             }}
             initial={{ scale: 0.95, opacity: 0 }}
@@ -208,14 +208,17 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
             >
               <div className="flex items-center gap-2">
                 <Bug size={20} style={{ color: "var(--color-warning)" }} />
-                <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+                <h2
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--color-text)" }}
+                >
                   Report an Issue
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={handleClose}
-                className="rounded-full p-1 transition-colors hover:brightness-110"
+                className="rounded-sm p-1 transition-colors hover:brightness-110"
                 style={{ color: "var(--color-text3)" }}
                 aria-label="Close"
                 disabled={submitState === "submitting"}
@@ -227,7 +230,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
             <form onSubmit={handleSubmit} className="p-4 space-y-4">
               {songContext && (
                 <div
-                  className="rounded-lg p-3 text-sm"
+                  className="rounded-sm p-3 text-sm"
                   style={{ background: "var(--color-surface2)" }}
                 >
                   <div className="mb-1" style={{ color: "var(--color-text3)" }}>
@@ -272,7 +275,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   required={isDescriptionRequired}
                   disabled={submitState === "submitting"}
                   maxLength={INPUT_LIMITS.REPORT_DESCRIPTION}
-                  className="w-full rounded-lg px-3 py-2 focus:outline-none focus:ring-2 disabled:opacity-50"
+                  className="w-full rounded-sm px-3 py-2 focus:outline-none focus:ring-2 disabled:opacity-50"
                   style={{
                     background: "var(--color-surface2)",
                     border: "1px solid var(--color-border)",
@@ -297,7 +300,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                   placeholder="your@email.com"
                   disabled={submitState === "submitting"}
                   maxLength={INPUT_LIMITS.EMAIL}
-                  className="w-full rounded-lg px-3 py-2 focus:outline-none focus:ring-2 disabled:opacity-50"
+                  className="w-full rounded-sm px-3 py-2 focus:outline-none focus:ring-2 disabled:opacity-50"
                   style={{
                     background: "var(--color-surface2)",
                     border: "1px solid var(--color-border)",
@@ -332,7 +335,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
                 disabled={
                   submitState === "submitting" || (isDescriptionRequired && !description.trim())
                 }
-                className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-medium transition-colors hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 rounded-sm px-4 py-2.5 font-medium transition-colors hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: "var(--color-accent)", color: "white" }}
               >
                 {submitState === "submitting" ? (

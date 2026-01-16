@@ -108,7 +108,9 @@ export const RecentSongs = memo(function RecentSongs({
           ) : (
             <ClockCounterClockwise size={16} weight="bold" />
           )}
-          <span className="text-sm font-medium uppercase tracking-wider">Recently played</span>
+          <span className="text-sm font-medium uppercase tracking-wider">
+            Recently played
+          </span>
         </div>
         {recents.length > 0 || showSkeleton ? (
           <button
@@ -133,7 +135,7 @@ export const RecentSongs = memo(function RecentSongs({
             {Array.from({ length: skeletonCount }, (_, i) => (
               <div key={i} className="flex-shrink-0 w-24">
                 <div
-                  className="w-24 h-24 rounded-xl animate-pulse"
+                  className="w-24 h-24 rounded-sm animate-pulse"
                   style={{ background: "var(--color-surface3)" }}
                 />
                 <div
@@ -152,7 +154,7 @@ export const RecentSongs = memo(function RecentSongs({
             {Array.from({ length: 3 }, (_, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 p-3 rounded-xl animate-pulse"
+                className="flex items-center gap-3 p-3 rounded-sm animate-pulse"
                 style={{ background: "var(--color-surface3)" }}
               >
                 <div
@@ -198,7 +200,7 @@ export const RecentSongs = memo(function RecentSongs({
                   draggable={false}
                 >
                   <div
-                    className="w-24 h-24 rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-105"
+                    className="w-24 h-24 rounded-sm overflow-hidden flex items-center justify-center transition-transform group-hover:scale-105"
                     style={{ background: "var(--color-surface1)" }}
                   >
                     {song.albumArt ? (
@@ -241,7 +243,7 @@ export const RecentSongs = memo(function RecentSongs({
                 <li key={song.id}>
                   <Link
                     href={songPath}
-                    className="flex items-center gap-3 p-3 rounded-xl transition-colors hover:brightness-105"
+                    className="flex items-center gap-3 p-3 rounded-sm transition-colors hover:brightness-105"
                     style={{
                       background: "var(--color-surface1)",
                       border: "1px solid var(--color-border)",

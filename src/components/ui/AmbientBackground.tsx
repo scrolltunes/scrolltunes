@@ -1,6 +1,5 @@
 "use client"
 
-import { usePreferences } from "@/core"
 import { motion } from "motion/react"
 import { memo } from "react"
 
@@ -55,13 +54,10 @@ export const AmbientBackground = memo(function AmbientBackground({
   variant = "default",
   className = "",
 }: AmbientBackgroundProps) {
-  const { themeMode } = usePreferences()
-  const isLightMode = themeMode === "light"
-
   const opacityMap = {
-    subtle: isLightMode ? 0.03 : 0.08,
-    default: isLightMode ? 0.04 : 0.12,
-    vibrant: isLightMode ? 0.06 : 0.18,
+    subtle: 0.08,
+    default: 0.12,
+    vibrant: 0.18,
   }
   const opacity = opacityMap[variant]
 
@@ -71,18 +67,18 @@ export const AmbientBackground = memo(function AmbientBackground({
       style={{ zIndex: 0 }}
       aria-hidden="true"
     >
-      {/* Primary accent orb - top left */}
+      {/* Primary accent orb - Tokyo Night blue */}
       <AmbientOrb
-        color={`rgba(91, 108, 255, ${opacity})`}
+        color={`rgba(122, 162, 247, ${opacity})`}
         size={600}
         x="-10%"
         y="-20%"
         duration={25}
       />
 
-      {/* Secondary purple orb - bottom right */}
+      {/* Secondary orb - Tokyo Night magenta */}
       <AmbientOrb
-        color={`rgba(139, 92, 246, ${opacity * 0.7})`}
+        color={`rgba(187, 154, 247, ${opacity * 0.7})`}
         size={500}
         x="70%"
         y="60%"
@@ -90,9 +86,9 @@ export const AmbientBackground = memo(function AmbientBackground({
         delay={5}
       />
 
-      {/* Tertiary accent orb - center */}
+      {/* Tertiary orb - Tokyo Night cyan */}
       <AmbientOrb
-        color={`rgba(91, 108, 255, ${opacity * 0.5})`}
+        color={`rgba(125, 207, 255, ${opacity * 0.5})`}
         size={400}
         x="40%"
         y="30%"
@@ -105,8 +101,8 @@ export const AmbientBackground = memo(function AmbientBackground({
         className="absolute inset-0"
         style={{
           background: `
-            radial-gradient(ellipse 80% 50% at 20% -10%, rgba(91, 108, 255, ${opacity * 0.8}), transparent 50%),
-            radial-gradient(ellipse 60% 40% at 80% 110%, rgba(139, 92, 246, ${opacity * 0.4}), transparent 45%)
+            radial-gradient(ellipse 80% 50% at 20% -10%, rgba(122, 162, 247, ${opacity * 0.8}), transparent 50%),
+            radial-gradient(ellipse 60% 40% at 80% 110%, rgba(187, 154, 247, ${opacity * 0.4}), transparent 45%)
           `,
         }}
       />

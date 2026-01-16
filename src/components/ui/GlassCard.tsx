@@ -16,17 +16,19 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(function Gla
 ) {
   const variantStyles = {
     default: {
-      background: "var(--color-surface1)",
-      border: "1px solid var(--color-border)",
+      background: "var(--bg-secondary)",
+      border: "1px solid var(--border-primary)",
+      backdropFilter: "blur(8px)",
     },
     elevated: {
-      background: "var(--color-surface-elevated)",
-      border: "1px solid var(--color-border-strong)",
-      boxShadow: "var(--shadow-md)",
+      background: "var(--bg-secondary)",
+      border: "1px solid var(--border-secondary)",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+      backdropFilter: "blur(12px)",
     },
     subtle: {
-      background: "rgba(12, 18, 32, 0.5)",
-      border: "1px solid var(--color-border)",
+      background: "rgba(26, 27, 38, 0.6)",
+      border: "1px solid var(--border-primary)",
       backdropFilter: "blur(12px)",
     },
   }
@@ -37,7 +39,7 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(function Gla
     return (
       <motion.div
         ref={ref}
-        className={`rounded-2xl cursor-pointer ${className}`}
+        className={`rounded-sm cursor-pointer ${className}`}
         style={style}
         whileHover={{ scale: 1.02, borderColor: "var(--color-accent)" }}
         whileTap={{ scale: 0.98 }}
@@ -49,7 +51,7 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(function Gla
   }
 
   return (
-    <div ref={ref} className={`rounded-2xl ${className}`} style={style}>
+    <div ref={ref} className={`rounded-sm ${className}`} style={style}>
       {children}
     </div>
   )
