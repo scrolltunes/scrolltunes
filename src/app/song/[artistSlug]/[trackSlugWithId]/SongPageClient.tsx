@@ -651,7 +651,7 @@ export default function SongPageClient({
         <p style={{ color: "var(--color-text3)" }}>{description}</p>
         <Link
           href="/"
-          className="px-6 py-3 rounded-sm font-medium transition-colors"
+          className="px-6 py-3 rounded-full font-medium transition-colors"
           style={{ background: "var(--color-accent)", color: "white" }}
         >
           Back to Search
@@ -661,7 +661,7 @@ export default function SongPageClient({
             <button
               type="button"
               onClick={() => setShowReportModal(true)}
-              className="px-6 py-3 rounded-sm font-medium transition-colors flex items-center justify-center gap-2"
+              className="px-6 py-3 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
               style={{
                 background: "var(--color-warning-soft)",
                 color: "var(--color-warning)",
@@ -712,7 +712,7 @@ export default function SongPageClient({
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
           <Link
             href="/"
-            className="w-10 h-10 shrink-0 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
+            className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
             style={{ background: "var(--color-surface2)" }}
             aria-label="Back to search"
           >

@@ -179,7 +179,7 @@ const FavoriteSongItem = memo(function FavoriteSongItem({
           e.stopPropagation()
           onRemove(song.id, albumArt)
         }}
-        className="flex items-center justify-center w-8 h-8 rounded-sm transition-colors"
+        className="flex items-center justify-center w-8 h-8 rounded-full transition-colors"
         style={{ background: "var(--color-surface2)" }}
         aria-label="Remove from favorites"
         whileTap={{ scale: 0.9 }}
@@ -218,7 +218,7 @@ function Header() {
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
         <Link
           href="/"
-          className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
           style={{ background: "var(--color-surface2)" }}
           aria-label="Back"
         >

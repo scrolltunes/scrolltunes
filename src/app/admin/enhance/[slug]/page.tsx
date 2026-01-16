@@ -1015,7 +1015,7 @@ export default function EnhancePage({
                     type="button"
                     onClick={handleSaveExistingEnhancements}
                     disabled={isSavingExisting}
-                    className="w-full px-4 py-3 rounded-sm font-medium transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+                    className="w-full px-4 py-3 rounded-full font-medium transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
                     style={{ background: "var(--color-success)", color: "white" }}
                   >
                     {isSavingExisting
@@ -1181,7 +1181,7 @@ export default function EnhancePage({
                     type="button"
                     onClick={handleSubmit}
                     disabled={pageState === "submitting"}
-                    className="w-full px-4 py-3 rounded-sm font-medium transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
+                    className="w-full px-4 py-3 rounded-full font-medium transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110"
                     style={{ background: "var(--color-success)", color: "white" }}
                   >
                     {pageState === "submitting"

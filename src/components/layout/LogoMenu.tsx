@@ -39,7 +39,7 @@ export const LogoMenu = memo(function LogoMenu() {
       <button
         type="button"
         onClick={handleToggle}
-        className="flex items-center gap-1 px-2 py-1.5 rounded-sm transition-colors focus:outline-none focus:ring-2 hover:brightness-95"
+        className="flex items-center gap-1 px-2 py-1.5 rounded-full transition-colors focus:outline-none focus:ring-2 hover:brightness-95"
         style={{ background: "var(--bg-tertiary)" }}
         aria-label="ScrollTunes menu"
         aria-expanded={isOpen}

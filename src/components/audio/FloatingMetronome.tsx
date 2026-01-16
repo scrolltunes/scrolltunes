@@ -187,7 +187,7 @@ export const FloatingMetronome = memo(function FloatingMetronome({
                       key={mode}
                       type="button"
                       onClick={() => handleModeChange(mode)}
-                      className="flex-1 rounded-sm px-2 py-1 text-xs transition-colors"
+                      className="flex-1 rounded-full px-2 py-1 text-xs transition-colors"
                       style={
                         metronomeState.mode === mode
                           ? { background: "var(--accent-primary)", color: "var(--bg-primary)" }
@@ -205,7 +205,7 @@ export const FloatingMetronome = memo(function FloatingMetronome({
                 <button
                   type="button"
                   onClick={handleMuteToggle}
-                  className="w-full rounded-sm px-2 py-1.5 text-xs transition-colors"
+                  className="w-full rounded-full px-2 py-1.5 text-xs transition-colors"
                   style={
                     metronomeState.isMuted
                       ? { background: "var(--color-danger-soft)", color: "var(--status-error)" }

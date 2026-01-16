@@ -106,7 +106,7 @@ export const Metronome = memo(function Metronome({
                 key={modeOption}
                 type="button"
                 onClick={() => handleModeChange(modeOption)}
-                className="p-2 rounded-sm transition-colors focus:outline-none focus-visible:ring-2"
+                className="p-2 rounded-full transition-colors focus:outline-none focus-visible:ring-2"
                 style={
                   isSelected
                     ? {
@@ -141,7 +141,7 @@ export const Metronome = memo(function Metronome({
             <motion.button
               type="button"
               onClick={handleToggleMute}
-              className="p-1.5 rounded-sm transition-colors focus:outline-none focus-visible:ring-2"
+              className="p-1.5 rounded-full transition-colors focus:outline-none focus-visible:ring-2"
               style={
                 isMuted
                   ? { background: "var(--color-danger-soft)", color: "var(--status-error)" }
