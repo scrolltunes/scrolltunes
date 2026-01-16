@@ -106,19 +106,21 @@ const search = (query: string, limit = 10) =>
 
     const result = yield* Effect.tryPromise({
       try: async () => {
+        // Popularity-ranked FTS search using rowid ordering
+        // - tracks_search has search_id = popularity rank (1 = most popular)
+        // - ORDER BY rowid ASC returns top popular results first
+        // - FTS5 can early-terminate on rowid order (no full sort needed)
+        // - This is O(limit) instead of O(matches) for common words
+        // See: docs/search-optimization-findings.md
         const rs = await client.execute({
           sql: `
-            SELECT t.id, t.title, t.artist, t.album, t.duration_sec, t.quality,
-                   t.spotify_id, t.popularity, t.tempo, t.musical_key, t.mode,
-                   t.time_signature, t.isrc, t.album_image_url
-            FROM tracks_fts fts
-            JOIN tracks t ON fts.rowid = t.id
-            WHERE tracks_fts MATCH ?
-            ORDER BY
-              (t.popularity IS NOT NULL) DESC,
-              t.popularity DESC,
-              t.quality DESC,
-              -bm25(tracks_fts) ASC
+            SELECT ts.track_id, ts.title, ts.artist, ts.album, ts.duration_sec,
+                   ts.quality, ts.spotify_id, ts.popularity, ts.tempo, ts.isrc,
+                   ts.album_image_url
+            FROM tracks_search_fts fts
+            JOIN tracks_search ts ON fts.rowid = ts.search_id
+            WHERE tracks_search_fts MATCH ?
+            ORDER BY fts.rowid ASC
             LIMIT ?
           `,
           args: [ftsQuery, limit],
@@ -132,7 +134,7 @@ const search = (query: string, limit = 10) =>
     })
 
     return result.map(row => ({
-      id: row.id as number,
+      id: row.track_id as number,
       title: row.title as string,
       artist: row.artist as string,
       album: row.album as string | null,
@@ -141,9 +143,10 @@ const search = (query: string, limit = 10) =>
       spotifyId: row.spotify_id as string | null,
       popularity: row.popularity as number | null,
       tempo: row.tempo as number | null,
-      musicalKey: row.musical_key as number | null,
-      mode: row.mode as number | null,
-      timeSignature: row.time_signature as number | null,
+      // These fields are not in tracks_search (rarely needed for search results)
+      musicalKey: null,
+      mode: null,
+      timeSignature: null,
       isrc: row.isrc as string | null,
       albumImageUrl: row.album_image_url as string | null,
     }))

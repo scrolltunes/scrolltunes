@@ -1127,11 +1127,51 @@ fn process_groups(groups: FxHashMap<(String, String), Vec<Track>>) -> Vec<Scored
 
 fn build_fts_index(conn: &Connection) -> Result<()> {
     let phase_start = Instant::now();
-    let spinner = create_spinner("Phase 4: Building FTS index");
 
+    // Step 1: Build tracks_fts (legacy, for backwards compatibility)
+    let spinner = create_spinner("Phase 4a: Building tracks_fts index");
     conn.execute("INSERT INTO tracks_fts(tracks_fts) VALUES('rebuild')", [])?;
+    spinner.finish_with_message("Phase 4a: tracks_fts index built");
 
-    spinner.finish_with_message("Phase 4: FTS index built");
+    // Step 2: Populate tracks_search with popularity-ranked rows
+    // search_id is assigned sequentially by popularity rank (1 = most popular)
+    let spinner = create_spinner("Phase 4b: Populating tracks_search (popularity-ranked)");
+    conn.execute_batch(
+        "INSERT INTO tracks_search (search_id, track_id, title, artist, album, duration_sec,
+                                    popularity, quality, spotify_id, tempo, isrc, album_image_url)
+         SELECT
+             ROW_NUMBER() OVER (
+                 ORDER BY
+                     popularity DESC NULLS LAST,
+                     quality DESC,
+                     id ASC
+             ) as search_id,
+             id as track_id,
+             title,
+             artist,
+             album,
+             duration_sec,
+             popularity,
+             quality,
+             spotify_id,
+             tempo,
+             isrc,
+             album_image_url
+         FROM tracks;",
+    )?;
+    spinner.finish_with_message("Phase 4b: tracks_search populated");
+
+    // Step 3: Build tracks_search_fts (fast popularity-ranked search)
+    let spinner = create_spinner("Phase 4c: Building tracks_search_fts index");
+    conn.execute("INSERT INTO tracks_search_fts(tracks_search_fts) VALUES('rebuild')", [])?;
+    spinner.finish_with_message("Phase 4c: tracks_search_fts index built");
+
+    // Step 4: Optimize both FTS indexes
+    let spinner = create_spinner("Phase 4d: Optimizing FTS indexes");
+    conn.execute("INSERT INTO tracks_fts(tracks_fts) VALUES('optimize')", [])?;
+    conn.execute("INSERT INTO tracks_search_fts(tracks_search_fts) VALUES('optimize')", [])?;
+    spinner.finish_with_message("Phase 4d: FTS indexes optimized");
+
     eprintln!(
         "[FTS] Complete ({})",
         format_duration(phase_start.elapsed())
@@ -3120,11 +3160,46 @@ fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Res
 
         CREATE INDEX idx_tracks_spotify_id ON tracks(spotify_id);
 
+        -- Partial index for FTS popularity ranking (filters to ~68% of tracks)
+        -- Speeds up: WHERE popularity IS NOT NULL ORDER BY popularity DESC
+        CREATE INDEX idx_tracks_popularity ON tracks(popularity DESC) WHERE popularity IS NOT NULL;
+
         CREATE VIRTUAL TABLE tracks_fts USING fts5(
             title, artist,
             content='tracks',
             content_rowid='id',
             tokenize='porter'
+        );
+
+        -- Popularity-ranked search surface for fast FTS queries
+        -- search_id is assigned by popularity rank (1 = most popular)
+        -- This allows ORDER BY rowid ASC to return top popular results
+        -- without sorting the full match set (FTS5 can early-terminate on rowid order)
+        CREATE TABLE tracks_search (
+            search_id   INTEGER PRIMARY KEY,  -- 1..N assigned by popularity DESC
+            track_id    INTEGER NOT NULL,     -- original tracks.id
+            title       TEXT NOT NULL,
+            artist      TEXT NOT NULL,
+            album       TEXT,
+            duration_sec INTEGER NOT NULL,
+            popularity  INTEGER,
+            quality     INTEGER,
+            spotify_id  TEXT,
+            tempo       REAL,
+            isrc        TEXT,
+            album_image_url TEXT
+        );
+
+        -- FTS index for popularity-ranked search surface
+        -- detail=none: smaller index, no phrase/NEAR queries (not needed for search box)
+        -- columnsize=0: skip column sizes (not using BM25 heavily)
+        CREATE VIRTUAL TABLE tracks_search_fts USING fts5(
+            title, artist,
+            content='tracks_search',
+            content_rowid='search_id',
+            tokenize='porter',
+            detail=none,
+            columnsize=0
         );
 
         -- Match failures table for post-hoc analysis (spec-05)
