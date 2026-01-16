@@ -171,7 +171,7 @@ export const SongListItem = memo(function SongListItem({
             <button
               type="button"
               onClick={handleRemove}
-              className="w-8 h-8 flex items-center justify-center rounded-sm transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-full transition-colors"
               style={{
                 background: "var(--color-surface2)",
                 color: "var(--color-text-muted)",
@@ -200,7 +200,7 @@ export const SongListItem = memo(function SongListItem({
         animate={{ opacity: 1, y: 0 }}
         {...(animateExit && { exit: { opacity: 0, x: -100, transition: { duration: 0.2 } } })}
         transition={{ ...springs.default, delay: animationIndex * 0.03 }}
-        className="w-full flex items-center gap-3 p-3 rounded-sm transition-colors hover:brightness-105"
+        className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors hover:brightness-105"
         style={cardStyle}
       >
         {content}

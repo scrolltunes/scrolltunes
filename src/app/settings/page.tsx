@@ -48,7 +48,7 @@ function Toggle({ enabled, onToggle, label, description, icon }: ToggleProps) {
     <button
       type="button"
       onClick={onToggle}
-      className="group w-full flex items-start gap-4 p-4 rounded-sm text-left transition-colors"
+      className="group w-full flex items-start gap-4 p-4 rounded-xl text-left transition-colors"
       style={{ background: "var(--color-surface1)" }}
     >
       <div
@@ -104,7 +104,7 @@ function SliderSetting({
   formatValue,
 }: SliderSettingProps) {
   return (
-    <div className="p-4 rounded-sm" style={{ background: "var(--color-surface1)" }}>
+    <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
       <div className="flex items-start gap-4">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
@@ -154,7 +154,7 @@ function RadioOption({ selected, onSelect, label, description, icon, badge }: Ra
     <button
       type="button"
       onClick={onSelect}
-      className="group w-full flex items-start gap-4 p-4 rounded-sm text-left transition-colors"
+      className="group w-full flex items-start gap-4 p-4 rounded-xl text-left transition-colors"
       style={{
         background: "var(--color-surface1)",
         border: selected ? "2px solid var(--color-accent)" : "2px solid transparent",
@@ -316,7 +316,7 @@ function VoiceActivationSection({
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-between p-4 rounded-sm transition-colors hover:brightness-95"
+              className="w-full flex items-center justify-between p-4 rounded-xl transition-colors hover:brightness-95"
               style={{ background: "var(--color-surface1)" }}
             >
               <div className="flex items-center gap-3">
@@ -467,7 +467,7 @@ function VoiceActivationSection({
                 <button
                   type="button"
                   onClick={handleResetToDefaults}
-                  className="w-full flex items-center justify-center gap-2 p-3 rounded-sm text-sm transition-colors hover:brightness-95"
+                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl text-sm transition-colors hover:brightness-95"
                   style={{
                     background: "var(--color-surface3)",
                     color: "var(--color-text3)",
@@ -562,7 +562,7 @@ function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
           <button
             type="button"
             onClick={handleClose}
-            className="flex-1 px-4 py-3 rounded-sm transition-colors hover:brightness-95"
+            className="flex-1 px-4 py-3 rounded-xl transition-colors hover:brightness-95"
             style={{ background: "var(--color-surface3)", color: "var(--color-text)" }}
           >
             Cancel
@@ -571,7 +571,7 @@ function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps) {
             type="button"
             onClick={handleDelete}
             disabled={confirmText !== "DELETE" || isDeleting}
-            className="flex-1 px-4 py-3 rounded-sm transition-colors hover:brightness-110 disabled:opacity-50"
+            className="flex-1 px-4 py-3 rounded-xl transition-colors hover:brightness-110 disabled:opacity-50"
             style={{ background: "var(--color-danger)", color: "white" }}
           >
             {isDeleting ? "Deleting..." : "Delete"}
@@ -708,7 +708,7 @@ function AccountSection() {
               <button
                 type="button"
                 onClick={handleExportData}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-sm text-sm font-medium transition-colors hover:brightness-95"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:brightness-95"
                 style={{ background: "var(--color-surface3)", color: "var(--color-text)" }}
               >
                 <DownloadSimple size={18} />
@@ -717,7 +717,7 @@ function AccountSection() {
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-sm text-sm font-medium transition-colors hover:brightness-95"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:brightness-95"
                 style={{ background: "var(--color-surface3)", color: "var(--color-text)" }}
               >
                 <SignOut size={18} />
@@ -733,7 +733,7 @@ function AccountSection() {
             <button
               type="button"
               onClick={() => setShowDeleteModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-sm text-sm font-medium transition-colors hover:brightness-110"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors hover:brightness-110"
               style={{
                 background: "var(--color-danger-soft)",
                 border: "1px solid var(--color-danger)",
@@ -803,7 +803,7 @@ export default function SettingsPage() {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <Link
             href="/"
-            className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-95"
+            className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors hover:brightness-95"
             style={{ background: "var(--color-surface3)" }}
             aria-label="Back"
           >
@@ -898,7 +898,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleReset}
-              className="w-full flex items-center justify-center gap-2 p-4 rounded-sm transition-colors hover:brightness-95"
+              className="w-full flex items-center justify-center gap-2 p-4 rounded-xl transition-colors hover:brightness-95"
               style={{
                 background: "var(--color-surface1)",
                 border: "1px solid var(--color-border)",

@@ -38,7 +38,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         type="button"
         className={`
           ${sizeStyles[size]}
-          rounded-sm
+          rounded-full
           flex items-center justify-center
           transition-colors
           opacity-40 cursor-not-allowed
@@ -60,7 +60,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       className={`
         ${sizeStyles[size]}
         ${variantStyles[variant]}
-        rounded-sm
+        rounded-full
         flex items-center justify-center
         transition-colors
         focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]
