@@ -57,6 +57,7 @@
 | Pop=0 fallback | +3.2% (~119K matches) |
 | Hebrew/Russian artist aliases | ~205 hand-crafted mappings |
 | Rowid-ranked search surface | **21x faster FTS queries** |
+| Album type selection | Prefer studio albums over compilations |
 
 ---
 
@@ -134,6 +135,28 @@ score = duration_score (0-100, graduated by diff)
 ```
 
 **Duration thresholds:** 0-2s=100, 3-5s=80, 6-10s=50, 11-15s=25, 16-30s=10, >30s=Reject
+
+---
+
+## Album Type Selection
+
+When multiple Spotify candidates match a track, selection uses **album_type as primary ranking dimension**:
+
+```
+Ranking order: album < single < compilation < unknown
+```
+
+### Selection Logic
+
+1. **Viable candidates** (score ≥ 80) always beat non-viable ones
+2. Among viable candidates: prefer lower album_type rank, then higher score
+3. Among non-viable candidates: prefer higher score (fallback)
+
+This ensures studio album versions are preferred over compilations (e.g., "1979" from "Mellon Collie" beats "Rotten Apples" greatest hits).
+
+### Data Source
+
+Album type fetched via `tracks.album_rowid → albums.album_type` from `spotify_clean.sqlite3`.
 
 ---
 

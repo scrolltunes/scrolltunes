@@ -83,8 +83,8 @@ struct Args {
     /// Path to output SQLite database
     output: PathBuf,
 
-    /// Path to spotify_clean.sqlite3 (optional, for enrichment)
-    #[arg(long)]
+    /// Path to spotify_clean.sqlite3 (for enrichment, requires --audio-features)
+    #[arg(long, requires = "audio_features")]
     spotify: Option<PathBuf>,
 
     /// Path to spotify_normalized.sqlite3 (pre-normalized Spotify data for faster matching)
@@ -92,8 +92,8 @@ struct Args {
     #[arg(long)]
     spotify_normalized: Option<PathBuf>,
 
-    /// Path to spotify_clean_audio_features.sqlite3 (optional, requires --spotify)
-    #[arg(long)]
+    /// Path to spotify_clean_audio_features.sqlite3 (required with --spotify for tempo/key/mode)
+    #[arg(long, requires = "spotify")]
     audio_features: Option<PathBuf>,
 
     /// Minimum Spotify popularity (0-100). Default 0 = include all.
@@ -278,6 +278,81 @@ type LrclibIndex = FxHashMap<(String, String), usize>;
 /// Title-only index for initial filtering before artist lookup (2-phase matching)
 type TitleOnlyIndex = FxHashMap<String, Vec<usize>>;
 
+/// Spotify album type for preferring canonical releases over compilations.
+/// Used as primary ranking dimension when selecting among viable match candidates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpotifyAlbumType {
+    Album,
+    Single,
+    Compilation,
+    Unknown,
+}
+
+impl SpotifyAlbumType {
+    /// Rank for sorting: lower is better (album < single < compilation < unknown)
+    pub fn rank(self) -> i32 {
+        match self {
+            SpotifyAlbumType::Album => 0,
+            SpotifyAlbumType::Single => 1,
+            SpotifyAlbumType::Compilation => 2,
+            SpotifyAlbumType::Unknown => 3,
+        }
+    }
+}
+
+impl From<Option<&str>> for SpotifyAlbumType {
+    fn from(s: Option<&str>) -> Self {
+        match s {
+            Some("album") => SpotifyAlbumType::Album,
+            Some("single") => SpotifyAlbumType::Single,
+            Some("compilation") => SpotifyAlbumType::Compilation,
+            _ => SpotifyAlbumType::Unknown,
+        }
+    }
+}
+
+/// Minimum match score threshold for album_type preference to apply.
+/// Candidates below this threshold are considered non-viable and won't benefit
+/// from album_type preference over viable candidates.
+const MIN_VIABLE_MATCH_SCORE: i32 = 80;
+
+/// Check if a new candidate beats the current best using album_type-aware ranking.
+///
+/// Selection logic (DBA spec Section 6.2 + 7):
+/// 1. Viable candidates (score >= MIN_VIABLE_MATCH_SCORE) always beat non-viable ones
+/// 2. Among viable candidates: prefer lower album_type.rank(), then higher score
+/// 3. Among non-viable candidates: prefer higher score (fallback behavior)
+///
+/// Returns true if the new candidate should replace the current best.
+fn is_better_match(
+    new_score: i32,
+    new_album_type: SpotifyAlbumType,
+    current_score: i32,
+    current_album_type: SpotifyAlbumType,
+) -> bool {
+    let new_viable = new_score >= MIN_VIABLE_MATCH_SCORE;
+    let current_viable = current_score >= MIN_VIABLE_MATCH_SCORE;
+
+    match (new_viable, current_viable) {
+        // New is viable, current is not -> new wins
+        (true, false) => true,
+        // Current is viable, new is not -> current wins
+        (false, true) => false,
+        // Both viable -> compare by (album_type.rank(), -score)
+        (true, true) => {
+            let new_rank = new_album_type.rank();
+            let current_rank = current_album_type.rank();
+            if new_rank != current_rank {
+                new_rank < current_rank // Lower rank is better
+            } else {
+                new_score > current_score // Higher score is better
+            }
+        }
+        // Neither viable -> compare by score only (fallback)
+        (false, false) => new_score > current_score,
+    }
+}
+
 /// Spotify track info for matching
 #[derive(Clone, Debug)]
 struct SpotifyTrack {
@@ -291,6 +366,7 @@ struct SpotifyTrack {
     popularity: i32,      // 0-100
     isrc: Option<String>, // For Deezer album art lookup
     album_rowid: i64,     // For album_images lookup
+    album_type: SpotifyAlbumType, // For preferring albums over compilations
 }
 
 /// Partial Spotify track (before artist lookup) for 2-phase matching.
@@ -1252,11 +1328,13 @@ fn stream_match_spotify(
             t.duration_ms,
             t.popularity,
             t.external_id_isrc,
-            t.album_rowid
+            t.album_rowid,
+            al.album_type
         FROM tracks t
         JOIN artists a ON a.rowid = (
             SELECT MIN(artist_rowid) FROM track_artists WHERE track_rowid = t.rowid
         )
+        LEFT JOIN albums al ON al.rowid = t.album_rowid
         WHERE t.popularity >= ?
     "#;
 
@@ -1270,6 +1348,7 @@ fn stream_match_spotify(
 
     while let Some(row) = rows.next()? {
         let primary_artist: String = row.get(2)?;
+        let album_type_str: Option<String> = row.get(7)?;
         let spotify_track = SpotifyTrack {
             id: row.get(0)?,
             name: row.get(1)?,
@@ -1279,6 +1358,7 @@ fn stream_match_spotify(
             popularity: row.get(4)?,
             isrc: row.get(5)?,
             album_rowid: row.get(6)?,
+            album_type: SpotifyAlbumType::from(album_type_str.as_deref()),
         };
 
         // Normalize and lookup in LRCLIB index
@@ -1478,11 +1558,13 @@ fn stream_and_match_spotify_delayed(
             t.duration_ms,
             t.popularity,
             t.external_id_isrc,
-            t.album_rowid
+            t.album_rowid,
+            al.album_type
         FROM tracks t
         JOIN artists a ON a.rowid = (
             SELECT MIN(artist_rowid) FROM track_artists WHERE track_rowid = t.rowid
         )
+        LEFT JOIN albums al ON al.rowid = t.album_rowid
         WHERE t.popularity >= ?
     "#;
 
@@ -1494,6 +1576,7 @@ fn stream_and_match_spotify_delayed(
 
     while let Some(row) = rows.next()? {
         let primary_artist: String = row.get(2)?;
+        let album_type_str: Option<String> = row.get(7)?;
         let spotify_track = SpotifyTrack {
             id: row.get(0)?,
             name: row.get(1)?,
@@ -1503,6 +1586,7 @@ fn stream_and_match_spotify_delayed(
             popularity: row.get(4)?,
             isrc: row.get(5)?,
             album_rowid: row.get(6)?,
+            album_type: SpotifyAlbumType::from(album_type_str.as_deref()),
         };
 
         // Normalize Spotify track
@@ -1525,12 +1609,16 @@ fn stream_and_match_spotify_delayed(
                 );
 
                 if score >= ACCEPT_THRESHOLD {
-                    let current_best = group
-                        .best_match
-                        .as_ref()
-                        .map(|(_, _, s)| *s)
-                        .unwrap_or(i32::MIN);
-                    if score > current_best {
+                    let should_replace = match &group.best_match {
+                        Some((_, current_track, current_score)) => is_better_match(
+                            score,
+                            spotify_track.album_type,
+                            *current_score,
+                            current_track.album_type,
+                        ),
+                        None => true,
+                    };
+                    if should_replace {
                         group.best_match = Some((track_idx, spotify_track.clone(), score));
                     }
                 }
@@ -1570,12 +1658,16 @@ fn stream_and_match_spotify_delayed(
                     }
 
                     if score >= ACCEPT_THRESHOLD {
-                        let current_best = group
-                            .best_match
-                            .as_ref()
-                            .map(|(_, _, s)| *s)
-                            .unwrap_or(i32::MIN);
-                        if score > current_best {
+                        let should_replace = match &group.best_match {
+                            Some((_, current_track, current_score)) => is_better_match(
+                                score,
+                                spotify_track.album_type,
+                                *current_score,
+                                current_track.album_type,
+                            ),
+                            None => true,
+                        };
+                        if should_replace {
                             group.best_match = Some((track_idx, spotify_track.clone(), score));
                         }
                     }
@@ -1754,12 +1846,16 @@ fn match_lrclib_to_spotify_normalized(
                     );
 
                     if score >= ACCEPT_THRESHOLD {
-                        let current_best = group
-                            .best_match
-                            .as_ref()
-                            .map(|(_, _, s)| *s)
-                            .unwrap_or(i32::MIN);
-                        if score > current_best {
+                        let should_replace = match &group.best_match {
+                            Some((_, current_track, current_score)) => is_better_match(
+                                score,
+                                spotify_track.album_type,
+                                *current_score,
+                                current_track.album_type,
+                            ),
+                            None => true,
+                        };
+                        if should_replace {
                             group.best_match = Some((track_idx, spotify_track.clone(), score));
                         }
                     }
@@ -1891,10 +1987,11 @@ fn match_pop0_fallback(
 
     // Stream pop=0 tracks and match on-the-fly
     let mut stmt = spotify_conn.prepare(
-        "SELECT t.rowid, t.id, t.name, a.name, t.duration_ms, t.popularity, t.external_id_isrc, t.album_rowid
+        "SELECT t.rowid, t.id, t.name, a.name, t.duration_ms, t.popularity, t.external_id_isrc, t.album_rowid, al.album_type
          FROM tracks t
          JOIN track_artists ta ON ta.track_rowid = t.rowid
          JOIN artists a ON a.rowid = ta.artist_rowid
+         LEFT JOIN albums al ON al.rowid = t.album_rowid
          WHERE t.popularity = 0"
     )?;
 
@@ -1931,6 +2028,7 @@ fn match_pop0_fallback(
 
         // Check if this matches any unmatched group
         if let Some(group_indices) = unmatched_index.get(&key) {
+            let album_type_str: Option<String> = row.get(8)?;
             let spotify_track = SpotifyTrack {
                 id: row.get(1)?,
                 name: title,
@@ -1940,6 +2038,7 @@ fn match_pop0_fallback(
                 popularity: row.get(5)?,
                 isrc: row.get(6)?,
                 album_rowid: row.get(7)?,
+                album_type: SpotifyAlbumType::from(album_type_str.as_deref()),
             };
 
             for &group_idx in group_indices {
@@ -1959,12 +2058,16 @@ fn match_pop0_fallback(
                     );
 
                     if score >= ACCEPT_THRESHOLD {
-                        let current_best = group
-                            .best_match
-                            .as_ref()
-                            .map(|(_, _, s)| *s)
-                            .unwrap_or(i32::MIN);
-                        if score > current_best {
+                        let should_replace = match &group.best_match {
+                            Some((_, current_track, current_score)) => is_better_match(
+                                score,
+                                spotify_track.album_type,
+                                *current_score,
+                                current_track.album_type,
+                            ),
+                            None => true,
+                        };
+                        if should_replace {
                             group.best_match = Some((track_idx, spotify_track.clone(), score));
                         }
                     }
@@ -2196,7 +2299,9 @@ fn title_first_rescue(
     let pb2 = create_progress_bar(rowids_to_fetch.len() as u64, "Scoring rescue candidates");
 
     // Group candidates by group_idx and find best
-    let mut best_per_group: FxHashMap<usize, (i64, f64, i32)> = FxHashMap::default(); // group_idx -> (rowid, similarity, score)
+    // Stores: (rowid, similarity, score, album_type)
+    let mut best_per_group: FxHashMap<usize, (i64, f64, i32, SpotifyAlbumType)> =
+        FxHashMap::default();
 
     for (i, (group_idx, track_rowid, similarity)) in rowids_to_fetch.iter().enumerate() {
         let group = &groups[*group_idx];
@@ -2212,12 +2317,20 @@ fn title_first_rescue(
                 let score = base_score + similarity_bonus;
 
                 if score >= ACCEPT_THRESHOLD {
-                    let current_best = best_per_group
-                        .get(group_idx)
-                        .map(|(_, _, s)| *s)
-                        .unwrap_or(i32::MIN);
-                    if score > current_best {
-                        best_per_group.insert(*group_idx, (*track_rowid, *similarity, score));
+                    let should_replace = match best_per_group.get(group_idx) {
+                        Some((_, _, current_score, current_album_type)) => is_better_match(
+                            score,
+                            spotify_track.album_type,
+                            *current_score,
+                            *current_album_type,
+                        ),
+                        None => true,
+                    };
+                    if should_replace {
+                        best_per_group.insert(
+                            *group_idx,
+                            (*track_rowid, *similarity, score, spotify_track.album_type),
+                        );
                     }
                 }
             }
@@ -2230,7 +2343,7 @@ fn title_first_rescue(
     pb2.finish();
 
     // Phase 6: Apply best matches to groups
-    for (group_idx, (track_rowid, _similarity, score)) in best_per_group.iter() {
+    for (group_idx, (track_rowid, _similarity, score, _album_type)) in best_per_group.iter() {
         if let Some(spotify_track) = track_details.get(track_rowid) {
             let group = &mut groups[*group_idx];
 
@@ -2583,7 +2696,7 @@ fn batch_fetch_track_details(
     for chunk in rowids.chunks(BATCH_SIZE) {
         let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
 
-        // Phase 1: Fetch track data with primary artist
+        // Phase 1: Fetch track data with primary artist and album_type
         let sql = format!(
             r#"SELECT
                 t.rowid,
@@ -2593,11 +2706,13 @@ fn batch_fetch_track_details(
                 t.duration_ms,
                 t.popularity,
                 t.external_id_isrc,
-                t.album_rowid
+                t.album_rowid,
+                al.album_type
             FROM tracks t
             JOIN artists a ON a.rowid = (
                 SELECT MIN(artist_rowid) FROM track_artists WHERE track_rowid = t.rowid
             )
+            LEFT JOIN albums al ON al.rowid = t.album_rowid
             WHERE t.rowid IN ({})"#,
             placeholders
         );
@@ -2610,6 +2725,7 @@ fn batch_fetch_track_details(
         while let Some(row) = rows.next()? {
             let rowid: i64 = row.get(0)?;
             let primary_artist: String = row.get(3)?;
+            let album_type_str: Option<String> = row.get(8)?;
             let track = SpotifyTrack {
                 id: row.get(1)?,
                 name: row.get(2)?,
@@ -2619,6 +2735,7 @@ fn batch_fetch_track_details(
                 popularity: row.get(5)?,
                 isrc: row.get(6)?,
                 album_rowid: row.get(7)?,
+                album_type: SpotifyAlbumType::from(album_type_str.as_deref()),
             };
             result.insert(rowid, track);
         }
@@ -4156,6 +4273,7 @@ mod tests {
             popularity: 64,
             isrc: None,
             album_rowid: 1,
+            album_type: SpotifyAlbumType::Album,
         };
 
         let score = combined_score(&lrclib_track, 40, &spotify_track, "type o negative");
@@ -4189,6 +4307,7 @@ mod tests {
             popularity: 80,
             isrc: None,
             album_rowid: 1,
+            album_type: SpotifyAlbumType::Album,
         };
 
         let score = combined_score(&lrclib_track, 40, &spotify_track, "artist");
@@ -4213,6 +4332,7 @@ mod tests {
             popularity: 80,
             isrc: None,
             album_rowid: 1,
+            album_type: SpotifyAlbumType::Album,
         };
 
         let score = combined_score(&lrclib_track, 40, &spotify_track, "artist one");
@@ -4238,6 +4358,7 @@ mod tests {
             popularity: 50,
             isrc: None,
             album_rowid: 1,
+            album_type: SpotifyAlbumType::Album,
         };
 
         let score = combined_score(&lrclib_track, 40, &spotify_track, "artist");
@@ -4277,6 +4398,7 @@ mod tests {
             popularity: 50,
             isrc: None,
             album_rowid: 1,
+            album_type: SpotifyAlbumType::Album,
         };
 
         let score = combined_score(&lrclib_track, 40, &spotify_track, "artist foo");
@@ -4307,6 +4429,7 @@ mod tests {
             popularity: 70,
             isrc: None,
             album_rowid: 1,
+            album_type: SpotifyAlbumType::Album,
         };
 
         let score = combined_score(&lrclib_track, 40, &spotify_track, "dj artist");
@@ -4344,6 +4467,7 @@ mod tests {
             popularity: 80,
             isrc: None,
             album_rowid: 1,
+            album_type: SpotifyAlbumType::Album,
         };
 
         let score = combined_score(&lrclib_track, 40, &spotify_track, "artist");
@@ -4633,6 +4757,7 @@ mod tests {
             popularity: 85,
             isrc: None,
             album_rowid: 1,
+            album_type: SpotifyAlbumType::Album,
         };
 
         // Search for "dua lipa" - should find match via secondary artist
@@ -4671,6 +4796,7 @@ mod tests {
             popularity: 85,
             isrc: None,
             album_rowid: 1,
+            album_type: SpotifyAlbumType::Album,
         };
 
         // Search for "metallica" - should not match (no artist overlap)
@@ -4680,6 +4806,139 @@ mod tests {
             "Multi-artist match with no artist overlap should be rejected, got {}",
             score
         );
+    }
+
+    // ========================================================================
+    // Album Type Ranking Tests (DBA Spec Section 8.2)
+    // ========================================================================
+
+    #[test]
+    fn test_is_better_match_album_beats_compilation_same_score() {
+        // If two candidates share the same combined_score, album should beat compilation
+        let score = 150;
+        assert!(
+            is_better_match(score, SpotifyAlbumType::Album, score, SpotifyAlbumType::Compilation),
+            "Album should beat compilation with same score"
+        );
+        assert!(
+            !is_better_match(score, SpotifyAlbumType::Compilation, score, SpotifyAlbumType::Album),
+            "Compilation should not beat album with same score"
+        );
+    }
+
+    #[test]
+    fn test_is_better_match_album_beats_single_same_score() {
+        // Album should beat single with same score
+        let score = 150;
+        assert!(
+            is_better_match(score, SpotifyAlbumType::Album, score, SpotifyAlbumType::Single),
+            "Album should beat single with same score"
+        );
+    }
+
+    #[test]
+    fn test_is_better_match_single_beats_compilation_same_score() {
+        // Single should beat compilation with same score
+        let score = 150;
+        assert!(
+            is_better_match(score, SpotifyAlbumType::Single, score, SpotifyAlbumType::Compilation),
+            "Single should beat compilation with same score"
+        );
+    }
+
+    #[test]
+    fn test_is_better_match_viable_compilation_beats_non_viable_album() {
+        // If album is below MIN_VIABLE_MATCH_SCORE but compilation is viable,
+        // compilation should win (viability threshold guardrail)
+        let non_viable_score = MIN_VIABLE_MATCH_SCORE - 10; // 70
+        let viable_score = MIN_VIABLE_MATCH_SCORE + 10; // 90
+
+        assert!(
+            is_better_match(
+                viable_score,
+                SpotifyAlbumType::Compilation,
+                non_viable_score,
+                SpotifyAlbumType::Album
+            ),
+            "Viable compilation should beat non-viable album"
+        );
+    }
+
+    #[test]
+    fn test_is_better_match_non_viable_album_does_not_beat_viable_compilation() {
+        // Non-viable album should NOT beat viable compilation
+        let non_viable_score = MIN_VIABLE_MATCH_SCORE - 10;
+        let viable_score = MIN_VIABLE_MATCH_SCORE + 10;
+
+        assert!(
+            !is_better_match(
+                non_viable_score,
+                SpotifyAlbumType::Album,
+                viable_score,
+                SpotifyAlbumType::Compilation
+            ),
+            "Non-viable album should not beat viable compilation"
+        );
+    }
+
+    #[test]
+    fn test_is_better_match_unknown_ranks_last() {
+        // Unknown album_type should rank after all known types
+        let score = 150;
+        assert!(
+            is_better_match(score, SpotifyAlbumType::Compilation, score, SpotifyAlbumType::Unknown),
+            "Compilation should beat unknown with same score"
+        );
+        assert!(
+            !is_better_match(score, SpotifyAlbumType::Unknown, score, SpotifyAlbumType::Compilation),
+            "Unknown should not beat compilation with same score"
+        );
+    }
+
+    #[test]
+    fn test_is_better_match_higher_score_wins_same_album_type() {
+        // With same album type, higher score should win
+        assert!(
+            is_better_match(160, SpotifyAlbumType::Album, 150, SpotifyAlbumType::Album),
+            "Higher score should beat lower score with same album type"
+        );
+        assert!(
+            !is_better_match(150, SpotifyAlbumType::Album, 160, SpotifyAlbumType::Album),
+            "Lower score should not beat higher score with same album type"
+        );
+    }
+
+    #[test]
+    fn test_is_better_match_both_non_viable_score_wins() {
+        // When both are non-viable, higher score wins regardless of album type
+        let low_score = 50;
+        let high_score = 70;
+
+        assert!(
+            is_better_match(high_score, SpotifyAlbumType::Compilation, low_score, SpotifyAlbumType::Album),
+            "Higher score compilation should beat lower score album when both non-viable"
+        );
+    }
+
+    #[test]
+    fn test_spotify_album_type_rank() {
+        // Test the rank ordering: album < single < compilation < unknown
+        assert!(SpotifyAlbumType::Album.rank() < SpotifyAlbumType::Single.rank());
+        assert!(SpotifyAlbumType::Single.rank() < SpotifyAlbumType::Compilation.rank());
+        assert!(SpotifyAlbumType::Compilation.rank() < SpotifyAlbumType::Unknown.rank());
+    }
+
+    #[test]
+    fn test_spotify_album_type_from_str() {
+        // Test string parsing
+        assert_eq!(SpotifyAlbumType::from(Some("album")), SpotifyAlbumType::Album);
+        assert_eq!(SpotifyAlbumType::from(Some("single")), SpotifyAlbumType::Single);
+        assert_eq!(
+            SpotifyAlbumType::from(Some("compilation")),
+            SpotifyAlbumType::Compilation
+        );
+        assert_eq!(SpotifyAlbumType::from(Some("unknown_value")), SpotifyAlbumType::Unknown);
+        assert_eq!(SpotifyAlbumType::from(None), SpotifyAlbumType::Unknown);
     }
 
     // ========================================================================
