@@ -813,6 +813,8 @@ export default function SongPageClient({
                 onAddToSetlist={() => setShowAddToSetlist(true)}
                 onShareClick={() => setShowShareModal(true)}
                 onInfoClick={() => setShowInfo(true)}
+                hasIssue={loadState.bpm === null}
+                onWarningClick={() => setShowReportModal(true)}
               />
             </div>
           </>

@@ -1,5 +1,4 @@
 export { FloatingActions, type FloatingActionsProps } from "./FloatingActions"
-export { FloatingInfoButton, type FloatingInfoButtonProps } from "./FloatingInfoButton"
 export { LyricLine, type LyricLineProps } from "./LyricLine"
 export { LyricsDisplay, type LyricsDisplayProps } from "./LyricsDisplay"
 export { PageIndicator, type PageIndicatorProps } from "./PageIndicator"

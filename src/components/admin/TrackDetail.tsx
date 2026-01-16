@@ -1,8 +1,9 @@
 "use client"
 
 import { springs } from "@/animations"
-import { Check, Clock, MusicNote, SpotifyLogo, Textbox, X } from "@phosphor-icons/react"
+import { ArrowSquareOut, Check, X } from "@phosphor-icons/react"
 import { motion } from "motion/react"
+import { useCallback, useState } from "react"
 import type { TrackWithEnrichment } from "./TracksList"
 
 // ============================================================================
@@ -11,7 +12,12 @@ import type { TrackWithEnrichment } from "./TracksList"
 
 interface TrackDetailProps {
   track: TrackWithEnrichment
-  renderActions?: (track: TrackWithEnrichment) => React.ReactNode
+  onCopyFromTurso?: (track: TrackWithEnrichment) => Promise<void>
+  onFindSpotify?: (track: TrackWithEnrichment) => void
+  onFetchBpm?: (track: TrackWithEnrichment) => Promise<void>
+  onViewLyrics?: (track: TrackWithEnrichment) => void
+  onDelete?: (track: TrackWithEnrichment) => Promise<void>
+  onRefresh?: () => void
 }
 
 // ============================================================================
@@ -33,79 +39,87 @@ function formatMusicalKey(key: number | null, mode: number | null): string | nul
   return pitch ? `${pitch}${modeStr}` : null
 }
 
-function formatTimeSignature(timeSig: number | null): string | null {
-  if (timeSig === null) return null
-  return `${timeSig}/4`
-}
-
 // ============================================================================
-// Status Row Component
+// Metadata Row Component
 // ============================================================================
 
-interface StatusRowProps {
+function MetadataRow({
+  label,
+  value,
+  actions,
+}: {
   label: string
   value: React.ReactNode
-  hasValue: boolean
-}
-
-function StatusRow({ label, value, hasValue }: StatusRowProps) {
+  actions?: React.ReactNode
+}) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      {hasValue ? (
-        <Check size={14} weight="bold" style={{ color: "var(--color-success)" }} />
-      ) : (
-        <X size={14} weight="bold" style={{ color: "var(--color-text-muted)" }} />
-      )}
-      <span className="font-medium" style={{ color: "var(--color-text3)" }}>
-        {label}:
-      </span>
+    <div
+      className="flex items-start gap-3 py-2 last:border-b-0"
+      style={{ borderBottom: "1px solid var(--color-border)" }}
+    >
       <span
-        className="tabular-nums"
-        style={{ color: hasValue ? "var(--color-text)" : "var(--color-text-muted)" }}
+        className="w-24 shrink-0 text-sm"
+        style={{ color: "var(--color-text-muted)" }}
       >
-        {hasValue ? value : "—"}
+        {label}
       </span>
+      <span className="flex-1 text-sm" style={{ color: "var(--color-text)" }}>
+        {value ?? <span style={{ color: "var(--color-text-muted)" }}>—</span>}
+      </span>
+      {actions && (
+        <span className="shrink-0 flex items-center gap-2">{actions}</span>
+      )}
     </div>
   )
 }
 
 // ============================================================================
-// Section Header Component
+// Inline Action Link
 // ============================================================================
 
-interface SectionHeaderProps {
-  icon: React.ReactNode
-  title: string
-  subtitle?: string
-  status: "complete" | "partial" | "none"
+function InlineAction({
+  label,
+  onClick,
+  loading,
+  variant = "default",
+}: {
+  label: string
+  onClick: () => void
+  loading?: boolean
+  variant?: "default" | "danger"
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="text-xs transition-colors hover:brightness-125 disabled:opacity-50"
+      style={{
+        color: variant === "danger" ? "var(--color-danger)" : "var(--color-accent)",
+      }}
+    >
+      {loading ? "..." : label}
+    </button>
+  )
 }
 
-function SectionHeader({ icon, title, subtitle, status }: SectionHeaderProps) {
-  const statusColors = {
-    complete: "var(--color-success)",
-    partial: "var(--color-warning)",
-    none: "var(--color-text-muted)",
-  }
+// ============================================================================
+// Status Badge
+// ============================================================================
 
+function StatusBadge({ label, active }: { label: string; active: boolean }) {
   return (
-    <div className="flex items-center gap-2 mb-3">
-      <div
-        className="w-8 h-8 rounded-lg flex items-center justify-center"
-        style={{ background: "var(--color-surface2)" }}
-      >
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <h4 className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
-          {title}
-        </h4>
-        {subtitle && (
-          <p className="text-xs" style={{ color: statusColors[status] }}>
-            {subtitle}
-          </p>
-        )}
-      </div>
-    </div>
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full"
+      style={
+        active
+          ? { background: "var(--color-success-soft)", color: "var(--color-success)" }
+          : { background: "var(--color-surface2)", color: "var(--color-text-muted)" }
+      }
+    >
+      {active ? <Check size={10} weight="bold" /> : <X size={10} />}
+      {label}
+    </span>
   )
 }
 
@@ -113,44 +127,61 @@ function SectionHeader({ icon, title, subtitle, status }: SectionHeaderProps) {
 // Main Component
 // ============================================================================
 
-export function TrackDetail({ track, renderActions }: TrackDetailProps) {
-  // Compute Turso enrichment status
-  const tursoSpotifyId = track.spotifyId
+export function TrackDetail({
+  track,
+  onCopyFromTurso,
+  onFindSpotify,
+  onFetchBpm,
+  onViewLyrics,
+  onDelete,
+  onRefresh,
+}: TrackDetailProps) {
+  const [isCopying, setIsCopying] = useState(false)
+  const [isFetchingBpm, setIsFetchingBpm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Computed values
   const tursoTempo = track.tempo
   const tursoKey = formatMusicalKey(track.musicalKey, track.mode)
-  const tursoTimeSig = formatTimeSignature(track.timeSignature)
-  const tursoPopularity = track.popularity
-  const tursoIsrc = track.isrc
-
-  const tursoFieldCount = [
-    tursoSpotifyId,
-    tursoTempo,
-    track.musicalKey !== null,
-    tursoTimeSig,
-    tursoPopularity,
-    tursoIsrc,
-  ].filter(Boolean).length
-  const tursoStatus: "complete" | "partial" | "none" =
-    tursoFieldCount >= 5 ? "complete" : tursoFieldCount > 0 ? "partial" : "none"
-
-  // Compute Neon enrichment status
-  const neonHasEntry = track.inCatalog
   const neonBpm = track.neonBpm
   const neonKey = track.neonMusicalKey
-  const neonBpmSource = track.neonBpmSource
-  const neonHasEnhancement = track.hasEnhancement
-  const neonHasChords = track.hasChordEnhancement
+  const effectiveBpm = neonBpm ?? tursoTempo
+  const effectiveKey = neonKey ?? tursoKey
+  const hasTursoEnrichment = track.spotifyId !== null && track.tempo !== null
 
-  const neonFieldCount = neonHasEntry
-    ? [neonBpm, neonKey, neonHasEnhancement, neonHasChords].filter(Boolean).length
-    : 0
-  const neonStatus: "complete" | "partial" | "none" = neonHasEntry
-    ? neonFieldCount >= 2
-      ? "complete"
-      : neonFieldCount > 0
-        ? "partial"
-        : "none"
-    : "none"
+  // Handlers
+  const handleCopyFromTurso = useCallback(async () => {
+    if (!onCopyFromTurso || isCopying) return
+    setIsCopying(true)
+    try {
+      await onCopyFromTurso(track)
+      onRefresh?.()
+    } finally {
+      setIsCopying(false)
+    }
+  }, [onCopyFromTurso, track, onRefresh, isCopying])
+
+  const handleFetchBpm = useCallback(async () => {
+    if (!onFetchBpm || isFetchingBpm) return
+    setIsFetchingBpm(true)
+    try {
+      await onFetchBpm(track)
+      onRefresh?.()
+    } finally {
+      setIsFetchingBpm(false)
+    }
+  }, [onFetchBpm, track, onRefresh, isFetchingBpm])
+
+  const handleDelete = useCallback(async () => {
+    if (!onDelete || isDeleting) return
+    if (!window.confirm(`Delete "${track.title}" by ${track.artist} from catalog?`)) return
+    setIsDeleting(true)
+    try {
+      await onDelete(track)
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [onDelete, track, isDeleting])
 
   return (
     <motion.div
@@ -159,157 +190,147 @@ export function TrackDetail({ track, renderActions }: TrackDetailProps) {
       transition={springs.default}
       className="p-4"
     >
-      {/* Track Info */}
       <div
-        className="flex items-center gap-6 mb-6 px-4 py-3 rounded-xl text-sm"
+        className="rounded-xl p-4"
         style={{
           background: "var(--color-surface2)",
           border: "1px solid var(--color-border)",
         }}
       >
-        <div className="flex items-center gap-2">
-          <Clock size={16} style={{ color: "var(--color-text-muted)" }} />
-          <span className="font-medium" style={{ color: "var(--color-text3)" }}>
-            Duration:
-          </span>
-          <span className="tabular-nums" style={{ color: "var(--color-text)" }}>
-            {formatDuration(track.durationSec)}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Textbox size={16} style={{ color: "var(--color-text-muted)" }} />
-          <span className="font-medium" style={{ color: "var(--color-text3)" }}>
-            Quality:
-          </span>
-          <span className="tabular-nums" style={{ color: "var(--color-text)" }}>
-            {track.quality}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium" style={{ color: "var(--color-text3)" }}>
-            LRCLIB:
-          </span>
-          <span className="tabular-nums" style={{ color: "var(--color-text)" }}>
-            {track.lrclibId}
-          </span>
-        </div>
-      </div>
+        <h4 className="text-sm font-medium mb-3" style={{ color: "var(--color-text)" }}>
+          Song Metadata
+        </h4>
 
-      {/* Enrichment Status Grid */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Turso (Spotify) Section */}
-        <div
-          className="rounded-xl p-4"
-          style={{
-            background: "var(--color-surface2)",
-            border: "1px solid var(--color-border)",
-          }}
-        >
-          <SectionHeader
-            icon={<SpotifyLogo size={18} style={{ color: "var(--color-accent)" }} />}
-            title="Spotify Metadata"
-            subtitle={
-              tursoStatus === "complete"
-                ? "All fields available"
-                : tursoStatus === "partial"
-                  ? "Partial enrichment"
-                  : "Not enriched"
-            }
-            status={tursoStatus}
-          />
-          <div className="space-y-2">
-            <StatusRow
-              label="Spotify ID"
-              value={tursoSpotifyId}
-              hasValue={tursoSpotifyId !== null}
-            />
-            <StatusRow
-              label="Tempo"
-              value={tursoTempo ? `${Math.round(tursoTempo)} BPM` : null}
-              hasValue={tursoTempo !== null}
-            />
-            <StatusRow
-              label="Key"
-              value={tursoKey ? `${tursoKey} (${tursoTimeSig ?? "4/4"})` : null}
-              hasValue={track.musicalKey !== null}
-            />
-            <StatusRow
-              label="Popularity"
-              value={tursoPopularity !== null ? tursoPopularity : null}
-              hasValue={tursoPopularity !== null}
-            />
-            <StatusRow label="ISRC" value={tursoIsrc} hasValue={tursoIsrc !== null} />
-          </div>
-        </div>
+        <div className="space-y-0">
+          <MetadataRow label="Duration" value={formatDuration(track.durationSec)} />
 
-        {/* Neon (Catalog) Section */}
-        <div
-          className="rounded-xl p-4"
-          style={{
-            background: "var(--color-surface2)",
-            border: "1px solid var(--color-border)",
-          }}
-        >
-          <SectionHeader
-            icon={<MusicNote size={18} style={{ color: "var(--color-accent)" }} />}
-            title="Neon (Catalog)"
-            subtitle={
-              !neonHasEntry
-                ? "Not in catalog"
-                : neonStatus === "complete"
-                  ? "Full enrichment"
-                  : neonStatus === "partial"
-                    ? "Partial enrichment"
-                    : "No enrichment"
-            }
-            status={neonStatus}
-          />
-          <div className="space-y-2">
-            <StatusRow
-              label="In Catalog"
-              value={neonHasEntry ? "Yes" : "No"}
-              hasValue={neonHasEntry}
-            />
-            <StatusRow
-              label="BPM"
-              value={neonBpm ? `${neonBpm} (${neonBpmSource ?? "Unknown"})` : null}
-              hasValue={neonBpm !== null}
-            />
-            <StatusRow label="Musical Key" value={neonKey} hasValue={neonKey !== null} />
-            <StatusRow
-              label="Word-level timing"
-              value={neonHasEnhancement ? "Yes" : "No"}
-              hasValue={neonHasEnhancement}
-            />
-            <StatusRow
-              label="Chord enhancement"
-              value={neonHasChords ? "Yes" : "No"}
-              hasValue={neonHasChords}
-            />
-            {track.totalPlayCount !== null && track.totalPlayCount > 0 && (
-              <div
-                className="flex items-center gap-2 text-sm mt-2 pt-2"
-                style={{ borderTop: "1px solid var(--color-border)" }}
+          <MetadataRow label="Quality" value={track.quality} />
+
+          <MetadataRow
+            label="LRCLIB ID"
+            value={
+              <a
+                href={`https://lrclib.net/api/get/${track.lrclibId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 hover:brightness-125 font-mono"
+                style={{ color: "var(--color-accent)" }}
               >
-                <span style={{ color: "var(--color-text-muted)" }}>Play count:</span>
-                <span className="tabular-nums font-medium" style={{ color: "var(--color-text)" }}>
-                  {track.totalPlayCount.toLocaleString()}
+                {track.lrclibId}
+                <ArrowSquareOut size={12} />
+              </a>
+            }
+            actions={
+              onViewLyrics && (
+                <InlineAction label="View" onClick={() => onViewLyrics(track)} />
+              )
+            }
+          />
+
+          <MetadataRow
+            label="Spotify ID"
+            value={track.spotifyId ? <span className="font-mono">{track.spotifyId}</span> : null}
+            actions={
+              onFindSpotify && (
+                <InlineAction label="Find" onClick={() => onFindSpotify(track)} />
+              )
+            }
+          />
+
+          <MetadataRow
+            label="BPM"
+            value={
+              effectiveBpm ? (
+                <span>
+                  {Math.round(effectiveBpm)}
+                  {track.neonBpmSource && (
+                    <span className="ml-1" style={{ color: "var(--color-text-muted)" }}>
+                      via {track.neonBpmSource}
+                    </span>
+                  )}
+                  {!neonBpm && tursoTempo && (
+                    <span className="ml-1" style={{ color: "var(--color-text-muted)" }}>
+                      (Turso)
+                    </span>
+                  )}
                 </span>
+              ) : null
+            }
+            actions={
+              <>
+                {!effectiveBpm && onFetchBpm && (
+                  <InlineAction
+                    label="Fetch"
+                    onClick={handleFetchBpm}
+                    loading={isFetchingBpm}
+                  />
+                )}
+                {hasTursoEnrichment && !track.inCatalog && onCopyFromTurso && (
+                  <InlineAction
+                    label="Copy from Turso"
+                    onClick={handleCopyFromTurso}
+                    loading={isCopying}
+                  />
+                )}
+              </>
+            }
+          />
+
+          <MetadataRow
+            label="Key"
+            value={effectiveKey}
+          />
+
+          <MetadataRow
+            label="Popularity"
+            value={track.popularity}
+          />
+
+          <MetadataRow
+            label="ISRC"
+            value={track.isrc}
+          />
+
+          <MetadataRow
+            label="Enhancements"
+            value={
+              <div className="flex flex-wrap gap-1.5">
+                <StatusBadge label="Words" active={track.hasEnhancement ?? false} />
+                <StatusBadge label="Chords" active={track.hasChordEnhancement ?? false} />
               </div>
-            )}
-          </div>
+            }
+          />
+
+          <MetadataRow
+            label="Catalog"
+            value={
+              track.inCatalog ? (
+                <span className="inline-flex items-center gap-1">
+                  <Check size={14} weight="bold" style={{ color: "var(--color-success)" }} />
+                  <span style={{ color: "var(--color-success)" }}>In catalog</span>
+                  {track.totalPlayCount !== null && track.totalPlayCount > 0 && (
+                    <span className="ml-2" style={{ color: "var(--color-text-muted)" }}>
+                      ({track.totalPlayCount.toLocaleString()} plays)
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span style={{ color: "var(--color-text-muted)" }}>Not in catalog</span>
+              )
+            }
+            actions={
+              track.inCatalog && onDelete && (
+                <InlineAction
+                  label="Remove"
+                  onClick={handleDelete}
+                  loading={isDeleting}
+                  variant="danger"
+                />
+              )
+            }
+          />
         </div>
       </div>
-
-      {/* Actions */}
-      {renderActions && (
-        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
-          <h4 className="text-sm font-medium mb-3" style={{ color: "var(--color-text3)" }}>
-            Actions
-          </h4>
-          {renderActions(track)}
-        </div>
-      )}
     </motion.div>
   )
 }

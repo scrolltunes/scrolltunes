@@ -4,7 +4,6 @@
  */
 
 import type { Lyrics } from "@/core"
-import { getBpmRace, getBpmWithFallback } from "@/lib/bpm"
 import { logBpmAttempt } from "@/lib/bpm/bpm-log"
 import { db } from "@/lib/db"
 import { chordEnhancements, lrcWordEnhancements, songLrclibIds, songs } from "@/lib/db/schema"
@@ -25,7 +24,6 @@ import {
   getTrackEffect,
   searchTracksEffect,
 } from "@/lib/spotify-client"
-import { BpmProviders } from "@/services/bpm-providers"
 import { ServerLayer } from "@/services/server-layer"
 import { TursoService } from "@/services/turso"
 import { eq } from "drizzle-orm"
@@ -238,71 +236,6 @@ function getEmbeddedTempoFromTurso(lrclibId: number) {
     const result = yield* turso.getById(lrclibId).pipe(Effect.catchAll(() => Effect.succeed(null)))
     return result
   })
-}
-
-// Fire-and-forget BPM fetch for deferred loading
-function fireAndForgetBpmFetch(
-  songId: string,
-  lrclibId: number,
-  title: string,
-  artist: string,
-  spotifyId: string | undefined,
-) {
-  const loggingContext = { lrclibId, songId, title, artist }
-
-  const bpmEffect = BpmProviders.pipe(
-    Effect.flatMap(service => {
-      const { fallbackProviders, raceProviders, lastResortProvider } =
-        service.withLogging(loggingContext)
-      const bpmQuery = { title, artist, spotifyId }
-
-      const primaryBpmEffect = spotifyId
-        ? getBpmRace(raceProviders, bpmQuery)
-        : getBpmWithFallback(fallbackProviders, bpmQuery)
-
-      const bpmWithLastResort = spotifyId
-        ? primaryBpmEffect.pipe(
-            Effect.catchAll(error =>
-              error._tag === "BPMNotFoundError"
-                ? lastResortProvider.getBpm(bpmQuery)
-                : Effect.fail(error),
-            ),
-          )
-        : primaryBpmEffect
-
-      return bpmWithLastResort.pipe(
-        Effect.catchAll(error => {
-          if (error._tag === "BPMAPIError") {
-            console.error("BPM API error:", error.status, error.message)
-          }
-          return Effect.succeed(null)
-        }),
-        Effect.catchAllDefect(defect => {
-          console.error("BPM defect:", defect)
-          return Effect.succeed(null)
-        }),
-      )
-    }),
-    Effect.flatMap(bpmResult => {
-      if (!bpmResult) return Effect.succeed(null)
-      return Effect.promise(async () => {
-        await db
-          .update(songs)
-          .set({
-            bpm: bpmResult.bpm,
-            musicalKey: bpmResult.key ?? null,
-            bpmSource: bpmResult.source,
-            updatedAt: new Date(),
-          })
-          .where(eq(songs.id, songId))
-        return bpmResult
-      })
-    }),
-  )
-
-  Effect.runPromise(bpmEffect.pipe(Effect.provide(ServerLayer))).catch(err =>
-    console.error("[BPM] Background fetch failed:", err),
-  )
 }
 
 // Fire-and-forget catalog update with album art
@@ -569,17 +502,6 @@ export async function loadSongData(
         errorReason: "not_found",
         latencyMs: Date.now() - tursoStart,
       })
-
-      // Priority 3: Defer BPM fetching to background provider cascade
-      if (cachedSong) {
-        fireAndForgetBpmFetch(
-          cachedSong.songId,
-          actualLrclibId,
-          lyrics.title,
-          lyrics.artist,
-          resolvedSpotifyId,
-        )
-      }
     }
   }
 

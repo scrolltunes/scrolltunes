@@ -85,49 +85,65 @@ const syncHistory = (request: Request) =>
           hasSyncedLyrics: true,
         })
 
-        const [catalogSong] = yield* Effect.tryPromise({
+        // First, check if song already exists
+        const [existingSong] = yield* Effect.tryPromise({
           try: () =>
             db
-              .insert(songs)
-              .values({
-                title: prepared.title,
-                artist: prepared.artist,
-                album: prepared.album ?? "",
-                durationMs: prepared.durationMs,
-                artistLower: prepared.artistLower,
-                titleLower: prepared.titleLower,
-                albumLower: prepared.albumLower,
-                hasSyncedLyrics: prepared.hasSyncedLyrics,
-                totalPlayCount: playCount,
-              })
-              .onConflictDoUpdate({
-                target: [songs.artistLower, songs.titleLower],
-                set: {
-                  ...(prepared.album && { album: prepared.album, albumLower: prepared.albumLower }),
-                  ...(prepared.durationMs && { durationMs: prepared.durationMs }),
-                  totalPlayCount: sql`${songs.totalPlayCount} + ${playCount}`,
-                  updatedAt: now,
-                },
-              })
-              .returning({ id: songs.id }),
+              .select({ id: songs.id })
+              .from(songs)
+              .where(
+                and(
+                  eq(songs.artistLower, prepared.artistLower),
+                  eq(songs.titleLower, prepared.titleLower),
+                ),
+              ),
           catch: cause => new SyncError({ cause }),
         })
 
-        // Link lrclibId to the song
-        if (catalogSong) {
-          yield* Effect.tryPromise({
+        let catalogSongId: string
+
+        if (existingSong) {
+          // Song exists - don't increment play count, just use existing ID
+          catalogSongId = existingSong.id
+        } else {
+          // Song doesn't exist - insert with initial play count
+          const [newSong] = yield* Effect.tryPromise({
             try: () =>
               db
-                .insert(songLrclibIds)
+                .insert(songs)
                 .values({
-                  songId: catalogSong.id,
-                  lrclibId,
-                  isPrimary: true,
+                  title: prepared.title,
+                  artist: prepared.artist,
+                  album: prepared.album ?? "",
+                  durationMs: prepared.durationMs,
+                  artistLower: prepared.artistLower,
+                  titleLower: prepared.titleLower,
+                  albumLower: prepared.albumLower,
+                  hasSyncedLyrics: prepared.hasSyncedLyrics,
+                  totalPlayCount: playCount,
                 })
-                .onConflictDoNothing(),
+                .onConflictDoNothing()
+                .returning({ id: songs.id }),
             catch: cause => new SyncError({ cause }),
           })
+
+          if (!newSong) continue // Race condition - song was inserted by another request
+          catalogSongId = newSong.id
         }
+
+        // Link lrclibId to the song
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .insert(songLrclibIds)
+              .values({
+                songId: catalogSongId,
+                lrclibId,
+                isPrimary: true,
+              })
+              .onConflictDoNothing(),
+          catch: cause => new SyncError({ cause }),
+        })
       }
 
       // Sync to user history

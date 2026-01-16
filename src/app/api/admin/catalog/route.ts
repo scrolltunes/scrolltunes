@@ -167,7 +167,10 @@ const getCatalog = (params: {
             )`.as("last_played_at"),
           })
           .from(songs)
-          .leftJoin(songLrclibIds, eq(songs.id, songLrclibIds.songId))
+          .leftJoin(
+            songLrclibIds,
+            and(eq(songs.id, songLrclibIds.songId), eq(songLrclibIds.isPrimary, true)),
+          )
           .where(whereClause)
           .orderBy(orderByClause)
           .limit(params.limit)

@@ -7,7 +7,6 @@ import {
   CatalogTrackLoadingRow,
   CatalogTrackRow,
 } from "@/components/admin/CatalogTrackRow"
-import { EnrichmentActions } from "@/components/admin/EnrichmentActions"
 import {
   SearchEmptyState,
   SearchResultLoadingRow,
@@ -311,13 +310,6 @@ export default function AdminTracksPage() {
     [catalogData],
   )
 
-  // Handler: Manual BPM
-  const handleManualBpm = useCallback((track: TrackWithEnrichment) => {
-    if (track.neonSongId) {
-      window.open(`/admin/songs/${track.neonSongId}`, "_blank")
-    }
-    // If not in catalog, the action is effectively a no-op
-  }, [])
 
   // Handler: View Lyrics
   const handleViewLyrics = useCallback((track: TrackWithEnrichment) => {
@@ -373,18 +365,12 @@ export default function AdminTracksPage() {
       return (
         <TrackDetail
           track={enrichmentTrack}
-          renderActions={t => (
-            <EnrichmentActions
-              track={t}
-              onCopyFromTurso={handleCopyFromTurso}
-              onFindSpotify={handleFindSpotify}
-              onFetchBpm={handleFetchBpm}
-              onManualBpm={handleManualBpm}
-              onViewLyrics={handleViewLyrics}
-              onDelete={handleDelete}
-              onRefresh={() => catalogData.mutate()}
-            />
-          )}
+          onCopyFromTurso={handleCopyFromTurso}
+          onFindSpotify={handleFindSpotify}
+          onFetchBpm={handleFetchBpm}
+          onViewLyrics={handleViewLyrics}
+          onDelete={handleDelete}
+          onRefresh={() => catalogData.mutate()}
         />
       )
     },
@@ -392,7 +378,6 @@ export default function AdminTracksPage() {
       handleCopyFromTurso,
       handleFindSpotify,
       handleFetchBpm,
-      handleManualBpm,
       handleViewLyrics,
       handleDelete,
       catalogData,
