@@ -5,7 +5,7 @@
  * Uses Vercel KV (Upstash Redis) to track monthly usage and prevent overages.
  */
 
-import { type FetchError, FetchService } from "@/services/fetch"
+import { type FetchError, HttpFetchService } from "@/services/fetch"
 import { PublicConfig } from "@/services/public-config"
 import { ServerConfig } from "@/services/server-config"
 import { Redis } from "@upstash/redis"
@@ -122,7 +122,7 @@ export class SpeechUsageTracker extends Context.Tag("SpeechUsageTracker")<
 const makeSpeechUsageTracker = Effect.gen(function* () {
   const { kvRestApiUrl, kvRestApiToken } = yield* ServerConfig
   const { web3FormsAccessKey } = yield* PublicConfig
-  const { fetch } = yield* FetchService
+  const { fetch } = yield* HttpFetchService
 
   const redis = new Redis({ url: kvRestApiUrl, token: kvRestApiToken })
 

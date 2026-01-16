@@ -1,72 +1,123 @@
 /**
- * Album art resolution with three-tier priority chain:
+ * Album art resolution with priority chain:
  * 1. Stored URL from Turso (instant, pre-enriched from Spotify dump)
- * 2. Deezer ISRC lookup (direct, ~100ms)
- * 3. Deezer search fallback (~200ms)
+ * 2. Spotify API lookup by ID (if spotifyId available, ~100ms)
+ * 3. Race: Spotify search vs Deezer search (~200ms)
  */
 
-import { type AlbumArtSize, getAlbumArt } from "@/lib/deezer-client"
+import { type AlbumArtSize, getAlbumArt as getDeezerAlbumArt } from "@/lib/deezer-client"
+import { SpotifyService } from "@/lib/spotify-client"
 import type { TursoSearchResult } from "@/services/turso"
 import { Effect } from "effect"
 
 /**
- * Fetch album art from Deezer by ISRC (International Standard Recording Code)
- * Returns the cover URL or null if not found
+ * Get album image URL from Spotify track, preferring ~300px size
  */
-const fetchDeezerByIsrc = (
-  isrc: string,
-  size: AlbumArtSize = "medium",
+function getSpotifyImageUrl(
+  images: readonly { url: string; height: number | null; width: number | null }[],
+  size: AlbumArtSize,
+): string | null {
+  if (images.length === 0) return null
+
+  // Target heights for each size
+  const targetHeight = size === "small" ? 64 : size === "medium" ? 300 : size === "big" ? 640 : 640
+
+  // Sort by distance from target height
+  const sorted = [...images].sort((a, b) => {
+    const aDist = Math.abs((a.height ?? 0) - targetHeight)
+    const bDist = Math.abs((b.height ?? 0) - targetHeight)
+    return aDist - bDist
+  })
+
+  return sorted[0]?.url ?? null
+}
+
+/**
+ * Fetch album art from Spotify by track ID
+ */
+const fetchSpotifyById = (
+  spotifyId: string,
+  size: AlbumArtSize,
+): Effect.Effect<string | null, never, SpotifyService> =>
+  Effect.gen(function* () {
+    const spotify = yield* SpotifyService
+    const track = yield* spotify.getTrack(spotifyId).pipe(
+      Effect.catchAll(() => Effect.succeed(null)),
+    )
+    if (!track) return null
+    return getSpotifyImageUrl(track.album.images, size)
+  })
+
+/**
+ * Search Spotify for album art by artist and title
+ */
+const searchSpotify = (
+  artist: string,
+  title: string,
+  size: AlbumArtSize,
+): Effect.Effect<string | null, never, SpotifyService> =>
+  Effect.gen(function* () {
+    const spotify = yield* SpotifyService
+    const query = `${title} ${artist}`
+    const result = yield* spotify.searchTracks(query, 1).pipe(
+      Effect.catchAll(() => Effect.succeed(null)),
+    )
+    if (!result?.tracks?.items?.[0]) return null
+    return getSpotifyImageUrl(result.tracks.items[0].album.images, size)
+  })
+
+/**
+ * Search Deezer for album art by artist and title
+ */
+const searchDeezer = (
+  artist: string,
+  title: string,
+  size: AlbumArtSize,
 ): Effect.Effect<string | null, never, never> =>
   Effect.tryPromise({
-    try: async () => {
-      const response = await fetch(`https://api.deezer.com/track/isrc:${isrc}`, {
-        cache: "force-cache",
-        next: { revalidate: 86400 }, // 24 hours
-      })
-      if (!response.ok) return null
-      const data = (await response.json()) as {
-        album?: {
-          cover_small?: string
-          cover_medium?: string
-          cover_big?: string
-          cover_xl?: string
-        }
-      }
-      const sizeKey = `cover_${size}` as const
-      return data.album?.[sizeKey] ?? null
-    },
+    try: () => getDeezerAlbumArt(artist, title, size),
     catch: () => null,
   }).pipe(Effect.catchAll(() => Effect.succeed(null)))
 
 /**
  * Get album art for a track using priority chain:
  * 1. Stored URL from Turso (instant)
- * 2. Deezer ISRC lookup (~100ms)
- * 3. Deezer search fallback (~200ms)
+ * 2. Spotify API by ID (if spotifyId available)
+ * 3. Race: Spotify search vs Deezer search
  */
 export const getAlbumArtForTrack = (
   track: TursoSearchResult,
   size: AlbumArtSize = "medium",
-): Effect.Effect<string | null, never, never> =>
+): Effect.Effect<string | null, never, SpotifyService> =>
   Effect.gen(function* () {
     // Priority 1: Stored URL from Spotify dump (instant)
     if (track.albumImageUrl) {
       return track.albumImageUrl
     }
 
-    // Priority 2: Deezer ISRC lookup (direct, ~100ms)
-    if (track.isrc) {
-      const isrcResult = yield* fetchDeezerByIsrc(track.isrc, size)
-      if (isrcResult) return isrcResult
+    // Priority 2: Spotify API by ID (if we have spotifyId)
+    if (track.spotifyId) {
+      const spotifyResult = yield* fetchSpotifyById(track.spotifyId, size)
+      if (spotifyResult) return spotifyResult
     }
 
-    // Priority 3: Deezer search fallback (~200ms)
-    const searchResult = yield* Effect.tryPromise({
-      try: () => getAlbumArt(track.artist, track.title, size),
-      catch: () => null,
-    }).pipe(Effect.catchAll(() => Effect.succeed(null)))
+    // Priority 3: Race between Spotify search and Deezer search
+    const spotifySearch = searchSpotify(track.artist, track.title, size)
+    const deezerSearch = searchDeezer(track.artist, track.title, size)
 
-    return searchResult
+    // Race both searches, return first non-null result
+    const raceResult = yield* Effect.raceAll([
+      spotifySearch.pipe(Effect.map(r => ({ source: "spotify" as const, url: r }))),
+      deezerSearch.pipe(Effect.map(r => ({ source: "deezer" as const, url: r }))),
+    ]).pipe(
+      Effect.flatMap(result => {
+        if (result.url) return Effect.succeed(result.url)
+        // First one returned null, wait for the other
+        return result.source === "spotify" ? deezerSearch : spotifySearch
+      }),
+    )
+
+    return raceResult
   })
 
 /**
@@ -75,39 +126,27 @@ export const getAlbumArtForTrack = (
  */
 export const getLargeAlbumArt = (
   track: TursoSearchResult,
-): Effect.Effect<string | null, never, never> =>
+): Effect.Effect<string | null, never, SpotifyService> =>
   Effect.gen(function* () {
-    // For large images, prefer runtime lookup for quality
-    // Stored URLs are medium (300px), we need large (640px+)
-
-    // Priority 1: Deezer ISRC lookup (returns multiple sizes)
-    if (track.isrc) {
-      const isrcResult = yield* Effect.tryPromise({
-        try: async () => {
-          const response = await fetch(`https://api.deezer.com/track/isrc:${track.isrc}`, {
-            cache: "force-cache",
-            next: { revalidate: 86400 },
-          })
-          if (!response.ok) return null
-          const data = (await response.json()) as {
-            album?: {
-              cover_xl?: string
-              cover_big?: string
-            }
-          }
-          return data.album?.cover_xl ?? data.album?.cover_big ?? null
-        },
-        catch: () => null,
-      }).pipe(Effect.catchAll(() => Effect.succeed(null)))
-
-      if (isrcResult) return isrcResult
+    // Priority 1: Spotify API by ID (if we have spotifyId)
+    if (track.spotifyId) {
+      const spotifyResult = yield* fetchSpotifyById(track.spotifyId, "xl")
+      if (spotifyResult) return spotifyResult
     }
 
-    // Priority 2: Deezer search for large image
-    const searchResult = yield* Effect.tryPromise({
-      try: () => getAlbumArt(track.artist, track.title, "xl"),
-      catch: () => null,
-    }).pipe(Effect.catchAll(() => Effect.succeed(null)))
+    // Priority 2: Race between Spotify search and Deezer search
+    const spotifySearch = searchSpotify(track.artist, track.title, "xl")
+    const deezerSearch = searchDeezer(track.artist, track.title, "xl")
 
-    return searchResult
+    const raceResult = yield* Effect.raceAll([
+      spotifySearch.pipe(Effect.map(r => ({ source: "spotify" as const, url: r }))),
+      deezerSearch.pipe(Effect.map(r => ({ source: "deezer" as const, url: r }))),
+    ]).pipe(
+      Effect.flatMap(result => {
+        if (result.url) return Effect.succeed(result.url)
+        return result.source === "spotify" ? deezerSearch : spotifySearch
+      }),
+    )
+
+    return raceResult
   })

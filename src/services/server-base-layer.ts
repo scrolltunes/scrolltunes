@@ -1,6 +1,6 @@
 import { Layer } from "effect"
 import { AppConfigProviderLive } from "./config-provider"
-import { FetchServiceLive } from "./fetch"
+import { HttpFetchServiceLive } from "./fetch"
 import { PublicConfigLive } from "./public-config"
 import { ServerConfigLive } from "./server-config"
 
@@ -8,4 +8,4 @@ export const ConfigLayer = Layer.mergeAll(PublicConfigLive, ServerConfigLive).pi
   Layer.provide(AppConfigProviderLive),
 )
 
-export const ServerBaseLayer = Layer.mergeAll(ConfigLayer, FetchServiceLive)
+export const ServerBaseLayer = Layer.mergeAll(ConfigLayer, HttpFetchServiceLive)

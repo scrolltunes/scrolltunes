@@ -1,4 +1,4 @@
-import { FetchService } from "@/services/fetch"
+import { HttpFetchService } from "@/services/fetch"
 import { ServerBaseLayer } from "@/services/server-base-layer"
 import { ServerConfig } from "@/services/server-config"
 import { Context, Data, Effect, Layer } from "effect"
@@ -106,7 +106,7 @@ const getCredentials = () =>
   )
 
 const fetchResponse = (url: string, init?: RequestInit, message = "Network error") =>
-  FetchService.pipe(
+  HttpFetchService.pipe(
     Effect.flatMap(({ fetch }) =>
       fetch(url, init).pipe(Effect.mapError(() => new SpotifyAPIError({ status: 0, message }))),
     ),
@@ -246,12 +246,12 @@ const getAudioFeaturesRaw = (trackId: string) =>
 
 const makeSpotifyService = Effect.gen(function* () {
   const serverConfig = yield* ServerConfig
-  const fetchService = yield* FetchService
+  const fetchService = yield* HttpFetchService
 
   const provideDeps = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(ServerConfig, serverConfig),
-      Effect.provideService(FetchService, fetchService),
+      Effect.provideService(HttpFetchService, fetchService),
     )
 
   return {

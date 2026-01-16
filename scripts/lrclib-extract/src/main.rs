@@ -241,6 +241,9 @@ pub struct MatchingStats {
     pub total_matches: usize,
     pub total_failures: usize,
 
+    // Data quality
+    pub missing_album_art: usize, // Matched tracks without album_image_url
+
     // Timing
     pub elapsed_seconds: f64,
 }
@@ -4359,7 +4362,7 @@ fn load_album_images_batched(
     conn: &Connection,
     album_rowids: &FxHashSet<i64>,
 ) -> Result<FxHashMap<i64, String>> {
-    println!(
+    info!(
         "[IMAGES] Loading album images (batched for {} albums)...",
         album_rowids.len()
     );
@@ -4371,7 +4374,7 @@ fn load_album_images_batched(
         return Ok(lookup);
     }
 
-    // Batch by 999 (SQLite parameter limit)
+    // Pass 1: Get ~300px images (height 250-350)
     for chunk in rowids_vec.chunks(999) {
         let placeholders = vec!["?"; chunk.len()].join(",");
         let sql = format!(
@@ -4398,7 +4401,52 @@ fn load_album_images_batched(
         }
     }
 
-    println!(
+    let found_count = lookup.len();
+
+    // Pass 2: For albums without ~300px images, get nearest larger size (>300)
+    let missing: Vec<i64> = rowids_vec
+        .iter()
+        .filter(|id| !lookup.contains_key(id))
+        .copied()
+        .collect();
+
+    if !missing.is_empty() {
+        for chunk in missing.chunks(999) {
+            let placeholders = vec!["?"; chunk.len()].join(",");
+            let sql = format!(
+                r#"
+                SELECT album_rowid, url, height
+                FROM album_images
+                WHERE album_rowid IN ({})
+                  AND height > 300
+                ORDER BY height ASC
+            "#,
+                placeholders
+            );
+
+            let mut stmt = conn.prepare(&sql)?;
+            let params: Vec<&dyn rusqlite::ToSql> =
+                chunk.iter().map(|r| r as &dyn rusqlite::ToSql).collect();
+
+            let mut rows = stmt.query(params.as_slice())?;
+            while let Some(row) = rows.next()? {
+                let album_rowid: i64 = row.get(0)?;
+                let url: String = row.get(1)?;
+                // Only keep first (smallest > 300) per album
+                lookup.entry(album_rowid).or_insert(url);
+            }
+        }
+
+        let fallback_count = lookup.len() - found_count;
+        if fallback_count > 0 {
+            info!(
+                "[IMAGES] Found {} fallback images (nearest larger size)",
+                fallback_count
+            );
+        }
+    }
+
+    info!(
         "[IMAGES] Loaded {} album image URLs (batched)",
         lookup.len()
     );
@@ -5641,6 +5689,10 @@ fn run_extract(args: ExtractArgs) -> Result<()> {
     // Finalize stats (spec-07)
     stats.total_matches = matched_count;
     stats.total_failures = enriched_tracks.len() - matched_count;
+    stats.missing_album_art = enriched_tracks
+        .iter()
+        .filter(|t| t.spotify_id.is_some() && t.album_image_url.is_none())
+        .count();
     stats.elapsed_seconds = elapsed.as_secs_f64();
 
     // Log final stats to stderr
@@ -5657,6 +5709,12 @@ fn run_extract(args: ExtractArgs) -> Result<()> {
     println!("  Tracks: {}", enriched_tracks.len());
     if args.spotify.is_some() {
         println!("  Spotify matches: {} ({:.1}%)", matched_count, match_rate);
+        if stats.missing_album_art > 0 {
+            println!(
+                "  Missing album art: {} (matched but no image)",
+                stats.missing_album_art
+            );
+        }
     }
     println!("  Output size: {:.2} MB", file_size as f64 / 1_048_576.0);
     println!("  Elapsed: {:.2}s", elapsed.as_secs_f64());

@@ -6,8 +6,8 @@ import { Layer } from "effect"
 import type { AnalyticsService } from "./analytics"
 import { AnalyticsServiceLive } from "./analytics"
 import { AppConfigProviderLive } from "./config-provider"
-import type { FetchService } from "./fetch"
-import { FetchServiceLive } from "./fetch"
+import type { HttpFetchService } from "./fetch"
+import { HttpFetchServiceLive } from "./fetch"
 import type { PublicConfig } from "./public-config"
 import { PublicConfigLive } from "./public-config"
 import type { SoundSystemService } from "./sound-system"
@@ -17,7 +17,7 @@ import { StorageServiceLive } from "./storage"
 
 export type ClientLayerContext =
   | AnalyticsService
-  | FetchService
+  | HttpFetchService
   | PublicConfig
   | SoundSystemService
   | StorageService
@@ -28,7 +28,7 @@ const ClientConfigLayer = PublicConfigLive.pipe(Layer.provide(AppConfigProviderL
 
 export const ClientLayer = Layer.mergeAll(
   AnalyticsServiceLive,
-  FetchServiceLive,
+  HttpFetchServiceLive,
   ClientConfigLayer,
   SoundSystemLive,
   StorageServiceLive,

@@ -5,8 +5,8 @@ export class FetchError extends Data.TaggedClass("FetchError")<{
   readonly cause: unknown
 }> {}
 
-export class FetchService extends Context.Tag("FetchService")<
-  FetchService,
+export class HttpFetchService extends Context.Tag("HttpFetchService")<
+  HttpFetchService,
   {
     readonly fetch: (
       input: RequestInfo | URL,
@@ -15,7 +15,7 @@ export class FetchService extends Context.Tag("FetchService")<
   }
 >() {}
 
-export const FetchServiceLive = Layer.succeed(FetchService, {
+export const HttpFetchServiceLive = Layer.succeed(HttpFetchService, {
   fetch: (input, init) =>
     Effect.tryPromise({
       try: () => fetch(input, init),

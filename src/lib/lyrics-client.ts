@@ -23,7 +23,7 @@
  */
 
 import type { Lyrics } from "@/core"
-import { FetchService } from "@/services/fetch"
+import { HttpFetchService } from "@/services/fetch"
 import { Data, Effect } from "effect"
 import { parseLRC } from "./lyrics-parser"
 import { type SpotifyService, formatArtists, searchTracksEffect } from "./spotify-client"
@@ -61,8 +61,8 @@ export class LyricsInvalidError extends Data.TaggedClass("LyricsInvalidError")<{
 
 export type LyricsError = LyricsNotFoundError | LyricsAPIError | LyricsInvalidError
 
-type LyricsClientEnv = FetchService
-type LyricsSpotifyEnv = FetchService | SpotifyService
+type LyricsClientEnv = HttpFetchService
+type LyricsSpotifyEnv = HttpFetchService | SpotifyService
 
 // --- API Response Types ---
 
@@ -88,8 +88,8 @@ const fetchResponse = (
   url: string,
   init?: RequestInit,
   message = "Network error",
-): Effect.Effect<Response, LyricsAPIError, FetchService> =>
-  FetchService.pipe(
+): Effect.Effect<Response, LyricsAPIError, HttpFetchService> =>
+  HttpFetchService.pipe(
     Effect.flatMap(({ fetch }) =>
       fetch(url, init).pipe(Effect.mapError(() => new LyricsAPIError({ status: 0, message }))),
     ),

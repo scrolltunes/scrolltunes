@@ -16,7 +16,7 @@ import type { CachedLyrics, RecentSong } from "@/lib/recent-songs-types"
 import { LYRICS_CACHE_TTL_MS } from "@/lib/recent-songs-types"
 import type { TopCatalogSong } from "@/lib/sync-service"
 import { Context, Data, Effect, Layer } from "effect"
-import { FetchService } from "./fetch"
+import { HttpFetchService } from "./fetch"
 import { StorageService } from "./storage"
 
 export class PrefetchError extends Data.TaggedClass("PrefetchError")<{
@@ -29,13 +29,13 @@ export class LyricsPrefetchService extends Context.Tag("LyricsPrefetchService")<
   {
     readonly prefetchLyrics: (
       id: number,
-    ) => Effect.Effect<PrefetchedLyricsData | null, PrefetchError, FetchService>
+    ) => Effect.Effect<PrefetchedLyricsData | null, PrefetchError, HttpFetchService>
     readonly prefetchMultiple: (
       ids: readonly number[],
-    ) => Effect.Effect<readonly PrefetchedLyricsData[], never, FetchService | StorageService>
+    ) => Effect.Effect<readonly PrefetchedLyricsData[], never, HttpFetchService | StorageService>
     readonly prefetchTopSongs: (
       limit?: number,
-    ) => Effect.Effect<readonly PrefetchedLyricsData[], never, FetchService | StorageService>
+    ) => Effect.Effect<readonly PrefetchedLyricsData[], never, HttpFetchService | StorageService>
     readonly isCached: (id: number) => Effect.Effect<boolean, never, StorageService>
     readonly cacheLyrics: (
       id: number,
@@ -114,9 +114,9 @@ const cacheLyricsImpl = (
 
 const prefetchLyricsImpl = (
   id: number,
-): Effect.Effect<PrefetchedLyricsData | null, PrefetchError, FetchService> =>
+): Effect.Effect<PrefetchedLyricsData | null, PrefetchError, HttpFetchService> =>
   Effect.gen(function* () {
-    const fetchSvc = yield* FetchService
+    const fetchSvc = yield* HttpFetchService
 
     const response = yield* fetchSvc
       .fetch(`/api/lyrics/${id}`)
@@ -181,7 +181,7 @@ const prefetchLyricsImpl = (
 
 const prefetchMultipleImpl = (
   ids: readonly number[],
-): Effect.Effect<readonly PrefetchedLyricsData[], never, FetchService | StorageService> =>
+): Effect.Effect<readonly PrefetchedLyricsData[], never, HttpFetchService | StorageService> =>
   Effect.gen(function* () {
     // Filter out already cached IDs
     const uncachedIds = yield* Effect.filter(ids, id =>
@@ -211,9 +211,9 @@ const prefetchMultipleImpl = (
 
 const prefetchTopSongsImpl = (
   limit = 20,
-): Effect.Effect<readonly PrefetchedLyricsData[], never, FetchService | StorageService> =>
+): Effect.Effect<readonly PrefetchedLyricsData[], never, HttpFetchService | StorageService> =>
   Effect.gen(function* () {
-    const fetchSvc = yield* FetchService
+    const fetchSvc = yield* HttpFetchService
 
     const response = yield* fetchSvc
       .fetch(`/api/songs/top?limit=${limit}`)
@@ -283,7 +283,7 @@ export const runPrefetchRecents = (recents: readonly RecentSong[]): Promise<void
  */
 const refreshMetadataImpl = (
   id: number,
-): Effect.Effect<PrefetchedLyricsData | null, never, FetchService | StorageService> =>
+): Effect.Effect<PrefetchedLyricsData | null, never, HttpFetchService | StorageService> =>
   prefetchLyricsImpl(id).pipe(
     Effect.flatMap(data => {
       if (!data) return Effect.succeed(null)

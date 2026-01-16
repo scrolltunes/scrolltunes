@@ -3,7 +3,8 @@ import { getAlbumArt } from "@/lib/deezer-client"
 import { type LRCLibTrackResult, searchLRCLibTracks } from "@/lib/lyrics-client"
 import { normalizeAlbumName, normalizeArtistName, normalizeTrackName } from "@/lib/normalize-track"
 import type { SearchResultTrack } from "@/lib/search-api-types"
-import type { FetchService } from "@/services/fetch"
+import type { SpotifyService } from "@/lib/spotify-client"
+import type { HttpFetchService } from "@/services/fetch"
 import type { ServerConfig } from "@/services/server-config"
 import { ServerLayer } from "@/services/server-layer"
 import { type TursoSearchResult, TursoService } from "@/services/turso"
@@ -18,14 +19,14 @@ import { type NextRequest, NextResponse } from "next/server"
  */
 
 /**
- * Enrich a Turso search result with album art using three-tier priority:
+ * Enrich a Turso search result with album art using priority chain:
  * 1. Stored URL from Turso (instant)
- * 2. Deezer ISRC lookup (~100ms)
- * 3. Deezer search fallback (~200ms)
+ * 2. Spotify API by ID (if spotifyId available)
+ * 3. Race: Spotify search vs Deezer search
  */
 function enrichWithAlbumArt(
   result: TursoSearchResult,
-): Effect.Effect<SearchResultTrack, never, FetchService> {
+): Effect.Effect<SearchResultTrack, never, SpotifyService> {
   return Effect.gen(function* () {
     const albumArt = yield* getAlbumArtForTrack(result, "medium")
 
@@ -51,7 +52,7 @@ function enrichWithAlbumArt(
 function searchTurso(
   query: string,
   limit: number,
-): Effect.Effect<SearchResultTrack[], never, TursoService | ServerConfig | FetchService> {
+): Effect.Effect<SearchResultTrack[], never, TursoService | ServerConfig | SpotifyService> {
   return Effect.gen(function* () {
     const turso = yield* TursoService
     const results = yield* turso.search(query, limit).pipe(
@@ -83,7 +84,7 @@ function searchTurso(
 function searchLRCLibFallback(
   query: string,
   limit: number,
-): Effect.Effect<SearchResultTrack[], never, FetchService> {
+): Effect.Effect<SearchResultTrack[], never, HttpFetchService> {
   return Effect.gen(function* () {
     const results = yield* searchLRCLibTracks(query).pipe(
       Effect.catchAll(() => Effect.succeed([] as readonly LRCLibTrackResult[])),
@@ -140,7 +141,7 @@ function searchLRCLibFallback(
 function search(
   query: string,
   limit: number,
-): Effect.Effect<SearchResultTrack[], never, FetchService | TursoService | ServerConfig> {
+): Effect.Effect<SearchResultTrack[], never, SpotifyService | TursoService | ServerConfig | HttpFetchService> {
   return searchTurso(query, limit).pipe(
     Effect.flatMap(results => {
       if (results.length > 0) {

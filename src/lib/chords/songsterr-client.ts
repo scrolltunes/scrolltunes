@@ -6,7 +6,7 @@
  * - Fetch ChordPro data from song pages
  */
 
-import { FetchService } from "@/services/fetch"
+import { HttpFetchService } from "@/services/fetch"
 import { ServerBaseLayer } from "@/services/server-base-layer"
 import { Context, Effect, Layer } from "effect"
 import type {
@@ -73,7 +73,7 @@ export class SongsterrService extends Context.Tag("SongsterrService")<
 >() {}
 
 const makeSongsterrService = Effect.gen(function* () {
-  const { fetch } = yield* FetchService
+  const { fetch } = yield* HttpFetchService
 
   const fetchResponse = (url: string, init?: RequestInit, message = "Network error") =>
     fetch(url, init).pipe(Effect.mapError(() => new SongsterrError({ status: 0, message })))
