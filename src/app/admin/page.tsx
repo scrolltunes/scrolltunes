@@ -78,7 +78,7 @@ function AccessDenied() {
           className="text-center max-w-sm"
         >
           <div
-            className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+            className="w-16 h-16 mx-auto mb-4 rounded-sm flex items-center justify-center"
             style={{ background: "var(--color-surface1)" }}
           >
             <ShieldWarning size={32} style={{ color: "var(--color-text-muted)" }} />
@@ -118,7 +118,7 @@ function StatCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...springs.default, delay }}
-      className="p-5 rounded-xl"
+      className="p-5 rounded-sm"
       style={{ background: "var(--color-surface1)" }}
     >
       <div className="flex items-center gap-3 mb-3">
@@ -166,7 +166,7 @@ function AnalyticsSection({ stats, isLoading }: { stats: AdminStats | null; isLo
         {[1, 2, 3].map(i => (
           <div
             key={i}
-            className="p-5 rounded-xl animate-pulse"
+            className="p-5 rounded-sm animate-pulse"
             style={{ background: "var(--color-surface1)" }}
           >
             <div
@@ -186,7 +186,7 @@ function AnalyticsSection({ stats, isLoading }: { stats: AdminStats | null; isLo
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springs.default, delay: 0.1 }}
-        className="p-5 rounded-xl"
+        className="p-5 rounded-sm"
         style={{ background: "var(--color-surface1)" }}
       >
         <div className="flex items-center gap-3 mb-4">
@@ -255,7 +255,7 @@ function ComingSoonSection({ title }: { title: string }) {
       className="flex flex-col items-center justify-center py-16 text-center"
     >
       <div
-        className="w-16 h-16 mb-4 rounded-2xl flex items-center justify-center"
+        className="w-16 h-16 mb-4 rounded-sm flex items-center justify-center"
         style={{ background: "var(--color-surface1)" }}
       >
         <ListChecks size={32} style={{ color: "var(--color-text-muted)" }} />

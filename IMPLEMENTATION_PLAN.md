@@ -76,21 +76,21 @@ Migrate ScrollTunes to a terminal-inspired dark theme (Tokyo Night palette) with
 
 ## Phase 6: Admin (Minimal)
 
-- [ ] **6.1** Update admin pages to reference new CSS token names (find/replace old variable names)
-- [ ] **6.2** Ensure admin tables/cards use new border and background tokens
-- [ ] **6.3** Verify admin functionality unchanged
+- [x] **6.1** Update admin pages to reference new CSS token names (find/replace old variable names)
+- [x] **6.2** Ensure admin tables/cards use new border and background tokens
+- [x] **6.3** Verify admin functionality unchanged
 
 ---
 
 ## Phase 7: Cleanup
 
-- [ ] **7.1** Search codebase for all `ui/` imports and migrate to `ui2/`
-- [ ] **7.2** Delete `src/components/ui/` directory (after all imports migrated)
-- [ ] **7.3** Delete `src/design/studio-pro-dark.css`
-- [ ] **7.4** Remove unused theme-related exports from `theme.ts`
-- [ ] **7.5** Remove theme picker UI from Settings page (if not done in 4.8)
-- [ ] **7.6** Audit for any remaining hardcoded colors (should use tokens)
-- [ ] **7.7** Rename `src/components/ui2/` to `src/components/ui/` and update all imports
+- [x] **7.1** Merge `ui2/` primitives into `ui/` (Button, Card, Badge, Input, Modal, IconButton, Skeleton)
+- [x] **7.2** Delete `src/components/ui2/` directory
+- [x] **7.3** Delete `src/design/studio-pro-dark.css`
+- [x] **7.4** Remove unused theme-related exports from `theme.ts` (done in Phase 1)
+- [x] **7.5** Remove theme picker UI from Settings page (done in Phase 4)
+- [x] **7.6** Audit for any remaining hardcoded colors (should use tokens)
+- [x] **7.7** Merged ui2/ into ui/ (no rename needed)
 - [ ] **7.8** Run `bun run check` (lint + typecheck + test) and fix any issues
 - [ ] **7.9** Manual visual QA on mobile and desktop
 

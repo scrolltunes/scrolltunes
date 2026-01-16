@@ -24,21 +24,12 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   }
 
   const variantStyles = {
-    default: {
-      background: "var(--color-surface2)",
-      color: "var(--color-text2)",
-    },
-    ghost: {
-      background: "transparent",
-      color: "var(--color-text3)",
-    },
-    accent: {
-      background: "var(--color-accent-soft)",
-      color: "var(--color-accent)",
-    },
+    default: "bg-[var(--bg-tertiary)] text-[var(--fg-secondary)] hover:bg-[var(--bg-highlight)]",
+    ghost:
+      "bg-transparent text-[var(--fg-muted)] hover:text-[var(--fg-secondary)] hover:bg-[var(--bg-tertiary)]",
+    accent:
+      "bg-[var(--color-accent-soft)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-white",
   }
-
-  const style = variantStyles[variant]
 
   if (disabled) {
     return (
@@ -47,14 +38,13 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         type="button"
         className={`
           ${sizeStyles[size]}
-          rounded-full
+          rounded-sm
           flex items-center justify-center
           transition-colors
           opacity-40 cursor-not-allowed
-          focus:outline-none
+          bg-[var(--bg-tertiary)] text-[var(--fg-muted)]
           ${className}
         `}
-        style={style}
         disabled
         aria-label={label}
       >
@@ -69,14 +59,13 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       type="button"
       className={`
         ${sizeStyles[size]}
-        rounded-full
+        ${variantStyles[variant]}
+        rounded-sm
         flex items-center justify-center
         transition-colors
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
-        focus-visible:ring-offset-transparent
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]
         ${className}
       `}
-      style={style}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}

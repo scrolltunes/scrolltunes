@@ -7,7 +7,7 @@ export interface SkeletonProps {
 }
 
 export const Skeleton = memo(function Skeleton({ className = "" }: SkeletonProps) {
-  return <div className={`bg-neutral-800 animate-pulse rounded ${className}`} />
+  return <div className={`bg-[var(--bg-tertiary)] animate-pulse rounded-sm ${className}`} />
 })
 
 export interface SongCardSkeletonProps {
@@ -18,11 +18,13 @@ export const SongCardSkeleton = memo(function SongCardSkeleton({
   className = "",
 }: SongCardSkeletonProps) {
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-xl bg-neutral-900 ${className}`}>
-      <div className="w-10 h-10 rounded-lg bg-neutral-800 animate-pulse" />
+    <div
+      className={`flex items-center gap-3 p-3 rounded-sm bg-[var(--bg-secondary)] border border-[var(--border-default)] ${className}`}
+    >
+      <div className="w-10 h-10 rounded-sm bg-[var(--bg-tertiary)] animate-pulse" />
       <div className="flex-1 space-y-2">
-        <div className="h-4 bg-neutral-800 rounded animate-pulse w-3/4" />
-        <div className="h-3 bg-neutral-800 rounded animate-pulse w-1/2" />
+        <div className="h-4 bg-[var(--bg-tertiary)] rounded-sm animate-pulse w-3/4" />
+        <div className="h-3 bg-[var(--bg-tertiary)] rounded-sm animate-pulse w-1/2" />
       </div>
     </div>
   )
@@ -35,5 +37,7 @@ export interface AlbumArtSkeletonProps {
 export const AlbumArtSkeleton = memo(function AlbumArtSkeleton({
   className = "",
 }: AlbumArtSkeletonProps) {
-  return <div className={`w-10 h-10 rounded-lg bg-neutral-800 animate-pulse ${className}`} />
+  return (
+    <div className={`w-10 h-10 rounded-sm bg-[var(--bg-tertiary)] animate-pulse ${className}`} />
+  )
 })

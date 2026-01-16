@@ -56,7 +56,7 @@ function AccessDenied() {
           className="text-center max-w-sm"
         >
           <div
-            className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+            className="w-16 h-16 mx-auto mb-4 rounded-sm flex items-center justify-center"
             style={{ background: "var(--color-surface1)" }}
           >
             <ShieldWarning size={32} style={{ color: "var(--color-text-muted)" }} />

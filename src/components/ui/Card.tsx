@@ -21,19 +21,19 @@ function getVariantStyles(variant: CardVariant): {
   switch (variant) {
     case "elevated":
       return {
-        background: "#24283b",
-        border: "1px solid #3d4259",
-        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2)",
+        background: "var(--bg-secondary)",
+        border: "1px solid var(--border-default)",
+        boxShadow: "var(--shadow-md)",
       }
     case "bordered":
       return {
         background: "transparent",
-        border: "2px solid #565f89",
+        border: "2px solid var(--fg-muted)",
       }
     default:
       return {
-        background: "#24283b",
-        border: "1px solid #3d4259",
+        background: "var(--bg-secondary)",
+        border: "1px solid var(--border-default)",
       }
   }
 }
@@ -52,7 +52,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
     return (
       <motion.div
         ref={ref}
-        className={`rounded-xl ${interactive ? "cursor-pointer" : ""} ${className}`}
+        className={`rounded-sm ${interactive ? "cursor-pointer" : ""} ${className}`}
         style={{
           background: styles.background,
           border: styles.border,
@@ -73,7 +73,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
   return (
     <div
       ref={ref}
-      className={`rounded-xl ${className}`}
+      className={`rounded-sm ${className}`}
       style={{
         background: styles.background,
         border: styles.border,
@@ -95,7 +95,7 @@ export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(function C
   ref,
 ) {
   return (
-    <div ref={ref} className={`px-4 py-3 border-b border-[#3d4259] ${className}`}>
+    <div ref={ref} className={`px-4 py-3 border-b border-[var(--border-default)] ${className}`}>
       {children}
     </div>
   )
@@ -127,7 +127,7 @@ export const CardFooter = forwardRef<HTMLDivElement, CardFooterProps>(function C
   ref,
 ) {
   return (
-    <div ref={ref} className={`px-4 py-3 border-t border-[#3d4259] ${className}`}>
+    <div ref={ref} className={`px-4 py-3 border-t border-[var(--border-default)] ${className}`}>
       {children}
     </div>
   )
