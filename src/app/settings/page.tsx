@@ -803,7 +803,7 @@ export default function SettingsPage() {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <Link
             href="/"
-            className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors hover:brightness-95"
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-95"
             style={{ background: "var(--color-surface3)" }}
             aria-label="Back"
           >

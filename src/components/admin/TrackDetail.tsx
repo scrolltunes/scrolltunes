@@ -57,18 +57,13 @@ function MetadataRow({
       className="flex items-start gap-3 py-2 last:border-b-0"
       style={{ borderBottom: "1px solid var(--color-border)" }}
     >
-      <span
-        className="w-24 shrink-0 text-sm"
-        style={{ color: "var(--color-text-muted)" }}
-      >
+      <span className="w-24 shrink-0 text-sm" style={{ color: "var(--color-text-muted)" }}>
         {label}
       </span>
       <span className="flex-1 text-sm" style={{ color: "var(--color-text)" }}>
         {value ?? <span style={{ color: "var(--color-text-muted)" }}>—</span>}
       </span>
-      {actions && (
-        <span className="shrink-0 flex items-center gap-2">{actions}</span>
-      )}
+      {actions && <span className="shrink-0 flex items-center gap-2">{actions}</span>}
     </div>
   )
 }
@@ -221,9 +216,7 @@ export function TrackDetail({
               </a>
             }
             actions={
-              onViewLyrics && (
-                <InlineAction label="View" onClick={() => onViewLyrics(track)} />
-              )
+              onViewLyrics && <InlineAction label="View" onClick={() => onViewLyrics(track)} />
             }
           />
 
@@ -231,9 +224,7 @@ export function TrackDetail({
             label="Spotify ID"
             value={track.spotifyId ? <span className="font-mono">{track.spotifyId}</span> : null}
             actions={
-              onFindSpotify && (
-                <InlineAction label="Find" onClick={() => onFindSpotify(track)} />
-              )
+              onFindSpotify && <InlineAction label="Find" onClick={() => onFindSpotify(track)} />
             }
           />
 
@@ -259,11 +250,7 @@ export function TrackDetail({
             actions={
               <>
                 {!effectiveBpm && onFetchBpm && (
-                  <InlineAction
-                    label="Fetch"
-                    onClick={handleFetchBpm}
-                    loading={isFetchingBpm}
-                  />
+                  <InlineAction label="Fetch" onClick={handleFetchBpm} loading={isFetchingBpm} />
                 )}
                 {hasTursoEnrichment && !track.inCatalog && onCopyFromTurso && (
                   <InlineAction
@@ -276,20 +263,11 @@ export function TrackDetail({
             }
           />
 
-          <MetadataRow
-            label="Key"
-            value={effectiveKey}
-          />
+          <MetadataRow label="Key" value={effectiveKey} />
 
-          <MetadataRow
-            label="Popularity"
-            value={track.popularity}
-          />
+          <MetadataRow label="Popularity" value={track.popularity} />
 
-          <MetadataRow
-            label="ISRC"
-            value={track.isrc}
-          />
+          <MetadataRow label="ISRC" value={track.isrc} />
 
           <MetadataRow
             label="Enhancements"
@@ -319,7 +297,8 @@ export function TrackDetail({
               )
             }
             actions={
-              track.inCatalog && onDelete && (
+              track.inCatalog &&
+              onDelete && (
                 <InlineAction
                   label="Remove"
                   onClick={handleDelete}

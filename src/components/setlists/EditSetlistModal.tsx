@@ -131,10 +131,7 @@ export function EditSetlistModal({
               <X size={20} weight="bold" />
             </button>
 
-            <h2
-              className="text-xl font-semibold mb-6 pr-8"
-              style={{ color: "var(--color-text)" }}
-            >
+            <h2 className="text-xl font-semibold mb-6 pr-8" style={{ color: "var(--color-text)" }}>
               Edit setlist
             </h2>
 

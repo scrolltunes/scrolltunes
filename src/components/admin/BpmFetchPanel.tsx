@@ -241,9 +241,7 @@ export function BpmFetchPanel({ lrclibId, hasBpm, onBpmFetched }: BpmFetchPanelP
                     className="shrink-0"
                     style={{ color: "var(--color-text-muted)" }}
                   />
-                  <p style={{ color: "var(--color-text-muted)" }}>
-                    No BPM found from any provider
-                  </p>
+                  <p style={{ color: "var(--color-text-muted)" }}>No BPM found from any provider</p>
                 </div>
               )}
             </div>
@@ -278,10 +276,7 @@ function ProviderRow({ provider }: { provider: ProviderStatus }) {
     >
       <div className="w-6 h-6 flex items-center justify-center shrink-0">
         {provider.status === "pending" && (
-          <div
-            className="w-2 h-2 rounded-full"
-            style={{ background: "var(--color-text-muted)" }}
-          />
+          <div className="w-2 h-2 rounded-full" style={{ background: "var(--color-text-muted)" }} />
         )}
         {provider.status === "loading" && (
           <Spinner size={20} className="animate-spin" style={{ color: "var(--color-accent)" }} />

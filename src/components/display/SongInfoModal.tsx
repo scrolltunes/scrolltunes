@@ -106,10 +106,7 @@ export function SongInfoModal({
                   </div>
                 )}
                 <div className="min-w-0">
-                  <h2
-                    className="text-xl font-semibold"
-                    style={{ color: "var(--color-text)" }}
-                  >
+                  <h2 className="text-xl font-semibold" style={{ color: "var(--color-text)" }}>
                     {displayTitle}
                   </h2>
                   <p style={{ color: "var(--color-text3)" }}>{displayArtist}</p>

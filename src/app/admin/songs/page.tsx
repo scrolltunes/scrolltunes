@@ -310,7 +310,6 @@ export default function AdminTracksPage() {
     [catalogData],
   )
 
-
   // Handler: View Lyrics
   const handleViewLyrics = useCallback((track: TrackWithEnrichment) => {
     const path = makeCanonicalPath({
