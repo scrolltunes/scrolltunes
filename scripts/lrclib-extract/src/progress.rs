@@ -10,6 +10,26 @@ use std::time::Duration;
 /// Global flag for log-only mode (set from args in main)
 pub static LOG_ONLY: AtomicBool = AtomicBool::new(false);
 
+/// Log a message to stderr only when in log-only mode.
+/// Use this for verbose progress messages that would interfere with progress bars.
+#[macro_export]
+macro_rules! log {
+    ($($arg:tt)*) => {
+        if $crate::progress::is_log_only() {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
+/// Log a message to stderr unconditionally.
+/// Use this for startup info, summaries, and important messages.
+#[macro_export]
+macro_rules! info {
+    ($($arg:tt)*) => {
+        eprintln!($($arg)*);
+    };
+}
+
 /// Set log-only mode globally
 pub fn set_log_only(value: bool) {
     LOG_ONLY.store(value, Ordering::Relaxed);
@@ -54,7 +74,7 @@ pub fn create_progress_bar(len: u64, msg: &str) -> ProgressBar {
 pub fn log_progress(phase: &str, current: u64, total: u64, interval: u64) {
     if is_log_only() && (current % interval == 0 || current == total) {
         let pct = 100.0 * current as f64 / total as f64;
-        eprintln!("[{}] {}/{} ({:.1}%)", phase, current, total, pct);
+        crate::log!("[{}] {}/{} ({:.1}%)", phase, current, total, pct);
     }
 }
 

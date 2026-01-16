@@ -18,8 +18,9 @@ use strsim::normalized_levenshtein;
 
 // Library imports
 use lrclib_extract::models::StringInterner;
-use lrclib_extract::progress::format_duration;
+use lrclib_extract::progress::{format_duration, is_log_only, set_log_only};
 use lrclib_extract::safety::validate_output_path;
+use lrclib_extract::{info, log};
 
 use normalize::{
     extract_primary_artist, normalize_artist, normalize_title, normalize_title_with_artist,
@@ -37,6 +38,44 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Run extraction with standard filenames from a working directory
+    ///
+    /// Uses hardcoded filenames:
+    ///   - Source: lrclib-db-dump-20251209T092057Z.sqlite3
+    ///   - Output: lrclib-enriched.sqlite3
+    ///   - Spotify: spotify_clean.sqlite3
+    ///   - Normalized: spotify_normalized.sqlite3
+    ///   - Audio features: spotify_clean_audio_features.sqlite3
+    Run {
+        /// Working directory containing the database files [default: ~/git/music]
+        #[arg(short, long)]
+        workdir: Option<PathBuf>,
+
+        /// Show what would be done without executing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Disable progress bars, use log output only
+        #[arg(long)]
+        log_only: bool,
+
+        /// Export stats to JSON file
+        #[arg(long)]
+        export_stats: Option<PathBuf>,
+
+        /// Log match failures to match_failures table
+        #[arg(long)]
+        log_failures: bool,
+
+        /// Filter by artist names (comma-separated)
+        #[arg(long)]
+        artists: Option<String>,
+
+        /// Minimum Spotify popularity (0-100)
+        #[arg(long, default_value = "0")]
+        min_popularity: i32,
+    },
+
     /// Extract deduplicated LRCLIB search index with optional Spotify enrichment
     Extract {
         /// Path to LRCLIB SQLite dump (source of truth)
@@ -216,7 +255,7 @@ impl MatchingStats {
     /// Log stats to stderr in JSON format
     pub fn log_phase(&self, phase: &str) {
         if let Ok(json) = serde_json::to_string_pretty(self) {
-            eprintln!("[STATS:{}]\n{}", phase, json);
+            log!("[STATS:{}]\n{}", phase, json);
         }
     }
 
@@ -923,12 +962,9 @@ fn select_canonical(tracks: Vec<Track>) -> Option<ScoredTrack> {
         })
 }
 
-/// Global flag for log-only mode (set from args in main)
-static LOG_ONLY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
 fn create_progress_bar(len: u64, msg: &str) -> ProgressBar {
     let pb = ProgressBar::new(len);
-    if LOG_ONLY.load(std::sync::atomic::Ordering::Relaxed) {
+    if is_log_only() {
         pb.set_draw_target(indicatif::ProgressDrawTarget::hidden());
     } else {
         pb.set_style(
@@ -946,13 +982,13 @@ fn create_progress_bar(len: u64, msg: &str) -> ProgressBar {
 fn log_progress(phase: &str, current: u64, total: u64, interval: u64) {
     if current % interval == 0 || current == total {
         let pct = 100.0 * current as f64 / total as f64;
-        eprintln!("[{}] {}/{} ({:.1}%)", phase, current, total, pct);
+        log!("[{}] {}/{} ({:.1}%)", phase, current, total, pct);
     }
 }
 
 fn create_spinner(msg: &str) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
-    if LOG_ONLY.load(std::sync::atomic::Ordering::Relaxed) {
+    if is_log_only() {
         pb.set_draw_target(indicatif::ProgressDrawTarget::hidden());
     } else {
         pb.set_style(
@@ -1067,7 +1103,7 @@ fn read_tracks(conn: &Connection, artist_filter: Option<&Vec<String>>) -> Result
     }
 
     pb.finish_with_message(format!("Phase 1: Read {} valid tracks", tracks.len()));
-    eprintln!(
+    log!(
         "[READ] Complete: {} tracks ({})",
         tracks.len(),
         format_duration(phase_start.elapsed())
@@ -1105,7 +1141,7 @@ fn build_groups_and_index(tracks: Vec<Track>) -> (Vec<LrclibGroup>, LrclibIndex)
 
     // Phase 1: Parallel normalization using rayon
     // Each thread normalizes tracks and builds a local map, then we merge
-    eprintln!("[GROUP] Normalizing {} tracks (parallel)...", total_tracks);
+    log!("[GROUP] Normalizing {} tracks (parallel)...", total_tracks);
     let norm_start = Instant::now();
 
     // Process in parallel: normalize and compute quality scores
@@ -1119,13 +1155,13 @@ fn build_groups_and_index(tracks: Vec<Track>) -> (Vec<LrclibGroup>, LrclibIndex)
         })
         .collect();
 
-    eprintln!(
+    log!(
         "[GROUP] Normalization complete ({})",
         format_duration(norm_start.elapsed())
     );
 
     // Phase 2: Sequential grouping with string interning (interning requires &mut)
-    eprintln!("[GROUP] Grouping with string interning...");
+    log!("[GROUP] Grouping with string interning...");
     let group_start = Instant::now();
 
     let mut interner = StringInterner::new();
@@ -1147,7 +1183,7 @@ fn build_groups_and_index(tracks: Vec<Track>) -> (Vec<LrclibGroup>, LrclibIndex)
     // Report interning stats
     let unique_strings = interner.len();
     let saved_allocations = total_tracks.saturating_sub(unique_strings / 2);
-    eprintln!(
+    log!(
         "[GROUP] Interned {} unique strings (saved ~{} allocations) ({})",
         unique_strings,
         saved_allocations,
@@ -1171,7 +1207,7 @@ fn build_groups_and_index(tracks: Vec<Track>) -> (Vec<LrclibGroup>, LrclibIndex)
         });
     }
 
-    eprintln!(
+    log!(
         "[GROUP] Complete: {} groups with {} variants ({})",
         groups.len(),
         groups.iter().map(|g| g.tracks.len()).sum::<usize>(),
@@ -1268,7 +1304,7 @@ fn build_fts_index(conn: &Connection) -> Result<()> {
     )?;
     spinner.finish_with_message("Phase 4d: FTS indexes optimized");
 
-    eprintln!(
+    log!(
         "[FTS] Complete ({})",
         format_duration(phase_start.elapsed())
     );
@@ -1282,7 +1318,7 @@ fn optimize_database(conn: &Connection) -> Result<()> {
     conn.execute_batch("VACUUM; ANALYZE;")?;
 
     spinner.finish_with_message("Phase 5: Database optimized");
-    eprintln!(
+    log!(
         "[OPTIMIZE] Complete ({})",
         format_duration(phase_start.elapsed())
     );
@@ -1816,7 +1852,7 @@ fn match_lrclib_to_spotify_normalized(
         total_candidates,
         fallback_matches_count
     ));
-    eprintln!(
+    log!(
         "[MATCH] Complete: {} groups with candidates from {} groups ({} total candidates, avg {:.2} per group, {} via primary-artist fallback)",
         matches_to_fetch.len(), total_groups, total_candidates,
         if matches_to_fetch.is_empty() { 0.0 } else { total_candidates as f64 / matches_to_fetch.len() as f64 },
@@ -1832,12 +1868,12 @@ fn match_lrclib_to_spotify_normalized(
         .into_iter()
         .collect();
     let fetch_start = Instant::now();
-    eprintln!(
+    log!(
         "[FETCH] Fetching track details for {} unique candidates...",
         all_rowids.len()
     );
     let track_details = batch_fetch_track_details(spotify_conn, &all_rowids)?;
-    eprintln!(
+    log!(
         "[FETCH] Complete: {} track details loaded ({})",
         track_details.len(),
         format_duration(fetch_start.elapsed())
@@ -1925,7 +1961,7 @@ fn match_lrclib_to_spotify_normalized(
         match_rate,
         format_duration(phase_start.elapsed())
     );
-    eprintln!(
+    log!(
         "[STATS:MAIN] exact={}, fallback={}, rejected={}, no_candidates={}",
         exact_accepted, fallback_accepted, all_rejected, stats.main_no_candidates
     );
@@ -1995,7 +2031,7 @@ fn match_pop0_fallback(
         .keys()
         .map(|(title_norm, _)| title_norm.clone())
         .collect();
-    eprintln!(
+    log!(
         "[POP0] Built title-only index with {} unique titles",
         title_only_index.len()
     );
@@ -2006,7 +2042,7 @@ fn match_pop0_fallback(
         [],
         |row| row.get(0),
     )?;
-    eprintln!(
+    log!(
         "[POP0] Streaming {} pop=0 tracks (optimized: tracks only)...",
         total
     );
@@ -2102,7 +2138,7 @@ fn match_pop0_fallback(
                 candidates.clear();
             }
 
-            eprintln!(
+            log!(
                 "[POP0] {}/{} ({:.1}%) - {} title matches, {} full matches",
                 rows_processed,
                 total,
@@ -2142,7 +2178,7 @@ fn match_pop0_fallback(
     }
 
     // Final progress log
-    eprintln!(
+    log!(
         "[POP0] {}/{} (100.0%) - {} title matches, processing final batch...",
         rows_processed, total, title_matches
     );
@@ -2163,7 +2199,7 @@ fn match_pop0_fallback(
     // Record pop0 match count (spec-07)
     stats.pop0_matches = matches_found as usize;
 
-    eprintln!(
+    log!(
         "[POP0] Complete: {} additional matches from pop=0 tracks ({})",
         matches_found,
         format_duration(phase_start.elapsed())
@@ -2387,7 +2423,7 @@ fn title_first_rescue(
         .collect();
 
     if rescue_candidates.is_empty() {
-        eprintln!("[RESCUE] No eligible groups for title-first rescue");
+        log!("[RESCUE] No eligible groups for title-first rescue");
         return Ok(0);
     }
 
@@ -2402,7 +2438,7 @@ fn title_first_rescue(
     stats.rescue_skipped_common_title = skipped_common;
     stats.rescue_attempted = rescue_candidates.len();
 
-    eprintln!(
+    log!(
         "[RESCUE] Running title-first rescue for {} groups ({} skipped as common titles)...",
         rescue_candidates.len(),
         skipped_common
@@ -2486,11 +2522,11 @@ fn title_first_rescue(
     stats.rescue_rejected_duration = rejected_duration;
 
     if rowids_to_fetch.is_empty() {
-        eprintln!("[RESCUE] No candidates passed similarity/duration filters");
+        log!("[RESCUE] No candidates passed similarity/duration filters");
         return Ok(0);
     }
 
-    eprintln!(
+    log!(
         "[RESCUE] {} candidates passed filters, fetching details...",
         rowids_to_fetch.len()
     );
@@ -2582,7 +2618,7 @@ fn title_first_rescue(
 
     stats.rescue_matches = matches_found as usize;
 
-    eprintln!(
+    log!(
         "[RESCUE] Complete: {} additional matches from title-first rescue ({})",
         matches_found,
         format_duration(phase_start.elapsed())
@@ -2620,12 +2656,12 @@ fn fuzzy_title_rescue(
         .collect();
 
     if rescue_candidates.is_empty() {
-        eprintln!("[FUZZY] No eligible groups for fuzzy title rescue");
+        log!("[FUZZY] No eligible groups for fuzzy title rescue");
         return Ok(0);
     }
 
     stats.fuzzy_title_attempted = rescue_candidates.len();
-    eprintln!(
+    log!(
         "[FUZZY] Running fuzzy title rescue for {} groups...",
         rescue_candidates.len()
     );
@@ -2653,7 +2689,7 @@ fn fuzzy_title_rescue(
         .map(|(_, _, artist)| *artist)
         .collect();
 
-    eprintln!(
+    log!(
         "[FUZZY] Streaming normalized DB to find titles for {} unique artists...",
         unique_artists.len()
     );
@@ -2686,7 +2722,7 @@ fn fuzzy_title_rescue(
 
         rows_processed += 1;
         if rows_processed % 5_000_000 == 0 {
-            eprintln!(
+            log!(
                 "[FUZZY] Streamed {}/{} pairs ({:.1}%), found {} artists so far",
                 rows_processed,
                 total_rows,
@@ -2696,7 +2732,7 @@ fn fuzzy_title_rescue(
         }
     }
 
-    eprintln!(
+    log!(
         "[FUZZY] Prefetch complete: {} artists with titles from {} pairs ({})",
         artist_titles_map.len(),
         rows_processed,
@@ -2707,7 +2743,7 @@ fn fuzzy_title_rescue(
     // Parallel Levenshtein matching using rayon
     // =========================================================================
     const TITLE_SIMILARITY_THRESHOLD: f64 = 0.90;
-    eprintln!("[FUZZY] Computing Levenshtein similarities (parallel)...");
+    log!("[FUZZY] Computing Levenshtein similarities (parallel)...");
     let lev_start = Instant::now();
 
     // Prepare data for parallel processing: (group_idx, title_norm, artist_norm, lrclib_duration_sec)
@@ -2750,7 +2786,7 @@ fn fuzzy_title_rescue(
         })
         .collect();
 
-    eprintln!(
+    log!(
         "[FUZZY] Levenshtein complete: {} potential matches ({})",
         fuzzy_matches.len(),
         format_duration(lev_start.elapsed())
@@ -2808,11 +2844,11 @@ fn fuzzy_title_rescue(
     stats.fuzzy_title_no_close_match = no_close_match_count;
 
     if rowids_to_fetch.is_empty() {
-        eprintln!("[FUZZY] No fuzzy matches found");
+        log!("[FUZZY] No fuzzy matches found");
         return Ok(0);
     }
 
-    eprintln!(
+    log!(
         "[FUZZY] {} candidates passed filters, fetching details...",
         rowids_to_fetch.len()
     );
@@ -2878,7 +2914,7 @@ fn fuzzy_title_rescue(
 
     stats.fuzzy_title_matches = matches_found as usize;
 
-    eprintln!(
+    log!(
         "[FUZZY] Complete: {} additional matches from fuzzy title rescue ({})",
         matches_found,
         format_duration(phase_start.elapsed())
@@ -2927,8 +2963,8 @@ fn album_upgrade_pass(
         .unwrap_or(false);
 
     if !table_exists {
-        eprintln!("[ALBUM_UPGRADE] pop0_albums_norm table not found, skipping album upgrade pass");
-        eprintln!(
+        log!("[ALBUM_UPGRADE] pop0_albums_norm table not found, skipping album upgrade pass");
+        log!(
             "[ALBUM_UPGRADE] Rebuild spotify_normalized.sqlite3 with normalize-spotify to enable"
         );
         return Ok(0);
@@ -2957,11 +2993,11 @@ fn album_upgrade_pass(
     stats.album_upgrade_candidates = candidates.len();
 
     if candidates.is_empty() {
-        eprintln!("[ALBUM_UPGRADE] No candidates for album upgrade");
+        log!("[ALBUM_UPGRADE] No candidates for album upgrade");
         return Ok(0);
     }
 
-    eprintln!(
+    log!(
         "[ALBUM_UPGRADE] Found {} candidates with non-Album matches (score >= {})",
         candidates.len(),
         ACCEPT_THRESHOLD
@@ -3002,7 +3038,7 @@ fn album_upgrade_pass(
     }
 
     if rowids_to_fetch.is_empty() {
-        eprintln!("[ALBUM_UPGRADE] No album versions found in pop0_albums_norm");
+        log!("[ALBUM_UPGRADE] No album versions found in pop0_albums_norm");
         return Ok(0);
     }
 
@@ -3010,7 +3046,7 @@ fn album_upgrade_pass(
     rowids_to_fetch.sort_unstable();
     rowids_to_fetch.dedup();
 
-    eprintln!(
+    log!(
         "[ALBUM_UPGRADE] Found {} potential album tracks, fetching details...",
         rowids_to_fetch.len()
     );
@@ -3085,7 +3121,7 @@ fn album_upgrade_pass(
 
     stats.album_upgrades = upgrades as usize;
 
-    eprintln!(
+    log!(
         "[ALBUM_UPGRADE] Complete: {} upgrades from {} candidates ({})",
         upgrades,
         candidates.len(),
@@ -3329,7 +3365,7 @@ fn deduplicate_by_spotify_id(tracks: Vec<EnrichedTrack>) -> Vec<EnrichedTrack> {
 
     let removed = before_count - result.len();
     if removed > 0 {
-        eprintln!(
+        log!(
             "[DEDUP] Removed {} duplicate spotify_id entries ({} matched + {} unmatched = {} total)",
             removed, matched_count, result.len() - matched_count, result.len()
         );
@@ -3816,7 +3852,7 @@ fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Res
 
         // Tail-friendly logging
         if written % 500_000 == 0 {
-            eprintln!(
+            log!(
                 "[WRITE] {}/{} ({:.1}%)",
                 written,
                 tracks.len(),
@@ -3828,7 +3864,7 @@ fn write_enriched_output(conn: &mut Connection, tracks: &[EnrichedTrack]) -> Res
     tx.commit()?;
 
     pb.finish_with_message(format!("Phase 3: Wrote {} enriched tracks", tracks.len()));
-    eprintln!(
+    log!(
         "[WRITE] Complete: {} tracks written ({})",
         tracks.len(),
         format_duration(phase_start.elapsed())
@@ -4059,7 +4095,7 @@ fn write_match_failures(conn: &Connection, failures: &[MatchFailureEntry]) -> Re
 
         // Tail-friendly logging
         if written % 100_000 == 0 {
-            eprintln!(
+            log!(
                 "[FAILURES] {}/{} ({:.1}%)",
                 written,
                 failures.len(),
@@ -4205,10 +4241,109 @@ fn test_search_enriched(conn: &Connection, query: &str) -> Result<()> {
     Ok(())
 }
 
+// Standard filenames used by the `run` command
+const LRCLIB_DUMP_FILENAME: &str = "lrclib-db-dump-20251209T092057Z.sqlite3";
+const LRCLIB_OUTPUT_FILENAME: &str = "lrclib-enriched.sqlite3";
+const SPOTIFY_CLEAN_FILENAME: &str = "spotify_clean.sqlite3";
+const SPOTIFY_NORMALIZED_FILENAME: &str = "spotify_normalized.sqlite3";
+const SPOTIFY_AUDIO_FEATURES_FILENAME: &str = "spotify_clean_audio_features.sqlite3";
+
+/// Resolve workdir, expanding ~ to home directory
+fn resolve_workdir(workdir: Option<PathBuf>) -> Result<PathBuf> {
+    let path = workdir.unwrap_or_else(|| PathBuf::from("~/git/music"));
+    let path_str = path.to_string_lossy();
+
+    if path_str.starts_with("~/") {
+        let home = std::env::var("HOME").context("HOME environment variable not set")?;
+        Ok(PathBuf::from(format!("{}/{}", home, &path_str[2..])))
+    } else {
+        Ok(path)
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Run {
+            workdir,
+            dry_run,
+            log_only,
+            export_stats,
+            log_failures,
+            artists,
+            min_popularity,
+        } => {
+            let workdir = resolve_workdir(workdir)?;
+            info!("Using workdir: {}", workdir.display());
+
+            // Construct paths using hardcoded filenames
+            let source = workdir.join(LRCLIB_DUMP_FILENAME);
+            let output = workdir.join(LRCLIB_OUTPUT_FILENAME);
+            let spotify = workdir.join(SPOTIFY_CLEAN_FILENAME);
+            let spotify_normalized = workdir.join(SPOTIFY_NORMALIZED_FILENAME);
+            let audio_features = workdir.join(SPOTIFY_AUDIO_FEATURES_FILENAME);
+
+            // Verify required files exist
+            if !source.exists() {
+                anyhow::bail!("{} not found in {}", LRCLIB_DUMP_FILENAME, workdir.display());
+            }
+            if !spotify.exists() {
+                anyhow::bail!("{} not found in {}", SPOTIFY_CLEAN_FILENAME, workdir.display());
+            }
+            if !audio_features.exists() {
+                anyhow::bail!(
+                    "{} not found in {}",
+                    SPOTIFY_AUDIO_FEATURES_FILENAME,
+                    workdir.display()
+                );
+            }
+
+            info!("  Source: {}", LRCLIB_DUMP_FILENAME);
+            info!("  Output: {}", LRCLIB_OUTPUT_FILENAME);
+            info!("  Spotify: {}", SPOTIFY_CLEAN_FILENAME);
+            info!(
+                "  Normalized: {}",
+                if spotify_normalized.exists() {
+                    SPOTIFY_NORMALIZED_FILENAME
+                } else {
+                    "(not found, will skip)"
+                }
+            );
+            info!("  Audio features: {}", SPOTIFY_AUDIO_FEATURES_FILENAME);
+            if let Some(ref artists_filter) = artists {
+                info!("  Artists filter: {}", artists_filter);
+            }
+            if min_popularity > 0 {
+                info!("  Min popularity: {}", min_popularity);
+            }
+            info!();
+
+            if dry_run {
+                info!("Dry run mode - exiting without executing");
+                return Ok(());
+            }
+
+            let args = ExtractArgs {
+                source,
+                output,
+                spotify: Some(spotify),
+                spotify_normalized: if spotify_normalized.exists() {
+                    Some(spotify_normalized)
+                } else {
+                    None
+                },
+                audio_features: Some(audio_features),
+                min_popularity,
+                workers: 0,
+                test: None,
+                artists,
+                log_only,
+                export_stats,
+                log_failures,
+            };
+            run_extract(args)
+        }
         Commands::Extract {
             source,
             output,
@@ -4270,7 +4405,7 @@ fn main() -> Result<()> {
 
 fn run_extract(args: ExtractArgs) -> Result<()> {
     // Set global log-only mode
-    LOG_ONLY.store(args.log_only, std::sync::atomic::Ordering::Relaxed);
+    set_log_only(args.log_only);
 
     if args.workers > 0 {
         rayon::ThreadPoolBuilder::new()
