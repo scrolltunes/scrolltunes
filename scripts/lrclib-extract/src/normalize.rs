@@ -972,6 +972,10 @@ pub fn normalize_title_with_artist(title: &str, artist: &str) -> String {
 /// Normalize an artist name for matching.
 /// Strips featured artists, handles "The" prefix/suffix, applies transliterations.
 pub fn normalize_artist(artist: &str) -> String {
+    // Handle NULL-separated multiple artists (LRCLIB format: "Artist1\0Artist2\0Artist3")
+    // Use only the primary (first) artist for matching
+    let artist = artist.split('\0').next().unwrap_or(artist);
+
     let mut result = normalize_punctuation(artist);
     for pattern in ARTIST_PATTERNS.iter() {
         result = pattern.replace_all(&result, "").to_string();
@@ -1065,6 +1069,18 @@ mod tests {
         assert_eq!(normalize_artist("Alan Walker;Noah Cyrus"), "alan walker");
         assert_eq!(normalize_artist("Steve Aoki;Lauren Jauregui"), "steve aoki");
         assert_eq!(normalize_artist("Kygo;OneRepublic"), "kygo");
+    }
+
+    #[test]
+    fn test_normalize_artist_null_separated() {
+        // NULL-separated multiple artists (LRCLIB format)
+        assert_eq!(normalize_artist("Luis Fonsi\0Daddy Yankee"), "luis fonsi");
+        assert_eq!(
+            normalize_artist("Luis Fonsi\0Daddy Yankee\0Justin Bieber"),
+            "luis fonsi"
+        );
+        assert_eq!(normalize_artist("The Beatles\0"), "beatles");
+        assert_eq!(normalize_artist("Single Artist"), "single artist");
     }
 
     #[test]
