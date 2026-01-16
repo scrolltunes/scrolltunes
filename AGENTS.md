@@ -82,6 +82,12 @@ Always use `SongListItem` from `@/components/ui` when displaying songs in lists.
 - **Always use MATCH queries**, never LIKE
 - Turso-first search with popularity ranking
 
+### Spotify Local DBs (~/git/music/)
+- `spotify_clean.sqlite3` — 64M track-artists, 125 GB
+- `spotify_normalized.sqlite3` — Pre-normalized index, 10 GB
+- `spotify_clean_audio_features.sqlite3` — BPM, key, mode, 41 GB
+- **Always use artist rowid/ID for queries**, never LIKE on artist names (slow, error-prone)
+
 ## Best Practices
 
 1. Memoize effects

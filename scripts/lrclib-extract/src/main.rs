@@ -159,6 +159,10 @@ pub struct MatchingStats {
     pub fuzzy_title_no_artist: usize, // Artist not found in Spotify
     pub fuzzy_title_no_close_match: usize, // No title with >=90% similarity
 
+    // Phase 2c: Album upgrade pass (promote Single/Compilation to Album)
+    pub album_upgrade_candidates: usize, // Groups with non-Album match and score >= 80
+    pub album_upgrades: usize,           // Groups upgraded to Album release
+
     // Phase 3: Pop=0 fallback (spec-04: includes previously-rejected groups)
     pub pop0_eligible: usize,
     pub pop0_from_no_candidates: usize, // Groups that never had candidates
@@ -363,9 +367,9 @@ struct SpotifyTrack {
     artist: String, // Primary artist (kept for debugging)
     artists: Vec<String>, // All credited artists (spec-03 multi-artist verification)
     duration_ms: i64,
-    popularity: i32,      // 0-100
-    isrc: Option<String>, // For Deezer album art lookup
-    album_rowid: i64,     // For album_images lookup
+    popularity: i32,              // 0-100
+    isrc: Option<String>,         // For Deezer album art lookup
+    album_rowid: i64,             // For album_images lookup
     album_type: SpotifyAlbumType, // For preferring albums over compilations
 }
 
@@ -1239,13 +1243,19 @@ fn build_fts_index(conn: &Connection) -> Result<()> {
 
     // Step 3: Build tracks_search_fts (fast popularity-ranked search)
     let spinner = create_spinner("Phase 4c: Building tracks_search_fts index");
-    conn.execute("INSERT INTO tracks_search_fts(tracks_search_fts) VALUES('rebuild')", [])?;
+    conn.execute(
+        "INSERT INTO tracks_search_fts(tracks_search_fts) VALUES('rebuild')",
+        [],
+    )?;
     spinner.finish_with_message("Phase 4c: tracks_search_fts index built");
 
     // Step 4: Optimize both FTS indexes
     let spinner = create_spinner("Phase 4d: Optimizing FTS indexes");
     conn.execute("INSERT INTO tracks_fts(tracks_fts) VALUES('optimize')", [])?;
-    conn.execute("INSERT INTO tracks_search_fts(tracks_search_fts) VALUES('optimize')", [])?;
+    conn.execute(
+        "INSERT INTO tracks_search_fts(tracks_search_fts) VALUES('optimize')",
+        [],
+    )?;
     spinner.finish_with_message("Phase 4d: FTS indexes optimized");
 
     eprintln!(
@@ -1913,9 +1923,14 @@ fn match_lrclib_to_spotify_normalized(
     Ok(())
 }
 
-/// Fallback matching for pop=0 tracks (not in normalized index).
+/// Optimized fallback matching for pop=0 tracks (not in normalized index).
 /// Streams pop=0 tracks from raw Spotify DB and matches against unmatched LRCLIB groups.
 /// Populates stats.pop0_* fields (spec-07 instrumentation).
+///
+/// Key optimizations vs original:
+/// 1. Stream tracks only (not track_artists join) - ~100M rows vs ~283M
+/// 2. Title normalization happens once per track, not per artist row
+/// 3. Candidates that pass title filter are batched, then artists fetched in bulk
 fn match_pop0_fallback(
     spotify_conn: &Connection,
     groups: &mut [LrclibGroup],
@@ -1965,129 +1980,118 @@ fn match_pop0_fallback(
     );
 
     // Optimization: Build title-only index for fast pre-filtering
-    // This avoids normalize_artist() calls for ~90% of rows (most titles won't match)
-    let mut title_only_index: FxHashSet<String> = FxHashSet::default();
-    for (title_norm, _artist_norm) in unmatched_index.keys() {
-        title_only_index.insert(title_norm.clone());
-    }
+    // This avoids artist lookups for ~90% of rows (most titles won't match)
+    let title_only_index: FxHashSet<String> = unmatched_index
+        .keys()
+        .map(|(title_norm, _)| title_norm.clone())
+        .collect();
     eprintln!(
         "[POP0] Built title-only index with {} unique titles",
         title_only_index.len()
     );
 
-    // Count pop=0 tracks
+    // Count pop=0 tracks (optimized: just count tracks, not track_artists)
     let total: u64 = spotify_conn.query_row(
-        "SELECT COUNT(*) FROM tracks t
-         JOIN track_artists ta ON ta.track_rowid = t.rowid
-         WHERE t.popularity = 0",
+        "SELECT COUNT(*) FROM tracks WHERE popularity = 0",
         [],
         |row| row.get(0),
     )?;
-    eprintln!("[POP0] Streaming {} pop=0 track-artist rows...", total);
+    eprintln!(
+        "[POP0] Streaming {} pop=0 tracks (optimized: tracks only)...",
+        total
+    );
 
-    // Stream pop=0 tracks and match on-the-fly
+    // Phase 1: Stream tracks only (no artist join), filter by title, collect candidates
+    // This reduces rows from ~283M (track_artists join) to ~100M (tracks only)
+    // Uses parallel title normalization for CPU-bound step
+    const READ_BUFFER_SIZE: usize = 100_000; // Read buffer before parallel processing
+    const CANDIDATE_BATCH_SIZE: usize = 50_000; // Process batch when this many candidates ready
+
+    // Wrap title_only_index in Arc for thread-safe sharing
+    let title_filter = Arc::new(title_only_index);
+
     let mut stmt = spotify_conn.prepare(
-        "SELECT t.rowid, t.id, t.name, a.name, t.duration_ms, t.popularity, t.external_id_isrc, t.album_rowid, al.album_type
+        "SELECT t.rowid, t.id, t.name, t.duration_ms, t.external_id_isrc, t.album_rowid, al.album_type
          FROM tracks t
-         JOIN track_artists ta ON ta.track_rowid = t.rowid
-         JOIN artists a ON a.rowid = ta.artist_rowid
          LEFT JOIN albums al ON al.rowid = t.album_rowid
-         WHERE t.popularity = 0"
+         WHERE t.popularity = 0",
     )?;
+
+    /// Raw row data before parallel title normalization
+    struct RawRow {
+        rowid: i64,
+        id: String,
+        name: String,
+        duration_ms: i64,
+        isrc: Option<String>,
+        album_rowid: i64,
+        album_type: SpotifyAlbumType,
+    }
 
     let mut rows = stmt.query([])?;
     let mut matches_found = 0u64;
     let mut rows_processed = 0u64;
     let mut title_matches = 0u64;
+    let mut candidates: Vec<Pop0Candidate> = Vec::with_capacity(CANDIDATE_BATCH_SIZE);
+
+    // Buffer for parallel processing
+    let mut read_buffer: Vec<RawRow> = Vec::with_capacity(READ_BUFFER_SIZE);
 
     while let Some(row) = rows.next()? {
-        let title: String = row.get(2)?;
-        let title_norm = normalize_title(&title);
-
-        // Quick pre-filter: skip if no group has this title (avoids artist normalization)
-        if !title_only_index.contains(&title_norm) {
-            rows_processed += 1;
-            if rows_processed % 5_000_000 == 0 {
-                eprintln!(
-                    "[POP0] {}/{} ({:.1}%) - {} title matches, {} full matches",
-                    rows_processed,
-                    total,
-                    100.0 * rows_processed as f64 / total as f64,
-                    title_matches,
-                    matches_found
-                );
-            }
-            continue;
-        }
-        title_matches += 1;
-
-        // Title matched - now normalize artist
-        let artist: String = row.get(3)?;
-        let artist_norm = normalize_artist(&artist);
-        let key = (title_norm.clone(), artist_norm.clone());
-
-        // Check if this matches any unmatched group
-        if let Some(group_indices) = unmatched_index.get(&key) {
-            let album_type_str: Option<String> = row.get(8)?;
-            let spotify_track = SpotifyTrack {
-                id: row.get(1)?,
-                name: title,
-                artist: artist.clone(),
-                artists: vec![artist], // Pop0 streaming gets single artist per row (spec-03: multi-artist via batch fetch)
-                duration_ms: row.get(4)?,
-                popularity: row.get(5)?,
-                isrc: row.get(6)?,
-                album_rowid: row.get(7)?,
-                album_type: SpotifyAlbumType::from(album_type_str.as_deref()),
-            };
-
-            for &group_idx in group_indices {
-                if groups_seen.contains(&group_idx) {
-                    continue; // Already matched
-                }
-
-                let group = &mut groups[group_idx];
-
-                // Score against all variants
-                for (track_idx, variant) in group.tracks.iter().enumerate() {
-                    let score = combined_score(
-                        &variant.track,
-                        variant.quality,
-                        &spotify_track,
-                        &artist_norm,
-                    );
-
-                    if score >= ACCEPT_THRESHOLD {
-                        let should_replace = match &group.best_match {
-                            Some((_, current_track, current_score)) => is_better_match(
-                                score,
-                                spotify_track.album_type,
-                                *current_score,
-                                current_track.album_type,
-                            ),
-                            None => true,
-                        };
-                        if should_replace {
-                            group.best_match = Some((track_idx, spotify_track.clone(), score));
-                        }
-                    }
-                }
-
-                if group.best_match.is_some() {
-                    groups_seen.insert(group_idx);
-                    matches_found += 1;
-                    // Record duration bucket for pop0 matches (spec-07)
-                    if let Some((track_idx, ref spotify, _)) = group.best_match {
-                        let lrclib_duration = group.tracks[track_idx].track.duration_sec;
-                        let diff_sec = lrclib_duration - spotify.duration_ms / 1000;
-                        stats.record_duration_bucket(diff_sec);
-                    }
-                }
-            }
-        }
+        let album_type_str: Option<String> = row.get(6)?;
+        read_buffer.push(RawRow {
+            rowid: row.get(0)?,
+            id: row.get(1)?,
+            name: row.get(2)?,
+            duration_ms: row.get(3)?,
+            isrc: row.get(4)?,
+            album_rowid: row.get(5)?,
+            album_type: SpotifyAlbumType::from(album_type_str.as_deref()),
+        });
 
         rows_processed += 1;
-        if rows_processed % 5_000_000 == 0 {
+
+        // Process buffer when full using parallel title normalization
+        if read_buffer.len() >= READ_BUFFER_SIZE {
+            let filter_ref = Arc::clone(&title_filter);
+            let new_candidates: Vec<Pop0Candidate> = read_buffer
+                .par_drain(..)
+                .filter_map(|r| {
+                    let title_norm = normalize_title(&r.name);
+                    if filter_ref.contains(&title_norm) {
+                        Some(Pop0Candidate {
+                            rowid: r.rowid,
+                            id: r.id,
+                            name: r.name,
+                            title_norm,
+                            duration_ms: r.duration_ms,
+                            isrc: r.isrc,
+                            album_rowid: r.album_rowid,
+                            album_type: r.album_type,
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            title_matches += new_candidates.len() as u64;
+            candidates.extend(new_candidates);
+
+            // Process candidate batch when full
+            if candidates.len() >= CANDIDATE_BATCH_SIZE {
+                let batch_matches = process_pop0_candidate_batch(
+                    spotify_conn,
+                    &candidates,
+                    &unmatched_index,
+                    groups,
+                    groups_seen,
+                    stats,
+                )?;
+                matches_found += batch_matches;
+                candidates.clear();
+            }
+
             eprintln!(
                 "[POP0] {}/{} ({:.1}%) - {} title matches, {} full matches",
                 rows_processed,
@@ -2099,6 +2103,53 @@ fn match_pop0_fallback(
         }
     }
 
+    // Process remaining rows in buffer
+    if !read_buffer.is_empty() {
+        let filter_ref = Arc::clone(&title_filter);
+        let new_candidates: Vec<Pop0Candidate> = read_buffer
+            .par_drain(..)
+            .filter_map(|r| {
+                let title_norm = normalize_title(&r.name);
+                if filter_ref.contains(&title_norm) {
+                    Some(Pop0Candidate {
+                        rowid: r.rowid,
+                        id: r.id,
+                        name: r.name,
+                        title_norm,
+                        duration_ms: r.duration_ms,
+                        isrc: r.isrc,
+                        album_rowid: r.album_rowid,
+                        album_type: r.album_type,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        title_matches += new_candidates.len() as u64;
+        candidates.extend(new_candidates);
+    }
+
+    // Final progress log
+    eprintln!(
+        "[POP0] {}/{} (100.0%) - {} title matches, processing final batch...",
+        rows_processed, total, title_matches
+    );
+
+    // Process remaining candidates
+    if !candidates.is_empty() {
+        let batch_matches = process_pop0_candidate_batch(
+            spotify_conn,
+            &candidates,
+            &unmatched_index,
+            groups,
+            groups_seen,
+            stats,
+        )?;
+        matches_found += batch_matches;
+    }
+
     // Record pop0 match count (spec-07)
     stats.pop0_matches = matches_found as usize;
 
@@ -2108,6 +2159,155 @@ fn match_pop0_fallback(
         format_duration(phase_start.elapsed())
     );
     Ok(matches_found)
+}
+
+/// Candidate track that passed title filter, pending artist lookup
+struct Pop0Candidate {
+    rowid: i64,
+    id: String,
+    name: String,
+    title_norm: String,
+    duration_ms: i64,
+    isrc: Option<String>,
+    album_rowid: i64,
+    album_type: SpotifyAlbumType,
+}
+
+/// Process a batch of pop=0 candidates: fetch artists in bulk, then match against groups.
+fn process_pop0_candidate_batch(
+    spotify_conn: &Connection,
+    candidates: &[Pop0Candidate],
+    unmatched_index: &FxHashMap<(String, String), Vec<usize>>,
+    groups: &mut [LrclibGroup],
+    groups_seen: &mut FxHashSet<usize>,
+    stats: &mut MatchingStats,
+) -> Result<u64> {
+    // Collect rowids for batch artist fetch
+    let rowids: Vec<i64> = candidates.iter().map(|c| c.rowid).collect();
+
+    if rowids.is_empty() {
+        return Ok(0);
+    }
+
+    // Batch fetch all artists for these tracks
+    let track_artists = batch_fetch_artists_for_tracks(spotify_conn, &rowids)?;
+
+    let mut matches_found = 0u64;
+
+    for c in candidates {
+        // Get artists for this track
+        let artists = match track_artists.get(&c.rowid) {
+            Some(a) => a,
+            None => continue,
+        };
+
+        // Try matching against each artist (usually just 1-2)
+        for artist in artists {
+            let artist_norm = normalize_artist(artist);
+            let key = (c.title_norm.clone(), artist_norm.clone());
+
+            if let Some(group_indices) = unmatched_index.get(&key) {
+                let spotify_track = SpotifyTrack {
+                    id: c.id.clone(),
+                    name: c.name.clone(),
+                    artist: artist.clone(),
+                    artists: artists.clone(),
+                    duration_ms: c.duration_ms,
+                    popularity: 0,
+                    isrc: c.isrc.clone(),
+                    album_rowid: c.album_rowid,
+                    album_type: c.album_type,
+                };
+
+                for &group_idx in group_indices {
+                    if groups_seen.contains(&group_idx) {
+                        continue;
+                    }
+
+                    let group = &mut groups[group_idx];
+
+                    for (track_idx, variant) in group.tracks.iter().enumerate() {
+                        let score = combined_score(
+                            &variant.track,
+                            variant.quality,
+                            &spotify_track,
+                            &artist_norm,
+                        );
+
+                        if score >= ACCEPT_THRESHOLD {
+                            let should_replace = match &group.best_match {
+                                Some((_, current_track, current_score)) => is_better_match(
+                                    score,
+                                    spotify_track.album_type,
+                                    *current_score,
+                                    current_track.album_type,
+                                ),
+                                None => true,
+                            };
+                            if should_replace {
+                                group.best_match = Some((track_idx, spotify_track.clone(), score));
+                            }
+                        }
+                    }
+
+                    if group.best_match.is_some() {
+                        groups_seen.insert(group_idx);
+                        matches_found += 1;
+                        if let Some((track_idx, ref spotify, _)) = group.best_match {
+                            let lrclib_duration = group.tracks[track_idx].track.duration_sec;
+                            let diff_sec = lrclib_duration - spotify.duration_ms / 1000;
+                            stats.record_duration_bucket(diff_sec);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(matches_found)
+}
+
+/// Batch fetch all artists for a set of track rowids.
+/// Returns map from track_rowid -> Vec<artist_name>.
+fn batch_fetch_artists_for_tracks(
+    conn: &Connection,
+    rowids: &[i64],
+) -> Result<FxHashMap<i64, Vec<String>>> {
+    if rowids.is_empty() {
+        return Ok(FxHashMap::default());
+    }
+
+    let mut result: FxHashMap<i64, Vec<String>> = FxHashMap::default();
+    result.reserve(rowids.len());
+
+    // Process in batches to avoid query size limits
+    const BATCH_SIZE: usize = 10_000;
+
+    for chunk in rowids.chunks(BATCH_SIZE) {
+        let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+
+        let sql = format!(
+            "SELECT ta.track_rowid, a.name
+             FROM track_artists ta
+             JOIN artists a ON a.rowid = ta.artist_rowid
+             WHERE ta.track_rowid IN ({})
+             ORDER BY ta.track_rowid, ta.artist_rowid",
+            placeholders
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params: Vec<&dyn rusqlite::ToSql> =
+            chunk.iter().map(|r| r as &dyn rusqlite::ToSql).collect();
+        let mut rows = stmt.query(params.as_slice())?;
+
+        while let Some(row) = rows.next()? {
+            let track_rowid: i64 = row.get(0)?;
+            let artist_name: String = row.get(1)?;
+            result.entry(track_rowid).or_default().push(artist_name);
+        }
+    }
+
+    Ok(result)
 }
 
 // ============================================================================
@@ -2675,6 +2875,214 @@ fn fuzzy_title_rescue(
     );
 
     Ok(matches_found)
+}
+
+// ============================================================================
+// Album Upgrade Pass
+// ============================================================================
+
+/// Album upgrade pass: Promote matches from Single/Compilation to Album releases.
+/// Searches pop0_albums_norm for album versions of tracks that already have a match
+/// but the match is from a Single or Compilation. If a better album version exists
+/// with similar duration, upgrade to the album version.
+///
+/// This fixes cases like "1979" where the single version was matched instead of
+/// the album version from "Mellon Collie and the Infinite Sadness".
+fn album_upgrade_pass(
+    spotify_conn: &Connection,
+    spotify_norm_path: &std::path::Path,
+    groups: &mut [LrclibGroup],
+    stats: &mut MatchingStats,
+) -> Result<u64> {
+    let phase_start = Instant::now();
+
+    // Open normalized DB for pop0_albums_norm lookups
+    let norm_conn = Connection::open(spotify_norm_path)?;
+    norm_conn.execute_batch(
+        "PRAGMA query_only = 1;
+         PRAGMA journal_mode = OFF;
+         PRAGMA synchronous = OFF;
+         PRAGMA temp_store = MEMORY;
+         PRAGMA cache_size = -100000;
+         PRAGMA mmap_size = 4294967296;",
+    )?;
+
+    // Check if pop0_albums_norm table exists
+    let table_exists: bool = norm_conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='pop0_albums_norm'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
+    if !table_exists {
+        eprintln!("[ALBUM_UPGRADE] pop0_albums_norm table not found, skipping album upgrade pass");
+        eprintln!(
+            "[ALBUM_UPGRADE] Rebuild spotify_normalized.sqlite3 with normalize-spotify to enable"
+        );
+        return Ok(0);
+    }
+
+    // Find groups eligible for upgrade:
+    // - Has a match with score >= 80
+    // - Current match album_type is NOT Album (i.e., Single, Compilation, or Unknown)
+    let mut candidates: Vec<(usize, String, String, i64)> = Vec::new();
+
+    for (idx, group) in groups.iter().enumerate() {
+        if let Some((track_idx, ref spotify, score)) = group.best_match {
+            if score >= ACCEPT_THRESHOLD && spotify.album_type != SpotifyAlbumType::Album {
+                let (title_norm, artist_norm) = &group.key;
+                let lrclib_duration_ms = group.tracks[track_idx].track.duration_sec * 1000;
+                candidates.push((
+                    idx,
+                    title_norm.clone(),
+                    artist_norm.clone(),
+                    lrclib_duration_ms,
+                ));
+            }
+        }
+    }
+
+    stats.album_upgrade_candidates = candidates.len();
+
+    if candidates.is_empty() {
+        eprintln!("[ALBUM_UPGRADE] No candidates for album upgrade");
+        return Ok(0);
+    }
+
+    eprintln!(
+        "[ALBUM_UPGRADE] Found {} candidates with non-Album matches (score >= {})",
+        candidates.len(),
+        ACCEPT_THRESHOLD
+    );
+
+    // Query pop0_albums_norm for each candidate's (title_norm, artist_norm)
+    // Duration filter: ±30s
+    const DURATION_TOLERANCE_MS: i64 = 30_000;
+
+    let mut rowids_to_fetch: Vec<i64> = Vec::new();
+    let mut candidate_rowid_map: FxHashMap<i64, Vec<usize>> = FxHashMap::default();
+
+    for (idx, title_norm, artist_norm, lrclib_duration_ms) in &candidates {
+        let min_duration = lrclib_duration_ms - DURATION_TOLERANCE_MS;
+        let max_duration = lrclib_duration_ms + DURATION_TOLERANCE_MS;
+
+        let mut stmt = norm_conn.prepare_cached(
+            "SELECT track_rowid, duration_ms FROM pop0_albums_norm
+             WHERE title_norm = ? AND artist_norm = ?
+             AND duration_ms BETWEEN ? AND ?",
+        )?;
+
+        let mut rows = stmt.query(rusqlite::params![
+            title_norm,
+            artist_norm,
+            min_duration,
+            max_duration
+        ])?;
+
+        while let Some(row) = rows.next()? {
+            let track_rowid: i64 = row.get(0)?;
+            rowids_to_fetch.push(track_rowid);
+            candidate_rowid_map
+                .entry(track_rowid)
+                .or_default()
+                .push(*idx);
+        }
+    }
+
+    if rowids_to_fetch.is_empty() {
+        eprintln!("[ALBUM_UPGRADE] No album versions found in pop0_albums_norm");
+        return Ok(0);
+    }
+
+    // Deduplicate rowids
+    rowids_to_fetch.sort_unstable();
+    rowids_to_fetch.dedup();
+
+    eprintln!(
+        "[ALBUM_UPGRADE] Found {} potential album tracks, fetching details...",
+        rowids_to_fetch.len()
+    );
+
+    // Batch fetch track details from spotify_clean
+    let track_details = batch_fetch_track_details(spotify_conn, &rowids_to_fetch)?;
+
+    // For each candidate, find the best album match
+    let mut upgrades = 0u64;
+
+    for (idx, _title_norm, artist_norm, _lrclib_duration_ms) in &candidates {
+        let group = &mut groups[*idx];
+
+        // Get current match for comparison
+        let (track_idx, ref current_spotify, current_score) = match &group.best_match {
+            Some(m) => m.clone(),
+            None => continue,
+        };
+
+        // Find all album tracks matching this candidate
+        let mut best_upgrade: Option<(SpotifyTrack, i32)> = None;
+
+        for (&rowid, candidate_indices) in &candidate_rowid_map {
+            if !candidate_indices.contains(idx) {
+                continue;
+            }
+
+            if let Some(spotify_track) = track_details.get(&rowid) {
+                // Verify album_type is Album (should always be true from pop0_albums_norm)
+                if spotify_track.album_type != SpotifyAlbumType::Album {
+                    continue;
+                }
+
+                // Score this album track against the LRCLIB variant
+                let variant = &group.tracks[track_idx];
+                let score =
+                    combined_score(&variant.track, variant.quality, spotify_track, artist_norm);
+
+                if score >= ACCEPT_THRESHOLD {
+                    // Check if this album track is better than current best upgrade
+                    let dominated = match &best_upgrade {
+                        Some((_, best_score)) => !is_better_match(
+                            score,
+                            SpotifyAlbumType::Album,
+                            *best_score,
+                            SpotifyAlbumType::Album,
+                        ),
+                        None => false,
+                    };
+
+                    if !dominated {
+                        best_upgrade = Some((spotify_track.clone(), score));
+                    }
+                }
+            }
+        }
+
+        // Apply upgrade if we found a viable album version
+        if let Some((upgrade_track, upgrade_score)) = best_upgrade {
+            // Use is_better_match to confirm upgrade is warranted
+            if is_better_match(
+                upgrade_score,
+                SpotifyAlbumType::Album,
+                current_score,
+                current_spotify.album_type,
+            ) {
+                group.best_match = Some((track_idx, upgrade_track, upgrade_score));
+                upgrades += 1;
+            }
+        }
+    }
+
+    stats.album_upgrades = upgrades as usize;
+
+    eprintln!(
+        "[ALBUM_UPGRADE] Complete: {} upgrades from {} candidates ({})",
+        upgrades,
+        candidates.len(),
+        format_duration(phase_start.elapsed())
+    );
+
+    Ok(upgrades)
 }
 
 /// Batch fetch track details by rowids with all artists (spec-03 multi-artist).
@@ -3903,6 +4311,16 @@ fn main() -> Result<()> {
                 );
             }
 
+            // Phase 2c: Album upgrade pass - promote Single/Compilation to Album
+            let album_upgrades =
+                album_upgrade_pass(&spotify_conn, spotify_norm_path, &mut groups, &mut stats)?;
+            if album_upgrades > 0 {
+                println!(
+                    "[MATCH] Album upgrade: {} matches upgraded to Album releases",
+                    album_upgrades
+                );
+            }
+
             // Fallback: search pop=0 tracks for unmatched groups
             let pop0_matches =
                 match_pop0_fallback(&spotify_conn, &mut groups, &mut groups_seen, &mut stats)?;
@@ -4817,11 +5235,21 @@ mod tests {
         // If two candidates share the same combined_score, album should beat compilation
         let score = 150;
         assert!(
-            is_better_match(score, SpotifyAlbumType::Album, score, SpotifyAlbumType::Compilation),
+            is_better_match(
+                score,
+                SpotifyAlbumType::Album,
+                score,
+                SpotifyAlbumType::Compilation
+            ),
             "Album should beat compilation with same score"
         );
         assert!(
-            !is_better_match(score, SpotifyAlbumType::Compilation, score, SpotifyAlbumType::Album),
+            !is_better_match(
+                score,
+                SpotifyAlbumType::Compilation,
+                score,
+                SpotifyAlbumType::Album
+            ),
             "Compilation should not beat album with same score"
         );
     }
@@ -4831,7 +5259,12 @@ mod tests {
         // Album should beat single with same score
         let score = 150;
         assert!(
-            is_better_match(score, SpotifyAlbumType::Album, score, SpotifyAlbumType::Single),
+            is_better_match(
+                score,
+                SpotifyAlbumType::Album,
+                score,
+                SpotifyAlbumType::Single
+            ),
             "Album should beat single with same score"
         );
     }
@@ -4841,7 +5274,12 @@ mod tests {
         // Single should beat compilation with same score
         let score = 150;
         assert!(
-            is_better_match(score, SpotifyAlbumType::Single, score, SpotifyAlbumType::Compilation),
+            is_better_match(
+                score,
+                SpotifyAlbumType::Single,
+                score,
+                SpotifyAlbumType::Compilation
+            ),
             "Single should beat compilation with same score"
         );
     }
@@ -4886,11 +5324,21 @@ mod tests {
         // Unknown album_type should rank after all known types
         let score = 150;
         assert!(
-            is_better_match(score, SpotifyAlbumType::Compilation, score, SpotifyAlbumType::Unknown),
+            is_better_match(
+                score,
+                SpotifyAlbumType::Compilation,
+                score,
+                SpotifyAlbumType::Unknown
+            ),
             "Compilation should beat unknown with same score"
         );
         assert!(
-            !is_better_match(score, SpotifyAlbumType::Unknown, score, SpotifyAlbumType::Compilation),
+            !is_better_match(
+                score,
+                SpotifyAlbumType::Unknown,
+                score,
+                SpotifyAlbumType::Compilation
+            ),
             "Unknown should not beat compilation with same score"
         );
     }
@@ -4915,7 +5363,12 @@ mod tests {
         let high_score = 70;
 
         assert!(
-            is_better_match(high_score, SpotifyAlbumType::Compilation, low_score, SpotifyAlbumType::Album),
+            is_better_match(
+                high_score,
+                SpotifyAlbumType::Compilation,
+                low_score,
+                SpotifyAlbumType::Album
+            ),
             "Higher score compilation should beat lower score album when both non-viable"
         );
     }
@@ -4931,13 +5384,22 @@ mod tests {
     #[test]
     fn test_spotify_album_type_from_str() {
         // Test string parsing
-        assert_eq!(SpotifyAlbumType::from(Some("album")), SpotifyAlbumType::Album);
-        assert_eq!(SpotifyAlbumType::from(Some("single")), SpotifyAlbumType::Single);
+        assert_eq!(
+            SpotifyAlbumType::from(Some("album")),
+            SpotifyAlbumType::Album
+        );
+        assert_eq!(
+            SpotifyAlbumType::from(Some("single")),
+            SpotifyAlbumType::Single
+        );
         assert_eq!(
             SpotifyAlbumType::from(Some("compilation")),
             SpotifyAlbumType::Compilation
         );
-        assert_eq!(SpotifyAlbumType::from(Some("unknown_value")), SpotifyAlbumType::Unknown);
+        assert_eq!(
+            SpotifyAlbumType::from(Some("unknown_value")),
+            SpotifyAlbumType::Unknown
+        );
         assert_eq!(SpotifyAlbumType::from(None), SpotifyAlbumType::Unknown);
     }
 

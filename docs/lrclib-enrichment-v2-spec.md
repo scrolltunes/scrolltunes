@@ -42,9 +42,10 @@
 | FETCH | 4.4m | Load 2.78M track details |
 | RESCUE | 1.8m | Title-first rescue → 64.5% |
 | FUZZY | 3.0m | Levenshtein matching → 68.5% |
-| POP0 | 28.7m | Streaming scan 284M pop=0 tracks |
+| ALBUM_UPGRADE | <1m | Promote Single/Compilation → Album |
+| POP0 | ~8-12m | Optimized: 100M tracks (was 284M) + parallel |
 | WRITE + FTS | ~1.5m | Write tracks + build FTS indexes |
-| **Total** | **~51 min** | |
+| **Total** | **~35-40 min** | |
 
 ### Improvements Implemented
 
@@ -54,7 +55,8 @@
 | Primary-artist fallback | +4.8% (~181K matches) |
 | Title-first rescue | +1.5% (~56K matches) |
 | Fuzzy title matching | +4.0% (~151K matches) |
-| Pop=0 fallback | +3.2% (~119K matches) |
+| Album upgrade pass | Promote Single/Compilation to Album |
+| Pop=0 fallback (optimized) | +3.2% (~119K matches), 3x faster |
 | Hebrew/Russian artist aliases | ~205 hand-crafted mappings |
 | Rowid-ranked search surface | **21x faster FTS queries** |
 | Album type selection | Prefer studio albums over compilations |
@@ -66,13 +68,14 @@
 ### Processing Pipeline
 
 ```
-lrclib-extract (~51 min)
+lrclib-extract (~35-40 min)
 ├─ READ: Load LRCLIB (12.2M → 10.0M filtered tracks)
 ├─ GROUP: Deduplicate by (title_norm, artist_norm) → 3.79M groups
 ├─ MATCH: Indexed lookup + primary-artist fallback → 63.0%
 ├─ RESCUE: Title-first rescue for no_candidates → 64.5%
 ├─ FUZZY: Levenshtein similarity ≥0.85 → 68.5%
-├─ POP0: Streaming scan 284M pop=0 tracks → 71.6%
+├─ ALBUM_UPGRADE: Promote Single/Compilation to Album releases
+├─ POP0: Optimized scan ~100M pop=0 tracks → 71.6%
 ├─ DEDUP: Remove duplicate spotify_id entries → 2.36M unique
 └─ WRITE: Output tracks + FTS indexes
 ```
@@ -84,7 +87,8 @@ lrclib-extract (~51 min)
 | **MAIN** | Exact normalized match + primary-artist fallback | 63.0% |
 | **RESCUE** | Title-only search, verify artist similarity ≥0.6 | +1.5% |
 | **FUZZY** | Levenshtein similarity ≥0.85 for title typos | +4.0% |
-| **POP0** | Search 284M tracks with popularity=0 | +3.2% |
+| **ALBUM_UPGRADE** | Promote matches from Single/Compilation to Album | Quality |
+| **POP0** | Search ~100M tracks with popularity=0 (optimized) | +3.2% |
 | **DEDUP** | Keep highest quality per spotify_id | -350K rows |
 
 ### Database Files
@@ -179,11 +183,12 @@ Album type fetched via `tracks.album_rowid → albums.album_type` from `spotify_
 cd scripts/lrclib-extract && cargo build --release
 
 # Pre-normalize Spotify (one-time, ~15 min)
+# Builds track_norm + pop0_albums_norm tables by default
 ./target/release/normalize-spotify \
   ~/git/music/spotify_clean.sqlite3 \
   ~/git/music/spotify_normalized.sqlite3
 
-# Run extraction (~51 min)
+# Run extraction (~45 min with optimizations)
 ./target/release/lrclib-extract \
   ~/git/music/lrclib-db-dump-*.sqlite3 \
   ~/git/music/lrclib-enriched.sqlite3 \
@@ -193,14 +198,21 @@ cd scripts/lrclib-extract && cargo build --release
   --log-only
 ```
 
-### CLI Flags
+### normalize-spotify Flags
+
+| Flag | Description |
+|------|-------------|
+| `--log-only` | Show log lines only (for `tail -f` in background runs) |
+| `--skip-pop0-albums` | Skip building pop0_albums_norm table (built by default) |
+
+### lrclib-extract Flags
 
 | Flag | Description |
 |------|-------------|
 | `--spotify` | Path to spotify_clean.sqlite3 for enrichment |
 | `--spotify-normalized` | Pre-normalized index for faster matching |
 | `--audio-features` | Path to audio features DB (tempo, key) |
-| `--log-only` | Disable progress bars, use log output |
+| `--log-only` | Show log lines only (for `tail -f` in background runs) |
 | `--log-failures` | Log match failures to match_failures table |
 | `--export-stats` | Export stats to JSON file |
 
@@ -440,5 +452,6 @@ scripts/lrclib-extract/src/
 | `match_lrclib_to_spotify_normalized` | Main indexed matching |
 | `title_first_rescue` | Rescue pass for no_candidates |
 | `fuzzy_title_rescue` | Levenshtein fuzzy matching |
-| `match_pop0_fallback` | Pop=0 streaming fallback |
+| `album_upgrade_pass` | Promote Single/Compilation to Album |
+| `match_pop0_fallback` | Optimized Pop=0 fallback (parallel) |
 | `deduplicate_by_spotify_id` | Remove duplicate matches |

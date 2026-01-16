@@ -1049,7 +1049,10 @@ mod tests {
     #[test]
     fn test_normalize_title_edit_suffix() {
         // Standalone edit variants
-        assert_eq!(normalize_title("Love You To Death (Edit)"), "love you to death");
+        assert_eq!(
+            normalize_title("Love You To Death (Edit)"),
+            "love you to death"
+        );
         assert_eq!(normalize_title("Song [Edit]"), "song");
         assert_eq!(normalize_title("Track - Edit"), "track");
         // Radio edit (existing pattern)
@@ -1086,7 +1089,10 @@ mod tests {
     #[test]
     fn test_normalize_artist_spanish_con() {
         // Spanish "con" (featuring) - common in Latin music
-        assert_eq!(normalize_artist("Luis Fonsi con Daddy Yankee"), "luis fonsi");
+        assert_eq!(
+            normalize_artist("Luis Fonsi con Daddy Yankee"),
+            "luis fonsi"
+        );
         assert_eq!(normalize_artist("Shakira con Maluma"), "shakira");
     }
 

@@ -33,6 +33,7 @@ serde = { version = "1.0", features = ["derive"] }  # Serialization for stats JS
 serde_json = "1.0"  # JSON serialization for stats and Spotify candidates
 any_ascii = "0.3"  # Unicode to ASCII transliteration for Cyrillic/non-Latin scripts
 strsim = "0.11"    # String similarity for fuzzy artist matching (spec-06)
+crossbeam-channel = "0.5"  # Multi-producer multi-consumer channels for parallel pipeline
 
 [profile.release]
 lto = true

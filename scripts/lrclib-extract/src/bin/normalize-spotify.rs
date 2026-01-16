@@ -26,6 +26,16 @@
 //! );
 //! ```
 
+/// Conditional logging macro - only prints when log_only is true.
+/// Used for tail-friendly output in background runs.
+macro_rules! log_only {
+    ($log_only:expr, $($arg:tt)*) => {
+        if $log_only {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use rusqlite::Connection;
@@ -36,6 +46,9 @@ use std::time::Instant;
 // Import from shared library
 use lrclib_extract::normalize::{normalize_artist, normalize_title};
 use lrclib_extract::safety::validate_output_path;
+
+/// Type alias for normalized key → (track_rowid, duration_ms) candidates map.
+type NormCandidatesMap = FxHashMap<(Arc<str>, Arc<str>), Vec<(i64, i64)>>;
 
 /// String interner for deduplicating normalized strings.
 /// Reduces memory usage significantly when many tracks share the same artist/title.
@@ -189,6 +202,7 @@ struct Args {
     spotify_db: String,
     output_db: String,
     log_only: bool,
+    skip_pop0_albums: bool,
 }
 
 fn parse_args() -> Result<Args> {
@@ -196,11 +210,12 @@ fn parse_args() -> Result<Args> {
 
     // Parse flags
     let log_only = args.iter().any(|a| a == "--log-only");
+    let skip_pop0_albums = args.iter().any(|a| a == "--skip-pop0-albums");
 
     // Filter out flags
     let args_filtered: Vec<&String> = args
         .iter()
-        .filter(|a| !matches!(a.as_str(), "--log-only"))
+        .filter(|a| !matches!(a.as_str(), "--log-only" | "--skip-pop0-albums"))
         .collect();
 
     if args_filtered.len() < 2 {
@@ -210,8 +225,9 @@ fn parse_args() -> Result<Args> {
         eprintln!();
         eprintln!("Options:");
         eprintln!(
-            "  --log-only       Disable progress bars, use log output only (for background runs)"
+            "  --log-only           Disable progress bars, use log output only (for background runs)"
         );
+        eprintln!("  --skip-pop0-albums   Skip building pop0_albums_norm table (built by default)");
         eprintln!();
         eprintln!("Creates a normalized lookup table with multiple candidates per key (spec-02).");
         eprintln!(
@@ -231,6 +247,7 @@ fn parse_args() -> Result<Args> {
         spotify_db,
         output_db,
         log_only,
+        skip_pop0_albums,
     })
 }
 
@@ -295,7 +312,11 @@ fn main() -> Result<()> {
 
     // Phase 1: Stream and collect all candidates per (title_norm, artist_norm) key
     println!("Phase 1: Normalizing tracks and collecting candidates...");
-    eprintln!("[PHASE1] Starting normalization of {} tracks...", total);
+    log_only!(
+        log_only,
+        "[PHASE1] Starting normalization of {} tracks...",
+        total
+    );
     let pb = create_progress_bar(total, log_only);
 
     // String interner for deduplicating normalized strings
@@ -340,9 +361,10 @@ fn main() -> Result<()> {
         if count % 100_000 == 0 {
             pb.set_position(count);
         }
-        // Tail-friendly logging
+        // Tail-friendly logging (only in log-only mode)
         if count % 500_000 == 0 {
-            eprintln!(
+            log_only!(
+                log_only,
                 "[READ] {}/{} ({:.1}%)",
                 count,
                 total,
@@ -352,7 +374,7 @@ fn main() -> Result<()> {
     }
     pb.set_position(count);
     pb.finish_with_message("done");
-    eprintln!("[READ] {}/{} (100.0%)", count, total);
+    log_only!(log_only, "[READ] {}/{} (100.0%)", count, total);
 
     // Report interner stats
     let interned_strings = interner.strings.len();
@@ -373,14 +395,15 @@ fn main() -> Result<()> {
         "Phase 2: Sorting {} keys for optimal write order...",
         unique_keys
     );
-    eprintln!("[PHASE2] Sorting {} keys...", unique_keys);
+    log_only!(log_only, "[PHASE2] Sorting {} keys...", unique_keys);
 
     let sort_start = Instant::now();
     let mut sorted_keys: Vec<(Arc<str>, Arc<str>)> = candidates_map.keys().cloned().collect();
     sorted_keys.sort_unstable();
     let sort_elapsed = sort_start.elapsed();
     println!("  Sorted in {:.2}s", sort_elapsed.as_secs_f64());
-    eprintln!(
+    log_only!(
+        log_only,
         "[PHASE2] Sort complete in {:.2}s",
         sort_elapsed.as_secs_f64()
     );
@@ -389,7 +412,11 @@ fn main() -> Result<()> {
         "Phase 2b: Deduplicating and writing ({}ms buckets, max {} per key, batch {})...",
         DURATION_BUCKET_MS, MAX_CANDIDATES_PER_KEY, BATCH_SIZE
     );
-    eprintln!("[PHASE2] Writing with batch size {}...", BATCH_SIZE);
+    log_only!(
+        log_only,
+        "[PHASE2] Writing with batch size {}...",
+        BATCH_SIZE
+    );
 
     let pb_dedup = create_progress_bar(unique_keys as u64, log_only);
 
@@ -423,7 +450,8 @@ fn main() -> Result<()> {
                 batch.clear();
 
                 if written % 1_000_000 == 0 {
-                    eprintln!(
+                    log_only!(
+                        log_only,
                         "[WRITE] {} rows ({:.1}% of keys)",
                         written,
                         100.0 * keys_processed as f64 / unique_keys as f64
@@ -446,7 +474,7 @@ fn main() -> Result<()> {
     }
 
     pb_dedup.finish_with_message("done");
-    eprintln!("[WRITE] {} total rows written", written);
+    log_only!(log_only, "[WRITE] {} total rows written", written);
 
     tx.commit()?;
 
@@ -458,7 +486,10 @@ fn main() -> Result<()> {
 
     // Create indexes (spec-02 R2.1)
     println!("Creating indexes...");
-    eprintln!("[INDEX] Creating index on (title_norm, artist_norm)...");
+    log_only!(
+        log_only,
+        "[INDEX] Creating index on (title_norm, artist_norm)..."
+    );
     let idx_start = Instant::now();
 
     out_conn.execute(
@@ -466,7 +497,7 @@ fn main() -> Result<()> {
         [],
     )?;
 
-    eprintln!("[INDEX] Creating index on title_norm only...");
+    log_only!(log_only, "[INDEX] Creating index on title_norm only...");
     out_conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_track_norm_title ON track_norm(title_norm)",
         [],
@@ -474,13 +505,13 @@ fn main() -> Result<()> {
 
     let idx_elapsed = idx_start.elapsed().as_secs_f64();
     println!("  Indexes created in {:.2}s", idx_elapsed);
-    eprintln!("[INDEX] Complete in {:.2}s", idx_elapsed);
+    log_only!(log_only, "[INDEX] Complete in {:.2}s", idx_elapsed);
 
     // Optimize
     println!("Optimizing database...");
-    eprintln!("[ANALYZE] Running ANALYZE...");
+    log_only!(log_only, "[ANALYZE] Running ANALYZE...");
     out_conn.execute("ANALYZE", [])?;
-    eprintln!("[ANALYZE] Complete");
+    log_only!(log_only, "[ANALYZE] Complete");
 
     // Get file size
     let metadata = std::fs::metadata(output_db)?;
@@ -503,6 +534,227 @@ fn main() -> Result<()> {
     println!("  Elapsed: {:.2}s", elapsed.as_secs_f64());
     println!("============================================================");
 
+    // Phase 3: Build pop0_albums_norm table (unless skipped)
+    if !args.skip_pop0_albums {
+        build_pop0_albums_index(&src_conn, &mut out_conn, log_only)?;
+    }
+
+    Ok(())
+}
+
+/// Build pop0_albums_norm index for album upgrade pass.
+/// Contains pop=0 tracks from albums (not singles/compilations) for promoting
+/// existing matches from Single/Compilation to Album releases.
+///
+/// Schema:
+/// ```sql
+/// CREATE TABLE pop0_albums_norm (
+///     title_norm   TEXT NOT NULL,
+///     artist_norm  TEXT NOT NULL,
+///     track_rowid  INTEGER NOT NULL,
+///     duration_ms  INTEGER NOT NULL,
+///     PRIMARY KEY (title_norm, artist_norm, track_rowid)
+/// );
+/// ```
+fn build_pop0_albums_index(
+    src_conn: &Connection,
+    out_conn: &mut Connection,
+    log_only: bool,
+) -> Result<()> {
+    let phase_start = Instant::now();
+    println!();
+    println!("Building pop0_albums_norm index for album upgrade pass...");
+    log_only!(
+        log_only,
+        "[POP0_ALBUMS] Starting pop0_albums_norm index build..."
+    );
+
+    // Create table
+    out_conn.execute(
+        "CREATE TABLE IF NOT EXISTS pop0_albums_norm (
+            title_norm   TEXT NOT NULL,
+            artist_norm  TEXT NOT NULL,
+            track_rowid  INTEGER NOT NULL,
+            duration_ms  INTEGER NOT NULL,
+            PRIMARY KEY (title_norm, artist_norm, track_rowid)
+        )",
+        [],
+    )?;
+
+    // Count rows for progress
+    let total: u64 = src_conn.query_row(
+        "SELECT COUNT(*) FROM tracks t
+         JOIN track_artists ta ON ta.track_rowid = t.rowid
+         JOIN albums al ON al.rowid = t.album_rowid
+         WHERE t.popularity = 0 AND al.album_type = 'album'",
+        [],
+        |row| row.get(0),
+    )?;
+    log_only!(
+        log_only,
+        "[POP0_ALBUMS] Found {} pop=0 album tracks to index",
+        total
+    );
+
+    let pb = create_progress_bar(total, log_only);
+
+    // Stream and collect candidates
+    let mut interner = StringInterner::new();
+    let mut candidates_map: NormCandidatesMap = FxHashMap::default();
+
+    let mut stmt = src_conn.prepare(
+        "SELECT t.rowid, t.name, a.name, t.duration_ms
+         FROM tracks t
+         JOIN track_artists ta ON ta.track_rowid = t.rowid
+         JOIN artists a ON a.rowid = ta.artist_rowid
+         JOIN albums al ON al.rowid = t.album_rowid
+         WHERE t.popularity = 0 AND al.album_type = 'album'",
+    )?;
+
+    let mut rows = stmt.query([])?;
+    let mut count = 0u64;
+
+    while let Some(row) = rows.next()? {
+        let track_rowid: i64 = row.get(0)?;
+        let title: String = row.get(1)?;
+        let artist: String = row.get(2)?;
+        let duration_ms: i64 = row.get(3)?;
+
+        let title_norm = interner.intern(normalize_title(&title));
+        let artist_norm = interner.intern(normalize_artist(&artist));
+        let key = (Arc::clone(&title_norm), Arc::clone(&artist_norm));
+
+        candidates_map
+            .entry(key)
+            .or_default()
+            .push((track_rowid, duration_ms));
+
+        count += 1;
+        if count % 100_000 == 0 {
+            pb.set_position(count);
+        }
+        if count % 1_000_000 == 0 {
+            log_only!(
+                log_only,
+                "[POP0_ALBUMS] Read {}/{} ({:.1}%)",
+                count,
+                total,
+                100.0 * count as f64 / total as f64
+            );
+        }
+    }
+    pb.finish_with_message("done");
+    log_only!(
+        log_only,
+        "[POP0_ALBUMS] Read {} rows, {} unique keys",
+        count,
+        candidates_map.len()
+    );
+
+    // Sort keys for sequential B-tree inserts
+    let mut sorted_keys: Vec<(Arc<str>, Arc<str>)> = candidates_map.keys().cloned().collect();
+    sorted_keys.sort_unstable();
+
+    // Write to table using batch inserts
+    println!("  Writing {} unique keys...", sorted_keys.len());
+    let tx = out_conn.transaction()?;
+
+    // Use smaller batch size for 4-column table
+    const POP0_BATCH_SIZE: usize = 8000;
+    let mut batch: Vec<(Arc<str>, Arc<str>, i64, i64)> = Vec::with_capacity(POP0_BATCH_SIZE);
+    let mut written = 0u64;
+
+    for key in sorted_keys {
+        let entries = candidates_map.remove(&key).unwrap();
+        let (title_norm, artist_norm) = key;
+
+        for (track_rowid, duration_ms) in entries {
+            batch.push((
+                Arc::clone(&title_norm),
+                Arc::clone(&artist_norm),
+                track_rowid,
+                duration_ms,
+            ));
+
+            if batch.len() >= POP0_BATCH_SIZE {
+                write_pop0_batch(&tx, &batch)?;
+                written += batch.len() as u64;
+                batch.clear();
+            }
+        }
+    }
+
+    // Write remaining batch
+    if !batch.is_empty() {
+        write_pop0_batch(&tx, &batch)?;
+        written += batch.len() as u64;
+    }
+
+    tx.commit()?;
+    log_only!(log_only, "[POP0_ALBUMS] Wrote {} rows", written);
+
+    // Create index
+    println!("  Creating index...");
+    log_only!(
+        log_only,
+        "[POP0_ALBUMS] Creating index on (title_norm, artist_norm)..."
+    );
+    out_conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pop0_albums_key ON pop0_albums_norm(title_norm, artist_norm)",
+        [],
+    )?;
+
+    out_conn.execute("ANALYZE pop0_albums_norm", [])?;
+
+    let elapsed = phase_start.elapsed();
+    println!(
+        "  pop0_albums_norm complete: {} rows, {} unique keys ({:.1}s)",
+        written,
+        candidates_map.len(),
+        elapsed.as_secs_f64()
+    );
+    log_only!(
+        log_only,
+        "[POP0_ALBUMS] Complete: {} rows in {:.1}s",
+        written,
+        elapsed.as_secs_f64()
+    );
+
+    Ok(())
+}
+
+/// Write a batch of pop0_albums_norm rows.
+fn write_pop0_batch(conn: &Connection, batch: &[(Arc<str>, Arc<str>, i64, i64)]) -> Result<()> {
+    if batch.is_empty() {
+        return Ok(());
+    }
+
+    // Build multi-value INSERT
+    let mut sql = String::with_capacity(100 + batch.len() * 10);
+    sql.push_str(
+        "INSERT OR IGNORE INTO pop0_albums_norm (title_norm, artist_norm, track_rowid, duration_ms) VALUES ",
+    );
+    for i in 0..batch.len() {
+        if i > 0 {
+            sql.push(',');
+        }
+        sql.push_str("(?,?,?,?)");
+    }
+
+    let mut stmt = conn.prepare_cached(&sql)?;
+    let params: Vec<&dyn rusqlite::ToSql> = batch
+        .iter()
+        .flat_map(|(t, a, r, d)| {
+            [
+                t as &dyn rusqlite::ToSql,
+                a as &dyn rusqlite::ToSql,
+                r as &dyn rusqlite::ToSql,
+                d as &dyn rusqlite::ToSql,
+            ]
+        })
+        .collect();
+
+    stmt.execute(params.as_slice())?;
     Ok(())
 }
 
