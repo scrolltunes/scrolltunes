@@ -39,12 +39,12 @@ const deleteSong = (songId: string) =>
     })
 
     // Delete song
-    const result = yield* Effect.tryPromise({
+    yield* Effect.tryPromise({
       try: () => db.delete(songs).where(eq(songs.id, songId)),
       catch: cause => new DatabaseError({ cause }),
     })
 
-    return { deleted: result.rowCount === 1 }
+    return { deleted: true }
   })
 
 export async function DELETE(

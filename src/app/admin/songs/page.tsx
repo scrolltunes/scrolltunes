@@ -41,7 +41,13 @@ const LIMIT = 50
 // Header Component
 // ============================================================================
 
-function Header() {
+function Header({
+  isSearchMode,
+  onBackToCatalog,
+}: {
+  isSearchMode?: boolean
+  onBackToCatalog?: () => void
+}) {
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50 h-14 backdrop-blur-lg"
@@ -51,14 +57,26 @@ function Header() {
       }}
     >
       <div className="max-w-6xl mx-auto h-full px-4 flex items-center">
-        <Link
-          href="/admin"
-          className="flex items-center gap-2 transition-colors hover:brightness-125"
-          style={{ color: "var(--color-text3)" }}
-        >
-          <ArrowLeft size={20} />
-          <span>Admin</span>
-        </Link>
+        {isSearchMode && onBackToCatalog ? (
+          <button
+            type="button"
+            onClick={onBackToCatalog}
+            className="flex items-center gap-2 transition-colors hover:brightness-125"
+            style={{ color: "var(--color-text3)" }}
+          >
+            <ArrowLeft size={20} />
+            <span>Catalog</span>
+          </button>
+        ) : (
+          <Link
+            href="/admin"
+            className="flex items-center gap-2 transition-colors hover:brightness-125"
+            style={{ color: "var(--color-text3)" }}
+          >
+            <ArrowLeft size={20} />
+            <span>Admin</span>
+          </Link>
+        )}
       </div>
     </header>
   )
@@ -395,7 +413,7 @@ export default function AdminTracksPage() {
       className="min-h-screen"
       style={{ background: "var(--color-bg)", color: "var(--color-text)" }}
     >
-      <Header />
+      <Header isSearchMode={isSearchMode} onBackToCatalog={handleClearSearch} />
       <main className="pt-20 pb-8 px-4">
         <div className="max-w-6xl mx-auto">
           {/* Page Title */}

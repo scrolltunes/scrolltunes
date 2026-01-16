@@ -51,6 +51,18 @@ pub static TITLE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(r"(?i)\s*[-–—_]?\s*[a-z0-9]+\.(?:com|net|org|io|ru|de|fr|es|co\.uk)").unwrap(),
         // Visualizer/commentary tags: "(Visualiser)", "(Lyric Video)", "(comentario)"
         Regex::new(r"(?i)\s*[\(\[](?:visuali[sz]er|lyric\s*video|official\s*video|audio|comentario|commentary)[\)\]]").unwrap(),
+        // Official audio/video variants: "(Official Audio)", "(Official Lyric Video)", "(Official HD Video)"
+        Regex::new(r"(?i)\s*[\(\[]official\s+(?:audio|lyric\s+video|hd\s+video|music\s+video)[\)\]]").unwrap(),
+        // Spanish featuring: "(con Artist)", "[con Someone]"
+        Regex::new(r"(?i)\s*[\(\[]con\s+[^)\]]+[\)\]]").unwrap(),
+        // Standalone remaster without year: "(Remastered)", "[Remaster]"
+        Regex::new(r"(?i)\s*[\(\[]remaster(?:ed)?[\)\]]").unwrap(),
+        // Non-English remaster variants: (Remasterizado), (Remasterisé), (Rimasterizzato), (Remasterizada)
+        Regex::new(r"(?i)\s*[\(\[](?:remasterizado|remasterizada|remasteris[eé]|rimasterizzato)[\)\]]").unwrap(),
+        // Standalone original: "(Original)", "[Original]"
+        Regex::new(r"(?i)\s*[\(\[]original[\)\]]").unwrap(),
+        // Full version: "(Full Version)", "[Full]"
+        Regex::new(r"(?i)\s*[\(\[]full(?:\s+version)?[\)\]]").unwrap(),
         // Additional suffix patterns identified from failure analysis (Jan 2026)
         // Digital remaster with year: "- 2001 Digital Remaster"
         Regex::new(r"(?i)\s*[-–—]\s*\d{4}\s+digital\s+remaster(?:ed)?\s*$").unwrap(),
@@ -116,15 +128,15 @@ pub static ARTIST_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         // Strip everything after feat/ft/featuring/with and common separators
         Regex::new(r"(?i)\s*[;]\s*.*").unwrap(), // Semicolon: "Artist1;Artist2" → "Artist1"
-        Regex::new(r"(?i)\s+(?:feat\.?|ft\.?|featuring|with|&|,|/)\s+.*").unwrap(),
+        Regex::new(r"(?i)\s+(?:feat\.?|ft\.?|featuring|with|con|&|,|/)\s+.*").unwrap(), // "con" = Spanish featuring
         Regex::new(r"(?i)\s+(?:band|orchestra|ensemble|quartet|trio)$").unwrap(),
     ]
 });
 
 /// Multi-artist separator pattern for extracting primary artist.
-/// Matches: &, /, ,, ;, •, +, x, vs, and, with, feat, ft
+/// Matches: &, /, ,, ;, •, +, x, vs, and, with, con, feat, ft
 pub static ARTIST_SEPARATOR: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\s*(?:[&/,;•+×]|(?:\s+(?:x|vs\.?|and|with|feat\.?|ft\.?)\s+))\s*").unwrap()
+    Regex::new(r"(?i)\s*(?:[&/,;•+×]|(?:\s+(?:x|vs\.?|and|with|con|feat\.?|ft\.?)\s+))\s*").unwrap()
 });
 
 /// Regex to collapse multiple whitespace into single space
@@ -1056,6 +1068,13 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_artist_spanish_con() {
+        // Spanish "con" (featuring) - common in Latin music
+        assert_eq!(normalize_artist("Luis Fonsi con Daddy Yankee"), "luis fonsi");
+        assert_eq!(normalize_artist("Shakira con Maluma"), "shakira");
+    }
+
+    #[test]
     fn test_artist_rebrand_alias() {
         // Lady Antebellum rebranded to Lady A in 2020
         assert_eq!(normalize_artist("Lady Antebellum"), "lady a");
@@ -1245,6 +1264,46 @@ mod tests {
             normalize_punctuation("Eyal Golan & Moshe Peretz"),
             "Eyal Golan and Moshe Peretz"
         );
+    }
+
+    #[test]
+    fn test_normalize_title_official_variants() {
+        // Official Audio
+        assert_eq!(normalize_title("Song (Official Audio)"), "song");
+        assert_eq!(normalize_title("Track [Official Audio]"), "track");
+        // Official Lyric Video
+        assert_eq!(normalize_title("Song (Official Lyric Video)"), "song");
+        // Official HD Video
+        assert_eq!(normalize_title("Track (Official HD Video)"), "track");
+    }
+
+    #[test]
+    fn test_normalize_title_spanish_featuring() {
+        // Spanish "con" (featuring) pattern
+        assert_eq!(normalize_title("Canción (con Artista)"), "cancion");
+        assert_eq!(normalize_title("Song [con Someone]"), "song");
+    }
+
+    #[test]
+    fn test_normalize_title_remaster_variants() {
+        // Standalone remaster without year
+        assert_eq!(normalize_title("Song (Remastered)"), "song");
+        assert_eq!(normalize_title("Track [Remaster]"), "track");
+        // Non-English remaster variants
+        assert_eq!(normalize_title("Canción (Remasterizado)"), "cancion");
+        assert_eq!(normalize_title("Chanson (Remasterisé)"), "chanson");
+        assert_eq!(normalize_title("Canzone (Rimasterizzato)"), "canzone");
+        assert_eq!(normalize_title("Canción (Remasterizada)"), "cancion");
+    }
+
+    #[test]
+    fn test_normalize_title_original_and_full() {
+        // Standalone original
+        assert_eq!(normalize_title("Song (Original)"), "song");
+        assert_eq!(normalize_title("Track [Original]"), "track");
+        // Full version
+        assert_eq!(normalize_title("Song (Full Version)"), "song");
+        assert_eq!(normalize_title("Track [Full]"), "track");
     }
 
     #[test]
