@@ -58,7 +58,7 @@ export default function LoginPage() {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <Link
             href="/"
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+            className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
             style={{ background: "var(--color-surface2)" }}
             aria-label="Back"
           >
@@ -74,9 +74,9 @@ export default function LoginPage() {
           transition={springs.default}
           className="w-full max-w-sm"
         >
-          <div className="p-6 rounded-xl space-y-6" style={{ background: "var(--color-surface1)" }}>
+          <div className="p-6 rounded-sm space-y-6" style={{ background: "var(--color-surface1)" }}>
             <div className="text-center">
-              <h1 className="text-2xl font-semibold">Sign in to ScrollTunes</h1>
+              <h1 className="text-2xl font-semibold font-mono">Sign in to ScrollTunes</h1>
             </div>
 
             <ul className="space-y-3">

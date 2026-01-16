@@ -75,7 +75,7 @@ export default function FavoritesPage() {
       <main className="pt-20 pb-8 px-4 relative z-10">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-semibold">Favorites</h1>
+            <h1 className="text-2xl font-semibold font-mono">Favorites</h1>
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               {favorites.length} {favorites.length === 1 ? "song" : "songs"}
             </p>
@@ -133,7 +133,7 @@ export default function FavoritesPage() {
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
           >
             <div
-              className="flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg"
+              className="flex items-center gap-3 px-4 py-3 rounded-sm shadow-lg"
               style={{
                 background: "var(--color-surface1)",
                 border: "1px solid var(--color-border)",
@@ -179,7 +179,7 @@ const FavoriteSongItem = memo(function FavoriteSongItem({
           e.stopPropagation()
           onRemove(song.id, albumArt)
         }}
-        className="flex items-center justify-center w-8 h-8 rounded-full transition-colors"
+        className="flex items-center justify-center w-8 h-8 rounded-sm transition-colors"
         style={{ background: "var(--color-surface2)" }}
         aria-label="Remove from favorites"
         whileTap={{ scale: 0.9 }}
@@ -218,7 +218,7 @@ function Header() {
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
         <Link
           href="/"
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+          className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
           style={{ background: "var(--color-surface2)" }}
           aria-label="Back"
         >

@@ -18,7 +18,7 @@ export default function PrivacyPage() {
       >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <BackButton fallbackHref="/" ariaLabel="Back" />
-          <h1 className="text-lg font-semibold">Privacy Policy</h1>
+          <h1 className="text-lg font-semibold font-mono">Privacy Policy</h1>
         </div>
       </header>
 
@@ -52,7 +52,7 @@ export default function PrivacyPage() {
               processing.
             </p>
             <div
-              className="p-4 rounded-xl space-y-2 text-sm"
+              className="p-4 rounded-sm space-y-2 text-sm"
               style={{ background: "var(--color-surface1)" }}
             >
               <p className="mb-2 font-medium" style={{ color: "var(--color-text3)" }}>

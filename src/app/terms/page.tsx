@@ -15,7 +15,7 @@ export default function TermsOfService() {
           <BackButton fallbackHref="/" ariaLabel="Back to ScrollTunes" />
         </div>
 
-        <h1 className="mb-2 text-4xl font-bold">Terms of Service</h1>
+        <h1 className="mb-2 text-4xl font-bold font-mono">Terms of Service</h1>
         <p className="mb-12" style={{ color: "var(--color-text3)" }}>
           Last updated: January 2026
         </p>

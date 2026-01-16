@@ -71,7 +71,7 @@ function formatDuration(ms: number): string {
 function SearchSkeleton() {
   return (
     <div
-      className="absolute top-full left-0 right-0 z-50 mt-3 rounded-xl shadow-2xl"
+      className="absolute top-full left-0 right-0 z-50 mt-3 rounded-sm shadow-2xl"
       style={{
         background: "var(--color-surface1)",
         border: "1px solid var(--color-border)",
@@ -614,7 +614,7 @@ export const SongSearch = memo(function SongSearch({
                 : "Search by song title or artist name"
             }
             maxLength={INPUT_LIMITS.SEARCH_QUERY}
-            className={`w-full rounded-xl py-3 pl-12 border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-transparent ${
+            className={`w-full rounded-sm py-3 pl-12 border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-transparent ${
               voiceSearch.isProcessing
                 ? "text-transparent caret-transparent"
                 : voiceSearch.isRecording || streamingText
@@ -719,7 +719,7 @@ export const SongSearch = memo(function SongSearch({
 
           {!error && hasSearched && results.length === 0 && !isPending && (
             <div
-              className="absolute top-full left-0 right-0 z-50 mt-3 p-8 flex flex-col items-center gap-3 text-center rounded-xl shadow-2xl"
+              className="absolute top-full left-0 right-0 z-50 mt-3 p-8 flex flex-col items-center gap-3 text-center rounded-sm shadow-2xl"
               style={{
                 background: "var(--color-surface1)",
                 border: "1px solid var(--color-border)",
@@ -744,7 +744,7 @@ export const SongSearch = memo(function SongSearch({
 
         {!error && results.length > 0 && (
           <ul
-            className="absolute top-full left-0 right-0 z-50 mt-3 max-h-80 overflow-y-auto rounded-xl shadow-2xl"
+            className="absolute top-full left-0 right-0 z-50 mt-3 max-h-80 overflow-y-auto rounded-sm shadow-2xl"
             style={{
               background: "var(--color-surface1)",
               border: "1px solid var(--color-border)",
@@ -764,7 +764,7 @@ export const SongSearch = memo(function SongSearch({
                   aria-label={`${track.name} by ${track.artist}`}
                 >
                   <div
-                    className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center"
+                    className="flex-shrink-0 w-12 h-12 rounded-sm overflow-hidden flex items-center justify-center"
                     style={{ background: "var(--color-surface2)" }}
                   >
                     {track.albumArt ? (

@@ -20,7 +20,7 @@ export default function AboutPage() {
       >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <BackButton fallbackHref="/" ariaLabel="Back" />
-          <h1 className="text-lg font-semibold">About</h1>
+          <h1 className="text-lg font-semibold font-mono">About</h1>
         </div>
       </header>
 
@@ -47,7 +47,7 @@ export default function AboutPage() {
             >
               What is ScrollTunes
             </h2>
-            <div className="p-4 rounded-xl" style={{ background: "var(--color-surface1)" }}>
+            <div className="p-4 rounded-sm" style={{ background: "var(--color-surface1)" }}>
               <p className="leading-relaxed" style={{ color: "var(--color-text2)" }}>
                 A hands-free lyrics teleprompter for musicians. The lyrics start scrolling when you
                 start singing, so you can focus on your performance instead of fumbling with your
@@ -60,7 +60,7 @@ export default function AboutPage() {
           <section>
             <Link
               href="/roadmap"
-              className="block p-4 rounded-xl transition-colors hover:brightness-110 group"
+              className="block p-4 rounded-sm transition-colors hover:brightness-110 group"
               style={{ background: "var(--color-surface1)" }}
             >
               <div className="flex items-center justify-between">
@@ -86,7 +86,7 @@ export default function AboutPage() {
               How it works
             </h2>
             <div
-              className="p-4 rounded-xl space-y-4"
+              className="p-4 rounded-sm space-y-4"
               style={{ background: "var(--color-surface1)" }}
             >
               <div>
@@ -121,7 +121,7 @@ export default function AboutPage() {
               Features
             </h2>
             <div
-              className="p-4 rounded-xl space-y-3"
+              className="p-4 rounded-sm space-y-3"
               style={{ background: "var(--color-surface1)" }}
             >
               <div className="flex items-start gap-3">
@@ -191,7 +191,7 @@ export default function AboutPage() {
             <div className="space-y-4">
               {/* Without an account */}
               <div
-                className="p-4 rounded-xl space-y-3"
+                className="p-4 rounded-sm space-y-3"
                 style={{ background: "var(--color-surface1)" }}
               >
                 <h3 className="text-sm font-medium" style={{ color: "var(--color-text3)" }}>
@@ -229,7 +229,7 @@ export default function AboutPage() {
 
               {/* With an account */}
               <div
-                className="p-4 rounded-xl space-y-3"
+                className="p-4 rounded-sm space-y-3"
                 style={{ background: "var(--color-surface1)" }}
               >
                 <h3 className="text-sm font-medium" style={{ color: "var(--color-text3)" }}>
@@ -276,7 +276,7 @@ export default function AboutPage() {
 
               {/* Always */}
               <div
-                className="p-4 rounded-xl space-y-3"
+                className="p-4 rounded-sm space-y-3"
                 style={{ background: "var(--color-surface1)" }}
               >
                 <h3 className="text-sm font-medium" style={{ color: "var(--color-text3)" }}>
@@ -327,7 +327,7 @@ export default function AboutPage() {
                 href="https://lrclib.net"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block p-4 rounded-xl transition-colors hover:brightness-110"
+                className="block p-4 rounded-sm transition-colors hover:brightness-110"
                 style={{ background: "var(--color-surface1)" }}
               >
                 <div className="font-medium" style={{ color: "var(--color-text)" }}>
@@ -341,7 +341,7 @@ export default function AboutPage() {
                 href="https://getsongbpm.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block p-4 rounded-xl transition-colors hover:brightness-110"
+                className="block p-4 rounded-sm transition-colors hover:brightness-110"
                 style={{ background: "var(--color-surface1)" }}
               >
                 <div className="font-medium" style={{ color: "var(--color-text)" }}>
@@ -355,7 +355,7 @@ export default function AboutPage() {
                 href="https://songsterr.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block p-4 rounded-xl transition-colors hover:brightness-110"
+                className="block p-4 rounded-sm transition-colors hover:brightness-110"
                 style={{ background: "var(--color-surface1)" }}
               >
                 <div className="font-medium" style={{ color: "var(--color-text)" }}>
@@ -380,7 +380,7 @@ export default function AboutPage() {
               href="https://x.com/ScrollTunes"
               target="_blank"
               rel="noopener noreferrer"
-              className="block p-4 rounded-xl transition-colors hover:brightness-110"
+              className="block p-4 rounded-sm transition-colors hover:brightness-110"
               style={{ background: "var(--color-surface1)" }}
             >
               <div
@@ -393,7 +393,7 @@ export default function AboutPage() {
             </a>
             <a
               href="mailto:contact@scrolltunes.com"
-              className="block p-4 rounded-xl transition-colors hover:brightness-110 mt-3"
+              className="block p-4 rounded-sm transition-colors hover:brightness-110 mt-3"
               style={{ background: "var(--color-surface1)" }}
             >
               <div
@@ -417,7 +417,7 @@ export default function AboutPage() {
             <div className="space-y-3">
               <Link
                 href="/terms"
-                className="block p-4 rounded-xl transition-colors hover:brightness-110"
+                className="block p-4 rounded-sm transition-colors hover:brightness-110"
                 style={{ background: "var(--color-surface1)" }}
               >
                 <div className="font-medium" style={{ color: "var(--color-text)" }}>
@@ -426,7 +426,7 @@ export default function AboutPage() {
               </Link>
               <Link
                 href="/privacy"
-                className="block p-4 rounded-xl transition-colors hover:brightness-110"
+                className="block p-4 rounded-sm transition-colors hover:brightness-110"
                 style={{ background: "var(--color-surface1)" }}
               >
                 <div className="font-medium" style={{ color: "var(--color-text)" }}>

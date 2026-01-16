@@ -154,7 +154,7 @@ export default function SetlistsPage() {
       <main className="pt-20 pb-8 px-4 relative z-10">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-semibold">Setlists</h1>
+            <h1 className="text-2xl font-semibold font-mono">Setlists</h1>
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
@@ -171,7 +171,7 @@ export default function SetlistsPage() {
               {[1, 2, 3].map(i => (
                 <div
                   key={i}
-                  className="p-4 rounded-xl animate-pulse"
+                  className="p-4 rounded-sm animate-pulse"
                   style={{ background: "var(--color-surface1)" }}
                 >
                   <div className="flex items-center gap-3">
@@ -280,7 +280,7 @@ export default function SetlistsPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={springs.default}
-              className="mx-4 w-full max-w-sm rounded-2xl p-6 shadow-xl"
+              className="mx-4 w-full max-w-sm rounded-sm p-6 shadow-xl"
               style={{ background: "var(--color-surface1)" }}
               onClick={e => e.stopPropagation()}
             >
@@ -328,7 +328,7 @@ function Header() {
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
         <Link
           href="/"
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:brightness-110"
+          className="w-10 h-10 rounded-sm flex items-center justify-center transition-colors hover:brightness-110"
           style={{ background: "var(--color-surface2)" }}
           aria-label="Back"
         >

@@ -44,16 +44,16 @@ Migrate ScrollTunes to a terminal-inspired dark theme (Tokyo Night palette) with
 
 ## Phase 4: Core Pages
 
-- [ ] **4.1** Update Home page (`/`) - search input, RecentSongs, HomeFavorites, HomeSetlists sections with new primitives
-- [ ] **4.2** Update `SongSearch.tsx` component with new Input, Card styling
-- [ ] **4.3** Update `RecentSongs.tsx` to use new Card/SongListItem styling
-- [ ] **4.4** Update Song page (`SongPageClient.tsx`) - header, action bar, overall layout
-- [ ] **4.5** Update Favorites page (`/favorites`) with new primitives
-- [ ] **4.6** Update Setlists page (`/setlists`) with new Card styling
-- [ ] **4.7** Update Setlist detail page (`SetlistDetailClient.tsx`)
-- [ ] **4.8** Update Settings page (`/settings`) - remove theme picker, update all controls to new styling
-- [ ] **4.9** Update Login page (`/login`) with terminal-styled sign-in button
-- [ ] **4.10** Update static pages (`/about`, `/terms`, `/privacy`, `/roadmap`) with new typography and Card styling
+- [x] **4.1** Update Home page (`/`) - search input, RecentSongs, HomeFavorites, HomeSetlists sections with new primitives
+- [x] **4.2** Update `SongSearch.tsx` component with new Input, Card styling
+- [x] **4.3** Update `RecentSongs.tsx` to use new Card/SongListItem styling
+- [x] **4.4** Update Song page (`SongPageClient.tsx`) - header, action bar, overall layout
+- [x] **4.5** Update Favorites page (`/favorites`) with new primitives
+- [x] **4.6** Update Setlists page (`/setlists`) with new Card styling
+- [x] **4.7** Update Setlist detail page (`SetlistDetailClient.tsx`)
+- [x] **4.8** Update Settings page (`/settings`) - remove theme picker, update all controls to new styling
+- [x] **4.9** Update Login page (`/login`) with terminal-styled sign-in button
+- [x] **4.10** Update static pages (`/about`, `/terms`, `/privacy`, `/roadmap`) with new typography and Card styling
 
 ---
 
