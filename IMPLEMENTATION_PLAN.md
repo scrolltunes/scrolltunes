@@ -11,7 +11,7 @@ Migrate ScrollTunes to a terminal-inspired dark theme (Tokyo Night palette) with
 ## Phase 1: Foundation
 
 - [x] **1.1** Update `globals.css` with Tokyo Night design tokens (replace current color variables with new palette: bg-primary/secondary/tertiary, fg-primary/secondary/muted, accent-primary/secondary/tertiary, status colors, borders)
-- [ ] **1.2** Remove `:root.light` block and `:root.dark` block from `globals.css` (single dark theme only)
+- [x] **1.2** Remove `:root.light` block and `:root.dark` block from `globals.css` (single dark theme only)
 - [ ] **1.3** Add terminal utility classes to `globals.css`: `.terminal-glow`, `.terminal-scanlines`, `.glass`, `.gradient-text`, `.focus-ring`, grid pattern utility
 - [ ] **1.4** Replace fonts in `layout.tsx`: Geist → Inter, Geist_Mono → Space Mono; update CSS variables `--font-inter`, `--font-space-mono`
 - [ ] **1.5** Simplify inline theme script in `layout.tsx` to always apply dark theme (remove light mode logic)
