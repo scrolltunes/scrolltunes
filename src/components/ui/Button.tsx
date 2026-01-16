@@ -16,7 +16,7 @@ type ButtonProps = Omit<HTMLMotionProps<"button">, "ref"> & {
 const baseStyles = [
   "inline-flex items-center justify-center gap-2",
   "font-mono font-medium tracking-wide",
-  "rounded-sm",
+  "rounded-full",
   "transition-all duration-150 ease-out",
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-primary)]",
   "disabled:pointer-events-none disabled:opacity-50",
