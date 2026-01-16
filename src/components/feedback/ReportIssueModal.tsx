@@ -209,7 +209,7 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
               <div className="flex items-center gap-2">
                 <Bug size={20} style={{ color: "var(--color-warning)" }} />
                 <h2
-                  className="font-mono text-lg font-semibold"
+                  className="text-lg font-semibold"
                   style={{ color: "var(--color-text)" }}
                 >
                   Report an Issue

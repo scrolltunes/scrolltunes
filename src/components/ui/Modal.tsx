@@ -89,7 +89,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
             {title && (
               <h2
                 id="modal-title"
-                className="mb-6 pr-8 font-mono text-xl font-semibold"
+                className="mb-6 pr-8 text-xl font-semibold"
                 style={{ color: "var(--color-text)" }}
               >
                 {title}

@@ -143,7 +143,7 @@ export function AddToSetlistModal({ isOpen, onClose, song }: AddToSetlistModalPr
               </button>
 
               <h2
-                className="font-mono text-xl font-semibold mb-2 pr-8"
+                className="text-xl font-semibold mb-2 pr-8"
                 style={{ color: "var(--color-text)" }}
               >
                 Add to setlist

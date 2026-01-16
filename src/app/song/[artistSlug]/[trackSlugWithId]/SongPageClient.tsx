@@ -734,8 +734,8 @@ export default function SongPageClient({
             </div>
           )}
           <div className="flex flex-col min-w-0 flex-1">
-            <span className="text-sm font-medium font-mono truncate">{songTitle}</span>
-            <span className="text-xs font-mono truncate" style={{ color: "var(--color-text3)" }}>
+            <span className="text-sm font-medium truncate">{songTitle}</span>
+            <span className="text-xs truncate" style={{ color: "var(--color-text3)" }}>
               {songArtist}
             </span>
           </div>

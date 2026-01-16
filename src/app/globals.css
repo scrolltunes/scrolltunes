@@ -47,7 +47,7 @@
   /* Text mappings */
   --color-text: var(--fg-primary);
   --color-text2: var(--fg-secondary);
-  --color-text3: var(--fg-muted);
+  --color-text3: rgba(192, 202, 245, 0.6);
   --color-text-muted: var(--fg-muted);
   --color-text-ghost: var(--fg-dim);
 
@@ -116,14 +116,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-space-mono);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
 /* Custom scrollbar styling using CSS variables */

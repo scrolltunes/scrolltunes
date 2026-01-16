@@ -71,7 +71,7 @@ export const LogoMenu = memo(function LogoMenu() {
               <Link
                 href="/settings"
                 onClick={handleClose}
-                className="flex items-center gap-3 px-4 py-2 font-mono transition-colors hover:bg-[var(--bg-tertiary)]"
+                className="flex items-center gap-3 px-4 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
                 style={{ color: "var(--fg-secondary)" }}
               >
                 <GearSix size={20} />
@@ -81,7 +81,7 @@ export const LogoMenu = memo(function LogoMenu() {
                 <Link
                   href="/admin"
                   onClick={handleClose}
-                  className="flex items-center gap-3 px-4 py-2 font-mono transition-colors hover:bg-[var(--bg-tertiary)]"
+                  className="flex items-center gap-3 px-4 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
                   style={{ color: "var(--color-warning)" }}
                 >
                   <ShieldCheck size={20} />
@@ -94,7 +94,7 @@ export const LogoMenu = memo(function LogoMenu() {
               <Link
                 href="/favorites"
                 onClick={handleClose}
-                className="flex items-center gap-3 px-4 py-2 font-mono transition-colors hover:bg-[var(--bg-tertiary)]"
+                className="flex items-center gap-3 px-4 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
                 style={{ color: "var(--fg-secondary)" }}
               >
                 <Heart size={20} />
@@ -104,7 +104,7 @@ export const LogoMenu = memo(function LogoMenu() {
                 <Link
                   href="/setlists"
                   onClick={handleClose}
-                  className="flex items-center gap-3 px-4 py-2 font-mono transition-colors hover:bg-[var(--bg-tertiary)]"
+                  className="flex items-center gap-3 px-4 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
                   style={{ color: "var(--fg-secondary)" }}
                 >
                   <MusicNotes size={20} />
@@ -117,7 +117,7 @@ export const LogoMenu = memo(function LogoMenu() {
               <Link
                 href="/about"
                 onClick={handleClose}
-                className="flex items-center gap-3 px-4 py-2 font-mono transition-colors hover:bg-[var(--bg-tertiary)]"
+                className="flex items-center gap-3 px-4 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
                 style={{ color: "var(--fg-secondary)" }}
               >
                 <Info size={20} />

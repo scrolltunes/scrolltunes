@@ -48,22 +48,22 @@ export const FloatingActions = memo(function FloatingActions({
           <motion.button
             type="button"
             onClick={handleWarningClick}
-            className="flex items-center gap-2 h-11 px-3 rounded-full bg-tokyoNight-orange/20 hover:bg-tokyoNight-orange/30 backdrop-blur-sm border border-tokyoNight-orange/30 transition-colors"
+            className="flex items-center gap-2 h-11 px-3 rounded-full bg-amber-500/20 hover:bg-amber-500/30 backdrop-blur-sm border border-amber-500/30 transition-colors"
             aria-label="Report issue"
             whileTap={{ scale: 0.95 }}
           >
-            <Warning size={20} className="text-tokyoNight-orange" />
-            <span className="text-tokyoNight-orange text-sm font-medium">Report issue</span>
+            <Warning size={20} className="text-amber-500" />
+            <span className="text-amber-500 text-sm font-medium">Report issue</span>
           </motion.button>
         ) : (
           <motion.button
             type="button"
             onClick={onInfoPress}
-            className="w-11 h-11 rounded-full flex items-center justify-center bg-tokyoNight-bg/80 backdrop-blur-sm border border-tokyoNight-selection hover:bg-tokyoNight-selection/50 transition-colors"
+            className="w-11 h-11 rounded-full flex items-center justify-center bg-neutral-900/80 backdrop-blur-sm border border-neutral-700/50 hover:bg-neutral-800 transition-colors"
             aria-label="Song info"
             whileTap={{ scale: 0.9 }}
           >
-            <Info size={20} className="text-tokyoNight-comment" />
+            <Info size={20} className="text-neutral-300" />
           </motion.button>
         )}
       </div>

@@ -100,7 +100,7 @@ export const SongActionBar = memo(function SongActionBar({
         <button
           type="button"
           onClick={onInfoClick}
-          className="flex items-center gap-1.5 p-2 rounded-full text-sm font-medium transition-colors hover:bg-tokyoNight-selection/50"
+          className="flex items-center gap-1.5 p-2 rounded-full text-sm font-medium transition-colors hover:bg-white/5"
           style={{
             background: "var(--color-surface2)",
             color: "var(--color-text3)",
@@ -120,7 +120,7 @@ export const SongActionBar = memo(function SongActionBar({
       <motion.button
         type="button"
         onClick={handleToggleFavorite}
-        className="flex items-center justify-center p-2 rounded-full transition-colors hover:bg-tokyoNight-selection/50"
+        className="flex items-center justify-center p-2 rounded-full transition-colors hover:bg-white/5"
         style={{ background: "var(--color-surface2)" }}
         aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
         aria-pressed={isFavorite}
@@ -145,7 +145,7 @@ export const SongActionBar = memo(function SongActionBar({
         <button
           type="button"
           onClick={onAddToSetlist}
-          className={`relative flex items-center gap-2 rounded-full transition-colors text-sm font-medium hover:bg-tokyoNight-selection/50 ${
+          className={`relative flex items-center gap-2 rounded-full transition-colors text-sm font-medium hover:bg-white/5 ${
             isInSetlist ? "px-2 py-2 sm:px-3" : "p-2 sm:px-3 sm:py-2"
           }`}
           style={{
@@ -195,7 +195,7 @@ export const SongActionBar = memo(function SongActionBar({
         <button
           type="button"
           onClick={onEditClick}
-          className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors hover:bg-tokyoNight-selection/50"
+          className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors hover:bg-white/5"
           style={{
             background: hasEdits ? "var(--color-accent-soft)" : "var(--color-surface2)",
             color: hasEdits ? "var(--color-accent)" : "var(--color-text3)",
@@ -217,7 +217,7 @@ export const SongActionBar = memo(function SongActionBar({
         <button
           type="button"
           onClick={onShareClick}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors hover:bg-tokyoNight-selection/50"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors hover:bg-white/5"
           style={{
             background: "var(--color-surface2)",
             color: "var(--color-text3)",

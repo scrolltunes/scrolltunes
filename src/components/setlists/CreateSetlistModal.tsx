@@ -101,7 +101,7 @@ export function CreateSetlistModal({ isOpen, onClose, onCreate }: CreateSetlistM
             </button>
 
             <h2
-              className="font-mono text-xl font-semibold mb-6 pr-8"
+              className="text-xl font-semibold mb-6 pr-8"
               style={{ color: "var(--color-text)" }}
             >
               Create setlist

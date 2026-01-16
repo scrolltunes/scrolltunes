@@ -36,7 +36,7 @@ export function Badge({
 }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-xs uppercase tracking-wide ${variantStyles[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs uppercase tracking-wide ${variantStyles[variant]} ${className}`}
     >
       {showStatusDot && <span className={`w-1.5 h-1.5 rounded-full ${dotStyles[variant]}`} />}
       {children}
