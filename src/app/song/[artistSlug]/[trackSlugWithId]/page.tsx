@@ -5,7 +5,7 @@ import SongPageClient from "./SongPageClient"
 
 interface PageProps {
   params: Promise<{ artistSlug: string; trackSlugWithId: string }>
-  searchParams: Promise<{ spotifyId?: string; edit?: string }>
+  searchParams: Promise<{ edit?: string }>
 }
 
 const BOT_USER_AGENTS = [
@@ -31,9 +31,8 @@ function isBot(userAgent: string | null): boolean {
   return BOT_USER_AGENTS.some(bot => ua.includes(bot))
 }
 
-export default async function SongPage({ params, searchParams }: PageProps) {
+export default async function SongPage({ params }: PageProps) {
   const { artistSlug, trackSlugWithId } = await params
-  const { spotifyId } = await searchParams
 
   const lrclibId = parseTrackSlugWithId(trackSlugWithId)
 
@@ -64,7 +63,7 @@ export default async function SongPage({ params, searchParams }: PageProps) {
     )
   }
 
-  const result = await loadSongData(lrclibId, spotifyId ?? null)
+  const result = await loadSongData(lrclibId)
 
   if (result._tag === "Success") {
     return (

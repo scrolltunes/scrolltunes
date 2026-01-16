@@ -338,10 +338,7 @@ export function fireAndForgetCatalogUpdate(
  * Uses catalog cache to skip external API calls when possible.
  * Defers BPM fetching on cache miss for faster initial load.
  */
-export async function loadSongData(
-  lrclibId: number,
-  spotifyId: string | null,
-): Promise<SongDataResult> {
+export async function loadSongData(lrclibId: number): Promise<SongDataResult> {
   // Check catalog cache first (includes BPM, spotifyId, albumArt)
   const cachedSongPromise = getCachedSongFromCatalog(lrclibId)
 
@@ -397,19 +394,18 @@ export async function loadSongData(
     cachedSong !== null && cachedSong.bpm !== null && cachedSong.bpmSource !== null
   const hasCachedAlbumArt = cachedSong !== null && cachedSong.albumArtUrl !== null
   const cachedSpotifyId = cachedSong?.spotifyId ?? null
-  const resolvedSpotifyIdParam = spotifyId ?? cachedSpotifyId
 
   // Determine what we need to fetch
   let spotifyResult: SpotifyLookupResult | null = null
   let albumArt: string | null = cachedSong?.albumArtUrl ?? null
   let albumArtLarge: string | null = cachedSong?.albumArtLargeUrl ?? null
-  let resolvedSpotifyId: string | undefined = resolvedSpotifyIdParam ?? undefined
+  let resolvedSpotifyId: string | undefined = cachedSpotifyId ?? undefined
 
-  // Only fetch Spotify if we need album art or don't have spotifyId
+  // Only fetch Spotify if we need album art
   if (!hasCachedAlbumArt) {
-    if (resolvedSpotifyIdParam) {
-      // Parallel: Spotify lookup + enhancements
-      const spotifyEffect = lookupSpotifyById(resolvedSpotifyIdParam)
+    if (cachedSpotifyId) {
+      // Use cached Spotify ID for lookup
+      const spotifyEffect = lookupSpotifyById(cachedSpotifyId)
       spotifyResult = await Effect.runPromise(spotifyEffect.pipe(Effect.provide(ServerLayer)))
       if (spotifyResult) {
         albumArt = spotifyResult.albumArt

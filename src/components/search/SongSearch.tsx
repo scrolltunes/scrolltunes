@@ -415,7 +415,7 @@ export const SongSearch = memo(function SongSearch({
               title: data.trackName ?? track.name,
               artist: data.artistName ?? track.artist,
             })
-            router.push(`${canonicalPath}?spotifyId=${track.spotifyId}`)
+            router.push(canonicalPath)
           } else {
             showInlineMessage("No synced lyrics available for this song")
           }
@@ -435,10 +435,7 @@ export const SongSearch = memo(function SongSearch({
             title: track.name,
             artist: track.artist,
           })
-          const url = track.spotifyId
-            ? `${canonicalPath}?spotifyId=${track.spotifyId}`
-            : canonicalPath
-          router.push(url)
+          router.push(canonicalPath)
           return
         }
       }

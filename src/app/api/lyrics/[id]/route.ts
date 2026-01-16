@@ -2,17 +2,15 @@ import type { LyricsApiSuccessResponse } from "@/lib/lyrics-api-types"
 import { loadSongData } from "@/services/song-loader"
 import { NextResponse } from "next/server"
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: idParam } = await params
   const id = Number.parseInt(idParam, 10)
-  const url = new URL(request.url)
-  const spotifyId = url.searchParams.get("spotifyId")
 
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: "Invalid ID: must be a positive integer" }, { status: 400 })
   }
 
-  const result = await loadSongData(id, spotifyId)
+  const result = await loadSongData(id)
 
   if (result._tag === "NotFound") {
     return NextResponse.json({ error: `No lyrics found for ID ${id}` }, { status: 404 })

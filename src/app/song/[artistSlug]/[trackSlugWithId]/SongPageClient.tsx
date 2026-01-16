@@ -180,7 +180,6 @@ export default function SongPageClient({
   initialError,
 }: SongPageClientProps) {
   const searchParams = useSearchParams()
-  const spotifyId = searchParams.get("spotifyId")
   const shouldEnterEditMode = searchParams.get("edit") === "1"
 
   const { initialLoadState, initialEnhancements, loadedFromCache } = useMemo(() => {
@@ -467,7 +466,7 @@ export default function SongPageClient({
       artist: loadState.lyrics.artist,
       album: loadState.lyrics.album,
       durationMs: loadState.lyrics.duration ? loadState.lyrics.duration * 1000 : undefined,
-      spotifyId: loadState.spotifyId ?? spotifyId,
+      spotifyId: loadState.spotifyId,
       lrclibId,
       hasSyncedLyrics: true,
       bpmAttribution:
@@ -480,7 +479,7 @@ export default function SongPageClient({
             }
           : null,
     })
-  }, [loadState, lrclibId, spotifyId])
+  }, [loadState, lrclibId])
 
   // Update cache when enhancements are loaded (so next visit has them immediately)
   const hasUpdatedCacheWithEnhancements = useRef(false)
@@ -679,7 +678,7 @@ export default function SongPageClient({
                 duration: 0,
                 bpm: null,
                 key: null,
-                spotifyId: spotifyId,
+                spotifyId: null,
                 bpmSource: null,
                 lrclibId: lrclibId,
                 lyricsError:

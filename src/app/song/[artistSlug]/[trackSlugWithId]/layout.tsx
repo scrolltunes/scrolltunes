@@ -5,7 +5,6 @@ import { headers } from "next/headers"
 
 interface GenerateMetadataProps {
   params: Promise<{ artistSlug: string; trackSlugWithId: string }>
-  searchParams: Promise<{ spotifyId?: string }>
 }
 
 const BOT_USER_AGENTS = [
@@ -39,12 +38,10 @@ function unslugify(slug: string): string {
 }
 
 export async function generateMetadata(
-  { params, searchParams }: GenerateMetadataProps,
+  { params }: GenerateMetadataProps,
   _parent: ResolvingMetadata,
 ): Promise<Metadata> {
   const { artistSlug, trackSlugWithId } = await params
-  const searchParamsObj = await searchParams
-  const spotifyId = searchParamsObj?.spotifyId
 
   const lrclibId = parseTrackSlugWithId(trackSlugWithId)
 
@@ -70,7 +67,7 @@ export async function generateMetadata(
     }
   }
 
-  const result = await loadSongData(lrclibId, spotifyId ?? null)
+  const result = await loadSongData(lrclibId)
 
   if (result._tag !== "Success") {
     return {
