@@ -310,9 +310,9 @@ export const LyricLine = memo(function LyricLine({
             animate={{ opacity: 1, scaleY: 1 }}
             exit={{ opacity: 0, scaleY: 0.8 }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="absolute top-1 bottom-1 w-[3px] rounded-full z-0"
+            className="absolute top-1 bottom-1 w-[3px] rounded-full z-0 left-0 md:left-[15%]"
             style={{
-              left: isRTL ? "auto" : "0",
+              left: isRTL ? "auto" : undefined,
               right: isRTL ? "0" : "auto",
               background: "var(--color-accent)",
               opacity: 0.6,
