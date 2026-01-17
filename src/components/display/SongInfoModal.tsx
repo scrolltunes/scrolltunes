@@ -91,7 +91,11 @@ export function SongInfoModal({
                 {albumArt && (
                   <div
                     className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-sm"
-                    style={{ background: "var(--color-surface2)" }}
+                    style={{
+                      background: "var(--color-surface2)",
+                      boxShadow:
+                        "0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
+                    }}
                   >
                     <img src={albumArt} alt="" className="h-full w-full object-cover" />
                   </div>

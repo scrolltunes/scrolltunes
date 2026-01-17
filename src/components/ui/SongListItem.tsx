@@ -133,7 +133,10 @@ export const SongListItem = memo(function SongListItem({
       >
         <div
           className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden"
-          style={{ background: "var(--color-surface2)" }}
+          style={{
+            background: "var(--color-surface2)",
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
+          }}
         >
           {isLoading ? (
             <AlbumArtSkeleton />

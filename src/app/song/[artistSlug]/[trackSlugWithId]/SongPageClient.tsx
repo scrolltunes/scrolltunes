@@ -727,12 +727,19 @@ export default function SongPageClient({
               src={loadState.albumArt}
               alt=""
               className="w-10 h-10 shrink-0 object-cover"
-              style={{ borderRadius: "8px" }}
+              style={{
+                borderRadius: "8px",
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
+              }}
             />
           ) : (
             <div
               className="w-10 h-10 shrink-0 flex items-center justify-center"
-              style={{ background: "var(--color-surface2)", borderRadius: "8px" }}
+              style={{
+                background: "var(--color-surface2)",
+                borderRadius: "8px",
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
+              }}
             >
               <MusicNote size={20} weight="fill" style={{ color: "var(--color-text-muted)" }} />
             </div>
