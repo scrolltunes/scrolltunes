@@ -24,9 +24,7 @@ describe("Turso search", () => {
 
     // Should return results with Creed's "My Sacrifice" near the top
     const hasCreed = results.some(
-      r =>
-        r.artist.toLowerCase().includes("creed") &&
-        r.title.toLowerCase().includes("sacrifice"),
+      r => r.artist.toLowerCase().includes("creed") && r.title.toLowerCase().includes("sacrifice"),
     )
 
     expect(hasCreed).toBe(true)

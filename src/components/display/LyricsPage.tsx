@@ -106,37 +106,37 @@ export const LyricsPage = memo(function LyricsPage({
     <div className="flex flex-col items-center py-2 px-4 md:px-8">
       <div className="flex flex-col gap-2 pl-4">
         {lines.map((line, i) => {
-        const globalIndex = pageStartIndex + i
-        const position = getLinePosition(globalIndex, currentLineIndex, pageStartIndex)
+          const globalIndex = pageStartIndex + i
+          const position = getLinePosition(globalIndex, currentLineIndex, pageStartIndex)
 
-        const isActive = position === "current"
-        const isPast = position === "past-far" || position === "past-near"
-        const isNext = position === "next"
+          const isActive = position === "current"
+          const isPast = position === "past-far" || position === "past-near"
+          const isNext = position === "next"
 
-        // Get chord data for this line
-        const chordData = showChords ? lineChordData?.get(globalIndex) : undefined
+          // Get chord data for this line
+          const chordData = showChords ? lineChordData?.get(globalIndex) : undefined
 
-        return (
-          <div key={line.id}>
-            <LyricLine
-              text={line.text}
-              isActive={isActive}
-              isPast={isPast}
-              isNext={isNext}
-              index={globalIndex}
-              fontSize={fontSize}
-              isRTL={isRTL}
-              {...(chordData?.chords && { chords: chordData.chords })}
-              {...(chordData?.chordPositions && { chordPositions: chordData.chordPositions })}
-              {...(onLineClick && { onClick: () => onLineClick(globalIndex) })}
-            />
-          </div>
-        )
+          return (
+            <div key={line.id}>
+              <LyricLine
+                text={line.text}
+                isActive={isActive}
+                isPast={isPast}
+                isNext={isNext}
+                index={globalIndex}
+                fontSize={fontSize}
+                isRTL={isRTL}
+                {...(chordData?.chords && { chords: chordData.chords })}
+                {...(chordData?.chordPositions && { chordPositions: chordData.chordPositions })}
+                {...(onLineClick && { onClick: () => onLineClick(globalIndex) })}
+              />
+            </div>
+          )
         })}
 
         {/* Preview of next page's first line */}
         {previewLine && (
-          <div className="relative mt-3 opacity-70 text-right">
+          <div className={`relative mt-3 opacity-70 ${isRTL ? "text-left" : "text-right"}`}>
             <div
               className="inline-flex items-center gap-1.5"
               style={{ flexDirection: isRTL ? "row-reverse" : "row" }}

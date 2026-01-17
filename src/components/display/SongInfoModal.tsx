@@ -143,9 +143,16 @@ export function SongInfoModal({
 
                 {spotifyId !== null && (
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5" style={{ color: "var(--color-text3)" }}>
+                    <span
+                      className="flex items-center gap-1.5"
+                      style={{ color: "var(--color-text3)" }}
+                    >
                       Spotify
-                      <SpotifyLogo size={14} weight="fill" style={{ color: "var(--color-spotify)" }} />
+                      <SpotifyLogo
+                        size={14}
+                        weight="fill"
+                        style={{ color: "var(--color-spotify)" }}
+                      />
                     </span>
                     <a
                       href={`https://open.spotify.com/track/${spotifyId}`}

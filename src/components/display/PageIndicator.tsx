@@ -7,6 +7,7 @@ export interface PageIndicatorProps {
   readonly totalPages: number
   readonly className?: string
   readonly onPageClick?: (page: number) => void
+  readonly isRTL?: boolean
 }
 
 /**
@@ -22,6 +23,7 @@ export const PageIndicator = memo(function PageIndicator({
   totalPages,
   className = "",
   onPageClick,
+  isRTL = false,
 }: PageIndicatorProps) {
   // For 1-page songs, show nothing
   if (totalPages <= 1) return null
@@ -62,7 +64,9 @@ export const PageIndicator = memo(function PageIndicator({
 
   return (
     <div
-      className={`absolute top-4 right-4 flex items-center gap-1.5 ${className}`}
+      className={`absolute top-4 ${isRTL ? "left-4" : "right-4"} flex items-center gap-1.5 ${
+        isRTL ? "flex-row-reverse" : ""
+      } ${className}`}
       aria-label={`Page ${currentPage} of ${totalPages}`}
       aria-live="polite"
     >

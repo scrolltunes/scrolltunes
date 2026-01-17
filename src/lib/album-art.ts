@@ -41,9 +41,9 @@ const fetchSpotifyById = (
 ): Effect.Effect<string | null, never, SpotifyService> =>
   Effect.gen(function* () {
     const spotify = yield* SpotifyService
-    const track = yield* spotify.getTrack(spotifyId).pipe(
-      Effect.catchAll(() => Effect.succeed(null)),
-    )
+    const track = yield* spotify
+      .getTrack(spotifyId)
+      .pipe(Effect.catchAll(() => Effect.succeed(null)))
     if (!track) return null
     return getSpotifyImageUrl(track.album.images, size)
   })
@@ -59,9 +59,9 @@ const searchSpotify = (
   Effect.gen(function* () {
     const spotify = yield* SpotifyService
     const query = `${title} ${artist}`
-    const result = yield* spotify.searchTracks(query, 1).pipe(
-      Effect.catchAll(() => Effect.succeed(null)),
-    )
+    const result = yield* spotify
+      .searchTracks(query, 1)
+      .pipe(Effect.catchAll(() => Effect.succeed(null)))
     if (!result?.tracks?.items?.[0]) return null
     return getSpotifyImageUrl(result.tracks.items[0].album.images, size)
   })

@@ -141,7 +141,11 @@ function searchLRCLibFallback(
 function search(
   query: string,
   limit: number,
-): Effect.Effect<SearchResultTrack[], never, SpotifyService | TursoService | ServerConfig | HttpFetchService> {
+): Effect.Effect<
+  SearchResultTrack[],
+  never,
+  SpotifyService | TursoService | ServerConfig | HttpFetchService
+> {
   return searchTurso(query, limit).pipe(
     Effect.flatMap(results => {
       if (results.length > 0) {

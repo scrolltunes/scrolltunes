@@ -55,7 +55,8 @@ export function ReportIssueModal({ isOpen, onClose, songContext }: ReportIssueMo
   const hasMissingSpotifyMetadata = songContext?.warnings?.some(
     w => w.type === "missing_spotify_metadata",
   )
-  const hasKnownIssue = hasMissingBpm || hasChordsError || hasLyricsError || hasMissingSpotifyMetadata
+  const hasKnownIssue =
+    hasMissingBpm || hasChordsError || hasLyricsError || hasMissingSpotifyMetadata
   const isDescriptionRequired = !hasKnownIssue
 
   const displayTitle = useMemo(

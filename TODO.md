@@ -689,3 +689,14 @@ flowchart TD
 
 ### Demo Page
 Access `/demo` to test voice detection with mock lyrics without needing Spotify/LRCLIB integration.
+
+## RTL Mode Comprehensive Support
+
+When lyrics are detected as RTL (Hebrew, Arabic, etc.), the following UI elements should be reversed:
+
+- [x] **Preview line** - left-aligned instead of right-aligned
+- [x] **Page navigation arrows** - swap left/right positions and icons
+- [x] **Progress bar** - direction reversed (right-to-left fill)
+- [x] **Page indicator dots** - reversed order
+- [x] **Metronome orb** - position swapped (bottom-left ↔ bottom-right)
+- [x] **Swipe gestures** - reversed direction (swipe left = prev, swipe right = next)

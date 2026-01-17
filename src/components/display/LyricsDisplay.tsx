@@ -114,6 +114,12 @@ export const LyricsDisplay = memo(function LyricsDisplay({
   const lyrics = state._tag !== "Idle" ? state.lyrics : null
   const totalLines = lyrics?.lines.length ?? 0
 
+  // Detect RTL direction once per song
+  const isRTL = useMemo(
+    () => (lyrics ? detectLyricsDirection(lyrics.lines) === "rtl" : false),
+    [lyrics],
+  )
+
   // Dynamic pagination calculation - measures actual content area
   const { linesPerPage: calculatedLinesPerPage, debugHeight } = useDynamicPagination({
     contentRef,
@@ -157,24 +163,6 @@ export const LyricsDisplay = memo(function LyricsDisplay({
     }
   }, [currentLineIndex, currentPage, isPlaying, isManualMode])
 
-  // Manual navigation via swipe
-  const handleSwipeLeft = useCallback(() => {
-    enterManualMode?.()
-    lyricsPageStore.nextPage()
-  }, [enterManualMode])
-
-  const handleSwipeRight = useCallback(() => {
-    enterManualMode?.()
-    lyricsPageStore.prevPage()
-  }, [enterManualMode])
-
-  const { handlers: swipeHandlers } = useSwipeGesture({
-    onSwipeLeft: handleSwipeLeft,
-    onSwipeRight: handleSwipeRight,
-    threshold: 50,
-    enabled: true,
-  })
-
   // Navigation arrow handlers
   const handlePrevPage = useCallback(() => {
     enterManualMode?.()
@@ -186,18 +174,36 @@ export const LyricsDisplay = memo(function LyricsDisplay({
     lyricsPageStore.nextPage()
   }, [enterManualMode])
 
+  // Manual navigation via swipe
+  const handleSwipeLeft = useCallback(() => {
+    if (isRTL) {
+      handlePrevPage()
+    } else {
+      handleNextPage()
+    }
+  }, [handleNextPage, handlePrevPage, isRTL])
+
+  const handleSwipeRight = useCallback(() => {
+    if (isRTL) {
+      handleNextPage()
+    } else {
+      handlePrevPage()
+    }
+  }, [handleNextPage, handlePrevPage, isRTL])
+
+  const { handlers: swipeHandlers } = useSwipeGesture({
+    onSwipeLeft: handleSwipeLeft,
+    onSwipeRight: handleSwipeRight,
+    threshold: 50,
+    enabled: true,
+  })
+
   // Handle line click - jump to that line
   const handleLineClick = useCallback(
     (index: number) => {
       jumpToLine(index)
     },
     [jumpToLine],
-  )
-
-  // Detect RTL direction once per song
-  const isRTL = useMemo(
-    () => (lyrics ? detectLyricsDirection(lyrics.lines) === "rtl" : false),
-    [lyrics],
   )
 
   // Build map of line index → chord data (transposed if needed)
@@ -354,11 +360,13 @@ export const LyricsDisplay = memo(function LyricsDisplay({
           style={{ background: "var(--color-progress-track)" }}
         >
           <div
-            className="h-full w-full origin-left"
+            className="h-full w-full"
             style={{
               transform: `scaleX(${pageProgress})`,
-              background:
-                "linear-gradient(90deg, var(--color-progress-start) 0%, var(--color-progress-end) 100%)",
+              transformOrigin: isRTL ? "right" : "left",
+              background: isRTL
+                ? "linear-gradient(270deg, var(--color-progress-start) 0%, var(--color-progress-end) 100%)"
+                : "linear-gradient(90deg, var(--color-progress-start) 0%, var(--color-progress-end) 100%)",
             }}
           />
         </div>
@@ -367,7 +375,8 @@ export const LyricsDisplay = memo(function LyricsDisplay({
         <PageIndicator
           currentPage={currentPage + 1}
           totalPages={totalPages}
-          onPageClick={(page) => {
+          isRTL={isRTL}
+          onPageClick={page => {
             enterManualMode?.()
             lyricsPageStore.goToPage(page - 1)
           }}
@@ -432,6 +441,7 @@ export const LyricsDisplay = memo(function LyricsDisplay({
           hasPrev={hasPrev}
           hasNext={hasNext}
           visible={!isMobile || showArrows}
+          isRTL={isRTL}
         />
       </div>
     </div>

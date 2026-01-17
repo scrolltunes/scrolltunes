@@ -13,6 +13,7 @@ export interface PageNavigationArrowsProps {
   readonly hasNext: boolean
   readonly className?: string
   readonly visible?: boolean
+  readonly isRTL?: boolean
 }
 
 /**
@@ -30,6 +31,7 @@ export const PageNavigationArrows = memo(function PageNavigationArrows({
   hasNext,
   className = "",
   visible = true,
+  isRTL = false,
 }: PageNavigationArrowsProps) {
   const isMobile = useIsMobile()
   const prefersReducedMotion = useReducedMotion()
@@ -73,6 +75,9 @@ export const PageNavigationArrows = memo(function PageNavigationArrows({
     ? "bg-black/40 text-white/70 active:bg-black/50 active:text-white/90"
     : "bg-transparent text-white/30 hover:bg-white/5 hover:text-white/60"
 
+  const leftAction = isRTL ? "next" : "prev"
+  const rightAction = isRTL ? "prev" : "next"
+
   return (
     <AnimatePresence>
       {visible && (
@@ -84,16 +89,32 @@ export const PageNavigationArrows = memo(function PageNavigationArrows({
           className={`absolute inset-y-0 left-0 right-0 flex items-center justify-between pointer-events-none ${className}`}
           aria-label="Page navigation"
         >
-          {/* Previous page button */}
-          {hasPrev ? (
+          {/* Left navigation button */}
+          {leftAction === "prev" ? (
+            hasPrev ? (
+              <motion.button
+                type="button"
+                className={`${baseButtonStyles} ${enabledStyles} pointer-events-auto ml-2`}
+                onClick={handlePrev}
+                whileHover={{ scale: hoverScale }}
+                whileTap={{ scale: tapScale }}
+                transition={transition}
+                aria-label="Previous page"
+              >
+                <CaretLeft size={iconSize} weight="bold" />
+              </motion.button>
+            ) : (
+              <div className={`${buttonSize} ml-2`} />
+            )
+          ) : hasNext ? (
             <motion.button
               type="button"
               className={`${baseButtonStyles} ${enabledStyles} pointer-events-auto ml-2`}
-              onClick={handlePrev}
+              onClick={handleNext}
               whileHover={{ scale: hoverScale }}
               whileTap={{ scale: tapScale }}
               transition={transition}
-              aria-label="Previous page"
+              aria-label="Next page"
             >
               <CaretLeft size={iconSize} weight="bold" />
             </motion.button>
@@ -101,16 +122,32 @@ export const PageNavigationArrows = memo(function PageNavigationArrows({
             <div className={`${buttonSize} ml-2`} />
           )}
 
-          {/* Next page button */}
-          {hasNext ? (
+          {/* Right navigation button */}
+          {rightAction === "next" ? (
+            hasNext ? (
+              <motion.button
+                type="button"
+                className={`${baseButtonStyles} ${enabledStyles} pointer-events-auto mr-2`}
+                onClick={handleNext}
+                whileHover={{ scale: hoverScale }}
+                whileTap={{ scale: tapScale }}
+                transition={transition}
+                aria-label="Next page"
+              >
+                <CaretRight size={iconSize} weight="bold" />
+              </motion.button>
+            ) : (
+              <div className={`${buttonSize} mr-2`} />
+            )
+          ) : hasPrev ? (
             <motion.button
               type="button"
               className={`${baseButtonStyles} ${enabledStyles} pointer-events-auto mr-2`}
-              onClick={handleNext}
+              onClick={handlePrev}
               whileHover={{ scale: hoverScale }}
               whileTap={{ scale: tapScale }}
               transition={transition}
-              aria-label="Next page"
+              aria-label="Previous page"
             >
               <CaretRight size={iconSize} weight="bold" />
             </motion.button>

@@ -34,7 +34,7 @@ import {
   useVoiceTrigger,
   useWakeLock,
 } from "@/hooks"
-import { applyEnhancement } from "@/lib"
+import { applyEnhancement, detectLyricsDirection } from "@/lib"
 import { computeLrcHashSync } from "@/lib/lrc-hash"
 import type { LyricsApiSuccessResponse, LyricsWarning } from "@/lib/lyrics-api-types"
 import { loadCachedLyrics, saveCachedLyrics } from "@/lib/lyrics-cache"
@@ -404,6 +404,10 @@ export default function SongPageClient({
   })
 
   const isLoaded = loadState._tag === "Loaded"
+  const isRTL = useMemo(() => {
+    if (loadState._tag !== "Loaded") return false
+    return detectLyricsDirection(loadState.lyrics.lines) === "rtl"
+  }, [loadState])
 
   const resetRef = useRef(reset)
   const stopListeningRef = useRef(stopListening)
@@ -866,7 +870,10 @@ export default function SongPageClient({
         )}
 
         {!isEditMode && loadState.bpm !== null && loadState.bpm > 0 && (
-          <FloatingMetronome bpm={loadState.bpm} position="bottom-right" />
+          <FloatingMetronome
+            bpm={loadState.bpm}
+            position={isRTL ? "bottom-right" : "bottom-left"}
+          />
         )}
 
         {/* {!isEditMode && <SingingDebugIndicator />} */}

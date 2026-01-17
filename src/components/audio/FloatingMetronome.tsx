@@ -1,12 +1,7 @@
 "use client"
 
 import { springs } from "@/animations"
-import {
-  metronomeStore,
-  useMetronome,
-  useMetronomeControls,
-  usePlayerState,
-} from "@/core"
+import { metronomeStore, useMetronome, useMetronomeControls, usePlayerState } from "@/core"
 import { soundSystem } from "@/sounds"
 import { Metronome } from "@phosphor-icons/react"
 import { AnimatePresence, motion } from "motion/react"
@@ -142,7 +137,9 @@ export const FloatingMetronome = memo(function FloatingMetronome({
                   onClick={handleToggleMetronome}
                   className="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors"
                   style={{
-                    background: metronomeState.isRunning ? "var(--accent-primary)" : "var(--color-surface3)",
+                    background: metronomeState.isRunning
+                      ? "var(--accent-primary)"
+                      : "var(--color-surface3)",
                     color: metronomeState.isRunning ? "white" : "var(--color-text)",
                   }}
                 >
@@ -194,17 +191,8 @@ export const FloatingMetronome = memo(function FloatingMetronome({
           }}
           aria-label={isActive ? "Stop metronome" : "Start metronome"}
         >
-          <MetronomeOrb
-            bpm={bpm}
-            isActive={isActive}
-            size="sm"
-            onPulse={handlePulse}
-          >
-            <Metronome
-              size={20}
-              weight={isActive ? "fill" : "regular"}
-              style={{ opacity: 0.6 }}
-            />
+          <MetronomeOrb bpm={bpm} isActive={isActive} size="sm" onPulse={handlePulse}>
+            <Metronome size={20} weight={isActive ? "fill" : "regular"} style={{ opacity: 0.6 }} />
           </MetronomeOrb>
         </button>
 
