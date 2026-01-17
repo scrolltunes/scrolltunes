@@ -1,4 +1,3 @@
-export { ActionBarMetronome, type ActionBarMetronomeProps } from "./ActionBarMetronome"
 export { FloatingMetronome, type FloatingMetronomeProps } from "./FloatingMetronome"
 export { LiveTranscriptPreview, type LiveTranscriptPreviewProps } from "./LiveTranscriptPreview"
 export { FontSizeControl, type FontSizeControlProps } from "./FontSizeControl"
