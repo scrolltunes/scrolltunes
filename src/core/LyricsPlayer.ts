@@ -69,6 +69,42 @@ export type PlayerEvent = LoadLyrics | Play | Pause | Seek | Reset | Tick
 // --- Helper Functions ---
 
 /**
+ * Trim empty lines from the start and end of lyrics.
+ * Empty lines in the middle are preserved.
+ */
+function trimEmptyLines(lyrics: Lyrics): Lyrics {
+  const lines = lyrics.lines
+  if (lines.length === 0) return lyrics
+
+  // Find first non-empty line
+  let startIndex = 0
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]?.text.trim()) {
+      startIndex = i
+      break
+    }
+  }
+
+  // Find last non-empty line
+  let endIndex = lines.length - 1
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i]?.text.trim()) {
+      endIndex = i
+      break
+    }
+  }
+
+  // If all lines are empty or nothing to trim, return as-is
+  if (startIndex > endIndex) return lyrics
+  if (startIndex === 0 && endIndex === lines.length - 1) return lyrics
+
+  return {
+    ...lyrics,
+    lines: lines.slice(startIndex, endIndex + 1),
+  }
+}
+
+/**
  * Compute line index from a player state (pure function)
  */
 function computeLineIndex(state: PlayerState): number {
@@ -220,7 +256,8 @@ export class LyricsPlayer {
       return
     }
     this.stopPlaybackLoop()
-    this.setState({ _tag: "Ready", lyrics })
+    const trimmedLyrics = trimEmptyLines(lyrics)
+    this.setState({ _tag: "Ready", lyrics: trimmedLyrics })
   }
 
   private handlePlay(): void {
