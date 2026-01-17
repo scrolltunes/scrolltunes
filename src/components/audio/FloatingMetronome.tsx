@@ -108,8 +108,6 @@ export const FloatingMetronome = memo(function FloatingMetronome({
       beatCountRef.current = 0
       metronomeStore.setBpm(bpm)
       metronomeStore.start()
-    } else if (!isPlaying) {
-      metronomeStore.stop()
     }
   }, [isPlaying, hasBpm, bpm])
 

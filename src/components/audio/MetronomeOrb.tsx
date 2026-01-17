@@ -85,8 +85,8 @@ export const MetronomeOrb = memo(function MetronomeOrb({
             key={`glow-${pulseKey}`}
             className="absolute inset-[-2px] rounded-full blur-sm"
             style={{ background: "var(--color-accent-glow)" }}
-            initial={{ opacity: 0.6, scale: 1 }}
-            animate={{ opacity: 0, scale: 1.2 }}
+            initial={{ opacity: 0.3, scale: 1 }}
+            animate={{ opacity: 0, scale: 1.1 }}
             exit={{ opacity: 0 }}
             transition={springs.default}
           />
@@ -100,8 +100,8 @@ export const MetronomeOrb = memo(function MetronomeOrb({
               key={`ring-${ringIndex}-${pulseKey}`}
               className="absolute inset-0 rounded-full border-2"
               style={{ borderColor: "var(--accent-primary)" }}
-              initial={{ scale: 1, opacity: 0.5 - ringIndex * 0.1 }}
-              animate={{ scale: 1.5 + ringIndex * 0.3, opacity: 0 }}
+              initial={{ scale: 1, opacity: 0.25 - ringIndex * 0.05 }}
+              animate={{ scale: 1.3 + ringIndex * 0.2, opacity: 0 }}
               transition={{
                 ...springs.default,
                 delay: ringIndex * 0.05,
