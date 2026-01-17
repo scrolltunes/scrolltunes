@@ -201,6 +201,7 @@ export const FloatingMetronome = memo(function FloatingMetronome({
             <Metronome
               size={20}
               weight={isActive ? "fill" : "regular"}
+              style={{ opacity: 0.6 }}
             />
           </MetronomeOrb>
         </button>
