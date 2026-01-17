@@ -35,11 +35,16 @@ interface PersistedMetronomeSettings {
 }
 
 const DEFAULT_STATE: MetronomeState = {
-  mode: "both",
+  mode: "click",
   isMuted: false,
   volume: 0.5,
   bpm: null,
   isRunning: false,
+}
+
+function normalizeMode(mode: MetronomeMode): MetronomeMode {
+  // "both" was removed from UI - treat as "click"
+  return mode === "both" ? "click" : mode
 }
 
 function loadPersistedSettings(): Partial<MetronomeState> {
@@ -49,7 +54,7 @@ function loadPersistedSettings(): Partial<MetronomeState> {
     if (!stored) return {}
     const parsed = JSON.parse(stored) as PersistedMetronomeSettings
     return {
-      mode: parsed.mode,
+      mode: normalizeMode(parsed.mode),
       isMuted: parsed.isMuted,
       volume: parsed.volume,
     }
@@ -131,12 +136,13 @@ export class MetronomeStore {
       })
 
       if (data?.metronome) {
-        this.setState({
-          mode: data.metronome.mode,
+        const normalizedSettings = {
+          mode: normalizeMode(data.metronome.mode),
           isMuted: data.metronome.isMuted,
           volume: data.metronome.volume,
-        })
-        savePersistedSettings(data.metronome)
+        }
+        this.setState(normalizedSettings)
+        savePersistedSettings(normalizedSettings)
       }
     },
   )

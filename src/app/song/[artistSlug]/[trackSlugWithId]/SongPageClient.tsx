@@ -1,6 +1,6 @@
 "use client"
 
-import { SingingDebugIndicator, VoiceIndicator } from "@/components/audio"
+import { FloatingMetronome, SingingDebugIndicator, VoiceIndicator } from "@/components/audio"
 import { LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
 import { EditModeProvider, EditToolbar, EditableLyricsDisplay } from "@/components/edit-mode"
 import { ReportIssueModal } from "@/components/feedback"
@@ -849,7 +849,6 @@ export default function SongPageClient({
                 title={loadState.lyrics.title}
                 artist={loadState.lyrics.artist}
                 {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
-                bpm={loadState.bpm}
                 onAddToSetlist={() => setShowAddToSetlist(true)}
                 onShareClick={() => setShowShareModal(true)}
                 onInfoClick={() => setShowInfo(true)}
@@ -864,6 +863,10 @@ export default function SongPageClient({
               enterManualMode={enterLyricsPageManualMode}
             />
           </>
+        )}
+
+        {!isEditMode && loadState.bpm !== null && loadState.bpm > 0 && (
+          <FloatingMetronome bpm={loadState.bpm} position="bottom-right" />
         )}
 
         {!isEditMode && <SingingDebugIndicator />}
