@@ -55,11 +55,14 @@ export const MetronomeOrb = memo(function MetronomeOrb({
     if (!isActive || bpm === null || bpm <= 0) return
 
     const intervalMs = 60000 / bpm
+    // Debounce the initial pulse to avoid double-clicks on rapid state changes
+    const initialTimeoutId = setTimeout(triggerPulse, 0)
     const intervalId = setInterval(triggerPulse, intervalMs)
 
-    triggerPulse()
-
-    return () => clearInterval(intervalId)
+    return () => {
+      clearTimeout(initialTimeoutId)
+      clearInterval(intervalId)
+    }
   }, [isActive, bpm, triggerPulse])
 
   const rings = useMemo(() => {

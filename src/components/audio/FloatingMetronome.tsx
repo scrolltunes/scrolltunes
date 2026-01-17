@@ -90,6 +90,7 @@ export const FloatingMetronome = memo(function FloatingMetronome({
   )
 
   const isPlaying = playerState._tag === "Playing"
+  const wasPlayingRef = useRef(false)
 
   const handleToggleMetronome = useCallback(() => {
     if (!hasBpm) return
@@ -108,7 +109,10 @@ export const FloatingMetronome = memo(function FloatingMetronome({
       beatCountRef.current = 0
       metronomeStore.setBpm(bpm)
       metronomeStore.start()
+    } else if (wasPlayingRef.current && !isPlaying) {
+      metronomeStore.stop()
     }
+    wasPlayingRef.current = isPlaying
   }, [isPlaying, hasBpm, bpm])
 
   return (
