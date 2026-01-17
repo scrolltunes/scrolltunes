@@ -1,6 +1,6 @@
 "use client"
 
-import { FloatingMetronome, SingingDebugIndicator, VoiceIndicator } from "@/components/audio"
+import { SingingDebugIndicator, VoiceIndicator } from "@/components/audio"
 import { LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
 import { EditModeProvider, EditToolbar, EditableLyricsDisplay } from "@/components/edit-mode"
 import { ReportIssueModal } from "@/components/feedback"
@@ -654,7 +654,6 @@ export default function SongPageClient({
   const isPlaying = playerState._tag === "Playing"
   const isReady = playerState._tag !== "Idle"
 
-  const currentBpm = loadState._tag === "Loaded" ? loadState.bpm : null
   const songTitle = loadState._tag === "Loaded" ? normalizeTrackName(loadState.lyrics.title) : null
   const songArtist =
     loadState._tag === "Loaded" ? normalizeArtistName(loadState.lyrics.artist) : null
@@ -850,6 +849,7 @@ export default function SongPageClient({
                 title={loadState.lyrics.title}
                 artist={loadState.lyrics.artist}
                 {...(loadState.albumArt !== null && { albumArt: loadState.albumArt })}
+                bpm={loadState.bpm}
                 onAddToSetlist={() => setShowAddToSetlist(true)}
                 onShareClick={() => setShowShareModal(true)}
                 onInfoClick={() => setShowInfo(true)}
@@ -866,7 +866,6 @@ export default function SongPageClient({
           </>
         )}
 
-        {!isEditMode && <FloatingMetronome bpm={currentBpm} position="bottom-right" />}
         {!isEditMode && <SingingDebugIndicator />}
       </main>
 

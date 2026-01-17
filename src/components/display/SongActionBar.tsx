@@ -1,5 +1,6 @@
 "use client"
 
+import { ActionBarMetronome } from "@/components/audio"
 import {
   type Setlist,
   favoritesStore,
@@ -25,6 +26,7 @@ export interface SongActionBarProps {
   readonly title: string
   readonly artist: string
   readonly albumArt?: string
+  readonly bpm?: number | null
   readonly onAddToSetlist: () => void
   readonly onShareClick?: () => void
   readonly onInfoClick?: () => void
@@ -54,6 +56,7 @@ export const SongActionBar = memo(function SongActionBar({
   title,
   artist,
   albumArt,
+  bpm,
   onAddToSetlist,
   onShareClick,
   onInfoClick,
@@ -227,6 +230,14 @@ export const SongActionBar = memo(function SongActionBar({
           <ShareNetwork size={18} />
           <span className="hidden sm:inline">Share Lyrics</span>
         </button>
+      )}
+
+      {/* Metronome - always right-justified, only show if BPM is available */}
+      {bpm !== null && bpm !== undefined && bpm > 0 && (
+        <div className="ml-auto flex items-center gap-3">
+          <div className="w-px h-6" style={{ background: "var(--color-border)" }} />
+          <ActionBarMetronome bpm={bpm} />
+        </div>
       )}
     </div>
   )

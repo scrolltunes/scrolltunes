@@ -7,20 +7,26 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 export interface MetronomeOrbProps {
   readonly bpm: number | null
   readonly isActive: boolean
-  readonly size?: "sm" | "md" | "lg"
+  readonly size?: "xs" | "sm" | "md" | "lg" | "auto"
   readonly onPulse?: () => void
+  readonly children?: React.ReactNode
+  readonly className?: string
 }
 
 const sizeClasses = {
+  xs: "w-5 h-5",
   sm: "w-10 h-10",
   md: "w-14 h-14",
   lg: "w-20 h-20",
+  auto: "",
 }
 
 const domeSizes = {
+  xs: "w-2 h-2",
   sm: "w-4 h-4",
   md: "w-6 h-6",
   lg: "w-8 h-8",
+  auto: "w-4 h-4",
 }
 
 const RING_COUNT = 3
@@ -30,6 +36,8 @@ export const MetronomeOrb = memo(function MetronomeOrb({
   isActive,
   size = "md",
   onPulse,
+  children,
+  className,
 }: MetronomeOrbProps) {
   const [pulseKey, setPulseKey] = useState(0)
   const onPulseRef = useRef(onPulse)
@@ -62,7 +70,7 @@ export const MetronomeOrb = memo(function MetronomeOrb({
 
   return (
     <div
-      className={`relative flex items-center justify-center ${sizeClasses[size]}`}
+      className={`relative flex items-center justify-center ${sizeClasses[size]} ${className ?? ""}`}
       role="img"
       aria-label={isDormant ? "Metronome inactive" : `Metronome running at ${bpm} beats per minute`}
     >
@@ -102,19 +110,24 @@ export const MetronomeOrb = memo(function MetronomeOrb({
           ))}
       </AnimatePresence>
 
-      <motion.div
-        className={`rounded-full ${domeSizes[size]}`}
-        style={{ background: isDormant ? "var(--color-text-muted)" : "var(--accent-primary)" }}
-        animate={
-          !isDormant
-            ? {
-                scale: [1, 1.3, 1],
-              }
-            : { scale: 1 }
-        }
-        transition={springs.snap}
-        key={`dome-${pulseKey}`}
-      />
+      {children ? (
+        <motion.div
+          className="relative z-10 flex items-center gap-2"
+          animate={!isDormant ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+          transition={springs.snap}
+          key={`content-${pulseKey}`}
+        >
+          {children}
+        </motion.div>
+      ) : (
+        <motion.div
+          className={`rounded-full ${domeSizes[size]}`}
+          style={{ background: isDormant ? "var(--color-text-muted)" : "var(--accent-primary)" }}
+          animate={!isDormant ? { scale: [1, 1.3, 1] } : { scale: 1 }}
+          transition={springs.snap}
+          key={`dome-${pulseKey}`}
+        />
+      )}
     </div>
   )
 })
