@@ -1,5 +1,5 @@
-// Design tokens for ScrollTunes - Tokyo Night theme (TUI Redesign)
-// Single dark theme only
+// Design tokens for ScrollTunes
+// Tokyo Night backgrounds with optimized colors for contrast
 
 export const theme = {
   colors: {
@@ -10,48 +10,48 @@ export const theme = {
     surface3: "#3d4259",
     surfaceElevated: "#24283b",
 
-    // Text hierarchy (Tokyo Night)
-    textPrimary: "#c0caf5",
-    textSecondary: "#a9b1d6",
-    textTertiary: "#565f89",
-    textMuted: "#565f89",
-    textGhost: "#414868",
+    // Text hierarchy - optimized for Tokyo Night
+    textPrimary: "#F3F5F7",
+    textSecondary: "rgba(243, 245, 247, 0.78)",
+    textTertiary: "rgba(243, 245, 247, 0.55)",
+    textMuted: "rgba(243, 245, 247, 0.38)",
+    textGhost: "rgba(243, 245, 247, 0.15)",
 
     // Legacy aliases (for backward compatibility)
     background: "#1a1b26",
     surface: "#24283b",
     elevated: "#2f3449",
 
-    // Accent colors (Tokyo Night)
-    accent: "#7aa2f7",
-    accentHover: "#8eb5ff",
-    accentBright: "#7dcfff",
-    accentSoft: "rgba(122, 162, 247, 0.14)",
-    accentGlow: "rgba(122, 162, 247, 0.25)",
+    // Accent colors - brighter for contrast
+    accent: "#7c8aff",
+    accentHover: "#929eff",
+    accentBright: "#a5b0ff",
+    accentSoft: "#262a42",
+    accentGlow: "rgba(124, 138, 255, 0.3)",
 
     // Legacy primary/secondary (for backward compatibility)
-    primary: "#7aa2f7",
-    secondary: "#bb9af7",
+    primary: "#7c8aff",
+    secondary: "#a78bfa",
 
-    // Semantic colors (Tokyo Night)
-    success: "#9ece6a",
-    successSoft: "rgba(158, 206, 106, 0.14)",
-    warning: "#e0af68",
-    warningSoft: "rgba(224, 175, 104, 0.14)",
-    danger: "#f7768e",
-    dangerSoft: "rgba(247, 118, 142, 0.14)",
+    // Semantic colors - optimized for dark bg
+    success: "#4ade80",
+    successSoft: "#1a3a28",
+    warning: "#fbbf24",
+    warningSoft: "#3d3422",
+    danger: "#f43f5e",
+    dangerSoft: "#3b2329",
 
     // Chord display
-    chord: "#e0af68",
-    chordSoft: "rgba(224, 175, 104, 0.14)",
+    chord: "#fbbf24",
+    chordSoft: "#3d3422",
 
-    // Spotify brand (keep for compliance)
-    spotify: "#1db954",
-    spotifySoft: "rgba(29, 185, 84, 0.14)",
+    // Spotify brand
+    spotify: "#1ed760",
+    spotifySoft: "#1f3329",
 
-    // Borders (Tokyo Night)
-    border: "#3d4259",
-    borderStrong: "#7aa2f7",
+    // Borders
+    border: "rgba(255, 255, 255, 0.10)",
+    borderStrong: "rgba(255, 255, 255, 0.16)",
   },
 
   spacing: {
@@ -65,20 +65,20 @@ export const theme = {
   },
 
   radius: {
-    sm: 4,
-    md: 6,
-    lg: 8,
-    xl: 12,
+    sm: 10,
+    md: 14,
+    lg: 18,
+    xl: 24,
     full: 9999,
   },
 
   shadow: {
-    sm: "0 1px 2px rgba(0, 0, 0, 0.3)",
-    md: "0 4px 12px rgba(0, 0, 0, 0.4)",
-    lg: "0 8px 24px rgba(0, 0, 0, 0.5)",
-    glow: "0 0 20px rgba(122, 162, 247, 0.15)",
-    glowActive: "0 0 30px rgba(122, 162, 247, 0.25)",
-    glowChord: "0 0 20px rgba(224, 175, 104, 0.3)",
+    sm: "0 1px 2px rgba(0, 0, 0, 0.4)",
+    md: "0 4px 12px rgba(0, 0, 0, 0.5)",
+    lg: "0 8px 24px rgba(0, 0, 0, 0.6)",
+    glow: "0 0 20px rgba(124, 138, 255, 0.2)",
+    glowActive: "0 0 30px rgba(124, 138, 255, 0.35)",
+    glowChord: "0 0 20px rgba(251, 191, 36, 0.35)",
   },
 
   // Typography tokens for lyrics display

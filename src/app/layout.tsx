@@ -3,14 +3,13 @@ import { auth } from "@/auth"
 import { AuthProvider } from "@/components/auth"
 import { DevTitle, Footer, FooterProvider, ThemeProvider } from "@/components/layout"
 import type { Metadata } from "next"
-import { Geist_Mono, Roboto } from "next/font/google"
+import { Geist, Geist_Mono } from "next/font/google"
 import { headers } from "next/headers"
 import "./globals.css"
 
-const roboto = Roboto({
-  variable: "--font-roboto",
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "700"],
 })
 
 const geistMono = Geist_Mono({
@@ -94,17 +93,25 @@ export default async function RootLayout({
   const session = await auth()
 
   return (
-    <html lang="en" style={{ background: "#1a1b26" }}>
+    <html lang="en" suppressHydrationWarning style={{ background: "#1a1b26" }}>
       <head>
-        {/* Dark theme only */}
-        <meta name="color-scheme" content="dark" />
+        {/* Color scheme hint for browser - processed very early */}
+        <meta name="color-scheme" content="dark light" />
+        {/* Critical CSS for theme - no media query to avoid flash before JS checks preferences */}
         <style
           dangerouslySetInnerHTML={{
-            __html: "html,body{background:#1a1b26!important}",
+            __html:
+              "html,body{background:#1a1b26!important}html.light,html.light body{background:#FAF7F2!important}",
+          }}
+        />
+        {/* Inline blocking script to set theme class based on user preference */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){let d=true;try{const s=localStorage.getItem("scrolltunes-preferences");const p=s?JSON.parse(s):{};const m=p.themeMode||"system";d=m==="dark"||(m==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches)}catch(e){}document.documentElement.classList.add(d?"dark":"light");document.documentElement.style.background=d?"#1a1b26":"#FAF7F2"})()`,
           }}
         />
       </head>
-      <body className={`${roboto.variable} ${geistMono.variable} antialiased dark`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AuthProvider session={session}>
           <ThemeProvider>
             <FooterProvider>

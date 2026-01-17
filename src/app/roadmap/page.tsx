@@ -41,7 +41,7 @@ export default function RoadmapPage() {
       >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <BackButton fallbackHref="/about" ariaLabel="Back" />
-          <h1 className="text-lg font-semibold font-mono">Roadmap</h1>
+          <h1 className="text-lg font-semibold">Roadmap</h1>
         </div>
       </header>
 

@@ -154,7 +154,7 @@ export default function SetlistsPage() {
       <main className="pt-20 pb-8 px-4 relative z-10">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-semibold font-mono">Setlists</h1>
+            <h1 className="text-2xl font-semibold">Setlists</h1>
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}

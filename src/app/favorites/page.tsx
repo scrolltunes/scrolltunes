@@ -75,7 +75,7 @@ export default function FavoritesPage() {
       <main className="pt-20 pb-8 px-4 relative z-10">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-semibold font-mono">Favorites</h1>
+            <h1 className="text-2xl font-semibold">Favorites</h1>
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               {favorites.length} {favorites.length === 1 ? "song" : "songs"}
             </p>

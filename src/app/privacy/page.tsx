@@ -18,7 +18,7 @@ export default function PrivacyPage() {
       >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-4">
           <BackButton fallbackHref="/" ariaLabel="Back" />
-          <h1 className="text-lg font-semibold font-mono">Privacy Policy</h1>
+          <h1 className="text-lg font-semibold">Privacy Policy</h1>
         </div>
       </header>
 

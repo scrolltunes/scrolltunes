@@ -76,7 +76,7 @@ export default function LoginPage() {
         >
           <div className="p-6 rounded-sm space-y-6" style={{ background: "var(--color-surface1)" }}>
             <div className="text-center">
-              <h1 className="text-2xl font-semibold font-mono">Sign in to ScrollTunes</h1>
+              <h1 className="text-2xl font-semibold">Sign in to ScrollTunes</h1>
             </div>
 
             <ul className="space-y-3">

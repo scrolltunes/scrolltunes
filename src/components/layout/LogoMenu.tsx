@@ -45,7 +45,7 @@ export const LogoMenu = memo(function LogoMenu() {
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <Logo size={24} />
+        <Logo size={24} colorful />
         <span className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
           ScrollTunes
         </span>

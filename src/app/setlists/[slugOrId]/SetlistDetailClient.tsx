@@ -183,7 +183,7 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
                 <Queue size={32} weight="fill" className="text-white/80" />
               </div>
               <div className="flex-1 min-w-0">
-                <h1 className="text-2xl font-semibold font-mono truncate">{currentSetlist.name}</h1>
+                <h1 className="text-2xl font-semibold truncate">{currentSetlist.name}</h1>
                 {currentSetlist.description && (
                   <p className="mt-1" style={{ color: "var(--color-text3)" }}>
                     {currentSetlist.description}
@@ -289,7 +289,7 @@ export function SetlistDetailClient({ setlist, songs: initialSongs }: SetlistDet
               onClick={e => e.stopPropagation()}
             >
               <h2
-                className="text-xl font-semibold font-mono mb-2"
+                className="text-xl font-semibold mb-2"
                 style={{ color: "var(--color-text)" }}
               >
                 Delete setlist?
