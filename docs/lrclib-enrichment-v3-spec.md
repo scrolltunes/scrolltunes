@@ -797,12 +797,12 @@ The `pop0_tracks` table only needs regeneration when:
 ```bash
 # 1. Rebuild normalized DB (only when Spotify data changes)
 ./target/release/lrclib-extract normalize-spotify \
-  --spotify-db ~/git/music/spotify_clean.sqlite3 \
-  --output-db ~/git/music/spotify_normalized.sqlite3 \
+  ~/git/music/spotify_clean.sqlite3 \
+  ~/git/music/spotify_normalized.sqlite3 \
   --log-only
 
 # 2. Run extraction (reuses normalized data)
-./target/release/lrclib-extract run --workdir ~/git/music --log-only
+./target/release/lrclib-extract run --workdir ~/git/music --log-only --log-failures
 ```
 
 ---
