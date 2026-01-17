@@ -80,7 +80,7 @@ export const SongActionBar = memo(function SongActionBar({
   const showInfoOrWarning = onInfoClick || (hasIssue && onWarningClick)
 
   return (
-    <div className="flex items-center justify-center gap-3 py-4 px-4">
+    <div className="flex items-center justify-center gap-3 py-4 px-4 max-w-3xl mx-auto">
       {/* Info/Warning button */}
       {hasIssue && onWarningClick ? (
         <button

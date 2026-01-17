@@ -75,7 +75,6 @@ export {
   LYRICS_DEFAULT_FONT_SIZE,
   DEFAULT_SINGING_DETECTOR_CONFIG,
   type Preferences,
-  type ThemeMode,
   type ActivationMode,
   type VadEnvironment,
   type SingingDetectorConfig,

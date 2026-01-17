@@ -33,8 +33,8 @@ export interface FloatingMetronomeProps {
 }
 
 const positionClasses = {
-  "bottom-left": "bottom-24 left-4",
-  "bottom-right": "bottom-24 right-4",
+  "bottom-left": "bottom-12 left-4",
+  "bottom-right": "bottom-12 right-4",
   "top-left": "top-4 left-4",
   "top-right": "top-4 right-4",
 }
@@ -159,7 +159,7 @@ export const FloatingMetronome = memo(function FloatingMetronome({
 
   return (
     <div
-      className={`fixed z-30 ${positionClasses[position]} ${className}`}
+      className={`fixed z-30 opacity-60 ${positionClasses[position]} ${className}`}
       aria-label="Floating metronome"
     >
       <div className="relative">

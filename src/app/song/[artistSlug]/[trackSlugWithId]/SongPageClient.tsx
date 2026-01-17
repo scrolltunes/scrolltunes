@@ -55,7 +55,15 @@ import {
 import { motion } from "motion/react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react"
 
 type ErrorType = "invalid-url" | "not-found" | "network" | "invalid-lyrics"
 
@@ -116,8 +124,11 @@ export interface SongPageClientProps {
   readonly initialError: ErrorType | null
 }
 
+/**
+ * Compute initial load state from server data only (no localStorage).
+ * This ensures server and client render the same initial state for hydration.
+ */
 function computeInitialLoadState(
-  lrclibId: number,
   initialData: SongDataSuccess | null,
   initialError: ErrorType | null,
 ): LoadState {
@@ -125,32 +136,6 @@ function computeInitialLoadState(
     return { _tag: "Error", errorType: initialError }
   }
 
-  // Always prefer localStorage cache first (avoids network calls for cached songs)
-  if (typeof window !== "undefined") {
-    const cached = loadCachedLyrics(lrclibId)
-    if (cached) {
-      const lrcContent = cached.lyrics.lines.map(l => l.text).join("\n")
-      const lrcHash = computeLrcHashSync(lrcContent)
-
-      return {
-        _tag: "Loaded",
-        lyrics: cached.lyrics,
-        lrcHash,
-        hasEnhancement: cached.hasEnhancement ?? false,
-        hasChordEnhancement: cached.hasChordEnhancement ?? false,
-        bpm: cached.bpm,
-        key: cached.key,
-        albumArt: cached.albumArt ?? null,
-        albumArtLarge: cached.albumArtLarge ?? null,
-        spotifyId: cached.spotifyId ?? null,
-        bpmSource: cached.bpmSource ?? null,
-        lyricsSource: cached.lyricsSource ?? null,
-        warnings: cached.warnings ?? [],
-      }
-    }
-  }
-
-  // Fall back to server data
   if (initialData) {
     const lrcContent = initialData.lyrics.lines.map(l => l.text).join("\n")
     const lrcHash = computeLrcHashSync(lrcContent)
@@ -185,38 +170,87 @@ export default function SongPageClient({
   const searchParams = useSearchParams()
   const shouldEnterEditMode = searchParams.get("edit") === "1"
 
-  const { initialLoadState, initialEnhancements, loadedFromCache } = useMemo(() => {
-    // Check localStorage first (before computing load state)
-    if (typeof window !== "undefined") {
-      const cached = loadCachedLyrics(lrclibId)
-      if (cached) {
-        const loadState = computeInitialLoadState(lrclibId, initialData, initialError)
-        return {
-          initialLoadState: loadState,
-          initialEnhancements: {
-            loading: false,
-            enhancement: cached.enhancement ?? null,
-            chordEnhancement: cached.chordEnhancement ?? null,
-          },
-          loadedFromCache: true,
-        }
+  // Server-computed initial state (no localStorage)
+  const serverState = useMemo(
+    () => computeInitialLoadState(initialData, initialError),
+    [initialData, initialError],
+  )
+
+  // Ref to track current load state (allows updates after initial render)
+  const loadStateRef = useRef<LoadState | null>(null)
+  const enhancementsRef = useRef<EnhancementsState | null>(null)
+  const loadedFromCacheRef = useRef(false)
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0)
+
+  // useSyncExternalStore with separate client/server snapshots
+  // - Server: uses serverState (no localStorage access)
+  // - Client: checks localStorage cache first, then falls back to serverState
+  // This avoids hydration mismatch while giving instant cached content
+  const subscribe = useCallback(() => () => {}, [])
+
+  const getSnapshot = useCallback((): LoadState => {
+    // If we've already set state manually, use that
+    if (loadStateRef.current !== null) {
+      return loadStateRef.current
+    }
+
+    // First render on client - check cache
+    const cached = loadCachedLyrics(lrclibId)
+    if (cached) {
+      const lrcContent = cached.lyrics.lines.map(l => l.text).join("\n")
+      const lrcHash = computeLrcHashSync(lrcContent)
+
+      loadStateRef.current = {
+        _tag: "Loaded",
+        lyrics: cached.lyrics,
+        lrcHash,
+        hasEnhancement: cached.hasEnhancement ?? false,
+        hasChordEnhancement: cached.hasChordEnhancement ?? false,
+        bpm: cached.bpm,
+        key: cached.key,
+        albumArt: cached.albumArt ?? null,
+        albumArtLarge: cached.albumArtLarge ?? null,
+        spotifyId: cached.spotifyId ?? null,
+        bpmSource: cached.bpmSource ?? null,
+        lyricsSource: cached.lyricsSource ?? null,
+        warnings: cached.warnings ?? [],
       }
-    }
-
-    const loadState = computeInitialLoadState(lrclibId, initialData, initialError)
-    return {
-      initialLoadState: loadState,
-      initialEnhancements: {
+      enhancementsRef.current = {
         loading: false,
-        enhancement: null,
-        chordEnhancement: null,
-      },
-      loadedFromCache: false,
+        enhancement: cached.enhancement ?? null,
+        chordEnhancement: cached.chordEnhancement ?? null,
+      }
+      loadedFromCacheRef.current = true
+      return loadStateRef.current
     }
-  }, [lrclibId, initialData, initialError])
 
-  const [loadState, setLoadState] = useState<LoadState>(initialLoadState)
-  const [enhancements, setEnhancements] = useState<EnhancementsState>(initialEnhancements)
+    // No cache, use server state
+    loadStateRef.current = serverState
+    return serverState
+  }, [lrclibId, serverState])
+
+  const getServerSnapshot = useCallback((): LoadState => serverState, [serverState])
+
+  const loadState = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+
+  // Setter that updates ref and triggers re-render
+  const setLoadState = useCallback((newState: LoadState) => {
+    loadStateRef.current = newState
+    forceUpdate()
+  }, [])
+
+  // Enhancements state (initialized from cache or default)
+  const enhancements = enhancementsRef.current ?? {
+    loading: false,
+    enhancement: null,
+    chordEnhancement: null,
+  }
+  const setEnhancements = useCallback((newState: EnhancementsState) => {
+    enhancementsRef.current = newState
+    forceUpdate()
+  }, [])
+
+  const loadedFromCache = loadedFromCacheRef.current
 
   useEffect(() => {
     if (loadState._tag !== "Loading") return
@@ -559,7 +593,7 @@ export default function SongPageClient({
     }
 
     hasFetchedEnhancements.current = true
-    setEnhancements(prev => ({ ...prev, loading: true }))
+    setEnhancements({ ...enhancements, loading: true })
 
     // Use actual lrclib ID from lyrics (may differ from URL if redirected)
     const actualLrclibId = loadState.lyrics.songId.startsWith("lrclib-")
@@ -576,7 +610,8 @@ export default function SongPageClient({
         })
       })
       .catch(() => {
-        setEnhancements(prev => ({ ...prev, loading: false }))
+        const current = enhancementsRef.current ?? enhancements
+        setEnhancements({ ...current, loading: false })
       })
   }, [loadState, lrclibId])
 
@@ -802,15 +837,9 @@ export default function SongPageClient({
           </EditModeProvider>
         ) : (
           <>
-            <LyricsDisplay
-              className="flex-1 min-h-0"
-              chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
-              isManualMode={isLyricsPageManualMode}
-              enterManualMode={enterLyricsPageManualMode}
-            />
-            {/* Action bar at bottom, directly above footer */}
+            {/* Action bar at top, below header */}
             <div
-              className="shrink-0 border-t [&>div]:py-1.5"
+              className="shrink-0 border-b [&>div]:py-1.5"
               style={{
                 background: "var(--color-header-bg)",
                 borderColor: "var(--color-border)",
@@ -828,6 +857,12 @@ export default function SongPageClient({
                 onWarningClick={() => setShowReportModal(true)}
               />
             </div>
+            <LyricsDisplay
+              className="flex-1 min-h-0"
+              chordEnhancement={loadState._tag === "Loaded" ? enhancements.chordEnhancement : null}
+              isManualMode={isLyricsPageManualMode}
+              enterManualMode={enterLyricsPageManualMode}
+            />
           </>
         )}
 

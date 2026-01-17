@@ -103,7 +103,7 @@ export const LyricsPage = memo(function LyricsPage({
   previewLineIndex,
 }: LyricsPageProps) {
   return (
-    <div className="flex flex-col gap-2 px-4 py-2">
+    <div className="flex flex-col gap-2 pl-8 pr-4 md:px-8 lg:px-0 py-2 max-w-3xl mx-auto">
       {lines.map((line, i) => {
         const globalIndex = pageStartIndex + i
         const position = getLinePosition(globalIndex, currentLineIndex, pageStartIndex)
@@ -135,19 +135,25 @@ export const LyricsPage = memo(function LyricsPage({
 
       {/* Preview of next page's first line */}
       {previewLine && (
-        <div className="relative mt-3 opacity-50">
-          <div className="flex items-center justify-center gap-1">
+        <div className="relative mt-3 opacity-70 text-right">
+          <div
+            className="inline-flex items-center gap-1.5"
+            style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+          >
             <ArrowBendDownRight
               size={14}
               weight="regular"
               className="shrink-0"
-              style={{ color: "var(--color-text)" }}
+              style={{
+                color: "var(--color-text3)",
+                transform: isRTL ? "scaleX(-1)" : undefined,
+              }}
             />
             <span
               className="truncate"
               style={{
                 fontSize: `${Math.round(fontSize * 0.7)}px`,
-                color: "var(--color-text)",
+                color: "var(--color-text3)",
               }}
             >
               {previewLine.text}

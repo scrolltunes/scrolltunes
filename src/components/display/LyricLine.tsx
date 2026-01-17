@@ -229,8 +229,10 @@ export const LyricLine = memo(function LyricLine({
   if (!text.trim()) {
     return (
       <div
-        className="py-2 text-center text-2xl"
-        style={{ color: "var(--color-text-ghost)" }}
+        className="py-2 text-2xl text-left md:text-center"
+        style={{
+          color: "var(--color-text-ghost)",
+        }}
         aria-hidden="true"
       >
         ♪
@@ -254,8 +256,9 @@ export const LyricLine = memo(function LyricLine({
         ? { color: "var(--color-text2)" }
         : { color: "var(--color-text3)" }
 
-  // Font weight - bold for active, medium for next, normal for others
-  const fontWeightClass = isActive ? "font-semibold" : isNext ? "font-medium" : "font-normal"
+  // Font weight - same for all lines to prevent layout shift
+  // See docs/lyrics-display-design.md for rationale
+  const fontWeightClass = "font-normal"
 
   const textSizeClass = fontSize === undefined ? "text-2xl md:text-3xl lg:text-4xl" : ""
 
@@ -264,7 +267,7 @@ export const LyricLine = memo(function LyricLine({
       ref={innerRef}
       type="button"
       onClick={onClick}
-      className={`relative w-full text-center px-4 ${hasPositionedChords ? "pt-6 pb-2" : "py-2"} rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${opacityClass}`}
+      className={`relative w-full ${hasPositionedChords ? "pt-6 pb-2" : "py-2"} rounded-lg focus:outline-none ${opacityClass} ${isRTL ? "text-right" : "text-left md:text-center"}`}
       aria-current={isActive ? "true" : undefined}
       aria-label={`Line ${index + 1}: ${text}`}
     >
@@ -273,10 +276,10 @@ export const LyricLine = memo(function LyricLine({
         <InlineChord chords={chords} isCurrentLine={isActive} />
       )}
 
-      {/* Static text rendering */}
+      {/* Static text rendering - pl-2 accounts for active indicator bar */}
       <span
         dir={isRTL ? "rtl" : undefined}
-        className={`relative z-10 block ${textSizeClass} ${fontWeightClass} leading-relaxed transition-colors duration-300`}
+        className={`relative z-10 block pl-2 ${textSizeClass} ${fontWeightClass} leading-relaxed transition-colors duration-300`}
         style={{
           ...(fontSize !== undefined ? { fontSize: `${fontSize}px` } : {}),
           ...textStyle,
@@ -299,16 +302,21 @@ export const LyricLine = memo(function LyricLine({
         })}
       </span>
 
-      {/* Active line background highlight */}
+      {/* Active line indicator - subtle left border */}
       <AnimatePresence>
         {isActive && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="absolute inset-y-0 left-1/2 -translate-x-1/2 z-0 lyric-active"
-            style={{ width: "fit-content", minWidth: "60%", maxWidth: "90%", padding: "0 2rem" }}
+            initial={{ opacity: 0, scaleY: 0.8 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: 0.8 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="absolute top-1 bottom-1 w-[3px] rounded-full z-0"
+            style={{
+              left: isRTL ? "auto" : "0",
+              right: isRTL ? "0" : "auto",
+              background: "var(--color-accent)",
+              opacity: 0.6,
+            }}
           />
         )}
       </AnimatePresence>

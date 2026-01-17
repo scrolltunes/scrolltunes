@@ -15,13 +15,13 @@ import {
   useShowChords,
   useTranspose,
 } from "@/core"
-import { useDynamicPagination, useSwipeGesture } from "@/hooks"
+import { useDynamicPagination, useIsMobile, useSwipeGesture } from "@/hooks"
 import { detectLyricsDirection } from "@/lib"
 import { type LyricChordPosition, matchChordsToLyrics, transposeChordLine } from "@/lib/chords"
 import { mergeChordSources } from "@/lib/chords/merge-chords"
 import type { ChordEnhancementPayloadV1 } from "@/lib/gp/chord-types"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { memo, useCallback, useEffect, useMemo, useRef } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PageIndicator } from "./PageIndicator"
 import { PageNavigationArrows } from "./PageNavigationArrows"
 import { LyricsPage } from "./LyricsPage"
@@ -70,6 +70,37 @@ export const LyricsDisplay = memo(function LyricsDisplay({
   const prefersReducedMotion = useReducedMotion()
   const currentTime = useContinuousTime()
   const isAdmin = useIsAdmin()
+  const isMobile = useIsMobile()
+
+  // Mobile: arrows hidden by default, shown on tap for 2.5 seconds
+  const [showArrows, setShowArrows] = useState(false)
+  const arrowTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleContainerTap = useCallback(() => {
+    if (!isMobile) return
+
+    // Show arrows
+    setShowArrows(true)
+
+    // Clear existing timeout
+    if (arrowTimeoutRef.current) {
+      clearTimeout(arrowTimeoutRef.current)
+    }
+
+    // Hide after 2.5 seconds
+    arrowTimeoutRef.current = setTimeout(() => {
+      setShowArrows(false)
+    }, 2500)
+  }, [isMobile])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (arrowTimeoutRef.current) {
+        clearTimeout(arrowTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // LyricsPage pagination state
   const { currentPage, totalPages, linesPerPage, pageLineRanges, direction } = useLyricsPageState()
@@ -314,6 +345,7 @@ export const LyricsDisplay = memo(function LyricsDisplay({
       <div
         ref={containerRef}
         className="relative flex-1 min-h-0 h-full overflow-hidden"
+        onClick={handleContainerTap}
         {...swipeHandlers}
       >
         {/* Page progress bar */}
@@ -331,12 +363,19 @@ export const LyricsDisplay = memo(function LyricsDisplay({
           />
         </div>
 
-        {/* Page indicator */}
-        <PageIndicator currentPage={currentPage + 1} totalPages={totalPages} />
+        {/* Page indicator - dot navigation */}
+        <PageIndicator
+          currentPage={currentPage + 1}
+          totalPages={totalPages}
+          onPageClick={(page) => {
+            enterManualMode?.()
+            lyricsPageStore.goToPage(page - 1)
+          }}
+        />
 
         {/* Debug overlay - admin only */}
         {isAdmin && (
-          <div className="absolute top-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono leading-relaxed">
+          <div className="absolute bottom-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono leading-relaxed">
             <div>
               Lines: {currentPageLines.length} | Store: {linesPerPage} | Calc:{" "}
               {calculatedLinesPerPage}
@@ -361,7 +400,7 @@ export const LyricsDisplay = memo(function LyricsDisplay({
         <AnimatePresence mode="wait" initial={false} custom={direction}>
           <motion.div
             key={currentPage}
-            className="absolute inset-0 pt-16 pb-20 px-4 sm:px-8 lg:px-12 overflow-hidden"
+            className="absolute inset-0 pt-16 pb-8 overflow-hidden"
             custom={direction}
             variants={animationVariants}
             initial="enter"
@@ -384,12 +423,13 @@ export const LyricsDisplay = memo(function LyricsDisplay({
           </motion.div>
         </AnimatePresence>
 
-        {/* Navigation arrows */}
+        {/* Navigation arrows - hidden on mobile until tap */}
         <PageNavigationArrows
           onPrev={handlePrevPage}
           onNext={handleNextPage}
           hasPrev={hasPrev}
           hasNext={hasNext}
+          visible={!isMobile || showArrows}
         />
       </div>
     </div>

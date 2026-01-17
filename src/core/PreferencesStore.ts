@@ -28,8 +28,6 @@ export const LYRICS_MAX_FONT_SIZE = 32
 export const LYRICS_FONT_SIZE_STEP = 2
 export const LYRICS_DEFAULT_FONT_SIZE = 20
 
-export type ThemeMode = "system" | "light" | "dark"
-
 /**
  * Activation mode for voice detection
  * - vad_energy: Uses Silero VAD + Energy AND-gate (default, reliable)
@@ -78,7 +76,6 @@ export interface Preferences {
   readonly wakeLockEnabled: boolean
   readonly doubleTapEnabled: boolean
   readonly shakeToRestartEnabled: boolean
-  readonly themeMode: ThemeMode
   readonly metronomeEnabled: boolean
   readonly fontSize: number
   readonly activationMode: ActivationMode
@@ -92,7 +89,6 @@ const DEFAULT_PREFERENCES: Preferences = {
   wakeLockEnabled: true,
   doubleTapEnabled: true,
   shakeToRestartEnabled: false,
-  themeMode: "dark",
   metronomeEnabled: true,
   fontSize: DEFAULT_FONT_SIZE,
   activationMode: "vad_energy",
@@ -226,14 +222,6 @@ export class PreferencesStore {
 
   setShakeToRestartEnabled(value: boolean): void {
     this.setState({ shakeToRestartEnabled: value })
-  }
-
-  getThemeMode(): ThemeMode {
-    return this.state.themeMode
-  }
-
-  setThemeMode(value: ThemeMode): void {
-    this.setState({ themeMode: value })
   }
 
   getMetronomeEnabled(): boolean {
