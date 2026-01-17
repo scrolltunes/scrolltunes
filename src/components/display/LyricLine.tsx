@@ -267,7 +267,7 @@ export const LyricLine = memo(function LyricLine({
       ref={innerRef}
       type="button"
       onClick={onClick}
-      className={`relative w-full ${hasPositionedChords ? "pt-6 pb-2" : "py-2"} rounded-lg focus:outline-none ${opacityClass} ${isRTL ? "text-right" : "text-left md:text-center"}`}
+      className={`relative w-full ${hasPositionedChords ? "pt-6 pb-2" : "py-2"} rounded-lg focus:outline-none ${opacityClass} ${isRTL ? "text-right" : "text-left"}`}
       aria-current={isActive ? "true" : undefined}
       aria-label={`Line ${index + 1}: ${text}`}
     >
@@ -276,50 +276,53 @@ export const LyricLine = memo(function LyricLine({
         <InlineChord chords={chords} isCurrentLine={isActive} />
       )}
 
-      {/* Static text rendering - pl-2 accounts for active indicator bar */}
-      <span
-        dir={isRTL ? "rtl" : undefined}
-        className={`relative z-10 block pl-2 ${textSizeClass} ${fontWeightClass} leading-relaxed transition-colors duration-300`}
-        style={{
-          ...(fontSize !== undefined ? { fontSize: `${fontSize}px` } : {}),
-          ...textStyle,
-        }}
-      >
-        {words.map((wordData, i) => {
-          const word = wordData.word
+      {/* Text with indicator bar - inline-block wrapper for proper bar positioning on desktop */}
+      <span className="relative inline-block">
+        {/* Active line indicator - positioned relative to text */}
+        <AnimatePresence>
+          {isActive && (
+            <motion.div
+              initial={{ opacity: 0, scaleY: 0.8 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              exit={{ opacity: 0, scaleY: 0.8 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="absolute top-1 bottom-1 w-[3px] rounded-full z-0"
+              style={{
+                left: isRTL ? "auto" : "-12px",
+                right: isRTL ? "-12px" : "auto",
+                background: "var(--color-accent)",
+                opacity: 0.6,
+              }}
+            />
+          )}
+        </AnimatePresence>
 
-          if (word.trim() === "") {
-            return <span key={i}>{word}</span>
-          }
+        {/* Static text rendering */}
+        <span
+          dir={isRTL ? "rtl" : undefined}
+          className={`relative z-10 ${textSizeClass} ${fontWeightClass} leading-relaxed transition-colors duration-300`}
+          style={{
+            ...(fontSize !== undefined ? { fontSize: `${fontSize}px` } : {}),
+            ...textStyle,
+          }}
+        >
+          {words.map((wordData, i) => {
+            const word = wordData.word
 
-          const wordChords = chordsPerWord[i] ?? []
+            if (word.trim() === "") {
+              return <span key={i}>{word}</span>
+            }
 
-          return (
-            <span key={i} className="relative inline-block">
-              {renderWordWithChordAnchors(word, wordChords, isActive, isNext)}
-            </span>
-          )
-        })}
+            const wordChords = chordsPerWord[i] ?? []
+
+            return (
+              <span key={i} className="relative inline-block">
+                {renderWordWithChordAnchors(word, wordChords, isActive, isNext)}
+              </span>
+            )
+          })}
+        </span>
       </span>
-
-      {/* Active line indicator - subtle left border */}
-      <AnimatePresence>
-        {isActive && (
-          <motion.div
-            initial={{ opacity: 0, scaleY: 0.8 }}
-            animate={{ opacity: 1, scaleY: 1 }}
-            exit={{ opacity: 0, scaleY: 0.8 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="absolute top-1 bottom-1 w-[3px] rounded-full z-0 left-0 md:left-[15%]"
-            style={{
-              left: isRTL ? "auto" : undefined,
-              right: isRTL ? "0" : "auto",
-              background: "var(--color-accent)",
-              opacity: 0.6,
-            }}
-          />
-        )}
-      </AnimatePresence>
     </button>
   )
 })

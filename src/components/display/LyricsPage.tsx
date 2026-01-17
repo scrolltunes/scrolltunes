@@ -103,8 +103,9 @@ export const LyricsPage = memo(function LyricsPage({
   previewLineIndex,
 }: LyricsPageProps) {
   return (
-    <div className="flex flex-col gap-2 pl-8 pr-4 md:px-8 lg:px-0 py-2 max-w-3xl mx-auto">
-      {lines.map((line, i) => {
+    <div className="flex flex-col items-center py-2 px-4 md:px-8">
+      <div className="flex flex-col gap-2 pl-4">
+        {lines.map((line, i) => {
         const globalIndex = pageStartIndex + i
         const position = getLinePosition(globalIndex, currentLineIndex, pageStartIndex)
 
@@ -131,36 +132,37 @@ export const LyricsPage = memo(function LyricsPage({
             />
           </div>
         )
-      })}
+        })}
 
-      {/* Preview of next page's first line */}
-      {previewLine && (
-        <div className="relative mt-3 opacity-70 text-right">
-          <div
-            className="inline-flex items-center gap-1.5"
-            style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-          >
-            <ArrowBendDownRight
-              size={14}
-              weight="regular"
-              className="shrink-0"
-              style={{
-                color: "var(--color-text3)",
-                transform: isRTL ? "scaleX(-1)" : undefined,
-              }}
-            />
-            <span
-              className="truncate"
-              style={{
-                fontSize: `${Math.round(fontSize * 0.7)}px`,
-                color: "var(--color-text3)",
-              }}
+        {/* Preview of next page's first line */}
+        {previewLine && (
+          <div className="relative mt-3 opacity-70 text-right">
+            <div
+              className="inline-flex items-center gap-1.5"
+              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
             >
-              {previewLine.text}
-            </span>
+              <ArrowBendDownRight
+                size={14}
+                weight="regular"
+                className="shrink-0"
+                style={{
+                  color: "var(--color-text3)",
+                  transform: isRTL ? "scaleX(-1)" : undefined,
+                }}
+              />
+              <span
+                className="truncate"
+                style={{
+                  fontSize: `${Math.round(fontSize * 0.7)}px`,
+                  color: "var(--color-text3)",
+                }}
+              >
+                {previewLine.text}
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 })
