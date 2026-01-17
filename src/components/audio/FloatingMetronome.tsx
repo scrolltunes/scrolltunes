@@ -115,7 +115,7 @@ export const FloatingMetronome = memo(function FloatingMetronome({
 
   return (
     <div
-      className={`fixed z-30 opacity-60 ${positionClasses[position]} ${className}`}
+      className={`fixed z-30 ${positionClasses[position]} ${className}`}
       aria-label="Floating metronome"
     >
       <div ref={menuRef} className="relative">
@@ -124,7 +124,7 @@ export const FloatingMetronome = memo(function FloatingMetronome({
             <motion.div
               className={`absolute ${popoverPositionClasses[position]} w-56 rounded-xl border p-3 backdrop-blur-md`}
               style={{
-                background: "color-mix(in srgb, var(--color-surface2) 85%, transparent)",
+                background: "var(--color-surface2)",
                 borderColor: "var(--color-border-strong)",
               }}
               initial={{ opacity: 0, scale: 0.9, y: 10 }}
@@ -185,7 +185,7 @@ export const FloatingMetronome = memo(function FloatingMetronome({
             e.preventDefault()
             setIsOpen(prev => !prev)
           }}
-          className="rounded-full p-2 backdrop-blur-sm border"
+          className="rounded-full p-2 backdrop-blur-sm border opacity-60"
           style={{
             background: "color-mix(in srgb, var(--color-surface1) 90%, transparent)",
             borderColor: "var(--color-border)",
