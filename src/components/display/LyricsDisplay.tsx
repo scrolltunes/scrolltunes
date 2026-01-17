@@ -7,7 +7,7 @@ import {
   useChordsData,
   useContinuousTime,
   useCurrentLineIndex,
-  useIsAdmin,
+  // useIsAdmin, // Used for debug overlay
   usePlayerControls,
   usePlayerState,
   usePreferences,
@@ -69,7 +69,7 @@ export const LyricsDisplay = memo(function LyricsDisplay({
   const transposeSemitones = useTranspose()
   const prefersReducedMotion = useReducedMotion()
   const currentTime = useContinuousTime()
-  const isAdmin = useIsAdmin()
+  // const isAdmin = useIsAdmin() // Used for debug overlay
   const isMobile = useIsMobile()
 
   // Mobile: arrows hidden by default, shown on tap for 2.5 seconds
@@ -373,8 +373,10 @@ export const LyricsDisplay = memo(function LyricsDisplay({
           }}
         />
 
-        {/* Debug overlay - admin only */}
-        {isAdmin && (
+        {/* Debug overlay - admin only (uncomment isAdmin hook above to enable) */}
+        {void linesPerPage}
+        {void debugHeight}
+        {/* {isAdmin && (
           <div className="absolute bottom-2 left-2 z-50 bg-black/70 text-white text-xs px-2 py-1 rounded font-mono leading-relaxed">
             <div>
               Lines: {currentPageLines.length} | Store: {linesPerPage} | Calc:{" "}
@@ -391,7 +393,7 @@ export const LyricsDisplay = memo(function LyricsDisplay({
               Font: {lyricsFontSize}px | Total: {totalLines}
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Hidden measurement div - measures container height */}
         <div ref={contentRef} className="absolute inset-0 pointer-events-none" aria-hidden="true" />

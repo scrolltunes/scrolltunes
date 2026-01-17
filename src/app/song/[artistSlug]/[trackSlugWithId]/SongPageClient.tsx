@@ -1,6 +1,6 @@
 "use client"
 
-import { FloatingMetronome, SingingDebugIndicator, VoiceIndicator } from "@/components/audio"
+import { FloatingMetronome, VoiceIndicator } from "@/components/audio"
 import { LyricsDisplay, SongActionBar, SongInfoModal } from "@/components/display"
 import { EditModeProvider, EditToolbar, EditableLyricsDisplay } from "@/components/edit-mode"
 import { ReportIssueModal } from "@/components/feedback"
@@ -869,7 +869,7 @@ export default function SongPageClient({
           <FloatingMetronome bpm={loadState.bpm} position="bottom-right" />
         )}
 
-        {!isEditMode && <SingingDebugIndicator />}
+        {/* {!isEditMode && <SingingDebugIndicator />} */}
       </main>
 
       {loadState._tag === "Loaded" && (
